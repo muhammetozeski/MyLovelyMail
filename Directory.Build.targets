@@ -1,0 +1,29 @@
+<Project>
+  <!--
+    .NET 10 SDK uses the portable RID graph for framework reference resolution.
+    The portable graph only contains the modern RIDs (win-x64, win-x86, win-arm64,
+    android-arm64, android-x64). Legacy RIDs (win10-x64, android-arm, android-x86)
+    that MAUI workloads emit by default are not in that graph and fail with
+    NETSDK1083 ("the specified RuntimeIdentifier is not recognized").
+
+    Force the modern equivalent onto RuntimeIdentifier before any framework
+    reference resolution runs, regardless of when the value is set.  This runs
+    very early (BeforeTargets="_ResolveFrameworkReferences") so both the SDK
+    restore graph and the build graph see the modern RID.
+  -->
+  <Target Name="MyLovelyMail_TranslateLegacyRid"
+          BeforeTargets="_TranslateRidToCurrent;_ResolveFrameworkReferences;Restore;Build">
+    <PropertyGroup>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x64'">win-x64</RuntimeIdentifier>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x86'">win-x86</RuntimeIdentifier>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-arm64'">win-arm64</RuntimeIdentifier>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-arm'">android-arm64</RuntimeIdentifier>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-x86'">android-x64</RuntimeIdentifier>
+      <!-- .NET 10 SDK doesn't ship a Microsoft.NETCore.App.Runtime.Mono NuGet package
+           for any RID.  Tell the framework reference resolution to use the regular
+           .NET runtime instead, otherwise MAUI BlazorHybrid restores fail with
+           NU1102 (package not found). -->
+      <UseMonoRuntime Condition="'$(UseMonoRuntime)' == ''">false</UseMonoRuntime>
+    </PropertyGroup>
+  </Target>
+</Project>

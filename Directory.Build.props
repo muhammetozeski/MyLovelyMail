@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    .NET 10 SDK uses the portable RID graph for framework reference resolution.
+    The portable graph only contains the modern RIDs (win-x64, win-x86, win-arm64,
+    android-arm64, android-x64). Legacy RIDs (win10-x64, android-arm, android-x86)
+    that MAUI workloads emit by default are not in that graph and fail with
+    NETSDK1083 ("the specified RuntimeIdentifier is not recognized").
+
+    Translate the legacy RIDs to the modern equivalents for all projects in the
+    solution so MAUI / WindowsAppSDK workloads can keep emitting their preferred
+    form while the actual build runs against the modern graph.
+  -->
+  <PropertyGroup>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x64'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x86'">win-x86</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-arm64'">win-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-arm'">android-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-x86'">android-x64</RuntimeIdentifier>
+  </PropertyGroup>
+</Project>

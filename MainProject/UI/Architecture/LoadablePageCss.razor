@@ -1,0 +1,25 @@
+@namespace MyLovelyMail.MainProject.UI.Layout.Architecture
+
+<style>
+    .loadable-spinner-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: @(AppMeasures.Viewport.Most)vh;
+    }
+
+    .loadable-spinner {
+        width: @(AppMeasures.Spinner.SizePx)px;
+        height: @(AppMeasures.Spinner.SizePx)px;
+        border: @(AppMeasures.Spinner.BorderWidthPx)px solid @AppColors.Primary;
+        border-top-color: transparent;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        animation: loadable-spin @(AppMeasures.Spinner.SpinDurationMs)ms linear infinite;
+    }
+
+    @@keyframes loadable-spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+

@@ -1,0 +1,21 @@
+<CoreCard Gradient="@Gradient"
+          TextColor="@AppColors.TextPrimary"
+          BackdropFilter="none"
+          Border="none"
+          Shadow="@(Shadow ?? AppStyles.GetGlow(Gradient.Start, 0.3f))"
+          Padding="@(Padding + "px")"
+          BorderRadius="@(BorderRadius + "px")"
+          OnClick="@OnClick"
+          CustomClass="@CustomClass">
+    @ChildContent
+</CoreCard>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public (Color Start, Color End) Gradient { get; set; } = (AppColors.Primary, AppColors.PrimaryDark);
+    [Parameter] public string? Shadow { get; set; }
+    [Parameter] public int Padding { get; set; } = AppMeasures.Space.Large;
+    [Parameter] public int BorderRadius { get; set; } = AppMeasures.Radius.Large;
+    [Parameter] public string CustomClass { get; set; } = "";
+}

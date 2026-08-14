@@ -1,0 +1,92 @@
+@namespace MyLovelyMail.MainProject.UI.Layout
+
+@{
+    string cssVars = AppStyles.BuildCssVariables();
+    string aurora = AppStyles.BuildAuroraBackground();
+    string textColor = AppColors.TextPrimary.ToRgbaHex(true);
+    string warningBg = AppColors.Warning.ToRgbaHex(true);
+    string warningFg = AppColors.BackgroundDeep.ToRgbaHex(true);
+}
+
+<style>
+    @((MarkupString)cssVars)
+
+    /* Emoji font (Resources/Fonts copied to wwwroot/fonts). unicode-range pins it to emoji codepoints ONLY, so it can sit
+       FIRST in font-family and win every emoji glyph (overriding the OS emoji font) while every text glyph still falls
+       through to the system stack — Noto Color Emoji has no Latin glyphs, so text is never affected. */
+    @@font-face {
+        font-family: "Noto Color Emoji";
+        src: url("fonts/NotoColorEmoji-Regular.ttf") format("truetype");
+        font-display: swap;
+        unicode-range: U+1F000-1FAFF, U+2600-27BF, U+2B00-2BFF, U+2190-21FF, U+2300-23FF, U+25A0-25FF, U+FE00-FE0F, U+1F1E6-1F1FF, U+20E3, U+200D, U+2122, U+2139;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        min-height: @(AppMeasures.Viewport.Full)vh;
+        overflow-x: hidden;
+        font-family: "Noto Color Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: @textColor;
+        @((MarkupString)aurora)
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    .app-page {
+        display: flex;
+        flex-direction: column;
+        min-height: @(AppMeasures.Viewport.Full)vh;
+        position: relative;
+    }
+
+        .app-page.has-bottom-nav {
+            padding-bottom: @(AppMeasures.Space.Px90)px;
+        }
+
+    main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+    }
+
+    .content {
+        flex: 1;
+        position: relative;
+        animation: pageFadeSlideIn @(AppMeasures.Duration.Normal)s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+
+    #blazor-error-ui {
+        background: @warningBg;
+        color: @warningFg;
+        bottom: 0;
+        left: 0;
+        width: @(AppMeasures.Percent.Full)%;
+        position: fixed;
+        padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+        display: none;
+        z-index: @(AppMeasures.ZLayer.Toast);
+    }
+
+        #blazor-error-ui .dismiss {
+            cursor: pointer;
+            position: absolute;
+            right: 0.75rem;
+            top: 0.5rem;
+        }
+
+    @@keyframes pageFadeSlideIn {
+        0% {
+            opacity: 0;
+            transform: translateY(@(AppMeasures.Space.Px16)px);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+

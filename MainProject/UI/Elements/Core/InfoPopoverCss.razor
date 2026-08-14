@@ -1,0 +1,78 @@
+@* Styles for InfoPopover. Every selector is namespaced "info-popover-*" because *Css.razor styles are
+   global (no CSS isolation), so bare names would leak across the app. The bubble floats above the trigger
+   and reads against the opaque TooltipBackground so its text is legible over any surface beneath. *@
+<style>
+    .info-popover {
+        position: relative;
+        display: inline-flex;
+    }
+
+    .info-popover-trigger {
+        display: inline-flex;
+        width: @(AppMeasures.Percent.Full)%;
+        cursor: pointer;
+    }
+
+    /* Full-screen transparent layer that swallows the next tap so the bubble closes when the user taps away. */
+    .info-popover-catcher {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: @(AppMeasures.ZLayer.Popover);
+    }
+
+    .info-popover-bubble {
+        position: absolute;
+        bottom: @(AppMeasures.Percent.Full)%;
+        left: @(AppMeasures.Percent.Half)%;
+        transform: translateX(-50%);
+        margin-bottom: @(AppMeasures.Space.Px10)px;
+        width: @(AppMeasures.Size.Px200)px;
+        max-width: @(AppMeasures.Size.Px220)px;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        text-align: left;
+        z-index: @(AppMeasures.ZLayer.Popover);
+        animation: info-popover-rise @(AppMeasures.Duration.Fast)s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .info-popover-title {
+        display: block;
+        margin-bottom: @(AppMeasures.Space.Px4)px;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Heavy);
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .info-popover-text {
+        display: block;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        line-height: @(AppMeasures.LineHeight.Snug);
+    }
+
+    /* A small rotated square under the bubble that points at the trigger; only its right+bottom edges
+       carry the border so the seam against the bubble body stays invisible. */
+    .info-popover-arrow {
+        position: absolute;
+        top: @(AppMeasures.Percent.Full)%;
+        left: @(AppMeasures.Percent.Half)%;
+        width: @(AppMeasures.Size.Px12)px;
+        height: @(AppMeasures.Size.Px12)px;
+        transform: translate(-50%, -50%) rotate(45deg);
+    }
+
+    @@keyframes info-popover-rise {
+        from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(@(AppMeasures.Space.Px4)px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    }
+</style>

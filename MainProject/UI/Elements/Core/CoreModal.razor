@@ -1,0 +1,46 @@
+@if (IsVisible)
+{
+    <div class="core-modal-backdrop" @onclick="HandleBackdropClick">
+        <div class="core-modal-content @(IsWobbling ? "wobbling-animation" : "")" style="@_computedStyle" @onclick:stopPropagation>
+            @ChildContent
+        </div>
+    </div>
+}
+
+<CoreModalCss />
+
+@code {
+    const bool ActivateModalLogs = false;
+
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public bool IsWobbling { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnBackdropClick { get; set; }
+    [Parameter] public bool IsAcrylic { get; set; }
+
+    // bu magic string değer'leri yerel nesnelere al. orneğin background bir Color nesnesine işaret etsin. public yap arkaplan gibi önemli şeyleri.
+    /// <summary> Card surface of the non-acrylic modal. Public so a consumer can read/override the same fill the modal paints itself with. </summary>
+    public static Color Background => AppColors.SurfaceStrong;
+
+    /// <summary> Hairline border color of the non-acrylic modal card. </summary>
+    public static Color BorderColor => AppColors.GlassBorderDefault;
+
+    /// <summary> Foreground text color shared by both modal variants. </summary>
+    public static Color TextColor => AppColors.TextPrimary;
+
+    string _computedStyle => IsAcrylic
+        ? AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong, AppMeasures.Blur.Heavy)
+          + $"border-radius:{AppMeasures.Radius.XLarge}px;padding:{AppMeasures.Space.XLarge}px;"
+          + $"color:{TextColor.ToRgbaHex(true)};"
+        : $"background:{Background.ToRgbaHex(true)};"
+          + $"border:{AppMeasures.Border.Thin}px solid {BorderColor.ToRgbaHex(true)};"
+          + $"border-radius:{AppMeasures.Radius.XLarge}px;padding:{AppMeasures.Space.XLarge}px;"
+          + $"box-shadow:{AppStyles.ShadowHeavy};"
+          + $"color:{TextColor.ToRgbaHex(true)};";
+
+    void HandleBackdropClick()
+    {
+        Log("CoreModal backdrop tapped, closing modal", Run: ActivateModalLogs);
+        if (OnBackdropClick.HasDelegate) OnBackdropClick.InvokeAsync();
+    }
+}

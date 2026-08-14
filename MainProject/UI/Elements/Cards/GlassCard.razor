@@ -1,0 +1,20 @@
+<CoreCard Acrylic="@Level"
+          AcrylicBlur="@Blur"
+          TextColor="@(TextColor ?? AppColors.TextPrimary)"
+          Padding="@(Padding + "px")"
+          BorderRadius="@(BorderRadius + "px")"
+          OnClick="@OnClick"
+          CustomClass="@CustomClass">
+    @ChildContent
+</CoreCard>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public Color? TextColor { get; set; }
+    [Parameter] public int Padding { get; set; } = AppMeasures.Space.Medium;
+    [Parameter] public int BorderRadius { get; set; } = AppMeasures.Radius.Medium;
+    [Parameter] public string CustomClass { get; set; } = "";
+    [Parameter] public AcrylicLevel Level { get; set; } = AcrylicLevel.Normal;
+    [Parameter] public int Blur { get; set; } = AppMeasures.Blur.Normal;
+}

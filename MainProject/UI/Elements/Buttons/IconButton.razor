@@ -1,0 +1,29 @@
+<CoreButton Background="@(Background ?? AppColors.Surface)"
+            Gradient="@Gradient"
+            TextColor="@(TextColor ?? AppColors.TextPrimary)"
+            BorderRadius="@(AppMeasures.Radius.Circular + "%")"
+            Padding="0"
+            Shadow="@Shadow"
+            Disabled="@Disabled"
+            OnClick="@OnClick"
+            CustomClass="icon-button-fixed">
+    @ChildContent
+</CoreButton>
+
+<style>
+    .icon-button-fixed {
+        width: @(AppMeasures.Size.Px40)px;
+        height: @(AppMeasures.Size.Px40)px;
+        flex-shrink: 0;
+    }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Microsoft.Maui.Graphics.Color? Background { get; set; }
+    [Parameter] public Microsoft.Maui.Graphics.Color? TextColor { get; set; }
+    [Parameter] public (Microsoft.Maui.Graphics.Color Start, Microsoft.Maui.Graphics.Color End)? Gradient { get; set; }
+    [Parameter] public string Shadow { get; set; } = AppStyles.ShadowSoft;
+}

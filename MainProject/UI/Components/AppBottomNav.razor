@@ -1,0 +1,50 @@
+@inject NavigationManager NavManager
+@implements IDisposable
+
+<AcrylicBar PinnedToBottom="true" Padding="0 0 env(safe-area-inset-bottom) 0" CustomClass="bottom-nav-container">
+    @foreach (var item in NavigationConstants.BottomNavigationItems)
+    {
+        <button class="nav-item @(_activePath == item.Link ? "active" : "")" @onclick="() => NavManager.NavigateTo(item.Link)">
+            <div class="nav-icon-box">
+                <span class="nav-icon">@item.Icon</span>
+                @if (_activePath == item.Link)
+                {
+                    <span class="nav-dot"></span>
+                }
+            </div>
+            <span class="nav-label">@item.Title</span>
+        </button>
+    }
+</AcrylicBar>
+
+<AppBottomNavCss />
+
+@code {
+
+    private string _activePath = NavigationConstants.Home.Link;
+
+    protected override void OnInitialized()
+    {
+        NavManager.LocationChanged += HandleLocationChanged;
+        UpdateActivePath(NavManager.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdateActivePath(e.Location);
+        StateHasChanged();
+    }
+
+    private void UpdateActivePath(string uri)
+    {
+        // Normalize to an absolute path like "/home" so NavItem.Path (a full route from NavigationConstants) matches directly.
+        var absolutePath = "/" + NavManager.ToBaseRelativePath(uri).ToLowerInvariant();
+        // Hidden pages (splash, login, paywall, etc.) won't match any tab and fall back to string.Empty.
+        _activePath = NavigationConstants.BottomNavigationItems.FirstOrDefault(item => absolutePath.StartsWith(item.Link)).Link ?? string.Empty;
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= HandleLocationChanged;
+    }
+}

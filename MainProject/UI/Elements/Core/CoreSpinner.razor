@@ -1,0 +1,32 @@
+<span class="core-spinner" style="@_computedStyle"></span>
+
+<style>
+    .core-spinner {
+        display: inline-block;
+        box-sizing: border-box;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        animation: core-spin @(AppMeasures.Spinner.SpinDurationMs)ms linear infinite;
+    }
+
+    @@keyframes core-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+
+@code {
+    // Every loader in the app reads the same AppMeasures.Spinner tokens so the throbber
+    // stays one consistent design. Callers only override when a specific spot needs a
+    // smaller dot or a non-Primary tint (e.g. a white spinner inside a colored button).
+    [Parameter] public int SizePx { get; set; } = AppMeasures.Spinner.SizePx;
+    [Parameter] public int BorderWidthPx { get; set; } = AppMeasures.Spinner.BorderWidthPx;
+    [Parameter] public Color? Color { get; set; }
+
+    // border-top-color is set inline (after the border shorthand) so the transparent gap
+    // wins by declaration order — no class rule and no !important needed to override it.
+    string _computedStyle =>
+        $"width:{SizePx}px;height:{SizePx}px;" +
+        $"border:{BorderWidthPx}px solid {(Color ?? AppColors.Primary).ToRgbaHex(true)};" +
+        $"border-top-color:transparent;";
+}

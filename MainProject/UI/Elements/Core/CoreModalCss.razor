@@ -1,0 +1,79 @@
+<style>
+    .core-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        @AppStyles.BuildBackdropFrost()
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: @(AppMeasures.Space.Px24)px;
+        box-sizing: border-box;
+        overscroll-behavior: contain;
+        z-index: @(AppMeasures.ZLayer.Modal);
+        animation: fadeIn @(AppMeasures.Duration.Normal)s ease-out;
+    }
+
+    .core-modal-content {
+        width: @(AppMeasures.Percent.Most)%;
+        max-width: @(AppMeasures.Size.Px400)px;
+        max-height: @(AppMeasures.Viewport.Most)vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        text-align: center;
+        animation: scaleIn @(AppMeasures.Duration.Normal)s cubic-bezier(0.16, 1, 0.3, 1);
+        box-sizing: border-box;
+    }
+
+    .wobbling-animation {
+        animation: wobble @(AppMeasures.Duration.Slow)s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes scaleIn {
+        from {
+            transform: scale(0.9);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @@keyframes wobble {
+        0% {
+            transform: scale(0) rotate(-15deg);
+            opacity: 0;
+        }
+
+        40% {
+            transform: scale(1.1) rotate(10deg);
+            opacity: 1;
+        }
+
+        60% {
+            transform: scale(0.9) rotate(-5deg);
+        }
+
+        80% {
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        100% {
+            transform: scale(1) rotate(0deg);
+        }
+    }
+</style>

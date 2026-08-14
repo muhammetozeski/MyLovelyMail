@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="Generators/Generators.csproj" />
+  <Project Path="MainProject/MainProject.csproj" />
+  <Project Path="MyLovelyMail.Web.Client/MyLovelyMail.Web.Client.csproj" />
+  <Project Path="MyLovelyMail.Web/MyLovelyMail.Web.csproj" />
+  <Project Path="MyLovelyMail/MyLovelyMail.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>

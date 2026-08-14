@@ -1,0 +1,60 @@
+<div class="core-card @(OnClick.HasDelegate ? "clickable" : "") @CustomClass" style="@_computedStyle" @onclick="HandleClick">
+    @ChildContent
+</div>
+
+<CoreCardCss />
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+
+    [Parameter] public Color? Background { get; set; } = AppColors.SurfaceNormal;
+    [Parameter] public Color? TextColor { get; set; } = AppColors.TextPrimary;
+    [Parameter] public (Color Start, Color End)? Gradient { get; set; }
+    [Parameter] public string BorderRadius { get; set; } = AppMeasures.Radius.Large + "px";
+    [Parameter] public string Padding { get; set; } = AppMeasures.Space.Large + "px";
+    [Parameter] public string Shadow { get; set; } = AppStyles.ShadowSoft;
+    [Parameter] public string? Border { get; set; }
+    [Parameter] public string BackdropFilter { get; set; } = "blur(" + AppMeasures.Blur.Normal + "px)";
+
+    /// <summary> When set, delegates background+blur+border+shadow to <see cref="AppStyles.BuildAcrylicStyle"/> — the canonical glass path. Overrides Background, Border, Shadow, BackdropFilter. </summary>
+    [Parameter] public AcrylicLevel? Acrylic { get; set; }
+
+    /// <summary> Blur strength used when <see cref="Acrylic"/> is set; ignored otherwise. </summary>
+    [Parameter] public int AcrylicBlur { get; set; } = AppMeasures.Blur.Normal;
+
+    string _computedStyle
+    {
+        get
+        {
+            if (Acrylic.HasValue)
+            {
+                return AppStyles.BuildAcrylicStyle(Acrylic.Value, AcrylicBlur)
+                       + $"color:{(TextColor ?? AppColors.TextPrimary).ToRgbaHex(true)};"
+                       + $"border-radius:{BorderRadius};"
+                       + $"padding:{Padding};";
+            }
+
+            string backgroundCss = Gradient.HasValue
+                ? $"linear-gradient(135deg, {Gradient.Value.Start.ToRgbaHex(true)}, {Gradient.Value.End.ToRgbaHex(true)})"
+                : Background?.ToRgbaHex(true) ?? "transparent";
+            string borderCss = Border ?? $"{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)}";
+
+            return $"background:{backgroundCss};"
+                 + $"color:{TextColor?.ToRgbaHex(true) ?? "inherit"};"
+                 + $"border-radius:{BorderRadius};"
+                 + $"padding:{Padding};"
+                 + $"box-shadow:{Shadow};"
+                 + $"border:{borderCss};"
+                 + (BackdropFilter != "none"
+                        ? $"backdrop-filter:{BackdropFilter};-webkit-backdrop-filter:{BackdropFilter};"
+                        : string.Empty);
+        }
+    }
+
+    void HandleClick()
+    {
+        if (OnClick.HasDelegate) OnClick.InvokeAsync();
+    }
+}

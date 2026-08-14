@@ -1,0 +1,36 @@
+<div class="core-input-group" style="@_groupStyle">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <span class="core-input-icon">@Icon</span>
+    }
+    <input type="@Type" placeholder="@Placeholder" @bind="CurrentValue" @bind:event="oninput" required="@IsRequired" class="core-input-element" />
+    @ChildContent
+</div>
+
+<CoreInputCss />
+
+@code {
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public bool IsRequired { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    
+    private string CurrentValue
+    {
+        get => Value;
+        set
+        {
+            if (Value != value)
+            {
+                Value = value;
+                ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    string _groupStyle => $"background-color: {AppColors.Background.ToRgbaHex(true)}; border-radius: {AppMeasures.Radius.Medium}px;";
+}

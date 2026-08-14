@@ -1,0 +1,56 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavManager
+@implements IDisposable
+
+<div class="app-page @(_showBottomNav ? "has-bottom-nav" : "")">
+    <main>
+        <article class="content">
+            @Body
+        </article>
+    </main>
+
+    @if (_showBottomNav)
+    {
+        <AppBottomNav />
+    }
+</div>
+
+
+@code {
+
+    private bool _showBottomNav = false;
+
+    protected override void OnInitialized()
+    {
+        
+        NavManager.LocationChanged += HandleLocationChanged;
+        Events.MainEvents.OnDataChanged += HandleDataChanged;
+        EvaluateBottomNavVisibility(NavManager.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        
+        EvaluateBottomNavVisibility(e.Location);
+        StateHasChanged();
+    }
+
+    private void HandleDataChanged(string eventName, object? data)
+    {
+        if (eventName == "OnThemeChanged")
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void EvaluateBottomNavVisibility(string uri)
+    {
+        _showBottomNav = true;
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= HandleLocationChanged;
+        Events.MainEvents.OnDataChanged -= HandleDataChanged;
+    }
+}

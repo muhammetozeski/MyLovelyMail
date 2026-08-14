@@ -1,0 +1,24 @@
+<CoreButton Background="@AppColors.SurfaceNormal"
+            TextColor="@AppColors.TextPrimary"
+            Border="@($"{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)}")"
+            BorderRadius="@(AppMeasures.Radius.Circular + "%")"
+            Padding="0"
+            FontSize="@AppMeasures.Font.Large"
+            Disabled="@Disabled"
+            OnClick="@OnClick"
+            CustomClass="core-back-button">
+    ⬅️
+</CoreButton>
+
+<style>
+    .core-back-button {
+        width: @(AppMeasures.Size.Px40)px;
+        height: @(AppMeasures.Size.Px40)px;
+        flex-shrink: 0;
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+}

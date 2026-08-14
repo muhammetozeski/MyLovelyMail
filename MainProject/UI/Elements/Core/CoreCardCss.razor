@@ -1,0 +1,17 @@
+<style>
+    .core-card {
+        display: flex;
+        flex-direction: column;
+        transition: transform @(AppMeasures.Duration.Fast)s, box-shadow @(AppMeasures.Duration.Fast)s;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+        .core-card.clickable {
+            cursor: pointer;
+        }
+
+            .core-card.clickable:active {
+                transform: scale(0.98);
+            }
+</style>

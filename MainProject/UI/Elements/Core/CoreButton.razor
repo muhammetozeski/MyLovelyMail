@@ -1,0 +1,50 @@
+<button class="@_cssClass" style="@_computedStyle" disabled="@Disabled" @onclick="OnClick">
+    @ChildContent
+</button>
+
+<CoreButtonCss />
+
+@code {
+    /// <summary> Toggles this component's Log output without touching every individual Log call. </summary>
+    const bool ActivateCoreButtonLogs = true;
+
+    /// <summary> Modifier class appended when IsFullWidth is on; defined in CoreButtonCss as a block-level flex box that fills 100% of the parent. </summary>
+    const string FullWidthClass = "core-btn--full";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+
+    [Parameter] public Microsoft.Maui.Graphics.Color? Background { get; set; }
+    [Parameter] public Microsoft.Maui.Graphics.Color? TextColor { get; set; }
+    [Parameter] public (Microsoft.Maui.Graphics.Color Start, Microsoft.Maui.Graphics.Color End)? Gradient { get; set; }
+    [Parameter] public string BorderRadius { get; set; } = AppMeasures.Radius.Medium + "px";
+    [Parameter] public string Padding { get; set; } = AppMeasures.Space.Medium + "px";
+    [Parameter] public int FontSize { get; set; } = AppMeasures.Font.Medium;
+    [Parameter] public int FontWeight { get; set; } = AppMeasures.Weight.Bold;
+    [Parameter] public string Shadow { get; set; } = "none";
+    [Parameter] public bool IsFullWidth { get; set; }
+    [Parameter] public string Border { get; set; } = "none";
+
+    /// <summary> Builds the full class list: the base button class, the optional full-width modifier, and any caller-supplied class. The full-width width:100% lives in CSS (not inline) so the @(...) token actually evaluates. </summary>
+    string _cssClass
+    {
+        get
+        {
+            string fullWidthPart = IsFullWidth ? " " + FullWidthClass : string.Empty;
+            Log($"CoreButton class built (IsFullWidth={IsFullWidth}, CustomClass='{CustomClass}')", Run: ActivateCoreButtonLogs);
+            return $"core-btn{fullWidthPart} {CustomClass}";
+        }
+    }
+
+    string _computedStyle =>
+        $"background: {(Gradient.HasValue ? $"linear-gradient(135deg, {Gradient.Value.Start.ToRgbaHex(true)}, {Gradient.Value.End.ToRgbaHex(true)})" : Background?.ToRgbaHex(true) ?? "transparent")};" +
+        $"color: {TextColor?.ToRgbaHex(true) ?? "inherit"};" +
+        $"border-radius: {BorderRadius};" +
+        $"padding: {Padding};" +
+        $"font-size: {FontSize}px;" +
+        $"font-weight: {FontWeight};" +
+        $"box-shadow: {Shadow};" +
+        $"border: {Border};";
+}

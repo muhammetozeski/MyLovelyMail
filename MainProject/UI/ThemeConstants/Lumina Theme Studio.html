@@ -1,0 +1,875 @@
+<!-- BU SADECE YARDIMCI ARAÇ. PROJE İLE ALAKALI DEĞİL. BU DOSYAYI GÖRMEZDEN GELEBİLİRSİN. KULLANMAK İÇİN SADECE DOSYAYI AÇMAN YETERLİ. -->
+<!-- YAPAY ZEKALAR BU DOSYAYI OKUMAKLA UĞRAŞMASIN VE BU DOSYAYA DOKUNMASINLAR -->
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Lumina Theme Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* ==================== %100 OFFLINE MODERN CSS (GLASSMORPHISM) ==================== */
+    :root {
+      --bg-dark: #050505;
+      --bg-surface: #111111;
+      --bg-glass: rgba(20, 20, 25, 0.6);
+      --bg-glass-hover: rgba(40, 40, 50, 0.8);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --success: #10b981;
+      --font-stack: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.08), transparent 25%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: var(--font-stack);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      line-height: 1.5;
+    }
+
+    /* Typography */
+    h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.05em; background: linear-gradient(to right, #c7d2fe, #fbcfe8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem; color: #e4e4e7; }
+    p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+
+    /* Layout & Containers */
+    .container { width: 100%; max-width: 950px; margin-bottom: 2rem; }
+    
+    .glass-panel {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Header */
+    .header-area { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 950px; margin-bottom: 2rem; }
+    .btn-icon { background: var(--bg-glass); border: 1px solid var(--border-glass); color: var(--text-main); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+    .btn-icon:hover { background: var(--bg-glass-hover); border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); transform: scale(1.05); }
+
+    /* Controls (Search & Sort) */
+    .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    @media (max-width: 768px) { .controls-grid { grid-template-columns: 1fr; } }
+    
+    .input-group { display: flex; flex-direction: column; gap: 0.5rem; position: relative; }
+    .input-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: var(--text-muted); }
+    
+    .search-input {
+      background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-glass); color: #fff;
+      padding: 0.8rem 1rem; border-radius: 8px; font-family: var(--font-stack); outline: none; transition: all 0.2s; width: 100%;
+    }
+    .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+    .search-preview { position: absolute; right: 12px; bottom: 12px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: none; }
+
+    .sort-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .btn-sort {
+      background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-glass); color: var(--text-muted);
+      padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-sort:hover:not(:disabled) { background: var(--bg-glass-hover); color: #fff; }
+    .btn-sort.active { background: var(--accent); border-color: var(--accent-hover); color: #fff; box-shadow: 0 4px 15px var(--accent-glow); }
+
+    /* Metin Rengi Simülatörü ve Renk Körlüğü Alanı */
+    .test-area {
+      grid-column: 1 / -1;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+      background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 1rem;
+    }
+    .test-select { background: rgba(0,0,0,0.5); border: 1px solid var(--border-glass); color: #fff; padding: 0.5rem 1rem; border-radius: 6px; outline: none; cursor: pointer; font-size: 0.9rem; }
+    .test-select:focus { border-color: var(--accent); }
+    .color-preview-circle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; padding: 0; overflow: hidden; }
+    .color-preview-circle::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-preview-circle::-webkit-color-swatch { border: none; }
+
+    /* Lists & Items */
+    .simulated-container { transition: filter 0.3s ease; }
+    .item-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+    .color-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 0.8rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);
+      transition: transform 0.1s, box-shadow 0.2s;
+      min-height: 64px;
+    }
+    .color-item:hover { transform: translateX(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    
+    .color-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex: 1; }
+    
+    /* İsim Etiketi */
+    .name-preview { font-size: 1.1rem; font-weight: 700; transition: color 0.3s; }
+    .name-preview.badge-mode {
+      background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.85rem; color: #fff !important;
+    }
+
+    .badge {
+      background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: #fff;
+    }
+    .badge-sim { background: rgba(99, 102, 241, 0.2); border-color: var(--accent); color: #c7d2fe; }
+    
+    /* Okunabilirlik Yüzde Etiketi (Dinamik Renkli) */
+    .readability-badge { 
+      font-size: 0.8rem; display: flex; align-items: center; gap: 6px; padding: 0.3rem 0.8rem; 
+      border-radius: 6px; font-weight: 700; border: 1px solid; 
+    }
+    
+    .color-controls { display: flex; align-items: center; gap: 0.5rem; }
+    .hex-input {
+      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.1); color: #fff;
+      padding: 0.4rem; border-radius: 6px; font-family: monospace; font-size: 0.85rem; width: 110px; text-align: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .hex-input:hover { border-color: rgba(255,255,255,0.4); background: rgba(0,0,0,0.8); }
+    
+    .btn-action {
+      background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255,255,255,0.1);
+      width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s; color: white;
+    }
+    .btn-action:hover { background: var(--accent); border-color: var(--accent-hover); transform: scale(1.1); }
+
+    /* IO Section */
+    .textarea {
+      width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); color: var(--text-main);
+      padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; resize: vertical; outline: none; margin-bottom: 1rem;
+    }
+    .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+    
+    .btn-primary { background: var(--accent); border: 1px solid var(--accent-hover); color: white; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 15px var(--accent-glow); }
+    .btn-secondary { background: transparent; border: 1px solid var(--border-glass); color: var(--text-main); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    /* Modal / Info */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-content {
+      background: var(--bg-surface); border: 1px solid rgba(255,255,255,0.2);
+      width: 90%; max-width: 750px; border-radius: 16px; padding: 2rem;
+      max-height: 85vh; overflow-y: auto;
+      transform: translateY(20px); transition: transform 0.3s;
+    }
+    .modal-content::-webkit-scrollbar { width: 8px; }
+    .modal-content::-webkit-scrollbar-track { background: var(--bg-dark); border-radius: 8px; }
+    .modal-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 8px; }
+    .modal-overlay.active .modal-content { transform: translateY(0); }
+    .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: rgba(255,255,255,0.1); border: none; border-radius: 50%; width: 32px; height: 32px; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+    .modal-close:hover { background: var(--accent); }
+
+    .modal-content h3 { color: #c7d2fe; margin: 1.5rem 0 0.5rem; font-size: 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.3rem;}
+    .modal-content p { color: #d4d4d8; font-size: 0.95rem; line-height: 1.6; }
+    .modal-content ul { color: #a1a1aa; padding-left: 1.5rem; font-size: 0.9rem; line-height: 1.8; }
+    .modal-content code { background: rgba(0,0,0,0.5); padding: 0.2rem 0.4rem; border-radius: 4px; color: #fbcfe8; font-family: monospace; }
+
+    /* Toast & Widget */
+    .toast { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 0.8rem 1.5rem; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .widget { position: fixed; background: #1f1f22; border: 1px solid #333; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.7); z-index: 50; width: 12rem; display: none; overflow: hidden; }
+    .widget-header { background: #2a2a2e; padding: 6px; cursor: move; text-align: center; font-size: 0.75rem; font-weight: bold; border-bottom: 1px solid #333; }
+    .widget-body { padding: 12px; }
+    .widget input[type="color"] { width: 100%; height: 40px; border: none; border-radius: 4px; cursor: pointer; background: none; }
+    
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); border: 1px dashed var(--border-glass); border-radius: 12px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <!-- SVG Filtreleri: Renk Körlüğü Simülasyonu İçin -->
+  <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+    <!-- Kırmızı Körlüğü -->
+    <filter id="protanopia">
+      <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Yeşil Körlüğü -->
+    <filter id="deuteranopia">
+      <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Mavi Körlüğü -->
+    <filter id="tritanopia">
+      <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Tam Renk Körlüğü (Siyah-Beyaz) -->
+    <filter id="achromatopsia">
+      <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0" />
+    </filter>
+  </svg>
+
+  <!-- ==================== BAŞLIK & HEADER ==================== -->
+  <header class="header-area">
+    <div>
+      <h1>Lumina Theme Studio</h1>
+      <p style="margin:0;">MAUI & Blazor Renk Uzmanı</p>
+    </div>
+    <button class="btn-icon" id="btn-info" title="Ayrıntılı Dokümantasyon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+    </button>
+  </header>
+
+  <!-- ==================== KONTROL MERKEZİ ==================== -->
+  <section class="container glass-panel">
+    <div class="controls-grid">
+      <!-- Arama Kutusu -->
+      <div class="input-group">
+        <label class="input-label">Renk Kodu Veya Adı Ara</label>
+        <div style="position: relative;">
+          <input id="search-input" type="text" class="search-input" placeholder="Örn: SurfaceNormal, #FF7A6B veya rgb(255,0,0)">
+          <div id="search-color-preview" class="search-preview"></div>
+        </div>
+      </div>
+      
+      <!-- Sıralama Kutusu -->
+      <div class="input-group">
+        <label class="input-label">Sıralama Seçenekleri</label>
+        <div class="sort-buttons">
+          <button id="sort-btn-similarity" class="btn-sort active" title="Gökkuşağı mantığında (HSL) veya aranan renge göre sıralar.">Benzerlik (Gökkuşağı)</button>
+          <button id="sort-btn-readability" class="btn-sort" title="Seçilen metin rengine göre en okunaklıdan en okunmaza doğru sıralar.">Okunabilirlik</button>
+          <button id="sort-btn-default" class="btn-sort">Özgün</button>
+          <button id="sort-btn-name-asc" class="btn-sort">Ad (A-Z)</button>
+        </div>
+      </div>
+
+      <!-- Test Araçları (Satır 2) -->
+      <div class="test-area">
+        <!-- Okunabilirlik Modu -->
+        <div style="display:flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;">
+          <label class="input-label">Metin Rengi Testi</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="text-color-mode" class="test-select" style="flex:1;">
+              <option value="auto">Otomatik (En İyi Zıt Renk)</option>
+              <option value="custom">Canlı Gözlem (Özel Renk Seç)</option>
+            </select>
+            <div id="custom-color-controls" style="display: none; align-items: center; gap: 0.5rem;">
+              <input type="color" id="custom-text-color" value="#A8B1D9" class="color-preview-circle">
+            </div>
+          </div>
+        </div>
+
+        <!-- Renk Körlüğü Simülatörü -->
+        <div style="display:flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;">
+          <label class="input-label">Erişilebilirlik (Renk Körlüğü)</label>
+          <select id="color-blindness-mode" class="test-select">
+            <option value="none">Normal Görüş (Filtre Yok)</option>
+            <option value="protanopia">Protanopia (Kırmızı Körlüğü)</option>
+            <option value="deuteranopia">Deuteranopia (Yeşil Körlüğü)</option>
+            <option value="tritanopia">Tritanopia (Mavi Körlüğü)</option>
+            <option value="achromatopsia">Achromatopsia (Tam Renk Körlüğü / Siyah Beyaz)</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== DİNAMİK VERİ ALANLARI ==================== -->
+  <div class="simulated-container" id="simulated-container">
+    <section class="container glass-panel">
+      <h2>Temel Renkler (Colors)</h2>
+      <ul id="color-list" class="item-list"></ul>
+    </section>
+
+    <section class="container glass-panel">
+      <h2>Aylık Gradyanlar (Month Gradients)</h2>
+      <ul id="gradient-list" class="item-list"></ul>
+    </section>
+
+    <section class="container glass-panel">
+      <h2>Aurora Noktaları (Aurora Stops)</h2>
+      <ul id="aurora-list" class="item-list"></ul>
+    </section>
+  </div>
+
+  <!-- ==================== C# IMPORT & EXPORT MERKEZİ ==================== -->
+  <section class="container glass-panel" style="border-color: rgba(99, 102, 241, 0.3);">
+    <h2>⚙️ C# Kod Senkronizasyonu (İçe / Dışa Aktar)</h2>
+    <p><code>AppThemes.cs</code> dosyanızdaki veriyi kopyalayıp yapıştırın. Değişimleri C# dosyasına geri alın.</p>
+    
+    <textarea id="csharp-input" class="textarea" rows="6" placeholder="BackgroundDeep = Color.FromArgb(&quot;#070A1A&quot;),&#10;SurfaceNormal = Colors.White.WithAlpha(0.08f),&#10;..."></textarea>
+    
+    <div class="flex-between">
+      <button id="parse-btn" class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        C#'tan İçeri Aktar
+      </button>
+      <button id="export-btn" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        C# Olarak Kopyala
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== INFO MODAL (KAYDIRILABİLİR KILAVUZ) ==================== -->
+  <div id="info-modal" class="modal-overlay">
+    <div class="modal-content" style="position: relative;">
+      <button id="close-modal" class="modal-close">&times;</button>
+      <h2 style="color: var(--accent); border: none; margin-bottom: 0;">Lumina Theme Studio</h2>
+      <p style="font-weight: bold; color: #fff;">MAUI Blazor Hybrid Temanızı Yönetmenin En Akıllı Yolu</p>
+      
+      <h3>🎯 Neden Geliştirildi? (Kullanım Senaryosu)</h3>
+      <p>Android veya iOS emülatöründe test yaparken bir butonun, kartın veya yazının renginin hatalı göründüğünü fark ettiniz. Ancak 100 farklı tema rengi arasından bunun <code>PrimaryDark</code> mı yoksa <code>SurfaceTint</code> mi olduğunu hatırlayamıyorsunuz.</p>
+      <p><strong>Çözüm:</strong> Bir Color Picker ile (örneğin Powertoys) hatalı rengin Hex kodunu alın ve bu araçta aratın! Araç, C# kodunuzdaki değişken isimlerini eşleştirerek size anında o rengin hangi değişkenden geldiğini bulacaktır.</p>
+
+      <h3>🎨 Metin Rengi Okunabilirliği (% Testi)</h3>
+      <p>Arayüzde teknik WCAG terimleri yerine insan algısına hitap eden <strong>Yüzdelik Oran (%)</strong> sistemi kullanılmıştır. Rozetler kendi arka planlarına duyarlı olarak dinamik renk alır ki yüzdelerin kendisi de her zaman okunabilsin!</p>
+      <ul>
+        <li><span style="color: #34d399; font-weight:bold;">%100 - %75 Okunabilir:</span> Gözü yormaz, harika kontrast.</li>
+        <li><span style="color: #fbbf24; font-weight:bold;">%74 - %45 İdare Eder:</span> Ortalama bir okunabilirlik sunar.</li>
+        <li><span style="color: #f87171; font-weight:bold;">%45 ve Altı (Göz Yorar):</span> Metni okumak işkenceye dönüşür. (Gölge efektleri kaldırıldığı için bu renklerde metin tamamen kaybolabilir, bu normaldir!)</li>
+      </ul>
+      <p><strong>Canlı Gözlem Modu:</strong> "Metin Rengi Testi" alanından <em>"Canlı Gözlem"</em>i seçerseniz, belirlediğiniz özel renk tüm listeye uygulanır ve okunabilirliği çıplak gözle görebilirsiniz.</p>
+      
+      <h3>👁️ Yeni: Renk Körlüğü ve Erişilebilirlik Simülatörü</h3>
+      <p>Dünya nüfusunun yaklaşık %8'i renk körüdür. MAUI uygulamanızı tasarlarken "Başarılı" mesajı için Yeşil, "Hatalı" mesajı için Kırmızı bir kutu koyarsanız, <strong>Deuteranopia</strong> (Yeşil Körlüğü) olan bir kullanıcı ikisini de çamur sarısı bir tonda görecektir!</p>
+      <p>Bu sebeple üst panele bir <strong>Renk Körlüğü Simülatörü</strong> eklendi. Seçtiğiniz filtre (SVG matrix algoritması) ile anında uygulamanızın engelli kullanıcılar tarafından nasıl göründüğünü test edebilir, renk paletinizi buna göre erişilebilir kılabilirsiniz.</p>
+
+      <h3>🌈 Zeki Benzerlik ve Yeni "Okunabilirlik" Sıralaması</h3>
+      <ul>
+        <li><strong>Benzerlik (Gökkuşağı):</strong> Bir renk aratmıyorsanız; Siyah, beyaz ve gri tonlarını kenara ayırır, diğer renkleri <strong>HSL (Renk Özü)</strong> uzayında işleyerek kusursuz bir gökkuşağı sarmalında sunar.</li>
+        <li><strong>Okunabilirlik (Yeni):</strong> Sizin seçtiğiniz metin rengiyle (veya otomatik modda) hangi arkaplan renginin en yüksek okunabilirlik oranına sahip olduğunu hesaplar ve listeyi en iyi okunandan, hiç okunmayana doğru sıralar.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST & WIDGET ==================== -->
+  <div id="toast" class="toast">Kopyalandı!</div>
+  
+  <div id="color-picker-widget" class="widget">
+    <div id="widget-header" class="widget-header">Renk Seçici</div>
+    <div class="widget-body">
+      <input id="widget-color-input" type="color">
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
+  <script>
+    // ------------------- Renk Matematik & Dönüşüm -------------------
+    
+    function rgbaToHex(rgba) {
+      const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!m) return "#000000";
+      const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
+      return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+    }
+
+    function ParseInt(hexSpan) { return parseInt(hexSpan, 16); }
+
+    function FromArgb(colorAsHex) {
+      let red = 0, green = 0, blue = 0, alpha = 255;
+      if (colorAsHex && colorAsHex.length > 0) {
+        let hex = colorAsHex[0] === '#' ? colorAsHex.slice(1) : colorAsHex;
+        if (hex.length === 6) {
+          red = ParseInt(hex.slice(0, 2)); green = ParseInt(hex.slice(2, 4)); blue = ParseInt(hex.slice(4, 6));
+        } else if (hex.length === 3) {
+          red = ParseInt(hex[0]+hex[0]); green = ParseInt(hex[1]+hex[1]); blue = ParseInt(hex[2]+hex[2]);
+        } else if (hex.length === 4) {
+          alpha = ParseInt(hex[0]+hex[0]); red = ParseInt(hex[1]+hex[1]); green = ParseInt(hex[2]+hex[2]); blue = ParseInt(hex[3]+hex[3]);
+        } else if (hex.length === 8) {
+          alpha = ParseInt(hex.slice(0, 2)); red = ParseInt(hex.slice(2, 4)); green = ParseInt(hex.slice(4, 6)); blue = ParseInt(hex.slice(6, 8));
+        }
+      }
+      return { red: red/255, green: green/255, blue: blue/255, alpha: alpha/255 };
+    }
+
+    function resolveCSSColor(str) {
+      if (!str) return null;
+      if (str.toLowerCase() === 'transparent') return { red: 0, green: 0, blue: 0, alpha: 0 };
+      const temp = document.createElement('div');
+      temp.style.color = 'transparent'; temp.style.color = str;
+      if (temp.style.color === 'transparent') return null;
+      document.body.appendChild(temp);
+      const computed = window.getComputedStyle(temp).color;
+      document.body.removeChild(temp);
+      const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (match) return { red: parseInt(match[1])/255, green: parseInt(match[2])/255, blue: parseInt(match[3])/255, alpha: match[4] !== undefined ? parseFloat(match[4]) : 1.0 };
+      return null;
+    }
+
+    function parseSearchQueryToColor(query) {
+      query = query.trim();
+      if (!query) return null;
+      if (query.startsWith('#') || /^[0-9A-F]{3,8}$/i.test(query)) return FromArgb(query);
+      return resolveCSSColor(query);
+    }
+
+    function getColorDistance(c1, c2) {
+      if (!c1 || !c2) return Infinity;
+      const dr = c1.red - c2.red, dg = c1.green - c2.green, db = c1.blue - c2.blue, da = c1.alpha - c2.alpha;
+      return Math.sqrt(dr*dr + dg*dg + db*db + da*da);
+    }
+
+    function calculateSimilarity(c1, c2) {
+      const dist = getColorDistance(c1, c2);
+      const similarity = Math.max(0, 1 - dist / 2.0);
+      return Math.round(similarity * 100);
+    }
+
+    function getHSL(colorObj) {
+      let r = colorObj.red, g = colorObj.green, b = colorObj.blue;
+      let max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+      if (max === min) { h = s = 0; } 
+      else {
+        let d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h: h * 360, s: s * 100, l: l * 100 };
+    }
+
+    // ------------------- Gelişmiş Okunabilirlik (% Test) Modülü -------------------
+    
+    function getLuminance(r, g, b) {
+      let a = [r, g, b].map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+      return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+    }
+
+    // İki renk arasındaki tam WCAG Kontrast Oranını (1.0 - 21.0) döndürür
+    function getContrastRatio(bgObj, textObj) {
+      // ALFA YOKSAYILDI (Kullanıcı talebi): Arkaplan tahmini yapılamayacağı için saf RGB değerleri baz alınıyor
+      const l1 = getLuminance(bgObj.red, bgObj.green, bgObj.blue);
+      const l2 = getLuminance(textObj.red, textObj.green, textObj.blue);
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+
+    // İnsan diline çevrilmiş (Yüzdelik) Okunabilirlik Skoru
+    function getReadabilityPercentage(ratio) {
+      if (ratio >= 7.0) return 100; // Mükemmel (AAA)
+      if (ratio >= 4.5) return Math.round(75 + ((ratio - 4.5) / 2.5) * 25); // 75-100% arası (AA)
+      if (ratio >= 3.0) return Math.round(40 + ((ratio - 3.0) / 1.5) * 35); // 40-75% arası
+      return Math.max(0, Math.round(((ratio - 1.0) / 2.0) * 40)); // 0-40% arası
+    }
+
+    // İlgili zemin için seçili olan ideal metin rengini döndürür
+    function getActiveTextObjForBg(bgObj) {
+      let isAuto = (document.getElementById('text-color-mode').value === 'auto');
+      if (isAuto) {
+        let ratioW = getContrastRatio(bgObj, {red:1, green:1, blue:1, alpha:1});
+        let ratioB = getContrastRatio(bgObj, {red:0, green:0, blue:0, alpha:1});
+        return ratioW >= ratioB ? {red:1, green:1, blue:1, alpha:1} : {red:0, green:0, blue:0, alpha:1};
+      } else {
+        return customTextColorObj;
+      }
+    }
+
+    // ------------------- Global Veriler -------------------
+    let colors = [];
+    let monthGradients = [];
+    let auroraStops = [];
+    const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+    let searchQuery = "";
+    let sortMode = "similarity"; 
+
+    // Metin Rengi Testi Durumu
+    let customTextColorObj = { red: 168/255, green: 177/255, blue: 217/255, alpha: 1 }; // Varsayılan #A8B1D9
+
+    // ------------------- UI Helpers -------------------
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => showToast(text + " Kopyalandı!"))
+      .catch(err => {
+        const el = document.createElement('textarea');
+        el.value = text; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+        showToast(text + " Kopyalandı!");
+      });
+    }
+
+    // ------------------- C# Kodu Ayrıştırıcı (Parser) -------------------
+    function parseHexAdv(hex, isArgb) {
+      hex = hex.replace('#', '');
+      let r=0, g=0, b=0, a=1;
+      if (hex.length === 6) {
+        r = parseInt(hex.substring(0,2), 16)/255; g = parseInt(hex.substring(2,4), 16)/255; b = parseInt(hex.substring(4,6), 16)/255;
+      } else if (hex.length === 8) {
+        if (isArgb) { a = parseInt(hex.substring(0,2), 16)/255; r = parseInt(hex.substring(2,4), 16)/255; g = parseInt(hex.substring(4,6), 16)/255; b = parseInt(hex.substring(6,8), 16)/255; } 
+        else { r = parseInt(hex.substring(0,2), 16)/255; g = parseInt(hex.substring(2,4), 16)/255; b = parseInt(hex.substring(4,6), 16)/255; a = parseInt(hex.substring(6,8), 16)/255; }
+      }
+      return { red: r, green: g, blue: b, alpha: a };
+    }
+
+    function evaluateColorExpression(expr) {
+      let str = expr.replace(/\s+/g, '');
+      let finalAlpha = null;
+      const alphaMatch = str.match(/\.WithAlpha\(([\d.]+)[fF]?\)/);
+      if (alphaMatch) { finalAlpha = parseFloat(alphaMatch[1]); str = str.split('.WithAlpha')[0]; }
+
+      let colorObj = { red: 0, green: 0, blue: 0, alpha: 1 };
+      if (str.startsWith('Color.FromArgb("') || str.startsWith('Color.FromRgba("')) {
+        const hexMatch = str.match(/"([^"]+)"/);
+        if (hexMatch) colorObj = parseHexAdv(hexMatch[1], str.startsWith('Color.FromArgb'));
+      } else if (str.startsWith('Colors.')) {
+        const name = str.substring(7);
+        const parsed = resolveCSSColor(name);
+        if (parsed) colorObj = parsed;
+      }
+      if (finalAlpha !== null) colorObj.alpha = finalAlpha;
+      return colorObj;
+    }
+
+    function formatColorData(obj) {
+      const r = Math.round(obj.red * 255), g = Math.round(obj.green * 255), b = Math.round(obj.blue * 255);
+      const hex = `#${(1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase()}`;
+      if (obj.alpha < 1) return { value: `rgba(${r},${g},${b},${obj.alpha.toFixed(2)})`, type: 'rgba', solidHex: hex, colorObj: obj };
+      return { value: hex, type: 'hex', solidHex: hex, colorObj: obj };
+    }
+
+    document.getElementById('parse-btn').addEventListener('click', () => {
+      const rawText = document.getElementById('csharp-input').value;
+      if (!rawText.trim()) return;
+      let code = rawText.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+      const colorExprStr = `(?:Color\\.(?:FromArgb|FromRgba)\\s*\\(\\s*"[^"]+"\\s*\\)|Colors\\.[A-Za-z]+)(?:\\.WithAlpha\\s*\\(\\s*[\\d.]+[fF]?\\s*\\))?`;
+      const propRegex = new RegExp(`([A-Za-z0-9_]+)\\s*=\\s*(${colorExprStr})(?=\\s*[,;\\}])`, 'g');
+      const gradientRegex = new RegExp(`\\(\\s*(${colorExprStr})\\s*,\\s*(${colorExprStr})\\s*\\)`, 'g');
+      const auroraRegex = new RegExp(`new[^\\(]*\\(\\s*(${colorExprStr})\\s*,\\s*"([^"]+)"\\s*,\\s*"([^"]+)"\\s*\\)`, 'g');
+
+      let parsedColors = [], parsedGradients = [], parsedAuroras = [], match;
+      while ((match = propRegex.exec(code)) !== null) parsedColors.push({ name: match[1], ...formatColorData(evaluateColorExpression(match[2])) });
+      while ((match = gradientRegex.exec(code)) !== null) parsedGradients.push({ pair: [formatColorData(evaluateColorExpression(match[1])).value, formatColorData(evaluateColorExpression(match[2])).value] }); 
+      while ((match = auroraRegex.exec(code)) !== null) parsedAuroras.push({ color: formatColorData(evaluateColorExpression(match[1])).value, pos1: match[2], pos2: match[3] });
+
+      if (parsedColors.length > 0) colors = parsedColors;
+      if (parsedGradients.length > 0) monthGradients = parsedGradients;
+      if (parsedAuroras.length > 0) auroraStops = parsedAuroras;
+
+      initializeDataObjects();
+      document.getElementById('search-input').value = ''; searchQuery = '';
+      updateSortUi(); renderAll(); showToast("Başarıyla Aktarıldı!");
+    });
+
+    // ------------------- C# Export (Dışa Aktarım) -------------------
+    document.getElementById('export-btn').addEventListener('click', () => {
+      let output = `public static readonly AppTheme CustomTheme = new()\n{\n    Name = "Exported Theme",\n\n`;
+      colors.forEach(c => {
+        let code = c.colorObj.alpha < 1 ? `Color.FromArgb("${c.solidHex}").WithAlpha(${c.colorObj.alpha.toFixed(2)}f)` : `Color.FromArgb("${c.solidHex}")`;
+        output += `    ${c.name.padEnd(20)} = ${code},\n`;
+      });
+      if(monthGradients.length > 0) {
+        output += `\n    MonthGradients =\n    [\n`;
+        monthGradients.forEach((g, idx) => {
+          let c1 = `Color.FromArgb("${g.pair[0].startsWith('rgb') ? rgbaToHex(g.pair[0]) : g.pair[0]}")`;
+          let c2 = `Color.FromArgb("${g.pair[1].startsWith('rgb') ? rgbaToHex(g.pair[1]) : g.pair[1]}")`;
+          output += `        (${c1}, ${c2})${idx < monthGradients.length-1 ? ',' : ''}\n`;
+        });
+        output += `    ],\n`;
+      }
+      if(auroraStops.length > 0) {
+        output += `\n    AuroraStops =\n    [\n`;
+        auroraStops.forEach((a, idx) => {
+          let col = `Color.FromArgb("${a.color.startsWith('rgb') ? rgbaToHex(a.color) : a.color}")`;
+          output += `        new(${col}, "${a.pos1}", "${a.pos2}")${idx < auroraStops.length-1 ? ',' : ''}\n`;
+        });
+        output += `    ]\n`;
+      }
+      output += `};`;
+      document.getElementById('csharp-input').value = output; copyToClipboard(output);
+    });
+
+    function initializeDataObjects() {
+      colors.forEach(c => { if (!c.colorObj) c.colorObj = FromArgb(c.solidHex); });
+      monthGradients.forEach((g) => {
+        const c1 = FromArgb(g.pair[0].startsWith('rgb') ? rgbaToHex(g.pair[0]) : g.pair[0]);
+        const c2 = FromArgb(g.pair[1].startsWith('rgb') ? rgbaToHex(g.pair[1]) : g.pair[1]);
+        g.colorObj = { red: (c1.red+c2.red)/2, green: (c1.green+c2.green)/2, blue: (c1.blue+c2.blue)/2, alpha: (c1.alpha+c2.alpha)/2 };
+      });
+      auroraStops.forEach(stop => { stop.colorObj = FromArgb(stop.color.startsWith('rgb') ? rgbaToHex(stop.color) : stop.color); });
+    }
+
+    // ------------------- Filtreleme & Sıralama -------------------
+    function sortList(list) {
+      const targetColor = parseSearchQueryToColor(searchQuery);
+      if (sortMode === "name-asc") list.sort((a, b) => a.name.localeCompare(b.name));
+      else if (sortMode === "name-desc") list.sort((a, b) => b.name.localeCompare(a.name));
+      else if (sortMode === "readability") {
+         // Okunabilirliğe (Kontrast Oranına) göre büyükten küçüğe sırala
+         list.sort((a, b) => {
+           let objA = a.colorObj || (a.pair && a.pair.colorObj); let objB = b.colorObj || (b.pair && b.pair.colorObj);
+           let txtA = getActiveTextObjForBg(objA); let txtB = getActiveTextObjForBg(objB);
+           return getContrastRatio(objB, txtB) - getContrastRatio(objA, txtA);
+         });
+      }
+      else if (sortMode === "similarity") {
+        if (targetColor) {
+           list.sort((a, b) => {
+             let objA = a.colorObj || (a.pair && a.pair.colorObj); let objB = b.colorObj || (b.pair && b.pair.colorObj);
+             return calculateSimilarity(objB, targetColor) - calculateSimilarity(objA, targetColor);
+           });
+        } else {
+           list.sort((a, b) => {
+             let hslA = getHSL(a.colorObj || (a.pair && a.pair.colorObj)); let hslB = getHSL(b.colorObj || (b.pair && b.pair.colorObj));
+             let isGrayA = hslA.s < 10 || hslA.l < 15 || hslA.l > 95; let isGrayB = hslB.s < 10 || hslB.l < 15 || hslB.l > 95;
+             if(isGrayA && !isGrayB) return 1; if(!isGrayA && isGrayB) return -1;
+             if(isGrayA && isGrayB) return hslB.l - hslA.l; 
+             return hslA.h - hslB.h; 
+           });
+        }
+      } else list.sort((a, b) => a.originalIndex - b.originalIndex);
+      return list;
+    }
+
+    function processItems(sourceArray, isGradient) {
+      let list = sourceArray.map((item, idx) => {
+        let copy = { ...item, originalIndex: idx };
+        if(isGradient) copy.name = monthNames[idx] || `Ay ${idx + 1}`; else if(!copy.name) copy.name = `Stop ${idx + 1}`;
+        return copy;
+      });
+
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase().trim(); const targetColor = parseSearchQueryToColor(searchQuery);
+        list = list.filter(item => {
+          const nameMatches = item.name.toLowerCase().includes(q) || (item.pos1 && item.pos1.toLowerCase().includes(q));
+          let valMatches = false;
+          if(isGradient) valMatches = item.pair[0].toLowerCase().includes(q) || item.pair[1].toLowerCase().includes(q);
+          else valMatches = (item.value && item.value.toLowerCase().includes(q)) || (item.color && item.color.toLowerCase().includes(q));
+          let simMatches = false;
+          if (targetColor) { let cObj = item.colorObj || (item.pair && item.pair.colorObj); simMatches = calculateSimilarity(cObj, targetColor) >= 60; }
+          return nameMatches || valMatches || simMatches;
+        });
+      }
+      return sortList(list);
+    }
+
+    // ------------------- Görselleştirme (DOM) -------------------
+    function renderList(containerId, processedData, type) {
+      const list = document.getElementById(containerId);
+      list.innerHTML = '';
+      if (processedData.length === 0) { list.innerHTML = `<div class="empty-state">🔍 Aranan kriterlere uygun renk bulunamadı.</div>`; return; }
+      
+      const targetColor = parseSearchQueryToColor(searchQuery);
+
+      processedData.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'color-item';
+        
+        let bgColorStr = ""; let colorObj = null;
+        if (type === 'color') { bgColorStr = item.solidHex; colorObj = item.colorObj; }
+        else if (type === 'gradient') { bgColorStr = `linear-gradient(to right, ${item.pair[0]}, ${item.pair[1]})`; colorObj = item.colorObj || (item.pair && item.pair.colorObj); }
+        else if (type === 'aurora') { bgColorStr = item.color.startsWith('rgb') ? rgbaToHex(item.color) : item.color; colorObj = item.colorObj; }
+
+        li.style.background = bgColorStr;
+        
+        // --- OKUNABİLİRLİK MATEMATİĞİ ---
+        let isAuto = (document.getElementById('text-color-mode').value === 'auto');
+        let activeTextObj = getActiveTextObjForBg(colorObj);
+
+        let ratio = getContrastRatio(colorObj, activeTextObj);
+        let perc = getReadabilityPercentage(ratio);
+        let hexColorForText = rgbaToHex(`rgba(${Math.round(activeTextObj.red*255)},${Math.round(activeTextObj.green*255)},${Math.round(activeTextObj.blue*255)})`);
+
+        // Okunabilirlik Yüzde Rozeti Sınıfı
+        let pClass = perc >= 75 ? 'readability-100' : (perc >= 45 ? 'readability-75' : 'readability-50');
+        let pIcon = perc >= 75 ? '✓' : (perc >= 45 ? '!' : '✗');
+        
+        // Sol Bilgi Alanı
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'color-info';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'name-preview';
+        nameSpan.textContent = item.name;
+        
+        // Rozet/Yazı Görünüm Kontrolü ve Gölge iptali
+        if (isAuto) {
+           nameSpan.classList.add('badge-mode');
+        } else {
+           nameSpan.style.color = hexColorForText;
+           nameSpan.classList.remove('badge-mode');
+           // GÖLGE KALDIRILDI! Zayıf okunabilirlikli bir renk seçtiğinde gerçekten okunmaz olacak.
+        }
+        infoDiv.appendChild(nameSpan);
+
+        if(type === 'aurora') {
+          const p1 = document.createElement('span'); p1.className='badge'; p1.style.background='rgba(0,0,0,0.4)'; p1.textContent = item.pos1;
+          const p2 = document.createElement('span'); p2.className='badge'; p2.style.background='rgba(0,0,0,0.4)'; p2.textContent = item.pos2;
+          infoDiv.appendChild(p1); infoDiv.appendChild(p2);
+        }
+
+        if (targetColor && searchQuery.trim() !== "") {
+          const sim = calculateSimilarity(colorObj, targetColor);
+          const simBadge = document.createElement('span'); simBadge.className = 'badge badge-sim'; simBadge.textContent = `%${sim} Benzer`;
+          infoDiv.appendChild(simBadge);
+        }
+
+        // --- YENİ DİNAMİK ROZET RENGİ ---
+        // Rozetin üstündeki yazının (#000 veya #FFF) tam zıttını rozet arkaplanı yapıyoruz
+        // Alfa yoksayılarak direkt RGB luminans hesabı yapılıyor
+        let badgeLuminance = getLuminance(colorObj.red, colorObj.green, colorObj.blue);
+        let badgeTextColor = badgeLuminance > 0.5 ? '#000000' : '#FFFFFF';
+        let badgeBgColor = badgeTextColor === '#FFFFFF' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)';
+
+        const contBadge = document.createElement('span');
+        contBadge.className = `readability-badge ${pClass}`;
+        contBadge.style.color = badgeTextColor;
+        contBadge.style.backgroundColor = badgeBgColor;
+        contBadge.style.borderColor = badgeTextColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+        contBadge.innerHTML = `<strong>${pIcon}</strong> %${perc} Okunabilir`;
+        contBadge.title = `Kontrast Oranı: ${ratio.toFixed(2)}:1`;
+        infoDiv.appendChild(contBadge);
+
+        li.appendChild(infoDiv);
+
+        // Sağ Kontroller (Sabit görünümlü Hex ve Renk Seçiciler)
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'color-controls';
+
+        if (type === 'gradient') {
+          const hex1 = document.createElement('input'); hex1.className = 'hex-input'; hex1.readOnly = true; hex1.value = item.pair[0]; hex1.onclick = () => copyToClipboard(hex1.value);
+          const btn1 = document.createElement('button'); btn1.className = 'btn-action'; btn1.textContent = '🎨'; btn1.onclick = (e) => { e.stopPropagation(); openWidget(e, {type: 'gradient', rowIdx: item.originalIndex, colorIdx: 0}); };
+          const hex2 = document.createElement('input'); hex2.className = 'hex-input'; hex2.readOnly = true; hex2.value = item.pair[1]; hex2.onclick = () => copyToClipboard(hex2.value);
+          const btn2 = document.createElement('button'); btn2.className = 'btn-action'; btn2.textContent = '🎨'; btn2.onclick = (e) => { e.stopPropagation(); openWidget(e, {type: 'gradient', rowIdx: item.originalIndex, colorIdx: 1}); };
+          controlsDiv.appendChild(hex1); controlsDiv.appendChild(btn1); controlsDiv.appendChild(hex2); controlsDiv.appendChild(btn2);
+        } else {
+          const hexInp = document.createElement('input'); hexInp.className = 'hex-input'; hexInp.readOnly = true; hexInp.value = type === 'color' ? item.value : item.color; hexInp.onclick = () => copyToClipboard(hexInp.value);
+          const btn = document.createElement('button'); btn.className = 'btn-action'; btn.textContent = '🎨'; btn.onclick = (e) => { e.stopPropagation(); openWidget(e, {type: type, rowIdx: item.originalIndex}); };
+          controlsDiv.appendChild(hexInp); controlsDiv.appendChild(btn);
+        }
+
+        li.appendChild(controlsDiv); list.appendChild(li);
+      });
+    }
+
+    function renderAll() {
+      renderList('color-list', processItems(colors, false), 'color');
+      renderList('gradient-list', processItems(monthGradients, true), 'gradient');
+      renderList('aurora-list', processItems(auroraStops, false), 'aurora');
+    }
+
+    function updateSortUi() {
+      const targetColor = parseSearchQueryToColor(searchQuery);
+      const simBtn = document.getElementById('sort-btn-similarity');
+      const previewDiv = document.getElementById('search-color-preview');
+
+      if (targetColor && searchQuery.trim() !== "") {
+        const rgbaStr = `rgba(${Math.round(targetColor.red*255)}, ${Math.round(targetColor.green*255)}, ${Math.round(targetColor.blue*255)}, ${targetColor.alpha})`;
+        previewDiv.style.backgroundColor = rgbaStr; previewDiv.style.display = 'block';
+      } else {
+        previewDiv.style.display = 'none';
+      }
+
+      document.querySelectorAll('.btn-sort').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`sort-btn-${sortMode}`);
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    // ------------------- Simülatör ve Test Olayları -------------------
+    document.getElementById('text-color-mode').addEventListener('change', (e) => {
+      const isCustom = e.target.value === 'custom';
+      document.getElementById('custom-color-controls').style.display = isCustom ? 'flex' : 'none';
+      renderAll();
+    });
+
+    document.getElementById('custom-text-color').addEventListener('input', (e) => {
+      const val = e.target.value;
+      customTextColorObj = FromArgb(val);
+      renderAll();
+    });
+
+    document.getElementById('color-blindness-mode').addEventListener('change', (e) => {
+      const val = e.target.value;
+      const simContainer = document.getElementById('simulated-container');
+      if(val === 'none') {
+        simContainer.style.filter = 'none';
+      } else {
+        simContainer.style.filter = `url(#${val})`;
+      }
+    });
+
+    // ------------------- Olaylar (Events) -------------------
+    document.getElementById('search-input').addEventListener('input', (e) => { searchQuery = e.target.value; updateSortUi(); renderAll(); });
+    document.getElementById('sort-btn-default').addEventListener('click', () => { sortMode = 'default'; updateSortUi(); renderAll(); });
+    document.getElementById('sort-btn-name-asc').addEventListener('click', () => { sortMode = 'name-asc'; updateSortUi(); renderAll(); });
+    document.getElementById('sort-btn-readability').addEventListener('click', () => { sortMode = 'readability'; updateSortUi(); renderAll(); });
+    document.getElementById('sort-btn-similarity').addEventListener('click', () => { sortMode = 'similarity'; updateSortUi(); renderAll(); });
+
+    // Info Modal
+    const modal = document.getElementById('info-modal');
+    document.getElementById('btn-info').addEventListener('click', () => modal.classList.add('active'));
+    document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('active'));
+    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.remove('active'); });
+
+    // ------------------- Widget Mantığı -------------------
+    let widgetTarget = null, widgetPosX = 150, widgetPosY = 150, isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
+    const widget = document.getElementById('color-picker-widget'), widgetHeader = document.getElementById('widget-header'), widgetColorInput = document.getElementById('widget-color-input');
+
+    function openWidget(event, targetInfo) {
+      widgetTarget = targetInfo;
+      let currentHex = "#000000";
+      if (targetInfo.type === 'color') currentHex = colors[targetInfo.rowIdx].solidHex;
+      else if (targetInfo.type === 'gradient') { const val = monthGradients[targetInfo.rowIdx].pair[targetInfo.colorIdx]; currentHex = val.startsWith('rgb') ? rgbaToHex(val) : val; }
+      else if (targetInfo.type === 'aurora') { const val = auroraStops[targetInfo.rowIdx].color; currentHex = val.startsWith('rgb') ? rgbaToHex(val) : val; }
+      
+      widgetColorInput.value = currentHex;
+      if (widgetPosX === null || widgetPosY === null) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        widgetPosX = rect.right + 8; widgetPosY = rect.top;
+      }
+      widget.style.left = widgetPosX + "px"; widget.style.top = widgetPosY + "px";
+      widget.style.display = 'block';
+      widgetColorInput.click();
+    }
+
+    widgetColorInput.addEventListener('input', (e) => {
+      const newHex = e.target.value;
+      if (!widgetTarget) return;
+      if (widgetTarget.type === 'color') { colors[widgetTarget.rowIdx].value = newHex; colors[widgetTarget.rowIdx].solidHex = newHex; } 
+      else if (widgetTarget.type === 'gradient') { monthGradients[widgetTarget.rowIdx].pair[widgetTarget.colorIdx] = newHex; } 
+      else if (widgetTarget.type === 'aurora') { auroraStops[widgetTarget.rowIdx].color = newHex; }
+      initializeDataObjects(); renderAll();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (widget.contains(e.target) || e.target.closest('.btn-action')) return;
+      widget.style.display = 'none'; widgetTarget = null;
+    });
+
+    widgetHeader.addEventListener('mousedown', (e) => {
+      isDragging = true; const rect = widget.getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left; dragOffsetY = e.clientY - rect.top; e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      widgetPosX = e.clientX - dragOffsetX; widgetPosY = e.clientY - dragOffsetY;
+      widget.style.left = widgetPosX + 'px'; widget.style.top = widgetPosY + 'px';
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; });
+
+    // ------------------- İlk Çalıştırma -------------------
+    document.addEventListener('DOMContentLoaded', () => {
+      updateSortUi(); renderAll();
+    });
+  </script>
+</body>
+</html>

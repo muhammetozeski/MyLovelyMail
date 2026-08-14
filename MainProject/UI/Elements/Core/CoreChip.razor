@@ -1,0 +1,31 @@
+<div class="core-chip @CustomClass" style="@_computedStyle">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <span style="margin-right: @(AppMeasures.Space.Px4)px;">@Icon</span>
+    }
+    @Text
+</div>
+
+<CoreChipCss />
+
+@code {
+    [Parameter] public string Text { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+    [Parameter] public Microsoft.Maui.Graphics.Color? Background { get; set; }
+    [Parameter] public Microsoft.Maui.Graphics.Color? TextColor { get; set; }
+    [Parameter] public (Microsoft.Maui.Graphics.Color Start, Microsoft.Maui.Graphics.Color End)? Gradient { get; set; }
+    [Parameter] public int PaddingX { get; set; } = 12;
+    [Parameter] public int PaddingY { get; set; } = 6;
+    [Parameter] public int FontSize { get; set; } = AppMeasures.Font.Small;
+    [Parameter] public string BorderRadius { get; set; } = AppMeasures.Radius.Large + "px";
+    [Parameter] public string Border { get; set; } = "none";
+
+    string _computedStyle => 
+        $"background: {(Gradient.HasValue ? $"linear-gradient(135deg, {Gradient.Value.Start.ToRgbaHex(true)}, {Gradient.Value.End.ToRgbaHex(true)})" : Background?.ToRgbaHex(true) ?? "transparent")};" +
+        $"color: {TextColor?.ToRgbaHex(true) ?? "inherit"};" +
+        $"padding: {PaddingY}px {PaddingX}px;" +
+        $"font-size: {FontSize}px;" +
+        $"border-radius: {BorderRadius};" +
+        $"border: {Border};";
+}

@@ -1,0 +1,19 @@
+@* Frosted edge bar shared by the top header and the bottom navigation. Renders the central
+   AppStyles.BuildBarSurface so neither caller hand-rolls the acrylic fill, corners or borders. *@
+<div class="@CustomClass" style="@_style">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary> True pins the bar to the bottom (rounds the top corners, hairline on top); false pins it to the top (rounds the bottom corners, hairline on bottom). </summary>
+    [Parameter] public bool PinnedToBottom { get; set; }
+
+    /// <summary> CSS padding shorthand applied inside the bar. </summary>
+    [Parameter] public string Padding { get; set; } = AppMeasures.Space.Medium + "px";
+
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+
+    string _style => AppStyles.BuildBarSurface(PinnedToBottom) + $"padding:{Padding};";
+}

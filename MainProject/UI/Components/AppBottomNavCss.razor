@@ -1,0 +1,85 @@
+@{
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string primary = AppColors.Primary.ToRgbaHex(true);
+    string primaryTint = AppColors.Primary.ToRgbaHex(true);
+}
+
+<style>
+    .bottom-nav-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: @(AppMeasures.Size.BottomNavHeight)px;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        z-index: @(AppMeasures.ZLayer.Modal);
+    }
+
+    .nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px8)px 0;
+        transition: all @(AppMeasures.Duration.Normal)s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-icon-box {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: @(AppMeasures.Size.Px32)px;
+        width: @(AppMeasures.Size.Px32)px;
+        border-radius: @(AppMeasures.Radius.Medium + "px");
+        transition: all @(AppMeasures.Duration.Normal)s ease;
+    }
+
+    /* Nav tab icon: grayscale + dimmed while its tab is inactive, full colour when active. Namespaced (".nav-icon", not ".icon") so it never leaks onto other icons app-wide. */
+    .nav-icon {
+        font-size: @(AppMeasures.Font.Title)px;
+        opacity: @(AppMeasures.Opacity.Dim);
+        filter: grayscale(100%);
+        transition: all @(AppMeasures.Duration.Normal)s ease;
+    }
+
+    .nav-label {
+        font-size: @(AppMeasures.Font.Small + "px");
+        font-weight: @AppMeasures.Weight.Medium;
+        color: @textSecondary;
+        margin-top: @(AppMeasures.Space.Px4)px;
+        transition: all @(AppMeasures.Duration.Normal)s ease;
+    }
+
+    .nav-dot {
+        position: absolute;
+        bottom: -@(AppMeasures.Space.Px6)px;
+        width: @(AppMeasures.Size.Px4)px;
+        height: @(AppMeasures.Size.Px4)px;
+        background-color: @primary;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        animation: scaleIn @(AppMeasures.Duration.Normal)s ease-out forwards;
+    }
+
+    .nav-item.active .nav-icon-box {
+        background-color: @primaryTint;
+        transform: translateY(-@(AppMeasures.Space.Px4)px);
+    }
+
+    .nav-item.active .nav-icon {
+        opacity: 1;
+        filter: grayscale(0%);
+    }
+
+    .nav-item.active .nav-label {
+        color: @primary;
+        transform: translateY(-@(AppMeasures.Space.Px2)px);
+    }
+</style>
+

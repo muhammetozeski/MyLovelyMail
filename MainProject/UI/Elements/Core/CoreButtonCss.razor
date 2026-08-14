@@ -1,0 +1,31 @@
+<style>
+    .core-btn {
+        border: none;
+        /* box-sizing keeps padding INSIDE the declared width so a full-width button never overflows its parent. */
+        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* text-align guards against an inherited left/right alignment from the surrounding text container. */
+        text-align: center;
+        cursor: pointer;
+        transition: transform @(AppMeasures.Duration.Fast)s, box-shadow @(AppMeasures.Duration.Fast)s, opacity @(AppMeasures.Duration.Fast)s;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+        /* Full-width variant: a block-level flex box filling 100% of the parent. inline-flex shrinks to content, so it must switch to flex to actually stretch. box-sizing above keeps it inside the parent. */
+        .core-btn--full {
+            display: flex;
+            width: @(AppMeasures.Percent.Full)%;
+        }
+
+        .core-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .core-btn:disabled {
+            opacity: @(AppMeasures.Opacity.Dim);
+            cursor: not-allowed;
+            box-shadow: none !important;
+        }
+</style>

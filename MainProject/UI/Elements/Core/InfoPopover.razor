@@ -1,0 +1,67 @@
+@* Reusable tap-to-reveal info bubble. Wrap any trigger content (a chip, a benefit row, an icon) in
+   <InfoPopover Text="..."> and tapping the trigger floats a small frosted bubble with that explanation.
+   No JavaScript: a Blazor flag toggles an "open" class and CSS drives the fade/scale; a full-screen
+   transparent catcher closes it on the next outside tap. Used by the paywall benefit chips and the
+   ProUpsellModal benefit rows to explain what each PRO unlock means. *@
+<span class="info-popover @CustomClass">
+    <span class="info-popover-trigger" @onclick="Toggle" @onclick:stopPropagation="true">
+        @ChildContent
+    </span>
+
+    @if (_isOpen)
+    {
+        <span class="info-popover-catcher" @onclick="Close" @onclick:stopPropagation="true"></span>
+
+        <span class="info-popover-bubble" style="@_bubbleStyle" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <span class="info-popover-title">@Title</span>
+            }
+            <span class="info-popover-text">@Text</span>
+            <span class="info-popover-arrow" style="@_arrowStyle"></span>
+        </span>
+    }
+</span>
+
+<InfoPopoverCss />
+
+@code {
+    /// <summary> Toggles this component's Log output without touching every individual Log call. </summary>
+    const bool ActivateInfoPopoverLogs = false;
+
+    bool _isOpen;
+
+    /// <summary> The trigger the user taps — a chip, benefit row, icon, or any inline content. </summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary> The explanation shown inside the floating bubble. </summary>
+    [Parameter] public string Text { get; set; } = string.Empty;
+
+    /// <summary> Optional bold heading drawn above <see cref="Text"/> (e.g. the benefit name). </summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary> Extra class hook on the wrapper so a consumer can size or align the trigger (e.g. make it stretch). </summary>
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+
+    string _bubbleStyle =>
+        $"background:{AppColors.TooltipBackground.ToRgbaHex(true)};" +
+        $"border:{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)};" +
+        $"box-shadow:{AppStyles.ShadowHeavy};";
+
+    string _arrowStyle =>
+        $"background:{AppColors.TooltipBackground.ToRgbaHex(true)};" +
+        $"border-right:{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)};" +
+        $"border-bottom:{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)};";
+
+    void Toggle()
+    {
+        _isOpen = !_isOpen;
+        Log($"InfoPopover toggled (open={_isOpen}, title='{Title}')", Run: ActivateInfoPopoverLogs);
+    }
+
+    void Close()
+    {
+        Log("InfoPopover closed via outside tap", Run: ActivateInfoPopoverLogs);
+        _isOpen = false;
+    }
+}
