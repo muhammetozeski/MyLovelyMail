@@ -10,6 +10,84 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         //https://gemini.google.com/app/273756111760fb9a
 
         /// <summary>
+        /// Default palette of MyLovelyMail: a LIGHT pastel look — warm cream backdrop with soft
+        /// pink/peach/lavender blooms, rose primary, peach secondary, apricot accent, plum text.
+        /// Frosted surfaces are translucent white so cards read as milky glass over the pastel sky.
+        /// </summary>
+        public static readonly AppTheme LovelyBloom = new()
+        {
+            Name = "Lovely Bloom",
+
+            BackgroundDeep = Color.FromRgba("#FFE8EEFF"),
+            BackgroundBase = Color.FromRgba("#FFF7F2FF"),
+
+            Primary = Color.FromRgba("#EC6FA9FF"),
+            PrimaryLight = Color.FromRgba("#F9A8D4FF"),
+            PrimaryDark = Color.FromRgba("#D14D8BFF"),
+            Secondary = Color.FromRgba("#FF9E80FF"),
+            SecondaryDark = Color.FromRgba("#F4714AFF"),
+            Accent = Color.FromRgba("#FFB86BFF"),
+            AccentDark = Color.FromRgba("#F08C1AFF"),
+
+            TextPrimary = Color.FromRgba("#43293AFF"),
+            TextSecondary = Color.FromRgba("#7D5A6EFF"),
+            TextMuted = Color.FromRgba("#B08FA1FF"),
+
+            SurfaceSubtle = Colors.White.WithAlpha(0.45f),
+            SurfaceNormal = Colors.White.WithAlpha(0.60f),
+            SurfaceStrong = Colors.White.WithAlpha(0.78f),
+            SurfaceTintPrimary = Color.FromRgba("#EC6FA9FF").WithAlpha(0.14f),
+            SurfaceTintAccent = Color.FromRgba("#FFB86BFF").WithAlpha(0.16f),
+            SurfaceDarken = Colors.Black.WithAlpha(0.08f),
+
+            GlassBorderTop = Colors.White.WithAlpha(0.90f),
+            GlassBorderBottom = Colors.White.WithAlpha(0.50f),
+            GlassBorderDefault = Color.FromRgba("#EC6FA9FF").WithAlpha(0.18f),
+
+            TooltipBackground = Color.FromRgba("#FFF0F6FF"),
+            PaywallBackground = Color.FromRgba("#FFE3ECFF"),
+
+            Success = Color.FromRgba("#34B27BFF"),
+            SuccessDark = Color.FromRgba("#1F8F5FFF"),
+            Error = Color.FromRgba("#E85D75FF"),
+            ErrorDark = Color.FromRgba("#D23B57FF"),
+            Warning = Color.FromRgba("#F5A623FF"),
+
+            Gold = Color.FromRgba("#E9B949FF"),
+            GoldDark = Color.FromRgba("#B8860BFF"),
+            PremiumText = Color.FromRgba("#8A6508FF"),
+            Diamond = Color.FromRgba("#4FB6E8FF"),
+            DiamondDark = Color.FromRgba("#1E88C9FF"),
+            Silver = Color.FromRgba("#C0C0C0FF"),
+            SilverDark = Color.FromRgba("#808080FF"),
+            Bronze = Color.FromRgba("#CD7F32FF"),
+            BronzeDark = Color.FromRgba("#8B4513FF"),
+
+            MonthGradients =
+            [
+                (Color.FromRgba("#F9A8D4FF"), Color.FromRgba("#EC6FA9FF")),
+                (Color.FromRgba("#FFC9B3FF"), Color.FromRgba("#FF9E80FF")),
+                (Color.FromRgba("#E3D0FFFF"), Color.FromRgba("#B79CEFFF")),
+                (Color.FromRgba("#B9E8CFFF"), Color.FromRgba("#6FCF97FF")),
+                (Color.FromRgba("#FFE0B3FF"), Color.FromRgba("#FFB86BFF")),
+                (Color.FromRgba("#BBE3F8FF"), Color.FromRgba("#6FB9E8FF")),
+                (Color.FromRgba("#FFC2CCFF"), Color.FromRgba("#F4718DFF")),
+                (Color.FromRgba("#C2F0E4FF"), Color.FromRgba("#5FC9B0FF")),
+                (Color.FromRgba("#FFD1B3FF"), Color.FromRgba("#F49355FF")),
+                (Color.FromRgba("#D9C2F0FF"), Color.FromRgba("#A47FDBFF")),
+                (Color.FromRgba("#F5E3B3FF"), Color.FromRgba("#E9B949FF")),
+                (Color.FromRgba("#C2D8FFFF"), Color.FromRgba("#7FA8EFFF"))
+            ],
+
+            AuroraStops =
+            [
+                new(Color.FromRgba("#FFC4D8FF"), "20% 15%", "55% 60%"),
+                new(Color.FromRgba("#FFD9C2FF"), "85% 35%", "60% 55%"),
+                new(Color.FromRgba("#E3D0FFFF"), "30% 95%", "60% 50%")
+            ]
+        };
+
+        /// <summary>
         /// Default palette: midnight-violet aurora backdrop, bright indigo primary, warm coral secondary,
         /// amber accent. Designed for a generic UI template theme — readable, premium, warm.
         /// </summary>
@@ -90,5 +168,8 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
                 new(Color.FromArgb("#7A2350"), "30% 95%", "60% 50%")
             ]
         };
+
+        /// <summary>Every shipped palette, in the order the theme picker lists them.</summary>
+        public static readonly AppTheme[] All = [LovelyBloom, PlayfulStarlight];
     }
 }

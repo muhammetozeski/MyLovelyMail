@@ -10,6 +10,7 @@ namespace MyLovelyMail
         {
             AppPaths.EnsureCreated();
             SettingsManager.LoadSettings();
+            MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
 
             var builder = MauiApp.CreateBuilder();
             builder
