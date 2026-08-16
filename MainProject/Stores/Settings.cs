@@ -1,0 +1,130 @@
+namespace MyLovelyMail.MainProject.Stores
+{
+    /// <summary>How deleting a message behaves.</summary>
+    public enum DeleteBehavior
+    {
+        MoveToTrash,
+        ArchiveInstead,
+        DeletePermanently
+    }
+
+    /// <summary>When remote images inside HTML mail are loaded.</summary>
+    public enum ExternalImagesPolicy
+    {
+        Block,
+        AllowFromContacts,
+        AllowAlways
+    }
+
+    /// <summary>How the credential vault encrypts stored passwords.</summary>
+    public enum VaultMode
+    {
+        Dpapi,
+        MasterPassword
+    }
+
+    /// <summary>Body format new messages start in.</summary>
+    public enum ComposeFormat
+    {
+        Html,
+        PlainText
+    }
+
+    /// <summary>
+    /// All globally accessible settings. Each public static readonly Setting&lt;T&gt; field is
+    /// auto-registered by <see cref="SettingsManager"/> (its key is the field name). Per-account
+    /// overrides of the mail-related subset live in <see cref="AccountSettings"/> and inherit
+    /// from these fields live until overridden.
+    /// </summary>
+    public static class Settings
+    {
+        // ---- Appearance ----
+
+        /// <summary>Name of the active theme in AppThemes ("LovelyBloom" pastel default, "PlayfulStarlight" dark).</summary>
+        public static readonly Setting<string> Theme = new("LovelyBloom");
+
+        /// <summary>Pick the light/dark theme automatically from the Windows app theme instead of the fixed Theme value.</summary>
+        public static readonly Setting<bool> FollowSystemTheme = new(false);
+
+        /// <summary>Global UI scale multiplier in percent (100 = design size).</summary>
+        public static readonly Setting<int> UiScalePercent = new(100);
+
+        /// <summary>Message list density: "Cozy", "Comfortable" or "Compact".</summary>
+        public static readonly Setting<string> MessageListDensity = new("Comfortable");
+
+        /// <summary>Show the unread-count badge on folders and the tray icon.</summary>
+        public static readonly Setting<bool> ShowUnreadBadge = new(true);
+
+        // ---- Sync ----
+
+        /// <summary>Minutes between automatic mail syncs when IMAP IDLE is not active.</summary>
+        public static readonly Setting<int> SyncIntervalMinutes = new(5);
+
+        /// <summary>Keep an IMAP IDLE connection open so new mail arrives instantly.</summary>
+        public static readonly Setting<bool> UseImapIdle = new(true);
+
+        /// <summary>Download attachments together with the message body instead of on first open.</summary>
+        public static readonly Setting<bool> DownloadAttachmentsAutomatically = new(false);
+
+        /// <summary>How many days of mail to keep offline in UserCache (0 = everything).</summary>
+        public static readonly Setting<int> OfflineKeepDays = new(0);
+
+        // ---- Reading ----
+
+        /// <summary>Seconds a message must stay open before it is marked read (0 = immediately).</summary>
+        public static readonly Setting<int> MarkAsReadDelaySeconds = new(0);
+
+        /// <summary>Group messages of the same thread into conversations in the list.</summary>
+        public static readonly Setting<bool> ConversationView = new(true);
+
+        /// <summary>Privacy policy for remote images inside HTML mail.</summary>
+        public static readonly Setting<ExternalImagesPolicy> ExternalImages = new(ExternalImagesPolicy.Block);
+
+        /// <summary>What happens when the user deletes a message.</summary>
+        public static readonly Setting<DeleteBehavior> DeleteAction = new(DeleteBehavior.MoveToTrash);
+
+        // ---- Composing ----
+
+        /// <summary>Body format new messages start in.</summary>
+        public static readonly Setting<ComposeFormat> DefaultComposeFormat = new(ComposeFormat.Html);
+
+        /// <summary>HTML signature appended to outgoing mail (empty = none).</summary>
+        public static readonly Setting<string> SignatureHtml = new("");
+
+        /// <summary>Seconds the outbox holds a sent message for "undo send" (0 = send immediately).</summary>
+        public static readonly Setting<int> UndoSendSeconds = new(5);
+
+        // ---- Notifications ----
+
+        /// <summary>Show a Windows notification when new mail arrives.</summary>
+        public static readonly Setting<bool> NotifyOnNewMail = new(true);
+
+        /// <summary>Notification sound name from Resources/Sounds ("none" silences, filters can override per rule).</summary>
+        public static readonly Setting<string> NotificationSound = new("default");
+
+        /// <summary>Quiet-hours window (local hour 0-23) during which notifications are held back. Start==End disables it.</summary>
+        public static readonly Setting<int> QuietHoursStart = new(0);
+        public static readonly Setting<int> QuietHoursEnd = new(0);
+
+        // ---- Window and startup ----
+
+        /// <summary>Closing the window hides to the system tray instead of exiting.</summary>
+        public static readonly Setting<bool> CloseToTray = new(true);
+
+        /// <summary>Start hidden in the tray instead of showing the window.</summary>
+        public static readonly Setting<bool> StartMinimized = new(false);
+
+        /// <summary>Launch MyLovelyMail automatically at Windows sign-in.</summary>
+        public static readonly Setting<bool> StartWithWindows = new(false);
+
+        // ---- Security ----
+
+        /// <summary>How the credential vault encrypts account passwords on disk.</summary>
+        public static readonly Setting<VaultMode> CredentialVaultMode = new(VaultMode.Dpapi);
+
+        // ---- Diagnostics ----
+
+        /// <summary>Master logging on/off.</summary>
+        public static readonly Setting<bool> EnableLogging = new(false);
+    }
+}

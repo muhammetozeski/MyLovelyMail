@@ -7,6 +7,7 @@ namespace MyLovelyMail
         public static void Main(string[] args)
         {
             MainProject.Storage.AppPaths.EnsureCreated();
+            MainProject.Stores.SettingsManager.LoadSettings();
 
             var builder = WebApplication.CreateBuilder(args);
 
