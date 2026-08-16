@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail
 {
@@ -6,6 +7,8 @@ namespace MyLovelyMail
     {
         public static MauiApp CreateMauiApp()
         {
+            AppPaths.EnsureCreated();
+
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()

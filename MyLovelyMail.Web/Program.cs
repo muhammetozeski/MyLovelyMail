@@ -6,6 +6,8 @@ namespace MyLovelyMail
     {
         public static void Main(string[] args)
         {
+            MainProject.Storage.AppPaths.EnsureCreated();
+
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
