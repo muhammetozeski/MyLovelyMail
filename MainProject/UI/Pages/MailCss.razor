@@ -1,0 +1,363 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+
+@{
+    string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string textMuted = AppColors.TextMuted.ToRgbaHex(true);
+    string primary = AppColors.Primary.ToRgbaHex(true);
+    string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+}
+
+<style>
+    .mail-screen {
+        display: grid;
+        grid-template-columns: @(AppMeasures.Size.Px260)px @(AppMeasures.Size.Px360)px 1fr;
+        gap: @(AppMeasures.Space.Medium)px;
+        padding: @(AppMeasures.Space.Medium)px;
+        box-sizing: border-box;
+        height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+        min-height: 0;
+    }
+
+    /* ---- Sidebar ---- */
+
+    .mail-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .mail-logo {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+        padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-welcome-card {
+        text-align: center;
+    }
+
+    .mail-welcome-icon {
+        font-size: @(AppMeasures.Font.Giant)px;
+    }
+
+    .mail-welcome-title {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin: @(AppMeasures.Space.Px8)px 0;
+    }
+
+    .mail-welcome-text {
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Normal)px;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        margin: 0 0 @(AppMeasures.Space.Px16)px 0;
+    }
+
+    .mail-account {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        color: @textPrimary;
+        text-align: left;
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-account:hover,
+        .mail-account--active {
+            background: @surfaceTint;
+        }
+
+    .mail-account-dot {
+        width: @(AppMeasures.Size.Px12)px;
+        height: @(AppMeasures.Size.Px12)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        flex-shrink: 0;
+    }
+
+    .mail-account-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-folder {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px24)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Normal)px;
+        text-align: left;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-folder:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-folder--active {
+        background: @surfaceTint;
+        color: @primary;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    .mail-folder-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ---- Message list ---- */
+
+    .mail-list {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px8)px;
+        min-height: 0;
+    }
+
+    .mail-rows {
+        overflow-y: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding-right: @(AppMeasures.Space.Px2)px;
+    }
+
+    .mail-row {
+        display: flex;
+        align-items: flex-start;
+        gap: @(AppMeasures.Space.Px8)px;
+        width: @(AppMeasures.Percent.Full)%;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        cursor: pointer;
+        text-align: left;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        color: @textPrimary;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+        box-sizing: border-box;
+    }
+
+        .mail-row:hover {
+            background: @surfaceTint;
+            transform: translateY(-@(AppMeasures.Size.Px1)px);
+        }
+
+    .mail-row--active {
+        background: @surfaceTint;
+        border-color: @primary;
+    }
+
+    .mail-row-dot {
+        width: @(AppMeasures.Size.Px5)px;
+        height: @(AppMeasures.Size.Px5)px;
+        margin-top: @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        flex-shrink: 0;
+        background: transparent;
+    }
+
+    .mail-row--unread .mail-row-dot {
+        background: @primary;
+    }
+
+    .mail-row--unread .mail-row-from,
+    .mail-row--unread .mail-row-subject {
+        font-weight: @(AppMeasures.Weight.Heavy);
+    }
+
+    .mail-row-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+    }
+
+    .mail-row-top {
+        display: flex;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-row-from {
+        font-size: @(AppMeasures.Font.Normal)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-row-date {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+        flex-shrink: 0;
+    }
+
+    .mail-row-subject {
+        font-size: @(AppMeasures.Font.Normal)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-row-flag {
+        margin-right: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-row-preview {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-row-attach {
+        margin-right: @(AppMeasures.Space.Px4)px;
+    }
+
+    /* ---- Reader ---- */
+
+    .mail-reader {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Medium)px;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .mail-reader-header {
+        display: flex;
+        align-items: flex-start;
+        gap: @(AppMeasures.Space.Px12)px;
+    }
+
+    .mail-reader-titles {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        min-width: 0;
+    }
+
+    .mail-reader-subject {
+        font-size: @(AppMeasures.Font.Title)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+        line-height: @(AppMeasures.LineHeight.Tight);
+    }
+
+    .mail-reader-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textSecondary;
+    }
+
+    .mail-reader-to {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+    }
+
+    .mail-reader-body {
+        flex: 1;
+    }
+
+    .mail-reader-preview,
+    .mail-reader-nobody {
+        margin: 0;
+        text-align: left;
+        font-size: @(AppMeasures.Font.Medium)px;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        color: @textPrimary;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .mail-reader-nobody {
+        color: @textMuted;
+        font-style: italic;
+    }
+
+    /* ---- Shared empty state ---- */
+
+    .mail-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        color: @textMuted;
+        min-height: @(AppMeasures.Size.Px200)px;
+    }
+
+    .mail-empty-icon {
+        font-size: @(AppMeasures.Font.Mega)px;
+        opacity: @(AppMeasures.Opacity.Soft);
+    }
+
+    .mail-empty-text {
+        font-size: @(AppMeasures.Font.Normal)px;
+    }
+
+    /* ---- Responsive: drop to two panes, then one ---- */
+
+    @@media (max-width: @(AppMeasures.Breakpoint.TwoPane)px) {
+        .mail-screen {
+            grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
+        }
+
+        .mail-reader {
+            display: none;
+        }
+
+        .mail-screen--reading .mail-reader {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: @(AppMeasures.ZLayer.Overlay);
+            padding: @(AppMeasures.Space.Medium)px;
+            @((MarkupString)AppStyles.BuildAuroraBackground())
+        }
+    }
+
+    @@media (max-width: @(AppMeasures.Breakpoint.OnePane)px) {
+        .mail-screen {
+            grid-template-columns: 1fr;
+        }
+
+        .mail-sidebar {
+            flex-direction: row;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .mail-folder {
+            padding-left: @(AppMeasures.Space.Px8)px;
+        }
+    }
+</style>

@@ -110,6 +110,13 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int BottomNavHeight = 70;
         }
 
+        /// <summary> Responsive breakpoints in CSS px (max-width media queries). Below TwoPane the mail screen drops the sidebar into a drawer; below OnePane the list and reader stack into a single switching pane. </summary>
+        public static class Breakpoint
+        {
+            public const int TwoPane = 980;
+            public const int OnePane = 660;
+        }
+
         /// <summary> Percentage measures. The number is unitless here; append the '%' sign at the call site. </summary>
         public static class Percent
         {

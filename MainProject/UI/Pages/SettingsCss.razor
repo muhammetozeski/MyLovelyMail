@@ -1,0 +1,128 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+
+<style>
+    .settings-screen {
+        max-width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px200)px;
+        margin: 0 auto;
+        padding: @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Px120)px;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Medium)px;
+    }
+
+    .settings-title {
+        font-size: @(AppMeasures.Font.Hero)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        margin: @(AppMeasures.Space.Px12)px 0 0;
+    }
+
+    .settings-section {
+        text-align: left;
+    }
+
+    .settings-section-title {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin-bottom: @(AppMeasures.Space.Px12)px;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px16)px;
+        padding: @(AppMeasures.Space.Px10)px 0;
+        border-top: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+    }
+
+        .settings-row:first-of-type {
+            border-top: none;
+        }
+
+    .settings-row-text {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        min-width: 0;
+    }
+
+    .settings-row-label {
+        font-size: @(AppMeasures.Font.Medium)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .settings-row-hint {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+    }
+
+    .settings-number {
+        width: @(AppMeasures.Size.Px100)px;
+        flex-shrink: 0;
+    }
+
+    .settings-empty-text {
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        margin: 0;
+    }
+
+    .settings-account-dot {
+        width: @(AppMeasures.Size.Px12)px;
+        height: @(AppMeasures.Size.Px12)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .settings-themes {
+        display: flex;
+        gap: @(AppMeasures.Space.Px12)px;
+        flex-wrap: wrap;
+    }
+
+    .settings-theme {
+        width: @(AppMeasures.Size.Px140)px;
+        height: @(AppMeasures.Size.Px80)px;
+        border-radius: @(AppMeasures.Radius.Large)px;
+        border: @(AppMeasures.Border.Medium)px solid;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: @(AppMeasures.Space.Px12)px;
+        box-sizing: border-box;
+        transition: transform @(AppMeasures.Duration.Fast)s ease, box-shadow @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .settings-theme:hover {
+            transform: translateY(-@(AppMeasures.Space.Px2)px);
+            box-shadow: @AppStyles.ShadowMedium;
+        }
+
+    .settings-theme--active {
+        box-shadow: @AppStyles.ShadowPrimaryGlow;
+    }
+
+    .settings-theme-name {
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+    }
+
+    .settings-theme-dots {
+        display: flex;
+        gap: @(AppMeasures.Space.Px4)px;
+    }
+
+    .settings-theme-dot {
+        width: @(AppMeasures.Size.Px14)px;
+        height: @(AppMeasures.Size.Px14)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        border: @(AppMeasures.Border.Thin)px solid rgba(255,255,255,0.6);
+    }
+</style>

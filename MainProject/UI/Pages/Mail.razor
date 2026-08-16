@@ -1,0 +1,155 @@
+@attribute [Route("/")]
+@attribute [Route(NavigationConstants.Mail.Link)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@implements IDisposable
+@inject NavigationManager Navigation
+<PageTitle>My Lovely Mail</PageTitle>
+
+<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")">
+
+    @* ---- Left: accounts + folders ---- *@
+    <aside class="mail-sidebar">
+        <div class="mail-logo">💌<span class="mail-logo-text">My Lovely Mail</span></div>
+
+        @if (AccountStore.Accounts.Count == 0)
+        {
+            <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
+                <div class="mail-welcome-icon">🌸</div>
+                <div class="mail-welcome-title">Welcome!</div>
+                <p class="mail-welcome-text">Add your first mail account and your inbox will bloom here.</p>
+                <PrimaryButton IsFullWidth="true" OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))">
+                    ➕ Add account
+                </PrimaryButton>
+            </GlassCard>
+        }
+        else
+        {
+            @foreach (var account in AccountStore.Accounts)
+            {
+                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "")"
+                        @onclick="() => SelectAccount(account)">
+                    <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
+                </button>
+
+                @if (MailUiState.SelectedAccount?.Id == account.Id)
+                {
+                    @foreach (var folder in Folders)
+                    {
+                        <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                @onclick="() => MailUiState.SelectFolder(folder)">
+                            <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
+                            <span class="mail-folder-name">@folder.DisplayName</span>
+                            @if (folder.UnreadCount > 0)
+                            {
+                                <CoreChip Text="@folder.UnreadCount.ToString()"
+                                          Background="@AppColors.Primary"
+                                          TextColor="@AppColors.TextOnAccent"
+                                          FontSize="@AppMeasures.Font.XSmall"
+                                          PaddingX="8" PaddingY="2" />
+                            }
+                        </button>
+                    }
+                }
+            }
+        }
+    </aside>
+
+    @* ---- Middle: message list ---- *@
+    <section class="mail-list">
+        <div class="mail-search">
+            <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+        </div>
+
+        @if (MailUiState.SelectedFolder == null)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">📮</div>
+                <div class="mail-empty-text">Pick a folder to see its mail</div>
+            </div>
+        }
+        else if (FilteredSummaries.Count == 0)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">🕊️</div>
+                <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+            </div>
+        }
+        else
+        {
+            <div class="mail-rows">
+                <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
+                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "")"
+                            @onclick="() => MailUiState.OpenMessageInReader(message)">
+                        <span class="mail-row-dot"></span>
+                        <span class="mail-row-main">
+                            <span class="mail-row-top">
+                                <span class="mail-row-from">@(string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName)</span>
+                                <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
+                            </span>
+                            <span class="mail-row-subject">
+                                @if (message.Flags.HasFlag(MailFlags.Important))
+                                {
+                                    <span class="mail-row-flag">❗</span>
+                                }
+                                @if (message.Flags.HasFlag(MailFlags.Flagged))
+                                {
+                                    <span class="mail-row-flag">⭐</span>
+                                }
+                                @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
+                            </span>
+                            <span class="mail-row-preview">
+                                @if (message.HasAttachments)
+                                {
+                                    <span class="mail-row-attach">📎</span>
+                                }
+                                @message.PreviewText
+                            </span>
+                        </span>
+                    </button>
+                </Virtualize>
+            </div>
+        }
+    </section>
+
+    @* ---- Right: reading pane ---- *@
+    <section class="mail-reader">
+        @if (MailUiState.OpenMessage is not { } open)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">💌</div>
+                <div class="mail-empty-text">Select a message to read it here</div>
+            </div>
+        }
+        else
+        {
+            <div class="mail-reader-header">
+                <BackButton OnClick="@MailUiState.CloseMessage" />
+                <div class="mail-reader-titles">
+                    <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
+                    <div class="mail-reader-meta">
+                        <span class="mail-reader-from">@open.FromName &lt;@open.FromAddress&gt;</span>
+                        <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
+                    {
+                        <div class="mail-reader-to">to @open.ToAddresses</div>
+                    }
+                </div>
+            </div>
+
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
+                @if (string.IsNullOrWhiteSpace(open.PreviewText))
+                {
+                    <p class="mail-reader-nobody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
+                }
+                else
+                {
+                    <p class="mail-reader-preview">@open.PreviewText</p>
+                }
+            </GlassCard>
+        }
+    </section>
+</div>
+
+<MailCss />

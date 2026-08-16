@@ -1,0 +1,133 @@
+@attribute [Route(NavigationConstants.Settings.Link)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
+<PageTitle>Settings — My Lovely Mail</PageTitle>
+
+<div class="settings-screen">
+    <h1 class="settings-title">⚙️ Settings</h1>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🎨 Appearance</div>
+        <div class="settings-themes">
+            @foreach (var theme in AppThemes.All)
+            {
+                <button class="settings-theme @(ThemeManager.Current == theme ? "settings-theme--active" : "")"
+                        style="@ThemePreviewStyle(theme)"
+                        @onclick="() => ApplyTheme(theme)">
+                    <span class="settings-theme-name" style="color:@theme.TextPrimary.ToRgbaHex(true)">@theme.Name</span>
+                    <span class="settings-theme-dots">
+                        <span class="settings-theme-dot" style="background:@theme.Primary.ToRgbaHex(true)"></span>
+                        <span class="settings-theme-dot" style="background:@theme.Secondary.ToRgbaHex(true)"></span>
+                        <span class="settings-theme-dot" style="background:@theme.Accent.ToRgbaHex(true)"></span>
+                    </span>
+                </button>
+            }
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🪟 Window &amp; startup</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Close to tray</span>
+                <span class="settings-row-hint">Closing the window hides the app instead of exiting</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.CloseToTray.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.CloseToTray, v))" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Start minimized</span>
+                <span class="settings-row-hint">Open hidden in the tray at launch</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.StartMinimized.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.StartMinimized, v))" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Start with Windows</span>
+                <span class="settings-row-hint">Launch automatically when you sign in</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.StartWithWindows.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.StartWithWindows, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🔔 Notifications</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Notify on new mail</span>
+                <span class="settings-row-hint">Show a Windows notification when mail arrives</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.NotifyOnNewMail.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.NotifyOnNewMail, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🔄 Sync</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Sync interval (minutes)</span>
+                <span class="settings-row-hint">How often accounts check for new mail</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.SyncIntervalMinutes.Value.ToString()" ValueChanged="@SetSyncInterval" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Instant push (IMAP IDLE)</span>
+                <span class="settings-row-hint">Keep a live connection so mail arrives immediately</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.UseImapIdle.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.UseImapIdle, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">👤 Accounts</div>
+        @if (AccountStore.Accounts.Count == 0)
+        {
+            <p class="settings-empty-text">No accounts yet.</p>
+        }
+        else
+        {
+            @foreach (var account in AccountStore.Accounts)
+            {
+                <div class="settings-row">
+                    <div class="settings-row-text">
+                        <span class="settings-row-label">
+                            <span class="settings-account-dot" style="background:@account.ColorHex"></span>
+                            @account.EmailAddress
+                        </span>
+                        <span class="settings-row-hint">@account.Protocol · @account.IncomingHost</span>
+                    </div>
+                </div>
+            }
+        }
+    </GlassCard>
+</div>
+
+<SettingsCss />
+
+@code {
+    static void SetAndSave<T>(Setting<T> setting, T value)
+    {
+        setting.Set(value);
+        SettingsManager.SaveSettings();
+    }
+
+    static void SetSyncInterval(string text)
+    {
+        if (int.TryParse(text, out int minutes) && minutes > 0)
+            SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
+    }
+
+    void ApplyTheme(AppTheme theme)
+    {
+        GlobalSettings.Theme.Set(theme.Name);
+        SettingsManager.SaveSettings();
+        ThemeManager.Apply(theme);
+    }
+
+    static string ThemePreviewStyle(AppTheme theme) =>
+        $"background:linear-gradient(160deg, {theme.BackgroundBase.ToRgbaHex(true)}, {theme.BackgroundDeep.ToRgbaHex(true)});" +
+        $"border-color:{(ThemeManager.Current == theme ? AppColors.Primary.ToRgbaHex(true) : AppColors.GlassBorderDefault.ToRgbaHex(true))};";
+}

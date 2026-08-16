@@ -1,0 +1,57 @@
+@* Pill-shaped on/off switch. No JavaScript: the Blazor click flips the bound value and CSS
+   animates the knob. Use for every boolean setting so switches look identical app-wide. *@
+<button type="button"
+        class="core-toggle @(Checked ? "core-toggle--on" : "") @CustomClass"
+        style="@_style"
+        disabled="@Disabled"
+        @onclick="Flip">
+    <span class="core-toggle-knob" style="@_knobStyle"></span>
+</button>
+
+<style>
+    .core-toggle {
+        position: relative;
+        width: @(AppMeasures.Size.Px48)px;
+        height: @(AppMeasures.Size.Px28)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .core-toggle:disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
+            cursor: not-allowed;
+        }
+
+    .core-toggle-knob {
+        position: absolute;
+        top: @(AppMeasures.Space.Px2)px;
+        left: @(AppMeasures.Space.Px2)px;
+        width: @(AppMeasures.Size.Px24)px;
+        height: @(AppMeasures.Size.Px24)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        transition: transform @(AppMeasures.Duration.Fast)s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .core-toggle--on .core-toggle-knob {
+        transform: translateX(@(AppMeasures.Size.Px20)px);
+    }
+</style>
+
+@code {
+    [Parameter] public bool Checked { get; set; }
+    [Parameter] public EventCallback<bool> CheckedChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+
+    string _style => Checked
+        ? $"background:linear-gradient(135deg, {AppColors.Primary.ToRgbaHex(true)}, {AppColors.Accent.ToRgbaHex(true)});box-shadow:{AppStyles.ShadowPrimaryGlow};"
+        : $"background:{AppColors.SurfaceDarken.ToRgbaHex(true)};border:{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)};";
+
+    string _knobStyle => $"background:{AppColors.TextOnFilledSurface.ToRgbaHex(true)};box-shadow:{AppStyles.ShadowSoft};";
+
+    Task Flip() => Disabled ? Task.CompletedTask : CheckedChanged.InvokeAsync(!Checked);
+}
