@@ -9,6 +9,7 @@ namespace MyLovelyMail
             MainProject.Storage.AppPaths.EnsureCreated();
             MainProject.Stores.SettingsManager.LoadSettings();
             MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
+            MainProject.Stores.AccountStore.Load();
 
             var builder = WebApplication.CreateBuilder(args);
 
