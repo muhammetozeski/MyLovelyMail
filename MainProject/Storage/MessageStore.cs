@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 
 namespace MyLovelyMail.MainProject.Storage
@@ -263,6 +264,15 @@ namespace MyLovelyMail.MainProject.Storage
                 Log($"Could not read cached message '{path}': {ex.Message}", LogLevel.Warning);
                 return null;
             }
+        }
+
+        /// <summary>The cached MIME parsed, or null when not cached. Parse failures throw — callers decide how to handle them.</summary>
+        public static MimeMessage? TryLoadMimeMessage(string accountId, string folderFullName, uint uid)
+        {
+            byte[]? bytes = TryLoadFullMessage(accountId, folderFullName, uid);
+            if (bytes == null) return null;
+            using var stream = new MemoryStream(bytes);
+            return MimeMessage.Load(stream);
         }
 
         #endregion

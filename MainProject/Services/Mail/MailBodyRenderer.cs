@@ -42,13 +42,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static RenderedBody? Render(MailAccountData account, string folderFullName, MailMessageSummary summary, bool allowRemoteImages = false)
         {
-            byte[]? mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid);
-            if (mimeBytes == null) return null;
-
             try
             {
-                using var stream = new MemoryStream(mimeBytes);
-                var message = MimeMessage.Load(stream);
+                if (MessageStore.TryLoadMimeMessage(account.Id, folderFullName, summary.Uid) is not { } message)
+                    return null;
 
                 bool blocked = false;
                 string body = !string.IsNullOrWhiteSpace(message.HtmlBody)

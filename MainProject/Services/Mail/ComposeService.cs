@@ -58,11 +58,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Reopens a stored draft summary as an editable ComposeDraft (null when its MIME is gone).</summary>
         public static ComposeDraft? LoadDraft(MailAccountData account, MailMessageSummary summary)
         {
-            byte[]? bytes = MessageStore.TryLoadFullMessage(account.Id, LocalDraftsFullName, summary.Uid);
-            if (bytes == null) return null;
+            if (MessageStore.TryLoadMimeMessage(account.Id, LocalDraftsFullName, summary.Uid) is not { } message)
+                return null;
 
-            using var stream = new MemoryStream(bytes);
-            var message = MimeMessage.Load(stream);
             return new ComposeDraft
             {
                 DraftId = summary.MessageId.StartsWith(DraftMessageIdPrefix) ? summary.MessageId[DraftMessageIdPrefix.Length..] : Guid.NewGuid().ToString("N"),
@@ -122,11 +120,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             try
             {
-                byte[]? mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid);
-                if (mimeBytes != null)
+                if (MessageStore.TryLoadMimeMessage(account.Id, folderFullName, summary.Uid) is { } message)
                 {
-                    using var stream = new MemoryStream(mimeBytes);
-                    var message = MimeMessage.Load(stream);
                     if (!string.IsNullOrWhiteSpace(message.TextBody)) return message.TextBody;
                     if (!string.IsNullOrWhiteSpace(message.HtmlBody))
                         return Regex.Replace(message.HtmlBody, "<[^>]+>", " ").Trim();

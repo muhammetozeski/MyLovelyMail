@@ -73,10 +73,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             try
             {
-                byte[]? bytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid);
-                if (bytes == null) return null;
-                using var stream = new MemoryStream(bytes);
-                return MimeMessage.Load(stream);
+                return MessageStore.TryLoadMimeMessage(account.Id, folderFullName, summary.Uid);
             }
             catch (Exception ex)
             {
