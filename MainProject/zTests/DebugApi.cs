@@ -120,6 +120,8 @@ namespace MyLovelyMail.MainProject.ZTests
             public string Subject { get; set; } = string.Empty;
             public string Body { get; set; } = string.Empty;
             public List<string> AttachmentPaths { get; set; } = [];
+            /// <summary>True = go through OutboxService (undo window) exactly like the compose pane's Send button.</summary>
+            public bool Queued { get; set; }
         }
 
         static async Task<object?> RouteAsync(HttpListenerRequest request)
@@ -270,8 +272,21 @@ namespace MyLovelyMail.MainProject.ZTests
                         await using var source = File.OpenRead(sourcePath);
                         await ComposeService.AttachFileAsync(draft, source, Path.GetFileName(sourcePath));
                     }
+                    if (body.Queued)
+                    {
+                        ComposeService.SaveDraft(draft);
+                        OutboxService.Enqueue(draft);
+                        return new { ok = true, queued = true, dueUtc = OutboxService.Current?.DueUtc };
+                    }
                     await ComposeService.SendAsync(draft);
                     return new { ok = true, attachments = draft.AttachmentPaths.Count };
+                }
+
+                case ("POST", "/undo"):
+                {
+                    var draft = OutboxService.Undo();
+                    if (draft != null) MailUiState.OpenCompose(draft);
+                    return new { undone = draft != null };
                 }
 
                 case ("POST", "/compose"):
