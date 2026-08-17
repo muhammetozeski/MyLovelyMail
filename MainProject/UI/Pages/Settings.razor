@@ -99,9 +99,13 @@
                         </span>
                         <span class="settings-row-hint">@account.Protocol · @account.IncomingHost</span>
                     </div>
+                    <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
                 </div>
             }
         }
+        <div class="settings-add-account">
+            <PrimaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountWizard.RoutePath))">➕ Add account</PrimaryButton>
+        </div>
     </GlassCard>
 </div>
 
@@ -118,6 +122,12 @@
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
+    }
+
+    void RemoveAccount(string accountId)
+    {
+        CredentialVault.RemovePassword(accountId);
+        AccountStore.Remove(accountId);
     }
 
     void ApplyTheme(AppTheme theme)

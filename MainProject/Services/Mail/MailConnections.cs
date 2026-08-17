@@ -23,9 +23,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         };
 
         /// <summary>The vault password for the account, or an explanatory exception when locked/missing.</summary>
-        static string RequirePassword(MailAccountData account)
+        static string RequirePassword(MailAccountData account, string? passwordOverride)
         {
-            string? password = CredentialVault.GetPassword(account.Id);
+            string? password = passwordOverride ?? CredentialVault.GetPassword(account.Id);
             if (password == null)
                 throw new InvalidOperationException(CredentialVault.IsUnlocked
                     ? $"No password stored for account '{account.EmailAddress}'."
@@ -33,13 +33,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return password;
         }
 
-        public static async Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken)
+        public static async Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
         {
             var client = new ImapClient();
             try
             {
                 await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
-                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account), cancellationToken);
+                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
                 return client;
             }
             catch
@@ -49,13 +49,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        public static async Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken)
+        public static async Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
         {
             var client = new Pop3Client();
             try
             {
                 await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
-                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account), cancellationToken);
+                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
                 return client;
             }
             catch
@@ -65,14 +65,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        public static async Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken)
+        public static async Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
         {
             var client = new SmtpClient();
             try
             {
                 string username = string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername;
                 await client.ConnectAsync(account.SmtpHost, account.SmtpPort, ToSocketOptions(account.SmtpSecurity), cancellationToken);
-                await client.AuthenticateAsync(username, RequirePassword(account), cancellationToken);
+                await client.AuthenticateAsync(username, RequirePassword(account, passwordOverride), cancellationToken);
                 return client;
             }
             catch

@@ -1,0 +1,132 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+
+<style>
+    .wizard-screen {
+        max-width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px200)px;
+        margin: 0 auto;
+        padding: @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Px120)px;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Medium)px;
+    }
+
+    .wizard-header {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px12)px;
+        margin-top: @(AppMeasures.Space.Px12)px;
+    }
+
+    .wizard-title {
+        font-size: @(AppMeasures.Font.Title)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        margin: 0;
+    }
+
+    .wizard-card {
+        text-align: left;
+    }
+
+    .wizard-section-title {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin-bottom: @(AppMeasures.Space.Px12)px;
+    }
+
+    .wizard-presets,
+    .wizard-protocols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .wizard-preset {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Normal)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .wizard-preset:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        }
+
+    .wizard-preset--active {
+        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
+        box-shadow: @AppStyles.ShadowPrimaryGlow;
+    }
+
+    .wizard-hint {
+        margin: @(AppMeasures.Space.Px12)px 0 0;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+    }
+
+    .wizard-field {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+        margin-bottom: @(AppMeasures.Space.Px12)px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .wizard-field--small {
+        flex: 0 0 @(AppMeasures.Size.Px140)px;
+    }
+
+    .wizard-label {
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+    }
+
+    .wizard-grid {
+        display: flex;
+        gap: @(AppMeasures.Space.Px12)px;
+        flex-wrap: wrap;
+    }
+
+    .wizard-select {
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px16)px @(AppMeasures.Space.Px12)px;
+        font-size: @(AppMeasures.Font.Normal)px;
+        outline: none;
+    }
+
+    .wizard-test {
+        margin: 0;
+        font-size: @(AppMeasures.Font.Normal)px;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        word-break: break-word;
+    }
+
+    .wizard-test--ok {
+        color: @AppColors.TextSuccess.ToRgbaHex(true);
+    }
+
+    .wizard-test--fail {
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+    }
+
+    .wizard-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: @(AppMeasures.Space.Px12)px;
+    }
+</style>
