@@ -37,10 +37,13 @@
 
     private void UpdateActivePath(string uri)
     {
-        // Normalize to an absolute path like "/home" so NavItem.Path (a full route from NavigationConstants) matches directly.
+        // Normalize to an absolute path like "/mail" so NavItem.Path (a full route from NavigationConstants) matches directly.
         var absolutePath = "/" + NavManager.ToBaseRelativePath(uri).ToLowerInvariant();
-        // Hidden pages (splash, login, paywall, etc.) won't match any tab and fall back to string.Empty.
-        _activePath = NavigationConstants.BottomNavigationItems.FirstOrDefault(item => absolutePath.StartsWith(item.Link)).Link ?? string.Empty;
+        // The root route is the Mail screen, so "/" must light up the Mail tab.
+        if (absolutePath == "/")
+            absolutePath = NavigationConstants.Mail.Link.ToLowerInvariant();
+        // Hidden pages (wizard steps etc.) won't match any tab and fall back to string.Empty.
+        _activePath = NavigationConstants.BottomNavigationItems.FirstOrDefault(item => absolutePath.StartsWith(item.Link.ToLowerInvariant())).Link ?? string.Empty;
     }
 
     public void Dispose()
