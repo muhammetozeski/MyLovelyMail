@@ -1,0 +1,161 @@
+@attribute [Route(RouteTemplate)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@inject NavigationManager Navigation
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
+<PageTitle>Account settings — My Lovely Mail</PageTitle>
+
+<div class="settings-screen">
+    @if (Account == null)
+    {
+        <div class="mail-empty">
+            <div class="mail-empty-icon">👻</div>
+            <div class="mail-empty-text">This account no longer exists.</div>
+        </div>
+    }
+    else
+    {
+        <div class="filters-header">
+            <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
+            <h1 class="filters-title">
+                <span class="settings-account-dot" style="background:@Account.ColorHex"></span>
+                @Account.EmailAddress
+            </h1>
+        </div>
+
+        <GlassCard CustomClass="settings-section">
+            <div class="settings-section-title">🙂 Identity</div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Display name</span>
+                    <span class="settings-row-hint">Shown to recipients of your mail</span>
+                </div>
+                <div class="settings-number settings-number--wide">
+                    <CoreInput Value="@Account.DisplayName" ValueChanged="@SetDisplayName" />
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Account color</span>
+                    <span class="settings-row-hint">Tints the workspace while this account is active</span>
+                </div>
+                <div class="wizard-colors">
+                    @foreach (var colorHex in AccountWizard.AccountColors)
+                    {
+                        <button class="wizard-color @(Account.ColorHex == colorHex ? "wizard-color--active" : "")"
+                                style="background:@colorHex" @onclick="() => SetColor(colorHex)"></button>
+                    }
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Account enabled</span>
+                    <span class="settings-row-hint">Disabled accounts stay configured but never sync</span>
+                </div>
+                <CoreToggle Checked="@Account.Enabled" CheckedChanged="@SetEnabled" />
+            </div>
+        </GlassCard>
+
+        <GlassCard CustomClass="settings-section">
+            <div class="settings-section-title">🧬 Account overrides</div>
+            <p class="settings-empty-text">
+                Each setting follows the global value until you change it here. "Inherited" rows update
+                live when the global setting changes; overridden rows keep their own value.
+            </p>
+            @foreach (var setting in AccountSettingsOf.GetAllSettings())
+            {
+                <div class="settings-row">
+                    <div class="settings-row-text">
+                        <span class="settings-row-label">
+                            @setting.KeyHumanReadable
+                            @if (setting.IsDefault)
+                            {
+                                <span class="account-badge account-badge--inherited">inherited</span>
+                            }
+                            else
+                            {
+                                <span class="account-badge account-badge--overridden">overridden</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="account-setting-controls">
+                        @if (setting.Value is bool boolValue)
+                        {
+                            <CoreToggle Checked="@boolValue" CheckedChanged="@(v => SetValue(setting, v.ToString()))" />
+                        }
+                        else if (setting.Value is Enum enumValue)
+                        {
+                            <select class="filters-select" value="@enumValue.ToString()"
+                                    @onchange="@(e => SetValue(setting, e.Value?.ToString() ?? string.Empty))">
+                                @foreach (var option in Enum.GetValues(enumValue.GetType()))
+                                {
+                                    <option value="@option">@option</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input class="filters-input account-setting-input"
+                                   type="@(setting.Value is int ? "number" : "text")"
+                                   value="@setting.Value"
+                                   @onchange="@(e => SetValue(setting, e.Value?.ToString() ?? string.Empty))" />
+                        }
+                        @if (!setting.IsDefault)
+                        {
+                            <button class="filters-remove" title="Reset to inherited" @onclick="() => ResetSetting(setting)">↩︎</button>
+                        }
+                    </div>
+                </div>
+            }
+        </GlassCard>
+    }
+</div>
+
+<SettingsCss />
+<FilterRulesCss />
+<AccountWizardCss />
+<MailCss />
+<AccountSettingsPageCss />
+
+@code {
+    public const string RouteTemplate = "/Settings/Account/{AccountId}";
+
+    [Parameter] public string AccountId { get; set; } = string.Empty;
+
+    MailAccountData? Account => AccountStore.GetById(AccountId);
+    AccountSettings AccountSettingsOf => AccountStore.GetSettings(AccountId);
+
+    public static string RouteFor(string accountId) => $"/Settings/Account/{accountId}";
+
+    void SetDisplayName(string name)
+    {
+        if (Account is not { } account) return;
+        account.DisplayName = name;
+        AccountStore.Save(account);
+    }
+
+    void SetColor(string colorHex)
+    {
+        if (Account is not { } account) return;
+        account.ColorHex = colorHex;
+        AccountStore.Save(account);
+    }
+
+    void SetEnabled(bool enabled)
+    {
+        if (Account is not { } account) return;
+        account.Enabled = enabled;
+        AccountStore.Save(account);
+    }
+
+    void SetValue(ISetting setting, string text)
+    {
+        ((ISettingSetup)setting).LoadFromStr(text);
+        AccountSettingsOf.Save();
+    }
+
+    void ResetSetting(ISetting setting)
+    {
+        setting.ResetToDefault();
+        AccountSettingsOf.Save();
+    }
+}

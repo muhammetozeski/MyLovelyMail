@@ -183,6 +183,7 @@
                         </span>
                         <span class="settings-row-hint">@account.Protocol · @account.IncomingHost</span>
                     </div>
+                    <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
                     <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
                 </div>
             }
