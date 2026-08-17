@@ -129,7 +129,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         // ---- Diagnostics ----
 
-        /// <summary>Master logging on/off.</summary>
-        public static readonly Setting<bool> EnableLogging = new(false);
+        /// <summary>Master logging on/off. On by default: entries buffer in RAM for the log viewer and persist scrambled to AppCache/Logs.</summary>
+        public static readonly Setting<bool> EnableLogging = new(true);
     }
 }

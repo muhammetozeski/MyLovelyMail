@@ -13,6 +13,8 @@ namespace MyLovelyMail
         {
             AppPaths.EnsureCreated();
             SettingsManager.LoadSettings();
+            Logger.ActivateLogging = Settings.EnableLogging.Value;
+            Logger.Log("App starting: paths ensured, settings loaded.");
             MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
             AccountStore.Load();
             CredentialVault.Load();

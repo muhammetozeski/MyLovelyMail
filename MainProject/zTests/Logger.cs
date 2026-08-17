@@ -2,6 +2,7 @@ global using static Logger;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using MyLovelyMail.MainProject.Storage;
 
 #pragma warning disable CA1050 // Ad alanlarında türleri bildirin
 public static class Logger
@@ -16,7 +17,7 @@ public static class Logger
         set => Interlocked.Exchange(ref _activateLogging, value ? 1 : 0);
     }
 
-    const bool WriteToDisk = false; // Bunu false yaparak diske yazmayı devre dışı bırakabilirsin, bu sayede sadece konsola loglama yapar
+    const bool WriteToDisk = true; // Bunu false yaparak diske yazmayı devre dışı bırakabilirsin, bu sayede sadece konsola loglama yapar
 
     static ConsoleColor LogColor = ConsoleColor.Gray;
 
@@ -29,7 +30,8 @@ public static class Logger
 
     public static readonly string startTime = DateTime.UtcNow.AddHours(3).ToString("yyyy.MM.dd HH.mm.ss.ff");
 
-    public const string LogsFolder = "Logs";
+    /// <summary>Logs live in AppCache: diagnostic data, safe to delete, never part of the user's own data.</summary>
+    public static readonly string LogsFolder = Path.Combine(AppPaths.AppCache, "Logs");
     public const string LogFileNamePrefix = "Log";
     public readonly static string LogFileName = LogsFolder + "\\" + LogFileNamePrefix + " " + startTime + ".txt";
 
@@ -79,7 +81,10 @@ public static class Logger
             {
                 foreach (var (Message, SyncEvent) in _logQueue.GetConsumingEnumerable())
                 {
-                    File.AppendAllText(LogFileName, Message + "\n");
+                    // Every persisted entry is scrambled (logs may carry subjects/addresses);
+                    // one Base64 line in the file = one entry, decoded via LogCrypto.Decrypt.
+                    try { File.AppendAllText(LogFileName, LogCrypto.Encrypt(Message) + "\n"); }
+                    catch { /* Logging must never take the app down with it. */ }
                     SyncEvent?.Set();
                 }
             })
