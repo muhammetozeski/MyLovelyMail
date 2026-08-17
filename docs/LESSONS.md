@@ -25,3 +25,21 @@ Short "problem → solution" notes so the same wall is never hit twice.
 
 - **Windows-invalid characters in Brainstorm idea file names** (`:` and `/` in titles) make
   `Set-Content` fail with misleading binding errors. Keep idea titles free of `\/:*?"<>|`.
+
+- **Browser-automation clicks race Blazor Server's SignalR round-trip.** Setting an input via JS
+  and clicking a disabled-until-bound button in the same script fails silently — the button is
+  still disabled when the click lands. Dispatch the input event, wait for the round-trip, then click.
+
+- **A running MyLovelyMail instance locks MainProject.dll** and `dotnet build` fails with MSB3027
+  after 10 retries. Always `Stop-Process -Name MyLovelyMail` before rebuilding the head project.
+
+- **`CopyFromScreen` snapshots capture whatever covers the window.** Use `PrintWindow` with
+  `PW_RENDERFULLCONTENT` (flag 2) instead — it renders the window's own surface even when it is
+  behind other windows, and it captures WebView2 content correctly.
+
+- **Servers without SPECIAL-USE (RFC 6154) report no folder roles** (smtp4dev, many others), which
+  duplicated Sent handling. `ImapSyncService.GuessRoleFromName` maps the conventional names.
+
+- **smtp4dev is a full local IMAP+SMTP loop for end-to-end tests**: send over SMTP :2525, sync it
+  back over IMAP :1143, any credentials accepted. Combined with the DEBUG-only REST API
+  (`DebugApi`, http://127.0.0.1:52539) the whole receive/send path is verifiable headlessly.
