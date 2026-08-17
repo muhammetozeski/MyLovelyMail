@@ -29,8 +29,10 @@ short, concrete, English, only where the code does not explain itself.
       its place, merge if not.
 - [ ] Null-handling sweep (principle 16): audit `!` uses and unguarded `?.` chains in
       Services and Stores.
-- [ ] Accessibility-modifier sweep (principle 29): drop redundant `private`, make
-      helpers static where they capture nothing (principle 42).
+- [x] Accessibility-modifier sweep (principle 29): checked — only 7 `private` uses exist
+      and all are required (property `private set` accessors, `[GeneratedRegex]` partial
+      signatures that must match generated code). Nothing to remove.
+- [ ] Static-helper sweep: make helpers static where they capture nothing (principle 42).
 - [ ] UI pages comment pass after the structural work settles.
 
 ## Rules picked up mid-work
