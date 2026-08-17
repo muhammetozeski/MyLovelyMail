@@ -18,7 +18,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         const MessageSummaryItems SummaryItems =
             MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.Flags |
-            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText;
+            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText |
+            MessageSummaryItems.References;
 
         /// <summary>Raised after a sync stored NEW messages: (accountId, folderFullName, newMessageCount).</summary>
         public static event Action<string, string, int>? OnNewMail;
@@ -273,6 +274,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 Uid = item.UniqueId.Id,
                 MessageId = item.Envelope?.MessageId ?? string.Empty,
+                InReplyTo = item.Envelope?.InReplyTo ?? string.Empty,
+                ReferenceIds = item.References == null ? [] : [.. item.References],
                 Subject = item.Envelope?.Subject ?? string.Empty,
                 FromName = from?.Name ?? string.Empty,
                 FromAddress = from?.Address ?? string.Empty,

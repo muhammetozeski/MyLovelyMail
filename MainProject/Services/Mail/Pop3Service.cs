@@ -1,4 +1,5 @@
 using MimeKit;
+using MimeKit.Utils;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 
@@ -54,7 +55,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 var summary = new MailMessageSummary
                 {
                     Uid = uid,
-                    MessageId = headers[HeaderId.MessageId] ?? uids[i],
+                    // Normalized (bracket-free) so POP-side ids can match IMAP-side envelope ids in threading.
+                    MessageId = MimeUtils.EnumerateReferences(headers[HeaderId.MessageId] ?? string.Empty).FirstOrDefault() ?? uids[i],
+                    InReplyTo = MimeUtils.EnumerateReferences(headers[HeaderId.InReplyTo] ?? string.Empty).FirstOrDefault() ?? string.Empty,
+                    ReferenceIds = [.. MimeUtils.EnumerateReferences(headers[HeaderId.References] ?? string.Empty)],
                     Subject = headers[HeaderId.Subject] ?? string.Empty,
                     FromName = from?.Name ?? string.Empty,
                     FromAddress = from?.Address ?? headers[HeaderId.From] ?? string.Empty,

@@ -28,6 +28,12 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>RFC Message-Id header, used for threading and duplicate detection.</summary>
         public string MessageId { get; set; } = string.Empty;
 
+        /// <summary>Message-Id this one replies to (empty when not a reply). Normalized, no angle brackets.</summary>
+        public string InReplyTo { get; set; } = string.Empty;
+
+        /// <summary>The References header chain (oldest first), normalized ids. Empty when absent.</summary>
+        public List<string> ReferenceIds { get; set; } = [];
+
         public string Subject { get; set; } = string.Empty;
         public string FromName { get; set; } = string.Empty;
         public string FromAddress { get; set; } = string.Empty;
