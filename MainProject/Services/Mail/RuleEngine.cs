@@ -25,6 +25,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Message-id → custom notification sound chosen by a SetNotificationSound action.</summary>
         static readonly Dictionary<string, string> customSoundByMessageId = [];
 
+        /// <summary>The sound only matters for the toast fired seconds after arrival, so the map is
+        /// simply dropped when it grows past this instead of tracking entry age.</summary>
+        const int MaxRememberedSounds = 500;
+
         /// <summary>Runs every enabled matching rule over the new summaries. Mutates flags/tags in place.</summary>
         public static RuleProcessResult ProcessIncoming(MailAccountData account, string folderFullName, List<MailMessageSummary> newSummaries)
         {
@@ -125,7 +129,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         break;
                     case FilterActionType.SetNotificationSound:
                         if (summary.MessageId.Length > 0)
+                        {
+                            if (customSoundByMessageId.Count >= MaxRememberedSounds)
+                                customSoundByMessageId.Clear();
                             customSoundByMessageId[summary.MessageId] = action.Argument;
+                        }
                         break;
                     case FilterActionType.MoveToRemoteFolder:
                         if (action.Argument.Length > 0)

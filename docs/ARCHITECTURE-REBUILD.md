@@ -19,9 +19,15 @@ short, concrete, English, only where the code does not explain itself.
 ## Next waves (in order)
 - [x] Mail.razor.cs split into focused partials (core list/search, Reader, Compose,
       Interaction) — pure move, no behavior change, smoke-tested — 1c62bcc
-- [ ] Comment pass, Services\Mail: rewrite summaries as notes-to-self; kill any
-      summary that restates the code (principles 39/40). Files: ComposeService,
-      AttachmentService, MessageActions, MailBodyRenderer, SmtpSendService, RuleEngine.
+- [x] MessageActions deduplicated: ToggleRead → SetRead; Delete + flag pushes share
+      RunServerActionInBackground — 5189451. Comments were already concrete.
+- [x] ComposeService deduplicated: StoreInLocalFolder + Preview shared by draft save
+      and Sent archive — da0bc0f. SmtpSendService audited clean (22 lines).
+- [x] Cached-MIME parsing centralized into MessageStore.TryLoadMimeMessage (was copied
+      in ComposeService ×2, AttachmentService, MailBodyRenderer) — 2696c8c, reader
+      smoke-tested. AttachmentService otherwise clean.
+- [ ] Comment/principle pass, remaining Services\Mail files: RuleEngine,
+      MailConnections, SearchService, ResiliencePolicy.
 - [x] Settings quartet verified: Setting (type infra), SettingsFile (shared key=value
       format used by global AND per-account stores), SettingsManager (global registry),
       Settings (declarations) — each earns its place, no merge needed. Half-qualified
