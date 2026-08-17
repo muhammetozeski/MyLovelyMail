@@ -29,6 +29,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
+            Log($"POP3 sync started: {account.EmailAddress}");
             using var client = await ResiliencePolicy.RunNetwork(
                 ct => MailConnections.OpenPop3Async(account, ct), cancellationToken);
 
@@ -101,6 +102,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             });
 
             await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken);
+            Log($"POP3 sync finished: {account.EmailAddress}, {allNew.Count} new of {uids.Count} on server");
         }
 
         /// <summary>Downloads one full message (found by its hashed uid) into the cache and returns it parsed.</summary>

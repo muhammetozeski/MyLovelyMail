@@ -146,6 +146,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static void SetPassword(string accountId, string password)
         {
             secrets[accountId] = password;
+            Log($"Vault: password stored for account {accountId}.");
             Save();
         }
 

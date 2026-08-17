@@ -53,6 +53,7 @@ namespace MyLovelyMail.MainProject.Stores
                 }
             }
             accounts.Sort(static (a, b) => a.CreatedUtc.CompareTo(b.CreatedUtc));
+            Log($"AccountStore loaded: {accounts.Count} account(s).");
         }
 
         public static MailAccountData? GetById(string accountId) =>
@@ -67,6 +68,7 @@ namespace MyLovelyMail.MainProject.Stores
 
             if (!accounts.Any(a => a.Id == account.Id))
                 accounts.Add(account);
+            Log($"Account saved: {account.EmailAddress} ({account.Protocol} {account.IncomingHost})");
             OnAccountsChanged?.Invoke();
         }
 

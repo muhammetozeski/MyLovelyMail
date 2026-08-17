@@ -81,6 +81,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             IsSyncing = false;
             OnSyncStateChanged?.Invoke();
+            Log("Sync pass finished for all enabled accounts.");
         }
     }
 }

@@ -33,12 +33,12 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>Called by the sync services after the rule pass with genuinely NEW messages only.</summary>
         public static void NotifyNewMessages(MailAccountData account, string folderFullName, List<MailMessageSummary> newMessages)
         {
-            if (Presenter == null) return;
-            if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) return;
-            if (IsInQuietHours(DateTime.Now.Hour)) return;
+            if (Presenter == null) { Log("Notification skipped: no platform presenter registered."); return; }
+            if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) { Log($"Notification skipped: NotifyOnNewMail off for {account.EmailAddress}."); return; }
+            if (IsInQuietHours(DateTime.Now.Hour)) { Log("Notification skipped: quiet hours."); return; }
 
             var audible = newMessages.Where(RuleEngine.ShouldNotify).ToList();
-            if (audible.Count == 0) return;
+            if (audible.Count == 0) { Log("Notification skipped: all new messages muted by rules."); return; }
 
             string soundName = RuleEngine.GetNotificationSound(audible[0])
                 ?? AccountStore.GetSettings(account.Id).NotificationSound.Value;

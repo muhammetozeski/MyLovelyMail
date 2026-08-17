@@ -165,9 +165,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
             message.Subject = draft.Subject;
             message.Body = new TextPart("plain") { Text = draft.Body };
 
+            Log($"Compose send started: '{draft.Subject}' -> {draft.To}");
             await SmtpSendService.SendAsync(account, message, cancellationToken);
             await ArchiveToSentAsync(account, message, cancellationToken);
             DeleteDraft(draft);
+            Log($"Compose send finished: '{draft.Subject}'");
         }
 
         static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)

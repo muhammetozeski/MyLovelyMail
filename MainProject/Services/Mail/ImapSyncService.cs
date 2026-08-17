@@ -26,6 +26,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
+            Log($"IMAP sync started: {account.EmailAddress}");
             await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
@@ -33,6 +34,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken);
+            Log($"IMAP sync finished: {account.EmailAddress}");
         }
 
         /// <summary>Syncs one folder's messages (used when the user opens a folder).</summary>
@@ -157,6 +159,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 maxUid = Math.Max(maxUid, item.UniqueId.Id);
                 if (item.UniqueId.Id > lastSeenUid) newCount++;
             }
+            Log($"IMAP folder '{folder.FullName}': fetched {summaries.Count} summaries ({newCount} new), server count {folder.Count}");
 
             // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
             RuleProcessResult? ruleResult = null;

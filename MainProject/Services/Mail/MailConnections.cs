@@ -40,6 +40,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
                 await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
+                Log($"IMAP connected: {account.IncomingHost}:{account.IncomingPort}");
                 return client;
             }
             catch
@@ -56,6 +57,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
                 await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
+                Log($"POP3 connected: {account.IncomingHost}:{account.IncomingPort}");
                 return client;
             }
             catch
@@ -73,6 +75,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 string username = string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername;
                 await client.ConnectAsync(account.SmtpHost, account.SmtpPort, ToSocketOptions(account.SmtpSecurity), cancellationToken);
                 await client.AuthenticateAsync(username, RequirePassword(account, passwordOverride), cancellationToken);
+                Log($"SMTP connected: {account.SmtpHost}:{account.SmtpPort}");
                 return client;
             }
             catch
