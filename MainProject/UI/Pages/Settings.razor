@@ -107,6 +107,28 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">📦 Data &amp; migration</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Migration bundle</span>
+                <span class="settings-row-hint">One file with settings, accounts, filters, tags and passphrase-protected passwords. Mail re-syncs on the new machine.</span>
+            </div>
+        </div>
+        <div class="settings-vault-switch">
+            <CoreInput Placeholder="Bundle path (e.g. D:\lovely-backup)" @bind-Value="BundlePath" />
+            <CoreInput Type="password" Placeholder="Passphrase" @bind-Value="BundlePassphrase" />
+        </div>
+        <div class="settings-migration-actions">
+            <SecondaryButton OnClick="@ExportBundle" Disabled="@(BundlePath.Trim().Length == 0 || BundlePassphrase.Length == 0)">⬆️ Export</SecondaryButton>
+            <SecondaryButton OnClick="@ImportBundle" Disabled="@(BundlePath.Trim().Length == 0 || BundlePassphrase.Length == 0)">⬇️ Import</SecondaryButton>
+        </div>
+        @if (MigrationStatus != null)
+        {
+            <p class="settings-empty-text">@MigrationStatus</p>
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🧰 Diagnostics</div>
         <div class="settings-row">
             <div class="settings-row-text">
@@ -239,6 +261,37 @@
     }
 
     string NewMasterPassword { get; set; } = string.Empty;
+    string BundlePath { get; set; } = string.Empty;
+    string BundlePassphrase { get; set; } = string.Empty;
+    string? MigrationStatus { get; set; }
+
+    void ExportBundle()
+    {
+        try
+        {
+            string path = MigrationService.ExportBundle(BundlePath.Trim(), BundlePassphrase);
+            MigrationStatus = $"✅ Exported to {path}";
+        }
+        catch (Exception ex)
+        {
+            MigrationStatus = $"❌ {ex.Message}";
+        }
+    }
+
+    void ImportBundle()
+    {
+        try
+        {
+            bool vaultMerged = MigrationService.ImportBundle(BundlePath.Trim(), BundlePassphrase);
+            MigrationStatus = vaultMerged
+                ? "✅ Bundle imported — accounts, settings and passwords restored."
+                : "⚠️ Files imported, but the passphrase did not open the password vault (re-enter account passwords or retry).";
+        }
+        catch (Exception ex)
+        {
+            MigrationStatus = $"❌ {ex.Message}";
+        }
+    }
 
     void SwitchVaultToMaster()
     {
