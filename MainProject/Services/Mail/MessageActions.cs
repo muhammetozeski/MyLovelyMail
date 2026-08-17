@@ -1,4 +1,5 @@
 using MailKit;
+using MailKit.Net.Imap;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
@@ -12,13 +13,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class MessageActions
     {
-        public static void ToggleRead(MailAccountData account, string folderFullName, MailMessageSummary summary)
-        {
-            bool nowSeen = !summary.Flags.HasFlag(MailFlags.Seen);
-            summary.Flags = nowSeen ? summary.Flags | MailFlags.Seen : summary.Flags & ~MailFlags.Seen;
-            MessageStore.UpsertSummaries(account.Id, folderFullName, [summary]);
-            PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Seen, nowSeen);
-        }
+        public static void ToggleRead(MailAccountData account, string folderFullName, MailMessageSummary summary) =>
+            SetRead(account, folderFullName, summary, !summary.Flags.HasFlag(MailFlags.Seen));
 
         /// <summary>Forces the read state to <paramref name="read"/> (no-op when already there) — bulk-action friendly.</summary>
         public static void SetRead(MailAccountData account, string folderFullName, MailMessageSummary summary, bool read)
@@ -76,38 +72,40 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ? null
                 : MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.Role == targetRole)?.FullName;
 
-            _ = Task.Run(async () =>
-            {
-                try
+            RunServerActionInBackground(account, folderFullName, $"Server delete failed for uid {summary.Uid}", LogLevel.Error,
+                async (client, folder, ct) =>
                 {
-                    await ResiliencePolicy.RunNetwork(async ct =>
+                    var uid = new UniqueId(summary.Uid);
+                    if (targetFolder != null)
                     {
-                        using var client = await MailConnections.OpenImapAsync(account, ct);
-                        var folder = await client.GetFolderAsync(folderFullName, ct);
-                        await folder.OpenAsync(FolderAccess.ReadWrite, ct);
-                        var uid = new UniqueId(summary.Uid);
-
-                        if (targetFolder != null)
-                        {
-                            var target = await client.GetFolderAsync(targetFolder, ct);
-                            await folder.MoveToAsync(uid, target, ct);
-                        }
-                        else
-                        {
-                            await folder.AddFlagsAsync(uid, MessageFlags.Deleted, silent: true, ct);
-                            await folder.ExpungeAsync(ct);
-                        }
-                        await client.DisconnectAsync(true, ct);
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Log($"Server delete failed for uid {summary.Uid}: {ex.Message}", LogLevel.Error);
-                }
-            });
+                        var target = await client.GetFolderAsync(targetFolder, ct);
+                        await folder.MoveToAsync(uid, target, ct);
+                    }
+                    else
+                    {
+                        await folder.AddFlagsAsync(uid, MessageFlags.Deleted, silent: true, ct);
+                        await folder.ExpungeAsync(ct);
+                    }
+                });
         }
 
-        static void PushFlagInBackground(MailAccountData account, string folderFullName, uint uid, MessageFlags flag, bool add)
+        static void PushFlagInBackground(MailAccountData account, string folderFullName, uint uid, MessageFlags flag, bool add) =>
+            RunServerActionInBackground(account, folderFullName, $"Flag push failed for uid {uid}", LogLevel.Warning,
+                async (_, folder, ct) =>
+                {
+                    if (add)
+                        await folder.AddFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
+                    else
+                        await folder.RemoveFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
+                });
+
+        /// <summary>
+        /// The shared fire-and-forget server push: skips POP3 and local folders, opens the folder
+        /// ReadWrite under the resilience pipeline, runs the action, logs failures with the given
+        /// context. Both Delete and flag pushes go through here so the guard logic exists once.
+        /// </summary>
+        static void RunServerActionInBackground(MailAccountData account, string folderFullName, string failContext,
+            LogLevel failLevel, Func<ImapClient, IMailFolder, CancellationToken, Task> action)
         {
             if (account.Protocol != IncomingProtocol.Imap || folderFullName.StartsWith(MessageStore.LocalFolderPrefix))
                 return;
@@ -121,16 +119,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         using var client = await MailConnections.OpenImapAsync(account, ct);
                         var folder = await client.GetFolderAsync(folderFullName, ct);
                         await folder.OpenAsync(FolderAccess.ReadWrite, ct);
-                        if (add)
-                            await folder.AddFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
-                        else
-                            await folder.RemoveFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
+                        await action(client, folder, ct);
                         await client.DisconnectAsync(true, ct);
                     });
                 }
                 catch (Exception ex)
                 {
-                    Log($"Flag push failed for uid {uid}: {ex.Message}", LogLevel.Warning);
+                    Log($"{failContext}: {ex.Message}", failLevel);
                 }
             });
         }
