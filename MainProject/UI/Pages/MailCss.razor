@@ -343,6 +343,60 @@
         font-style: italic;
     }
 
+    /* ---- Compose ---- */
+
+    .mail-compose-button {
+        margin-bottom: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-compose-card {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px10)px;
+        text-align: left;
+        flex: 1;
+    }
+
+    .mail-compose-from {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textSecondary;
+    }
+
+    .mail-compose-body {
+        flex: 1;
+        min-height: @(AppMeasures.Size.Px200)px;
+        resize: vertical;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @textPrimary;
+        padding: @(AppMeasures.Space.Px12)px;
+        font-size: @(AppMeasures.Font.Normal)px;
+        font-family: inherit;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .mail-compose-error {
+        margin: 0;
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        word-break: break-word;
+    }
+
+    .mail-compose-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-reader-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
     /* ---- Shared empty state ---- */
 
     .mail-empty {

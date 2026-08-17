@@ -11,6 +11,11 @@
     <aside class="mail-sidebar">
         <div class="mail-logo">💌<span class="mail-logo-text">My Lovely Mail</span></div>
 
+        @if (MailUiState.SelectedAccount != null)
+        {
+            <PrimaryButton IsFullWidth="true" OnClick="@StartCompose" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
+        }
+
         @if (AccountStore.Accounts.Count == 0)
         {
             <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
@@ -112,9 +117,40 @@
         }
     </section>
 
-    @* ---- Right: reading pane ---- *@
+    @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
-        @if (MailUiState.OpenMessage is not { } open)
+        @if (MailUiState.ActiveCompose is { } draft)
+        {
+            <div class="mail-reader-header">
+                <BackButton OnClick="@MailUiState.CloseCompose" />
+                <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
+            </div>
+
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
+                <div class="mail-compose-from">From: <b>@draft.Account?.EmailAddress</b></div>
+                <CoreInput Placeholder="To (comma separated)" Icon="👤" @bind-Value="draft.To" />
+                <CoreInput Placeholder="Cc" Icon="👥" @bind-Value="draft.Cc" />
+                <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
+                <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
+
+                @if (SendError != null)
+                {
+                    <p class="mail-compose-error">❌ @SendError</p>
+                }
+
+                <div class="mail-compose-actions">
+                    <SecondaryButton OnClick="@MailUiState.CloseCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
+                    <PrimaryButton OnClick="@SendActiveDraftAsync" Disabled="@(Sending || string.IsNullOrWhiteSpace(draft.To))">
+                        @if (Sending)
+                        {
+                            <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
+                        }
+                        📨 Send
+                    </PrimaryButton>
+                </div>
+            </GlassCard>
+        }
+        else if (MailUiState.OpenMessage is not { } open)
         {
             <div class="mail-empty">
                 <div class="mail-empty-icon">💌</div>
@@ -136,6 +172,15 @@
                         <div class="mail-reader-to">to @open.ToAddresses</div>
                     }
                 </div>
+            </div>
+
+            <div class="mail-reader-actions">
+                <SecondaryButton OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
+                <SecondaryButton OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
+                <SecondaryButton OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
+                <SecondaryButton OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
+                <SecondaryButton OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
+                <DangerButton OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
             </div>
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">

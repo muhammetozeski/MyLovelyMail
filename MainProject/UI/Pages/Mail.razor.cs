@@ -119,6 +119,68 @@ namespace MyLovelyMail.MainProject.UI.Pages
         };
 
         bool ShowShortcutHelp { get; set; }
+        bool Sending { get; set; }
+        string? SendError { get; set; }
+
+        static void StartCompose()
+        {
+            if (MailUiState.SelectedAccount is { } account)
+                MailUiState.OpenCompose(ComposeService.BuildNew(account));
+        }
+
+        static void StartReply(MailMessageSummary message, bool replyAll)
+        {
+            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+                MailUiState.OpenCompose(ComposeService.BuildReply(account, folder.FullName, message, replyAll));
+        }
+
+        static void StartForward(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+                MailUiState.OpenCompose(ComposeService.BuildForward(account, folder.FullName, message));
+        }
+
+        static void ToggleOpenFlagged(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+                MessageActions.ToggleFlagged(account, folder.FullName, message);
+        }
+
+        static void ToggleOpenImportant(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+                MessageActions.ToggleImportant(account, folder.FullName, message);
+        }
+
+        static void DeleteOpen(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+            {
+                MessageActions.Delete(account, folder.FullName, message);
+                MailUiState.CloseMessage();
+            }
+        }
+
+        async Task SendActiveDraftAsync()
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            Sending = true;
+            SendError = null;
+            StateHasChanged();
+            try
+            {
+                await ComposeService.SendAsync(draft);
+                MailUiState.CloseCompose();
+            }
+            catch (Exception ex)
+            {
+                SendError = ex.Message;
+            }
+            finally
+            {
+                Sending = false;
+            }
+        }
 
         static readonly (string Keys, string Action)[] ShortcutHelpRows =
         [

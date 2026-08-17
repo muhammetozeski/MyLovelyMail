@@ -16,7 +16,22 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>Row highlighted by keyboard navigation (independent of the opened message).</summary>
         public static MailMessageSummary? FocusedMessage { get; private set; }
 
+        /// <summary>The draft open in the compose pane; null = compose pane closed.</summary>
+        public static ComposeDraft? ActiveCompose { get; private set; }
+
         public static event Action? OnSelectionChanged;
+
+        public static void OpenCompose(ComposeDraft draft)
+        {
+            ActiveCompose = draft;
+            OnSelectionChanged?.Invoke();
+        }
+
+        public static void CloseCompose()
+        {
+            ActiveCompose = null;
+            OnSelectionChanged?.Invoke();
+        }
 
         public static void FocusMessage(MailMessageSummary? message)
         {
