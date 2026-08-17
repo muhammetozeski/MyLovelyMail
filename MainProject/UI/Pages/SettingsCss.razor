@@ -72,6 +72,29 @@
         margin: 0;
     }
 
+    .settings-density {
+        display: flex;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-shrink: 0;
+    }
+
+    .settings-density-option {
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    .settings-density-option--on {
+        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
+    }
+
     .settings-vault-switch {
         display: flex;
         gap: @(AppMeasures.Space.Px12)px;

@@ -1,7 +1,16 @@
 @namespace MyLovelyMail.MainProject.UI.Pages
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 
 @{
+    // Row metrics follow the density setting: Cozy = roomy + 2 preview lines, Compact = tight single line.
+    (int rowPaddingY, int previewLines, int rowGap) = GlobalSettings.MessageListDensity.Value switch
+    {
+        "Cozy" => (AppMeasures.Space.Px14, 2, AppMeasures.Space.Px8),
+        "Compact" => (AppMeasures.Space.Px4, 0, AppMeasures.Space.Px2),
+        _ => (AppMeasures.Space.Px10, 1, AppMeasures.Space.Px6)
+    };
+
     string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
     string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
     string textMuted = AppColors.TextMuted.ToRgbaHex(true);
@@ -219,7 +228,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: @(AppMeasures.Space.Px6)px;
+        gap: @(rowGap)px;
         padding-right: @(AppMeasures.Space.Px2)px;
     }
 
@@ -232,7 +241,7 @@
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
         cursor: pointer;
         text-align: left;
-        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px12)px;
+        padding: @(rowPaddingY)px @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         color: @textPrimary;
         transition: all @(AppMeasures.Duration.Fast)s ease;
@@ -349,8 +358,18 @@
         font-size: @(AppMeasures.Font.Small)px;
         color: @textMuted;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        @if (previewLines == 0)
+        {
+            @("display: none;")
+        }
+        else if (previewLines == 1)
+        {
+            @("text-overflow: ellipsis; white-space: nowrap;")
+        }
+        else
+        {
+            @($"display: -webkit-box; -webkit-line-clamp: {previewLines}; -webkit-box-orient: vertical; white-space: normal;")
+        }
     }
 
     .mail-row-attach {

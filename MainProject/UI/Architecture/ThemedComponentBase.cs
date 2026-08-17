@@ -15,7 +15,8 @@ namespace MyLovelyMail.MainProject.UI.Layout.Architecture
 
         void HandleDataChanged(string eventName, object? data)
         {
-            if (eventName == "OnThemeChanged")
+            // OnStyleChanged covers non-palette style tokens (density etc.) flowing through the same pipe.
+            if (eventName is "OnThemeChanged" or "OnStyleChanged")
                 InvokeAsync(StateHasChanged);
         }
 
