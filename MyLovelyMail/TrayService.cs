@@ -52,6 +52,9 @@ namespace MyLovelyMail
             mainWindow?.Dispatcher.Dispatch(() =>
             {
                 if (mainWindow?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window platformWindow) return;
+                // A window restored from poisoned bounds sits far off-screen — showing it there
+                // looks exactly like "nothing happens", so always pull it back first.
+                ClampToWorkArea(mainWindow);
                 platformWindow.AppWindow.Show();
                 platformWindow.Activate();
             });
@@ -105,19 +108,38 @@ namespace MyLovelyMail
         /// <summary>Fire-and-forget manual sync used by the tray menu.</summary>
         public static void SyncNow() => _ = SyncScheduler.SyncNowAsync();
 
+        /// <summary>Smallest believable size for a real (non-minimized) app window, in DIP.</summary>
+        const int MinSaneWindowWidth = 400;
+        const int MinSaneWindowHeight = 300;
+
+        /// <summary>
+        /// A minimized window reports its caption-stub bounds (X/Y around -25600, size ~159x37 DIP).
+        /// Persisting or restoring those puts the window kilometers off-screen — the classic
+        /// "app opens but nothing appears" state this user hit.
+        /// </summary>
+        static bool BoundsLookSane(double x, double y, double width, double height) =>
+            x > -10000 && y > -10000 && width >= MinSaneWindowWidth && height >= MinSaneWindowHeight;
+
+        /// <summary>Pulls the window into the visible work area (keeps at least a grabbable part on screen).</summary>
+        static void ClampToWorkArea(Window window)
+        {
+            var screen = DeviceDisplay.MainDisplayInfo;
+            double maxX = Math.Max(0, screen.Width / screen.Density - 200);
+            double maxY = Math.Max(0, screen.Height / screen.Density - 200);
+            window.X = Math.Clamp(window.X, 0, maxX);
+            window.Y = Math.Clamp(window.Y, 0, maxY);
+        }
+
         /// <summary>Applies saved window bounds (first run keeps defaults) and persists them debounced on move/resize.</summary>
         static void RestoreWindowBounds(Window window)
         {
-            if (Settings.WindowWidth.Value > 0 && Settings.WindowHeight.Value > 0)
+            if (BoundsLookSane(Settings.WindowX.Value, Settings.WindowY.Value, Settings.WindowWidth.Value, Settings.WindowHeight.Value))
             {
-                // Clamp so a monitor removed since last run cannot leave the window off-screen.
-                var screen = DeviceDisplay.MainDisplayInfo;
-                double maxX = Math.Max(0, screen.Width / screen.Density - 200);
-                double maxY = Math.Max(0, screen.Height / screen.Density - 200);
-                window.X = Math.Min(Settings.WindowX.Value, maxX);
-                window.Y = Math.Min(Settings.WindowY.Value, maxY);
+                window.X = Settings.WindowX.Value;
+                window.Y = Settings.WindowY.Value;
                 window.Width = Settings.WindowWidth.Value;
                 window.Height = Settings.WindowHeight.Value;
+                ClampToWorkArea(window);
             }
 
             System.Timers.Timer? saveDebounce = null;
@@ -127,7 +149,7 @@ namespace MyLovelyMail
                 saveDebounce = new System.Timers.Timer(800) { AutoReset = false };
                 saveDebounce.Elapsed += (_, _) =>
                 {
-                    if (window.Width <= 0 || window.Height <= 0) return;
+                    if (!BoundsLookSane(window.X, window.Y, window.Width, window.Height)) return;
                     Settings.WindowX.Set((int)window.X);
                     Settings.WindowY.Set((int)window.Y);
                     Settings.WindowWidth.Set((int)window.Width);
