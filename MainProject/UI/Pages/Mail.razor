@@ -3,6 +3,8 @@
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
 @implements IDisposable
 @inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Forms
+@using System.IO
 <PageTitle>My Lovely Mail</PageTitle>
 
 <div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
@@ -205,6 +207,24 @@
                 <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
                 <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
                 </div>
+
+                <label class="mail-compose-dropzone">
+                    <InputFile OnChange="OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                    📎 Attach files — click or drop them here
+                </label>
+                @if (draft.AttachmentPaths.Count > 0)
+                {
+                    <div class="mail-compose-attachments">
+                        @foreach (var attachmentPath in draft.AttachmentPaths)
+                        {
+                            <span class="mail-compose-attachment-chip">
+                                📎 @Path.GetFileName(attachmentPath)
+                                <button class="mail-compose-attachment-remove" title="Remove"
+                                        @onclick="() => RemoveComposeAttachment(attachmentPath)">✕</button>
+                            </span>
+                        }
+                    </div>
+                }
 
                 @if (SendError != null)
                 {

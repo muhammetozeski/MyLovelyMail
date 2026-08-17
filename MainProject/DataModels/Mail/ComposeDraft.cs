@@ -11,5 +11,8 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public string Cc { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
         public string Body { get; set; } = string.Empty;
+
+        /// <summary>Full paths of the staged attachment copies under AppCache (see ComposeService.AttachFileAsync).</summary>
+        public List<string> AttachmentPaths { get; set; } = [];
     }
 }

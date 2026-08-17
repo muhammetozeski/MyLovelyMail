@@ -1,15 +1,46 @@
+using Microsoft.AspNetCore.Components.Forms;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
-    // Compose pane: new/reply/forward draft lifecycle, idle autosave, send.
+    // Compose pane: new/reply/forward draft lifecycle, attachments, idle autosave, send.
     public partial class Mail
     {
+        const int MaxComposeAttachments = 20;
+        const long MaxComposeAttachmentBytes = 50 * 1024 * 1024;
+
         bool Sending { get; set; }
         string? SendError { get; set; }
         System.Timers.Timer? draftAutosaveTimer;
         DateTime? DraftSavedAt { get; set; }
+
+        async Task OnComposeFilesSelectedAsync(InputFileChangeEventArgs e)
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            try
+            {
+                foreach (var file in e.GetMultipleFiles(MaxComposeAttachments))
+                {
+                    await using var source = file.OpenReadStream(MaxComposeAttachmentBytes);
+                    await ComposeService.AttachFileAsync(draft, source, file.Name);
+                }
+                SendError = null;
+            }
+            catch (IOException)
+            {
+                SendError = $"A file is too big — the limit is {MaxComposeAttachmentBytes / (1024 * 1024)} MB.";
+            }
+            NoteComposeActivity();
+            StateHasChanged();
+        }
+
+        void RemoveComposeAttachment(string path)
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            ComposeService.RemoveAttachment(draft, path);
+            NoteComposeActivity();
+        }
 
         static void StartCompose()
         {

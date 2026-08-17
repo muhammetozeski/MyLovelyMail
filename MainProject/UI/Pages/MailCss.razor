@@ -652,6 +652,70 @@
         box-sizing: border-box;
     }
 
+    /* Attachment dropzone: the invisible file input stretches over the whole label so both
+       clicking anywhere and dropping files onto it reach the same input. */
+    .mail-compose-dropzone {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px10)px;
+        border: @(AppMeasures.Border.Medium)px dashed @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        cursor: pointer;
+        transition: border-color @(AppMeasures.Duration.Fast)s ease, color @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-compose-dropzone:hover {
+            border-color: @AppColors.Primary.ToRgbaHex(true);
+            color: @AppColors.TextSecondary.ToRgbaHex(true);
+        }
+
+    .mail-compose-file-input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .mail-compose-attachments {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .mail-compose-attachment-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        max-width: @(AppMeasures.Size.Px280)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-compose-attachment-remove {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        padding: 0 @(AppMeasures.Space.Px2)px;
+    }
+
+        .mail-compose-attachment-remove:hover {
+            color: @AppColors.TextDanger.ToRgbaHex(true);
+        }
+
     .mail-compose-error {
         margin: 0;
         color: @AppColors.TextDanger.ToRgbaHex(true);

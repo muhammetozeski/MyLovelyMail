@@ -19,7 +19,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Raw recipient text survives in headers even when it is not yet a parseable address.</summary>
         const string DraftToHeader = "X-LovelyDraft-To";
         const string DraftCcHeader = "X-LovelyDraft-Cc";
+        /// <summary>'|'-separated staged attachment paths, so a reopened draft gets its files back.</summary>
+        const string DraftAttachmentsHeader = "X-LovelyDraft-Attachments";
         const string DraftMessageIdPrefix = "draft:";
+
+        /// <summary>Attachment picks are copied here (per draft id) so sending never depends on the original file still existing.</summary>
+        static string AttachmentStageFolder(ComposeDraft draft) =>
+            Path.Combine(AppPaths.AppCache, "ComposeAttachments", draft.DraftId);
 
         static string LocalDraftsFullName => MessageStore.LocalFolderPrefix + LocalDraftsFolderName;
 
@@ -35,6 +41,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             message.Subject = draft.Subject;
             message.Headers.Add(DraftToHeader, draft.To);
             message.Headers.Add(DraftCcHeader, draft.Cc);
+            if (draft.AttachmentPaths.Count > 0)
+                message.Headers.Add(DraftAttachmentsHeader, string.Join('|', draft.AttachmentPaths));
             message.Body = new TextPart("plain") { Text = draft.Body };
 
             using var buffer = new MemoryStream();
@@ -68,7 +76,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 To = message.Headers[DraftToHeader] ?? string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
                 Cc = message.Headers[DraftCcHeader] ?? string.Empty,
                 Subject = message.Subject ?? string.Empty,
-                Body = message.TextBody ?? string.Empty
+                Body = message.TextBody ?? string.Empty,
+                // Only files still present in the stage folder come back; the rest are silently gone.
+                AttachmentPaths = [.. (message.Headers[DraftAttachmentsHeader] ?? string.Empty)
+                    .Split('|', StringSplitOptions.RemoveEmptyEntries)
+                    .Where(File.Exists)]
             };
         }
 
@@ -76,6 +88,36 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             if (draft.Account is { } account)
                 MessageStore.RemoveMessages(account.Id, LocalDraftsFullName, [DraftUid(draft)]);
+            try
+            {
+                if (Directory.Exists(AttachmentStageFolder(draft)))
+                    Directory.Delete(AttachmentStageFolder(draft), recursive: true);
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not clean staged attachments: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
+        /// <summary>Copies a picked file into the draft's stage folder and records it on the draft.</summary>
+        public static async Task AttachFileAsync(ComposeDraft draft, Stream source, string fileName)
+        {
+            string folder = AttachmentStageFolder(draft);
+            Directory.CreateDirectory(folder);
+            string sanitized = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+            string target = Path.Combine(folder, sanitized);
+            for (int copy = 2; File.Exists(target); copy++)
+                target = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(sanitized)} ({copy}){Path.GetExtension(sanitized)}");
+
+            await using (var output = File.Create(target))
+                await source.CopyToAsync(output);
+            draft.AttachmentPaths.Add(target);
+        }
+
+        public static void RemoveAttachment(ComposeDraft draft, string path)
+        {
+            draft.AttachmentPaths.Remove(path);
+            try { File.Delete(path); } catch { /* stage cleanup is best-effort */ }
         }
 
         public static ComposeDraft BuildNew(MailAccountData account) => new() { Account = account };
@@ -145,7 +187,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (!string.IsNullOrWhiteSpace(draft.Cc))
                 message.Cc.AddRange(InternetAddressList.Parse(draft.Cc));
             message.Subject = draft.Subject;
-            message.Body = new TextPart("plain") { Text = draft.Body };
+
+            var builder = new BodyBuilder { TextBody = draft.Body };
+            foreach (string path in draft.AttachmentPaths.Where(File.Exists))
+                await builder.Attachments.AddAsync(path, cancellationToken);
+            message.Body = builder.ToMessageBody();
 
             Log($"Compose send started: '{draft.Subject}' -> {draft.To}");
             await SmtpSendService.SendAsync(account, message, cancellationToken);
