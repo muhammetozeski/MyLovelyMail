@@ -37,22 +37,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             message.Headers.Add(DraftCcHeader, draft.Cc);
             message.Body = new TextPart("plain") { Text = draft.Body };
 
-            if (!MessageStore.GetFolders(account.Id).Any(f => f.FullName == LocalDraftsFullName))
-                MessageStore.SaveFolder(new MailFolderData
-                {
-                    AccountId = account.Id,
-                    FullName = LocalDraftsFullName,
-                    DisplayName = LocalDraftsFolderName,
-                    Role = FolderRole.Drafts,
-                    IsLocal = true
-                });
-
             using var buffer = new MemoryStream();
             message.WriteTo(buffer);
             uint uid = DraftUid(draft);
-            MessageStore.SaveFullMessage(account.Id, LocalDraftsFullName, uid, buffer.ToArray());
-            MessageStore.UpsertSummaries(account.Id, LocalDraftsFullName,
-            [
+            StoreInLocalFolder(account, LocalDraftsFolderName, FolderRole.Drafts, uid, buffer.ToArray(),
                 new MailMessageSummary
                 {
                     Uid = uid,
@@ -63,9 +51,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     ToAddresses = draft.To,
                     DateUtc = DateTime.UtcNow,
                     Flags = MailFlags.Draft | MailFlags.Seen,
-                    PreviewText = draft.Body.Length > 160 ? draft.Body[..160] : draft.Body
-                }
-            ]);
+                    PreviewText = Preview(draft.Body)
+                });
         }
 
         /// <summary>Reopens a stored draft summary as an editable ComposeDraft (null when its MIME is gone).</summary>
@@ -199,21 +186,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 using var buffer = new MemoryStream();
                 await message.WriteToAsync(buffer, cancellationToken);
                 uint uid = Pop3Service.Fnv1aHash(message.MessageId ?? Guid.NewGuid().ToString());
-                string localSent = MessageStore.LocalFolderPrefix + LocalSentFolderName;
-
-                if (!MessageStore.GetFolders(account.Id).Any(f => f.FullName == localSent))
-                    MessageStore.SaveFolder(new MailFolderData
-                    {
-                        AccountId = account.Id,
-                        FullName = localSent,
-                        DisplayName = LocalSentFolderName,
-                        Role = FolderRole.Sent,
-                        IsLocal = true
-                    });
-
-                MessageStore.SaveFullMessage(account.Id, localSent, uid, buffer.ToArray());
-                MessageStore.UpsertSummaries(account.Id, localSent,
-                [
+                StoreInLocalFolder(account, LocalSentFolderName, FolderRole.Sent, uid, buffer.ToArray(),
                     new MailMessageSummary
                     {
                         Uid = uid,
@@ -224,14 +197,39 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         ToAddresses = string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
                         DateUtc = DateTime.UtcNow,
                         Flags = MailFlags.Seen,
-                        PreviewText = message.TextBody?.Length > 160 ? message.TextBody[..160] : message.TextBody ?? string.Empty
-                    }
-                ]);
+                        PreviewText = Preview(message.TextBody)
+                    });
             }
             catch (Exception ex)
             {
                 Log($"Sent-copy archive failed (message was still sent): {ex.Message}", LogLevel.Warning);
             }
+        }
+
+        /// <summary>List-row preview text: the first <see cref="PreviewChars"/> characters of the body.</summary>
+        const int PreviewChars = 160;
+        static string Preview(string? body) =>
+            body == null ? string.Empty : body.Length > PreviewChars ? body[..PreviewChars] : body;
+
+        /// <summary>
+        /// Ensures the app-local folder exists, then stores the MIME plus its summary row —
+        /// the shared tail of draft saving and the POP3/no-Sent-folder archive path.
+        /// </summary>
+        static void StoreInLocalFolder(MailAccountData account, string folderName, FolderRole role, uint uid, byte[] mimeBytes, MailMessageSummary summary)
+        {
+            string fullName = MessageStore.LocalFolderPrefix + folderName;
+            if (!MessageStore.GetFolders(account.Id).Any(f => f.FullName == fullName))
+                MessageStore.SaveFolder(new MailFolderData
+                {
+                    AccountId = account.Id,
+                    FullName = fullName,
+                    DisplayName = folderName,
+                    Role = role,
+                    IsLocal = true
+                });
+
+            MessageStore.SaveFullMessage(account.Id, fullName, uid, mimeBytes);
+            MessageStore.UpsertSummaries(account.Id, fullName, [summary]);
         }
     }
 }
