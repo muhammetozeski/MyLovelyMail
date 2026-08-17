@@ -167,7 +167,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
             });
 
             if (newCount > 0 && lastSeenUid > 0)
+            {
                 OnNewMail?.Invoke(account.Id, folder.FullName, newCount);
+                NotificationService.NotifyNewMessages(account, folder.FullName,
+                    [.. summaries.Where(s => s.Uid > lastSeenUid)]);
+            }
         }
 
         /// <summary>Executes the move requests a rule pass produced — local ones via the store, remote ones over the still-open connection.</summary>

@@ -62,6 +62,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     foreach (var (uid, localFolder) in ruleResult.LocalMoves)
                         MessageStore.MoveToLocalFolder(account.Id, InboxFullName, uid, localFolder);
 
+                if (known.Count > 0 && summaries.Count > 0)
+                    NotificationService.NotifyNewMessages(account, InboxFullName, summaries);
+
                 MessageStore.SaveFolder(new MailFolderData
                 {
                     AccountId = account.Id,

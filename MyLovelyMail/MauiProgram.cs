@@ -17,6 +17,7 @@ namespace MyLovelyMail
             AccountStore.Load();
             CredentialVault.Load();
             FilterRuleStore.Load();
+            NotificationBridge.Initialize();
             MainProject.Services.Mail.SyncScheduler.Start();
 
             var builder = MauiApp.CreateBuilder();
