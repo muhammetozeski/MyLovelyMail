@@ -49,6 +49,10 @@
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
                     <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
+                    @if (AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    {
+                        <span class="mail-account-unread" style="background:@account.ColorHex">@accountUnread</span>
+                    }
                 </button>
 
                 @if (MailUiState.SelectedAccount?.Id == account.Id)

@@ -99,9 +99,19 @@
     }
 
     .mail-account-name {
+        flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .mail-account-unread {
+        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Heavy);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        flex-shrink: 0;
     }
 
     .mail-folder {

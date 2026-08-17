@@ -226,6 +226,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 : [.. summaries.Where(MatchesSearch)];
         }
 
+        /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
+        static int AccountUnreadCount(string accountId) =>
+            MessageStore.GetFolders(accountId)
+                .Where(f => f.Role is not (FolderRole.Trash or FolderRole.Junk))
+                .Sum(f => f.UnreadCount);
+
         /// <summary>The folder a listed message actually lives in (differs from the selection in all-folders search).</summary>
         string? ResolveFolderOf(MailMessageSummary message) =>
             HitFolders.TryGetValue(message, out var hit) ? hit.FullName : MailUiState.SelectedFolder?.FullName;
