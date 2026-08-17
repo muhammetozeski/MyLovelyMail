@@ -15,12 +15,17 @@
                 <button class="settings-theme @(ThemeManager.Current == theme ? "settings-theme--active" : "")"
                         style="@ThemePreviewStyle(theme)"
                         @onclick="() => ApplyTheme(theme)">
-                    <span class="settings-theme-name" style="color:@theme.TextPrimary.ToRgbaHex(true)">@theme.Name</span>
-                    <span class="settings-theme-dots">
-                        <span class="settings-theme-dot" style="background:@theme.Primary.ToRgbaHex(true)"></span>
-                        <span class="settings-theme-dot" style="background:@theme.Secondary.ToRgbaHex(true)"></span>
-                        <span class="settings-theme-dot" style="background:@theme.Accent.ToRgbaHex(true)"></span>
+                    <span class="settings-theme-mini">
+                        <span class="settings-theme-mini-sidebar" style="background:@theme.Primary.WithAlpha(0.8f).ToRgbaHex(true)"></span>
+                        <span class="settings-theme-mini-list">
+                            <span class="settings-theme-mini-row" style="background:@theme.SurfaceStrong.ToRgbaHex(true)">
+                                <span class="settings-theme-mini-unread" style="background:@theme.Accent.ToRgbaHex(true)"></span>
+                            </span>
+                            <span class="settings-theme-mini-row" style="background:@theme.SurfaceNormal.ToRgbaHex(true)"></span>
+                            <span class="settings-theme-mini-row" style="background:@theme.Secondary.WithAlpha(0.35f).ToRgbaHex(true)"></span>
+                        </span>
                     </span>
+                    <span class="settings-theme-name" style="color:@theme.TextPrimary.ToRgbaHex(true)">@theme.Name</span>
                 </button>
             }
         </div>

@@ -134,18 +134,64 @@
     }
 
     .settings-theme {
-        width: @(AppMeasures.Size.Px140)px;
-        height: @(AppMeasures.Size.Px80)px;
+        width: @(AppMeasures.Size.Px180)px;
+        height: @(AppMeasures.Size.Px110)px;
         border-radius: @(AppMeasures.Radius.Large)px;
         border: @(AppMeasures.Border.Medium)px solid;
         cursor: pointer;
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
         justify-content: space-between;
-        padding: @(AppMeasures.Space.Px12)px;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px10)px;
         box-sizing: border-box;
         transition: transform @(AppMeasures.Duration.Fast)s ease, box-shadow @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    /* Miniature inbox: a sidebar sliver plus three fake mail rows painted from the theme's own tokens. */
+    .settings-theme-mini {
+        flex: 1;
+        display: flex;
+        gap: @(AppMeasures.Space.Px4)px;
+        min-height: 0;
+    }
+
+    .settings-theme-mini-sidebar {
+        width: @(AppMeasures.Size.Px12)px;
+        border-radius: @(AppMeasures.Radius.Px4)px;
+        flex-shrink: 0;
+    }
+
+    .settings-theme-mini-list {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        min-width: 0;
+    }
+
+    .settings-theme-mini-row {
+        flex: 1;
+        border-radius: @(AppMeasures.Radius.Px4)px;
+        display: flex;
+        align-items: center;
+        padding-left: @(AppMeasures.Space.Px6)px;
+    }
+
+    .settings-theme-mini-unread {
+        width: @(AppMeasures.Size.Px5)px;
+        height: @(AppMeasures.Size.Px5)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+    }
+
+    .settings-theme:hover .settings-theme-mini-unread {
+        animation: mini-unread-pulse @(AppMeasures.Duration.Long)s ease-in-out infinite;
+    }
+
+    @@keyframes mini-unread-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.8); }
     }
 
         .settings-theme:hover {
@@ -160,17 +206,5 @@
     .settings-theme-name {
         font-size: @(AppMeasures.Font.Small)px;
         font-weight: @(AppMeasures.Weight.Bold);
-    }
-
-    .settings-theme-dots {
-        display: flex;
-        gap: @(AppMeasures.Space.Px4)px;
-    }
-
-    .settings-theme-dot {
-        width: @(AppMeasures.Size.Px14)px;
-        height: @(AppMeasures.Size.Px14)px;
-        border-radius: @(AppMeasures.Radius.Circular)%;
-        border: @(AppMeasures.Border.Thin)px solid rgba(255,255,255,0.6);
     }
 </style>
