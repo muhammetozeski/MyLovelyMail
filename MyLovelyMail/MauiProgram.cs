@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
+using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.ZTests;
 #if WINDOWS
 using H.NotifyIcon;
 #endif
@@ -18,7 +21,7 @@ namespace MyLovelyMail
             SettingsManager.LoadSettings();
             Logger.ActivateLogging = Settings.EnableLogging.Value;
             Logger.Log("App starting: paths ensured, settings loaded.");
-            MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
+            ThemeManager.ApplyFromSettings();
             AccountStore.Load();
             CredentialVault.Load();
             FilterRuleStore.Load();
@@ -26,11 +29,11 @@ namespace MyLovelyMail
             NotificationBridge.Initialize();
             SoundBridge.Initialize();
 #if DEBUG
-            MainProject.ZTests.DebugApi.Start();
+            DebugApi.Start();
 #endif
-            MainProject.Services.Mail.SyncScheduler.Start();
-            AccountStore.OnAccountsChanged += MainProject.Services.Mail.ImapIdleService.Refresh;
-            MainProject.Services.Mail.ImapIdleService.Refresh();
+            SyncScheduler.Start();
+            AccountStore.OnAccountsChanged += ImapIdleService.Refresh;
+            ImapIdleService.Refresh();
 
             var builder = MauiApp.CreateBuilder();
             builder

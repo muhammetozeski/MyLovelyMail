@@ -1,4 +1,5 @@
 using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail
@@ -85,7 +86,7 @@ namespace MyLovelyMail
                 {
                     // Only a DEPLOYED install (launcher present at the root) may own the Run entry.
                     // Dev/debug sandboxes otherwise hijack the user's autostart with a bin\ path.
-                    string launcherPath = Path.Combine(MainProject.Storage.AppPaths.Root, "MyLovelyMail.exe");
+                    string launcherPath = Path.Combine(AppPaths.Root, "MyLovelyMail.exe");
                     if (!File.Exists(launcherPath))
                     {
                         Logger.Log("Autostart write skipped: not a deployed install (no root launcher).");

@@ -1,4 +1,5 @@
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail
@@ -46,7 +47,7 @@ namespace MyLovelyMail
             Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
 
             if (!toast.Mute)
-                MainProject.Services.SoundService.Play(toast.SoundName);
+                SoundService.Play(toast.SoundName);
         }
 
         static void HandleNotificationInvoked(object sender, Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs args)
@@ -62,12 +63,12 @@ namespace MyLovelyMail
             var account = AccountStore.GetById(accountId);
             if (account == null) return;
 
-            var summary = MainProject.Storage.MessageStore.GetSummary(accountId, folderFullName, uid);
-            var folder = MainProject.Storage.MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
+            var summary = MessageStore.GetSummary(accountId, folderFullName, uid);
+            var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
 
-            MainProject.Services.MailUiState.SelectAccount(account);
-            if (folder != null) MainProject.Services.MailUiState.SelectFolder(folder);
-            if (summary != null) MainProject.Services.MailUiState.OpenMessageInReader(summary);
+            MailUiState.SelectAccount(account);
+            if (folder != null) MailUiState.SelectFolder(folder);
+            if (summary != null) MailUiState.OpenMessageInReader(summary);
         }
 #endif
     }
