@@ -533,6 +533,50 @@
         font-size: @(AppMeasures.Font.XSmall)px;
     }
 
+    .mail-tag-chip {
+        display: inline-flex;
+        align-items: center;
+        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        border: none;
+        margin-right: @(AppMeasures.Space.Px4)px;
+        white-space: nowrap;
+    }
+
+    .mail-tag-chip--action {
+        cursor: pointer;
+        transition: transform @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-tag-chip--action:hover {
+            transform: translateY(-@(AppMeasures.Size.Px1)px);
+        }
+
+    .mail-tag-chip--off {
+        opacity: @(AppMeasures.Opacity.Disabled);
+    }
+
+    .mail-tag-picker {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .mail-tag-input {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textPrimary;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        outline: none;
+        width: @(AppMeasures.Size.Px120)px;
+    }
+
     .mail-save-status {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;

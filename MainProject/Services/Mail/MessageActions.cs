@@ -37,6 +37,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
             PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Flagged, nowFlagged);
         }
 
+        /// <summary>Adds or removes a tag on the message (tags are app-local, never pushed to the server).</summary>
+        public static void ToggleTag(MailAccountData account, string folderFullName, MailMessageSummary summary, string tagName)
+        {
+            string? existing = summary.Tags.FirstOrDefault(t => t.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+                summary.Tags.Remove(existing);
+            else
+                summary.Tags.Add(tagName);
+            MessageStore.UpsertSummaries(account.Id, folderFullName, [summary]);
+        }
+
         /// <summary>Important is the app's own marker — it lives only in the local store.</summary>
         public static void ToggleImportant(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {

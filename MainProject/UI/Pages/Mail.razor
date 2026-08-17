@@ -129,6 +129,10 @@
                                 {
                                     <span class="mail-row-folder">📁 @hitFolder</span>
                                 }
+                                @foreach (var tag in message.Tags)
+                                {
+                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag)">@tag</span>
+                                }
                                 @if (message.HasAttachments)
                                 {
                                     <span class="mail-row-attach">📎</span>
@@ -205,8 +209,36 @@
                 <SecondaryButton OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
                 <SecondaryButton OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
                 <SecondaryButton OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
+                <SecondaryButton OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
                 <DangerButton OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
             </div>
+
+            @if (open.Tags.Count > 0 || ShowTagPicker)
+            {
+                <div class="mail-attachments">
+                    @foreach (var tag in open.Tags)
+                    {
+                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag)"
+                                title="Search this tag" @onclick="() => SearchByTag(tag)">@tag</button>
+                    }
+                </div>
+            }
+
+            @if (ShowTagPicker)
+            {
+                <div class="mail-tag-picker">
+                    @foreach (var tag in TagStore.AllTags)
+                    {
+                        <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
+                                style="background:@TagStore.ColorOf(tag)"
+                                @onclick="() => ToggleTagOnOpen(open, tag)">
+                            @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
+                        </button>
+                    }
+                    <input class="mail-tag-input" placeholder="New tag..." @bind="NewTagName" @bind:event="oninput" />
+                    <button class="mail-search-toggle" @onclick="() => AddNewTag(open)" disabled="@(NewTagName.Trim().Length == 0)">➕ Add</button>
+                </div>
+            }
 
             @if (OpenAttachments.Count > 0)
             {

@@ -113,6 +113,25 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         List<AttachmentInfo> OpenAttachments { get; set; } = [];
         string? SaveStatus { get; set; }
+        bool ShowTagPicker { get; set; }
+        string NewTagName { get; set; } = string.Empty;
+
+        void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
+
+        void ToggleTagOnOpen(MailMessageSummary message, string tagName)
+        {
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+                MessageActions.ToggleTag(account, folderName, message, tagName);
+        }
+
+        void AddNewTag(MailMessageSummary message)
+        {
+            string tagName = NewTagName.Trim();
+            if (tagName.Length == 0) return;
+            TagStore.ColorOf(tagName);
+            ToggleTagOnOpen(message, tagName);
+            NewTagName = string.Empty;
+        }
 
         async Task SaveAttachmentAsync(int attachmentIndex)
         {

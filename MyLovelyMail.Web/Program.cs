@@ -12,6 +12,7 @@ namespace MyLovelyMail
             MainProject.Stores.AccountStore.Load();
             MainProject.Stores.CredentialVault.Load();
             MainProject.Stores.FilterRuleStore.Load();
+            MainProject.Stores.TagStore.Load();
 
             var builder = WebApplication.CreateBuilder(args);
 
