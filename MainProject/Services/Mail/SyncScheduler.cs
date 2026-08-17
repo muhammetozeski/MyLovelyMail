@@ -56,6 +56,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             IsSyncing = true;
             OnSyncStateChanged?.Invoke();
 
+            // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
+            // polling cycle even though nothing explicitly notifies this scheduler about them.
+            ImapIdleService.Refresh();
+
             foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
             {
                 try

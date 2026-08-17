@@ -23,6 +23,8 @@ namespace MyLovelyMail
             MainProject.ZTests.DebugApi.Start();
 #endif
             MainProject.Services.Mail.SyncScheduler.Start();
+            AccountStore.OnAccountsChanged += MainProject.Services.Mail.ImapIdleService.Refresh;
+            MainProject.Services.Mail.ImapIdleService.Refresh();
 
             var builder = MauiApp.CreateBuilder();
             builder
