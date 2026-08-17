@@ -71,7 +71,8 @@ namespace MyLovelyMail.MainProject.Storage
             return sb.ToString();
         }
 
-        static string IndexKey(string accountId, string folderFullName) => accountId + '\u001F' + folderFullName;
+        /// <summary>Canonical account+folder key — the single place this pairing is ever built.</summary>
+        public static string FolderKey(string accountId, string folderFullName) => accountId + '\u001F' + folderFullName;
 
         #endregion
 
@@ -114,7 +115,7 @@ namespace MyLovelyMail.MainProject.Storage
 
         static FolderIndex GetIndex(string accountId, string folderFullName)
         {
-            var index = Indexes.GetOrAdd(IndexKey(accountId, folderFullName), static _ => new FolderIndex());
+            var index = Indexes.GetOrAdd(FolderKey(accountId, folderFullName), static _ => new FolderIndex());
             if (!index.Loaded)
             {
                 lock (index.SaveLock)

@@ -219,7 +219,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             if (MailUiState.SelectedFolder?.FullName != folderFullName) return;
 
-            string folderKey = accountId + '\u001F' + folderFullName;
+            string folderKey = MessageStore.FolderKey(accountId, folderFullName);
             if (seenUidsFolderKey != folderKey)
             {
                 // Folder switch: everything currently listed counts as seen, nothing blooms.

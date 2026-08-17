@@ -26,13 +26,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Raised when an on-demand folder sync starts or finishes (drives the folder loading state).</summary>
         public static event Action? OnFolderSyncStateChanged;
 
-        /// <summary>Folders currently being synced on demand, keyed accountId + '\u001F' + folderFullName.</summary>
+        /// <summary>Folders currently being synced on demand, keyed by <see cref="MessageStore.FolderKey"/>.</summary>
         static readonly HashSet<string> onDemandInFlight = [];
 
         public static bool IsFolderSyncing(string accountId, string folderFullName)
         {
             lock (onDemandInFlight)
-                return onDemandInFlight.Contains(accountId + '\u001F' + folderFullName);
+                return onDemandInFlight.Contains(MessageStore.FolderKey(accountId, folderFullName));
         }
 
         /// <summary>
@@ -42,7 +42,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static void KickFolderSync(MailAccountData account, string folderFullName)
         {
-            string key = account.Id + '\u001F' + folderFullName;
+            string key = MessageStore.FolderKey(account.Id, folderFullName);
             lock (onDemandInFlight)
                 if (!onDemandInFlight.Add(key)) return;
 
