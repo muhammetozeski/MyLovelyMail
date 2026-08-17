@@ -7,6 +7,9 @@ using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
+    /// <summary>Rendered document plus whether remote images were stripped (drives the allow-once banner).</summary>
+    public sealed record RenderedBody(string Html, bool RemoteImagesBlocked);
+
     /// <summary>
     /// Turns a cached .eml into a sanitized HTML document for the reader's sandboxed iframe.
     /// Sanitizing strips active content (scripts, objects, event handlers, javascript: URLs),
@@ -37,7 +40,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// The sanitized HTML document for the message, or null when the full body is not cached
         /// yet (caller downloads it first). Never throws — a broken MIME falls back to the preview.
         /// </summary>
-        public static string? Render(MailAccountData account, string folderFullName, MailMessageSummary summary)
+        public static RenderedBody? Render(MailAccountData account, string folderFullName, MailMessageSummary summary, bool allowRemoteImages = false)
         {
             byte[]? mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid);
             if (mimeBytes == null) return null;
@@ -47,20 +50,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 using var stream = new MemoryStream(mimeBytes);
                 var message = MimeMessage.Load(stream);
 
+                bool blocked = false;
                 string body = !string.IsNullOrWhiteSpace(message.HtmlBody)
-                    ? Sanitize(message.HtmlBody, message)
+                    ? Sanitize(message.HtmlBody, message, allowRemoteImages, ref blocked)
                     : $"<pre>{WebUtility.HtmlEncode(message.TextBody ?? summary.PreviewText)}</pre>";
 
-                return WrapDocument(body);
+                return new RenderedBody(WrapDocument(body), blocked);
             }
             catch (Exception ex)
             {
                 Log($"Body render failed for uid {summary.Uid}: {ex.Message}", LogLevel.Warning);
-                return WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>");
+                return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>"), false);
             }
         }
 
-        static string Sanitize(string html, MimeMessage message)
+        static string Sanitize(string html, MimeMessage message, bool allowRemoteImages, ref bool blockedRemoteImages)
         {
             html = ScriptBlocks().Replace(html, string.Empty);
             html = ForbiddenTags().Replace(html, string.Empty);
@@ -68,8 +72,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
             html = JavascriptUrls().Replace(html, "$1=$2about:blank$2");
             html = InlineCidImages(html, message);
 
-            if (Settings.ExternalImages.Value == ExternalImagesPolicy.Block)
+            if (!allowRemoteImages && Settings.ExternalImages.Value == ExternalImagesPolicy.Block && RemoteImageSources().IsMatch(html))
+            {
+                blockedRemoteImages = true;
                 html = RemoteImageSources().Replace(html, $"$1$2{BlockedImagePlaceholder}$2");
+            }
 
             return html;
         }

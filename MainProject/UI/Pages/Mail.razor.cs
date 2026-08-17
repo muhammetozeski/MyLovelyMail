@@ -66,8 +66,19 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         string? OpenBodyHtml { get; set; }
         bool OpenBodyLoading { get; set; }
+        bool OpenBodyBlockedImages { get; set; }
         string? BodyError { get; set; }
         uint loadedBodyUid;
+        uint remoteImagesAllowedUid;
+
+        /// <summary>Re-renders the open message with remote images allowed for THIS message only.</summary>
+        void AllowImagesOnce()
+        {
+            if (MailUiState.OpenMessage is not { } open) return;
+            remoteImagesAllowedUid = open.Uid;
+            loadedBodyUid = 0;
+            _ = LoadOpenBodyIfNeededAsync();
+        }
 
         /// <summary>
         /// Renders the opened message's cached body; downloads it first when missing. A uid guard
@@ -92,8 +103,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OpenBodyLoading = true;
             await InvokeAsync(StateHasChanged);
 
-            string? html = MailBodyRenderer.Render(account, folderName, open);
-            if (html == null)
+            bool allowRemote = open.Uid == remoteImagesAllowedUid;
+            var rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
+            if (rendered == null)
             {
                 try
                 {
@@ -101,7 +113,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                         await ImapSyncService.DownloadMessageAsync(account, folderName, open.Uid);
                     else if (account.Protocol == IncomingProtocol.Pop3)
                         await Pop3Service.DownloadMessageAsync(account, open.Uid);
-                    html = MailBodyRenderer.Render(account, folderName, open);
+                    rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
                 }
                 catch (Exception ex)
                 {
@@ -111,7 +123,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (MailUiState.OpenMessage?.Uid != open.Uid) return;
 
-            OpenBodyHtml = html;
+            OpenBodyHtml = rendered?.Html;
+            OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
             OpenBodyLoading = false;
             OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
             MarkOpenAsRead(account, folderName, open);

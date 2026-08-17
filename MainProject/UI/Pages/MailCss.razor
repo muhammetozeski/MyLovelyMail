@@ -655,6 +655,18 @@
         width: @(AppMeasures.Size.Px120)px;
     }
 
+    .mail-image-banner {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textSecondary;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
+    }
+
     .mail-save-status {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;

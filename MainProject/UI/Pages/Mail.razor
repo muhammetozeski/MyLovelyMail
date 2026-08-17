@@ -292,6 +292,14 @@
                 <div class="mail-save-status">@SaveStatus</div>
             }
 
+            @if (OpenBodyBlockedImages)
+            {
+                <div class="mail-image-banner">
+                    🖼️ Remote images were blocked for your privacy.
+                    <button class="mail-search-toggle" @onclick="AllowImagesOnce">Show images once</button>
+                </div>
+            }
+
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
                 @if (OpenBodyLoading)
                 {

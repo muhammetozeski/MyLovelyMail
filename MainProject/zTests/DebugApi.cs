@@ -199,7 +199,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         summary.Subject,
                         summary.FromAddress,
                         summary.ToAddresses,
-                        bodyHtml = MailBodyRenderer.Render(account, folder, summary),
+                        bodyHtml = MailBodyRenderer.Render(account, folder, summary)?.Html,
                         attachments = AttachmentService.List(account, folder, summary)
                     };
                 }
