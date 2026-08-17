@@ -65,6 +65,10 @@
                 <button class="wizard-preset @(Protocol == IncomingProtocol.Pop3 ? "wizard-preset--active" : "")"
                         @onclick="() => PickProtocol(IncomingProtocol.Pop3)">📪 POP3</button>
             </div>
+            @if (Protocol == IncomingProtocol.Pop3)
+            {
+                <p class="wizard-hint">💡 POP3 exposes only the Inbox — the protocol has no server folders (Sent, Spam, custom folders stay invisible). Pick IMAP to see the full folder tree.</p>
+            }
         </div>
 
         <div class="wizard-grid">
