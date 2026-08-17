@@ -9,7 +9,9 @@
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            return new Window(new MainPage()) { Title = "MyLovelyMail" };
+            var window = new Window(new MainPage()) { Title = "My Lovely Mail" };
+            TrayService.AttachWindow(window);
+            return window;
         }
     }
 }

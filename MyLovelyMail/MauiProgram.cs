@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+#if WINDOWS
+using H.NotifyIcon;
+#endif
 
 namespace MyLovelyMail
 {
@@ -22,6 +25,9 @@ namespace MyLovelyMail
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 });
+#if WINDOWS
+            builder.UseNotifyIcon();
+#endif
 
             builder.Services.AddMauiBlazorWebView();
 
