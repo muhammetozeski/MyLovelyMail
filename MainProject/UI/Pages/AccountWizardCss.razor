@@ -109,6 +109,31 @@
         outline: none;
     }
 
+    .wizard-colors {
+        display: flex;
+        gap: @(AppMeasures.Space.Px8)px;
+        flex-wrap: wrap;
+    }
+
+    .wizard-color {
+        width: @(AppMeasures.Size.Px28)px;
+        height: @(AppMeasures.Size.Px28)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        border: @(AppMeasures.Border.Medium)px solid transparent;
+        cursor: pointer;
+        transition: transform @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .wizard-color:hover {
+            transform: scale(1.15);
+        }
+
+    .wizard-color--active {
+        border-color: @AppColors.TextPrimary.ToRgbaHex(true);
+        box-shadow: @AppStyles.ShadowSoft;
+        transform: scale(1.15);
+    }
+
     .wizard-test {
         margin: 0;
         font-size: @(AppMeasures.Font.Normal)px;

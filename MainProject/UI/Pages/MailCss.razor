@@ -117,7 +117,7 @@
 
     .mail-folder--active {
         background: @surfaceTint;
-        color: @primary;
+        color: var(--account-accent, @primary);
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
@@ -200,7 +200,7 @@
         }
 
     .mail-row-folder {
-        color: @primary;
+        color: var(--account-accent, @primary);
         margin-right: @(AppMeasures.Space.Px6)px;
         font-weight: @(AppMeasures.Weight.Medium);
     }
@@ -246,7 +246,7 @@
 
     .mail-row--active {
         background: @surfaceTint;
-        border-color: @primary;
+        border-color: var(--account-accent, @primary);
     }
 
     /* Keyboard-focused row: a soft accent outline distinct from the opened (active) row. */
@@ -299,7 +299,7 @@
     }
 
     .mail-row--unread .mail-row-dot {
-        background: @primary;
+        background: var(--account-accent, @primary);
     }
 
     .mail-row--unread .mail-row-from,
@@ -381,6 +381,8 @@
     }
 
     .mail-reader-subject {
+        border-bottom: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
+        padding-bottom: @(AppMeasures.Space.Px4)px;
         font-size: @(AppMeasures.Font.Title)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @textPrimary;

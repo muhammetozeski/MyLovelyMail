@@ -9,8 +9,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
     {
         public const string RoutePath = "/Settings/AddAccount";
 
-        /// <summary>Rotating palette assigned to new accounts so each gets a distinct sidebar color.</summary>
-        static readonly string[] AccountColors = ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A"];
+        /// <summary>Pastel palette offered in the wizard; the default rotates so each account differs.</summary>
+        internal static readonly string[] AccountColors = ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+
+        string SelectedColorHex { get; set; } = AccountColors[AccountStore.Accounts.Count % AccountColors.Length];
 
         ProviderPreset? SelectedPreset { get; set; }
         bool presetPickedManually;
@@ -89,7 +91,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SmtpHost = SmtpHost.Trim(),
             SmtpPort = int.TryParse(SmtpPortText, out int smtpPort) ? smtpPort : 465,
             SmtpSecurity = SmtpSecurity,
-            ColorHex = AccountColors[AccountStore.Accounts.Count % AccountColors.Length]
+            ColorHex = SelectedColorHex
         };
 
         async Task TestConnectionAsync()

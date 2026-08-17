@@ -5,7 +5,8 @@
 @inject NavigationManager Navigation
 <PageTitle>My Lovely Mail</PageTitle>
 
-<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")">
+<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
+     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))">
 
     @* ---- Left: accounts + folders ---- *@
     <aside class="mail-sidebar">

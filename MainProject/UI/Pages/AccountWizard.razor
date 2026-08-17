@@ -41,6 +41,17 @@
             <span class="wizard-label">Password / app password</span>
             <CoreInput Type="password" Placeholder="••••••••" Icon="🔑" @bind-Value="Password" />
         </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Account color (tints the workspace when this account is active)</span>
+            <div class="wizard-colors">
+                @foreach (var colorHex in AccountColors)
+                {
+                    <button class="wizard-color @(SelectedColorHex == colorHex ? "wizard-color--active" : "")"
+                            style="background:@colorHex"
+                            @onclick="() => SelectedColorHex = colorHex"></button>
+                }
+            </div>
+        </div>
     </GlassCard>
 
     <GlassCard CustomClass="wizard-card">
