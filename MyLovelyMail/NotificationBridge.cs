@@ -19,6 +19,7 @@ namespace MyLovelyMail
                 manager.NotificationInvoked += HandleNotificationInvoked;
                 manager.Register();
                 NotificationService.Presenter = ShowToast;
+                Logger.Log("Toast pipeline registered.");
             }
             catch (Exception ex)
             {
@@ -41,6 +42,7 @@ namespace MyLovelyMail
                 builder.MuteAudio();
 
             Microsoft.Windows.AppNotifications.AppNotificationManager.Default.Show(builder.BuildNotification());
+            Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
         }
 
         static void HandleNotificationInvoked(object sender, Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs args)

@@ -204,6 +204,16 @@ namespace MyLovelyMail.MainProject.ZTests
                     };
                 }
 
+                case ("GET", "/logs"):
+                {
+                    int take = int.TryParse(query["take"], out int parsed) ? parsed : 100;
+                    string? filter = query["filter"];
+                    IEnumerable<string> lines = Logger.AllLogs;
+                    if (!string.IsNullOrEmpty(filter))
+                        lines = lines.Where(l => l.Contains(filter, StringComparison.OrdinalIgnoreCase));
+                    return lines.TakeLast(take).ToArray();
+                }
+
                 case ("POST", "/open"):
                 {
                     string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
