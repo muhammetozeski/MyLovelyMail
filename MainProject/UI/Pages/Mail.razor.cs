@@ -53,7 +53,78 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void HandleStateChanged()
         {
             RefreshLists();
+            _ = LoadOpenBodyIfNeededAsync();
             InvokeAsync(StateHasChanged);
+        }
+
+        string? OpenBodyHtml { get; set; }
+        bool OpenBodyLoading { get; set; }
+        string? BodyError { get; set; }
+        uint loadedBodyUid;
+
+        /// <summary>
+        /// Renders the opened message's cached body; downloads it first when missing. A uid guard
+        /// drops stale results when the user opens another message mid-download.
+        /// </summary>
+        async Task LoadOpenBodyIfNeededAsync()
+        {
+            var account = MailUiState.SelectedAccount;
+            var open = MailUiState.OpenMessage;
+            if (account == null || open == null)
+            {
+                OpenBodyHtml = null;
+                loadedBodyUid = 0;
+                return;
+            }
+            if (loadedBodyUid == open.Uid && (OpenBodyHtml != null || OpenBodyLoading)) return;
+            if (ResolveFolderOf(open) is not { } folderName) return;
+
+            loadedBodyUid = open.Uid;
+            OpenBodyHtml = null;
+            BodyError = null;
+            OpenBodyLoading = true;
+            await InvokeAsync(StateHasChanged);
+
+            string? html = MailBodyRenderer.Render(account, folderName, open);
+            if (html == null)
+            {
+                try
+                {
+                    if (account.Protocol == IncomingProtocol.Imap && !folderName.StartsWith(MessageStore.LocalFolderPrefix))
+                        await ImapSyncService.DownloadMessageAsync(account, folderName, open.Uid);
+                    else if (account.Protocol == IncomingProtocol.Pop3)
+                        await Pop3Service.DownloadMessageAsync(account, open.Uid);
+                    html = MailBodyRenderer.Render(account, folderName, open);
+                }
+                catch (Exception ex)
+                {
+                    BodyError = ex.Message;
+                }
+            }
+
+            if (MailUiState.OpenMessage?.Uid != open.Uid) return;
+
+            OpenBodyHtml = html;
+            OpenBodyLoading = false;
+            MarkOpenAsRead(account, folderName, open);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        /// <summary>Applies the opened-equals-read behavior, honoring the configured delay.</summary>
+        static void MarkOpenAsRead(MailAccountData account, string folderName, MailMessageSummary open)
+        {
+            int delaySeconds = GlobalSettings.MarkAsReadDelaySeconds.Value;
+            if (delaySeconds <= 0)
+            {
+                MessageActions.MarkRead(account, folderName, open);
+                return;
+            }
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+                if (MailUiState.OpenMessage?.Uid == open.Uid)
+                    MessageActions.MarkRead(account, folderName, open);
+            });
         }
 
         void HandleFolderChanged(string accountId, string folderFullName)

@@ -208,13 +208,30 @@
             </div>
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
-                @if (string.IsNullOrWhiteSpace(open.PreviewText))
+                @if (OpenBodyLoading)
                 {
-                    <p class="mail-reader-nobody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
+                    <div class="mail-body-loading">
+                        <CoreSpinner />
+                    </div>
+                }
+                else if (OpenBodyHtml != null)
+                {
+                    <iframe class="mail-reader-frame" sandbox="allow-same-origin" srcdoc="@OpenBodyHtml"></iframe>
                 }
                 else
                 {
-                    <p class="mail-reader-preview">@open.PreviewText</p>
+                    @if (BodyError != null)
+                    {
+                        <p class="mail-compose-error">❌ @BodyError</p>
+                    }
+                    @if (string.IsNullOrWhiteSpace(open.PreviewText))
+                    {
+                        <p class="mail-reader-nobody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
+                    }
+                    else
+                    {
+                        <p class="mail-reader-preview">@open.PreviewText</p>
+                    }
                 }
             </GlassCard>
         }
