@@ -21,7 +21,10 @@ namespace MyLovelyMail.MainProject.ZTests
     ///   GET  /folders?accountId=                      cached folders of the account
     ///   GET  /messages?accountId=&amp;folder=&amp;take=      newest summaries of a folder
     ///   GET  /message?accountId=&amp;folder=&amp;uid=        rendered body + attachments of one message
-    ///   POST /send       {accountId,to,cc,subject,body}   send through SMTP
+    ///   POST /send       {accountId,to,cc,subject,body,attachmentPaths}   send through SMTP
+    ///   POST /open       ?accountId=&amp;folder=&amp;uid=     select + open the message in the reader
+    ///   POST /compose    ?accountId=&amp;attachmentPath=   open the compose pane (optionally pre-attach a file)
+    ///   GET  /logs       ?filter=&amp;take=                in-memory log lines
     /// </summary>
     public static class DebugApi
     {
@@ -115,6 +118,7 @@ namespace MyLovelyMail.MainProject.ZTests
             public string Cc { get; set; } = string.Empty;
             public string Subject { get; set; } = string.Empty;
             public string Body { get; set; } = string.Empty;
+            public List<string> AttachmentPaths { get; set; } = [];
         }
 
         static async Task<object?> RouteAsync(HttpListenerRequest request)
@@ -236,15 +240,36 @@ namespace MyLovelyMail.MainProject.ZTests
                     var body = await JsonSerializer.DeserializeAsync<SendRequest>(request.InputStream, Json)
                         ?? throw new InvalidOperationException("Empty request body.");
                     var account = AccountStore.GetById(body.AccountId) ?? throw new InvalidOperationException("Unknown account.");
-                    await ComposeService.SendAsync(new ComposeDraft
+                    var draft = new ComposeDraft
                     {
                         Account = account,
                         To = body.To,
                         Cc = body.Cc,
                         Subject = body.Subject,
                         Body = body.Body
-                    });
-                    return new { ok = true };
+                    };
+                    foreach (string sourcePath in body.AttachmentPaths)
+                    {
+                        await using var source = File.OpenRead(sourcePath);
+                        await ComposeService.AttachFileAsync(draft, source, Path.GetFileName(sourcePath));
+                    }
+                    await ComposeService.SendAsync(draft);
+                    return new { ok = true, attachments = draft.AttachmentPaths.Count };
+                }
+
+                case ("POST", "/compose"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var draft = ComposeService.BuildNew(account);
+                    if (query["attachmentPath"] is { Length: > 0 } attachmentPath)
+                    {
+                        await using var source = File.OpenRead(attachmentPath);
+                        await ComposeService.AttachFileAsync(draft, source, Path.GetFileName(attachmentPath));
+                    }
+                    MailUiState.SelectAccount(account);
+                    MailUiState.OpenCompose(draft);
+                    return new { ok = true, draft.DraftId, attachments = draft.AttachmentPaths.Count };
                 }
 
                 default:

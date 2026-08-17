@@ -52,3 +52,7 @@ Short "problem → solution" notes so the same wall is never hit twice.
 - **smtp4dev is a full local IMAP+SMTP loop for end-to-end tests**: send over SMTP :2525, sync it
   back over IMAP :1143, any credentials accepted. Combined with the DEBUG-only REST API
   (`DebugApi`, http://127.0.0.1:52539) the whole receive/send path is verifiable headlessly.
+
+## Never drive the UI with screen clicks — extend the DebugApi instead
+- Problem: verifying UI states (open compose, click a folder) by simulating mouse clicks moves the user's cursor and steals focus while they are using the machine.
+- Solution: the DEBUG REST API (127.0.0.1:52539) is the only sanctioned way to drive the running app. When a UI state has no endpoint, add one (like POST /compose) instead of reaching for SetCursorPos/mouse_event. Click-free PrintWindow snapshots remain fine; anything that touches cursor, keyboard or foreground focus is banned.
