@@ -11,6 +11,9 @@ namespace MyLovelyMail.MainProject.Services
         public required string Body { get; init; }
         /// <summary>True silences the toast sound (per-message "none" sound or a muting rule).</summary>
         public bool Mute { get; init; }
+
+        /// <summary>Sound name to play with the toast (rule-chosen or the account default); ignored when muted.</summary>
+        public string SoundName { get; init; } = "default";
         public string AccountId { get; init; } = string.Empty;
         public string FolderFullName { get; init; } = string.Empty;
         /// <summary>The single new message's uid; 0 for a batch toast.</summary>
@@ -50,6 +53,7 @@ namespace MyLovelyMail.MainProject.Services
                     Title = string.IsNullOrWhiteSpace(audible[0].FromName) ? audible[0].FromAddress : audible[0].FromName,
                     Body = string.IsNullOrWhiteSpace(audible[0].Subject) ? "(no subject)" : audible[0].Subject,
                     Mute = mute,
+                    SoundName = soundName,
                     AccountId = account.Id,
                     FolderFullName = folderFullName,
                     Uid = audible[0].Uid
@@ -59,6 +63,7 @@ namespace MyLovelyMail.MainProject.Services
                     Title = "My Lovely Mail",
                     Body = $"💌 {audible.Count} new messages for {account.EmailAddress}",
                     Mute = mute,
+                    SoundName = soundName,
                     AccountId = account.Id,
                     FolderFullName = folderFullName
                 };

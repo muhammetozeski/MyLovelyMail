@@ -38,11 +38,15 @@ namespace MyLovelyMail
                 .AddArgument("folder", toast.FolderFullName)
                 .AddArgument("uid", toast.Uid.ToString());
 
-            if (toast.Mute)
-                builder.MuteAudio();
+            // The toast's own audio is always muted; our SoundBridge plays the (possibly
+            // rule-customized) sound instead, so per-rule sounds actually differ.
+            builder.MuteAudio();
 
             Microsoft.Windows.AppNotifications.AppNotificationManager.Default.Show(builder.BuildNotification());
             Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
+
+            if (!toast.Mute)
+                MainProject.Services.SoundService.Play(toast.SoundName);
         }
 
         static void HandleNotificationInvoked(object sender, Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs args)

@@ -21,6 +21,7 @@ namespace MyLovelyMail
             FilterRuleStore.Load();
             TagStore.Load();
             NotificationBridge.Initialize();
+            SoundBridge.Initialize();
 #if DEBUG
             MainProject.ZTests.DebugApi.Start();
 #endif

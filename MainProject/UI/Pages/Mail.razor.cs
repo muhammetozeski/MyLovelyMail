@@ -406,6 +406,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             try
             {
                 await ComposeService.SendAsync(draft);
+                SoundService.Play("success");
                 MailUiState.CloseCompose();
             }
             catch (Exception ex)
