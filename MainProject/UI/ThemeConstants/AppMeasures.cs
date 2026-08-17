@@ -231,6 +231,8 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const string Longer = "1.5";
             public const string VerySlow = "2";
             public const string Slowest = "3";
+            /// <summary> Ambient background motion (aurora drift) — long enough to be felt, not watched. </summary>
+            public const string Glacial = "22";
         }
 
         /// <summary> The single throbber design every spinning loader reuses, so the whole app spins identically. </summary>

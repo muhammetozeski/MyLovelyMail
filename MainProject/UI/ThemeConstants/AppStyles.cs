@@ -123,6 +123,16 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             return $"background:{radials}, linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
         }
 
+        /// <summary>
+        /// The aurora stops alone (no base gradient) as a background value — painted onto an
+        /// oversized fixed layer that the drift animation moves, while the body keeps the static
+        /// base gradient underneath. Split from <see cref="BuildAuroraBackground"/> so the moving
+        /// part never repaints the whole page background.
+        /// </summary>
+        public static string BuildAuroraStopsLayer() =>
+            "background:" + string.Join(", ", AppColors.AuroraStops.Select(s =>
+                $"radial-gradient(ellipse {s.Size} at {s.Position}, {s.Color.WithAlpha(0.55f).ToRgbaHex(true)} 0%, transparent 70%)")) + ";";
+
         //TODO: improve this comment. do we use these css variables or they are only for bootstrap and other css stuff?
         //yani demek istediğim: bu değişkenler MainProject içinde herhangi bir yerde kullanılıyor mu? bunun cevabını summary'ye ekle kesin ve net bir şekilde emin olarak. sonra da bu todo'yu sil.
         /// <summary>

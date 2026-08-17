@@ -3,7 +3,8 @@
 
 @{
     string cssVars = AppStyles.BuildCssVariables();
-    string aurora = AppStyles.BuildAuroraBackground();
+    string auroraBase = $"background:linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
+    string auroraStops = AppStyles.BuildAuroraStopsLayer();
     string textColor = AppColors.TextPrimary.ToRgbaHex(true);
     string warningBg = AppColors.Warning.ToRgbaHex(true);
     string warningFg = AppColors.BackgroundDeep.ToRgbaHex(true);
@@ -29,10 +30,49 @@
         overflow-x: hidden;
         font-family: "Noto Color Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: @textColor;
-        @((MarkupString)aurora)
+        @((MarkupString)auroraBase)
         background-attachment: fixed;
         background-repeat: no-repeat;
         background-size: cover;
+    }
+
+    /* The aurora blooms live on an oversized fixed layer BEHIND all content so the drift
+       animation only moves a GPU-composited transform — the page itself never repaints. */
+    body::before {
+        content: "";
+        position: fixed;
+        top: -15vh;
+        left: -15vw;
+        width: 130vw;
+        height: 130vh;
+        z-index: -1;
+        pointer-events: none;
+        @((MarkupString)auroraStops)
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    @@media (prefers-reduced-motion: no-preference) {
+        body::before {
+            animation: aurora-drift @(AppMeasures.Duration.Glacial)s ease-in-out infinite alternate;
+        }
+    }
+
+    @@keyframes aurora-drift {
+        0% {
+            transform: translate(0, 0) scale(1);
+            filter: hue-rotate(0deg);
+        }
+
+        50% {
+            transform: translate(-3%, -2%) scale(1.06);
+            filter: hue-rotate(8deg);
+        }
+
+        100% {
+            transform: translate(2%, 1%) scale(1.03);
+            filter: hue-rotate(-6deg);
+        }
     }
 
     .app-page {
