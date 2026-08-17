@@ -43,11 +43,18 @@
     .mail-logo {
         display: flex;
         align-items: center;
+        flex-wrap: nowrap;
         gap: @(AppMeasures.Space.Px8)px;
         font-size: @(AppMeasures.Font.Large)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @textPrimary;
         padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-logo-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .mail-welcome-card {
