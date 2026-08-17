@@ -50,8 +50,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     });
                 }
 
+                // POP3 has no server folders: remote-move actions cannot apply; local ones can.
+                RuleProcessResult? ruleResult = null;
+                if (known.Count > 0 && summaries.Count > 0)
+                    ruleResult = RuleEngine.ProcessIncoming(account, InboxFullName, summaries);
+
                 if (summaries.Count > 0)
                     MessageStore.UpsertSummaries(account.Id, InboxFullName, summaries);
+
+                if (ruleResult != null)
+                    foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+                        MessageStore.MoveToLocalFolder(account.Id, InboxFullName, uid, localFolder);
 
                 MessageStore.SaveFolder(new MailFolderData
                 {

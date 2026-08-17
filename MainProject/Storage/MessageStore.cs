@@ -195,6 +195,36 @@ namespace MyLovelyMail.MainProject.Storage
 
         #endregion
 
+        /// <summary>Prefix marking folders that exist only on this machine (created by rules/user).</summary>
+        public const string LocalFolderPrefix = "Local/";
+
+        /// <summary>
+        /// Moves one message into a local-only folder: creates the folder info on first use,
+        /// carries the cached .eml along when present, and removes the source entry.
+        /// </summary>
+        public static void MoveToLocalFolder(string accountId, string fromFolderFullName, uint uid, string localFolderName)
+        {
+            var summary = GetSummary(accountId, fromFolderFullName, uid);
+            if (summary == null) return;
+
+            string targetFullName = LocalFolderPrefix + localFolderName;
+            if (!GetFolders(accountId).Any(f => f.FullName == targetFullName))
+                SaveFolder(new MailFolderData
+                {
+                    AccountId = accountId,
+                    FullName = targetFullName,
+                    DisplayName = localFolderName,
+                    IsLocal = true
+                });
+
+            byte[]? mimeBytes = TryLoadFullMessage(accountId, fromFolderFullName, uid);
+            if (mimeBytes != null)
+                SaveFullMessage(accountId, targetFullName, uid, mimeBytes);
+
+            UpsertSummaries(accountId, targetFullName, [summary]);
+            RemoveMessages(accountId, fromFolderFullName, [uid]);
+        }
+
         #region Full message bodies (disk only)
 
         public static bool HasFullMessage(string accountId, string folderFullName, uint uid) =>

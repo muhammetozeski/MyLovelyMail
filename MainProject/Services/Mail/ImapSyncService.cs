@@ -30,7 +30,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
                 await SyncFolderListAsync(account, client, ct);
-                await SyncOpenedFolderAsync(account, client.Inbox, ct);
+                await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken);
         }
@@ -42,7 +42,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
                 var folder = await client.GetFolderAsync(folderFullName, ct);
-                await SyncOpenedFolderAsync(account, folder, ct);
+                await SyncOpenedFolderAsync(account, client, folder, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken);
         }
@@ -104,7 +104,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return FolderRole.None;
         }
 
-        static async Task SyncOpenedFolderAsync(MailAccountData account, IMailFolder folder, CancellationToken cancellationToken)
+        static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken)
         {
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
@@ -143,8 +143,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 if (item.UniqueId.Id > lastSeenUid) newCount++;
             }
 
+            // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
+            RuleProcessResult? ruleResult = null;
+            if (lastSeenUid > 0 && summaries.Count > 0)
+                ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, summaries);
+
             if (summaries.Count > 0)
                 MessageStore.UpsertSummaries(account.Id, folder.FullName, summaries);
+
+            if (ruleResult != null)
+                await ExecuteRuleMovesAsync(account, client, folder, ruleResult, cancellationToken);
 
             MessageStore.SaveFolder(new MailFolderData
             {
@@ -160,6 +168,30 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             if (newCount > 0 && lastSeenUid > 0)
                 OnNewMail?.Invoke(account.Id, folder.FullName, newCount);
+        }
+
+        /// <summary>Executes the move requests a rule pass produced — local ones via the store, remote ones over the still-open connection.</summary>
+        static async Task ExecuteRuleMovesAsync(MailAccountData account, ImapClient client, IMailFolder folder, RuleProcessResult ruleResult, CancellationToken cancellationToken)
+        {
+            foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+                MessageStore.MoveToLocalFolder(account.Id, folder.FullName, uid, localFolder);
+
+            if (ruleResult.RemoteMoves.Count == 0) return;
+
+            await folder.OpenAsync(FolderAccess.ReadWrite, cancellationToken);
+            foreach (var moveGroup in ruleResult.RemoteMoves.GroupBy(m => m.TargetFolder))
+            {
+                try
+                {
+                    var targetFolder = await client.GetFolderAsync(moveGroup.Key, cancellationToken);
+                    await folder.MoveToAsync([.. moveGroup.Select(m => new UniqueId(m.Uid))], targetFolder, cancellationToken);
+                    MessageStore.RemoveMessages(account.Id, folder.FullName, moveGroup.Select(m => m.Uid));
+                }
+                catch (Exception ex)
+                {
+                    Log($"Rule move to '{moveGroup.Key}' failed: {ex.Message}", LogLevel.Error);
+                }
+            }
         }
 
         static MailMessageSummary ToSummary(IMessageSummary item)
