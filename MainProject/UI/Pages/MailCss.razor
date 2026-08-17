@@ -355,6 +355,30 @@
         background: var(--account-accent, @primary);
     }
 
+    /* One-shot arrival bloom: the row unfolds from slightly small with a petal-like accent glow. */
+    .mail-row--bloom {
+        animation: mail-bloom @(AppMeasures.Duration.Slow)s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @@keyframes mail-bloom {
+        0% {
+            transform: scale(0.92);
+            opacity: 0;
+            box-shadow: 0 0 0 0 var(--account-accent, @primary);
+        }
+
+        45% {
+            transform: scale(1.02);
+            opacity: 1;
+            box-shadow: 0 0 @(AppMeasures.Space.Px24)px @(AppMeasures.Space.Px2)px @AppColors.Primary.WithAlpha(0.35f).ToRgbaHex(true);
+        }
+
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 transparent;
+        }
+    }
+
     .mail-row--unread .mail-row-from,
     .mail-row--unread .mail-row-subject {
         font-weight: @(AppMeasures.Weight.Heavy);

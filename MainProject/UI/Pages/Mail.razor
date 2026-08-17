@@ -122,7 +122,7 @@
             }
             <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
                 <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
-                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "")"
+                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
                             @onclick="e => HandleRowClick(e, message)">
                         <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
                               @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">

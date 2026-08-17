@@ -200,11 +200,37 @@ namespace MyLovelyMail.MainProject.UI.Pages
             });
         }
 
+        /// <summary>Uids that arrived in the open folder since the previous refresh — they bloom once, then join the seen set.</summary>
+        readonly HashSet<uint> bloomingUids = [];
+        readonly HashSet<uint> seenUids = [];
+        string seenUidsFolderKey = string.Empty;
+
         void HandleFolderChanged(string accountId, string folderFullName)
         {
             if (MailUiState.SelectedAccount?.Id != accountId) return;
             RefreshLists();
+            TrackNewArrivalsForBloom(accountId, folderFullName);
             InvokeAsync(StateHasChanged);
+        }
+
+        void TrackNewArrivalsForBloom(string accountId, string folderFullName)
+        {
+            if (MailUiState.SelectedFolder?.FullName != folderFullName) return;
+
+            string folderKey = accountId + '\u001F' + folderFullName;
+            if (seenUidsFolderKey != folderKey)
+            {
+                // Folder switch: everything currently listed counts as seen, nothing blooms.
+                seenUidsFolderKey = folderKey;
+                seenUids.Clear();
+                bloomingUids.Clear();
+                foreach (var summary in FilteredSummaries) seenUids.Add(summary.Uid);
+                return;
+            }
+
+            foreach (var summary in FilteredSummaries)
+                if (seenUids.Add(summary.Uid) && summary.IsUnread)
+                    bloomingUids.Add(summary.Uid);
         }
 
         bool SearchAllFolders { get; set; }
