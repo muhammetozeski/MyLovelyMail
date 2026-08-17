@@ -216,6 +216,8 @@
         }
         else
         {
+            @* @key remounts this subtree per message, so the open animation replays on every switch. *@
+            <div class="mail-reader-content" @key="open.Uid">
             <div class="mail-reader-header">
                 <BackButton OnClick="@MailUiState.CloseMessage" />
                 <div class="mail-reader-titles">
@@ -328,6 +330,7 @@
                     }
                 }
             </GlassCard>
+            </div>
         }
     </section>
 </div>

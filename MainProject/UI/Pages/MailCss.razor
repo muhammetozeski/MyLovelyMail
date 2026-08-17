@@ -494,13 +494,39 @@
         min-width: 0;
     }
 
+    /* Remounted per message via @@key, so the open animation replays on every switch. */
+    .mail-reader-content {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Medium)px;
+        min-height: 0;
+        flex: 1;
+        animation: reader-open @(AppMeasures.Duration.Medium)s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @@keyframes reader-open {
+        from {
+            opacity: 0;
+            transform: translateX(@(AppMeasures.Space.Px24)px) scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
     .mail-reader-subject {
-        border-bottom: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
         padding-bottom: @(AppMeasures.Space.Px4)px;
         font-size: @(AppMeasures.Font.Title)px;
         font-weight: @(AppMeasures.Weight.Bold);
-        color: @textPrimary;
         line-height: @(AppMeasures.LineHeight.Tight);
+        /* Gradient headline: accent-to-primary ink that follows the account tint. */
+        background: linear-gradient(90deg, var(--account-accent, @primary), @AppColors.SecondaryDark.ToRgbaHex(true));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        border-bottom: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
     }
 
     .mail-reader-meta {
