@@ -516,17 +516,16 @@
         }
     }
 
+    /* No gradient-clipped ink here: background-clip:text crushes color emoji in subjects into
+       tinted silhouettes. Solid text + a gradient underline carries the accent instead. */
     .mail-reader-subject {
         padding-bottom: @(AppMeasures.Space.Px4)px;
         font-size: @(AppMeasures.Font.Title)px;
         font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
         line-height: @(AppMeasures.LineHeight.Tight);
-        /* Gradient headline: accent-to-primary ink that follows the account tint. */
-        background: linear-gradient(90deg, var(--account-accent, @primary), @AppColors.SecondaryDark.ToRgbaHex(true));
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        border-bottom: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
+        border-image: linear-gradient(90deg, var(--account-accent, @primary), @AppColors.Accent.ToRgbaHex(true)) 1;
+        border-bottom: @(AppMeasures.Border.Medium)px solid;
     }
 
     .mail-reader-meta {
