@@ -11,6 +11,9 @@ namespace MyLovelyMail
     {
         public static MauiApp CreateMauiApp()
         {
+            if (!SingleInstance.Claim())
+                Environment.Exit(0);
+
             AppPaths.EnsureCreated();
             SettingsManager.LoadSettings();
             Logger.ActivateLogging = Settings.EnableLogging.Value;
