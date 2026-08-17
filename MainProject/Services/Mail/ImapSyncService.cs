@@ -69,6 +69,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
+            using var syncScope = SyncScheduler.EnterSyncScope();
             Log($"IMAP sync started: {account.EmailAddress}");
             await ResiliencePolicy.RunNetwork(async ct =>
             {
@@ -83,6 +84,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Syncs one folder's messages (used when the user opens a folder).</summary>
         public static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
         {
+            using var syncScope = SyncScheduler.EnterSyncScope();
             await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);

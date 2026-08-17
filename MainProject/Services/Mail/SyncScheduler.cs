@@ -11,11 +11,35 @@ namespace MyLovelyMail.MainProject.Services.Mail
     public static class SyncScheduler
     {
         static CancellationTokenSource? loopCancellation;
+        static int activeSyncCount;
+        static bool passRunning;
 
-        /// <summary>True while a manual or scheduled sync pass is running (drives the UI spinner).</summary>
-        public static bool IsSyncing { get; private set; }
+        /// <summary>True while ANY sync runs — scheduled pass, IDLE push or folder-on-open alike.</summary>
+        public static bool IsSyncing => Volatile.Read(ref activeSyncCount) > 0;
 
         public static event Action? OnSyncStateChanged;
+
+        /// <summary>
+        /// Counted activity scope. Each real sync (account pass, single folder) wraps itself in
+        /// this, so the heart/sweep indicators fire no matter WHO triggered the sync. Without the
+        /// counter, IDLE-triggered and folder-open syncs ran invisible.
+        /// </summary>
+        internal static IDisposable EnterSyncScope() => new SyncScope();
+
+        sealed class SyncScope : IDisposable
+        {
+            public SyncScope()
+            {
+                Interlocked.Increment(ref activeSyncCount);
+                OnSyncStateChanged?.Invoke();
+            }
+
+            public void Dispose()
+            {
+                Interlocked.Decrement(ref activeSyncCount);
+                OnSyncStateChanged?.Invoke();
+            }
+        }
 
         /// <summary>Starts the periodic loop. Idempotent — extra calls are ignored while it runs.</summary>
         public static void Start()
@@ -52,9 +76,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Syncs every enabled account once. Safe to call while the loop runs.</summary>
         public static async Task SyncNowAsync(CancellationToken cancellationToken = default)
         {
-            if (IsSyncing) return;
-            IsSyncing = true;
-            OnSyncStateChanged?.Invoke();
+            if (passRunning) return;
+            passRunning = true;
 
             // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
             // polling cycle even though nothing explicitly notifies this scheduler about them.
@@ -79,8 +102,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
             }
 
-            IsSyncing = false;
-            OnSyncStateChanged?.Invoke();
+            passRunning = false;
             Log("Sync pass finished for all enabled accounts.");
         }
     }
