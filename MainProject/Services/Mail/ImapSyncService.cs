@@ -71,6 +71,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static async Task SyncFolderListAsync(MailAccountData account, ImapClient client, CancellationToken cancellationToken)
         {
             var serverFolders = await client.GetFoldersAsync(client.PersonalNamespaces[0], false, cancellationToken);
+            var cachedFolders = MessageStore.GetFolders(account.Id);
 
             foreach (var folder in serverFolders)
             {
@@ -87,6 +88,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     DisplayName = folder.Name,
                     Role = ResolveRole(client, folder),
                     UidValidity = folder.UidValidity,
+                    // Refreshing counts must never erase sync progress: dropping LastSeenUid to 0
+                    // here re-imported "the newest 300" as brand-new on EVERY pass, which both
+                    // wasted traffic and kept the new-mail notification condition permanently false.
+                    LastSeenUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSeenUid ?? 0,
                     TotalCount = folder.Count,
                     UnreadCount = folder.Unread
                 });
