@@ -3,6 +3,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     /// <summary>An in-progress outgoing message edited in the compose pane (plain text body).</summary>
     public class ComposeDraft
     {
+        /// <summary>Stable identity so every autosave overwrites the SAME local draft.</summary>
+        public string DraftId { get; set; } = Guid.NewGuid().ToString("N");
+
         public MailAccountData? Account { get; set; }
         public string To { get; set; } = string.Empty;
         public string Cc { get; set; } = string.Empty;

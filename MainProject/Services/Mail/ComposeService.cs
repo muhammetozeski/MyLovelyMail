@@ -14,6 +14,84 @@ namespace MyLovelyMail.MainProject.Services.Mail
     public static class ComposeService
     {
         public const string LocalSentFolderName = "Sent";
+        public const string LocalDraftsFolderName = "Drafts";
+
+        /// <summary>Raw recipient text survives in headers even when it is not yet a parseable address.</summary>
+        const string DraftToHeader = "X-LovelyDraft-To";
+        const string DraftCcHeader = "X-LovelyDraft-Cc";
+        const string DraftMessageIdPrefix = "draft:";
+
+        static string LocalDraftsFullName => MessageStore.LocalFolderPrefix + LocalDraftsFolderName;
+
+        public static uint DraftUid(ComposeDraft draft) => Pop3Service.Fnv1aHash(DraftMessageIdPrefix + draft.DraftId);
+
+        /// <summary>Writes/overwrites the draft in the local Drafts folder (autosave + close paths).</summary>
+        public static void SaveDraft(ComposeDraft draft)
+        {
+            if (draft.Account is not { } account) return;
+
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
+            message.Subject = draft.Subject;
+            message.Headers.Add(DraftToHeader, draft.To);
+            message.Headers.Add(DraftCcHeader, draft.Cc);
+            message.Body = new TextPart("plain") { Text = draft.Body };
+
+            if (!MessageStore.GetFolders(account.Id).Any(f => f.FullName == LocalDraftsFullName))
+                MessageStore.SaveFolder(new MailFolderData
+                {
+                    AccountId = account.Id,
+                    FullName = LocalDraftsFullName,
+                    DisplayName = LocalDraftsFolderName,
+                    Role = FolderRole.Drafts,
+                    IsLocal = true
+                });
+
+            using var buffer = new MemoryStream();
+            message.WriteTo(buffer);
+            uint uid = DraftUid(draft);
+            MessageStore.SaveFullMessage(account.Id, LocalDraftsFullName, uid, buffer.ToArray());
+            MessageStore.UpsertSummaries(account.Id, LocalDraftsFullName,
+            [
+                new MailMessageSummary
+                {
+                    Uid = uid,
+                    MessageId = DraftMessageIdPrefix + draft.DraftId,
+                    Subject = draft.Subject,
+                    FromName = account.DisplayName,
+                    FromAddress = account.EmailAddress,
+                    ToAddresses = draft.To,
+                    DateUtc = DateTime.UtcNow,
+                    Flags = MailFlags.Draft | MailFlags.Seen,
+                    PreviewText = draft.Body.Length > 160 ? draft.Body[..160] : draft.Body
+                }
+            ]);
+        }
+
+        /// <summary>Reopens a stored draft summary as an editable ComposeDraft (null when its MIME is gone).</summary>
+        public static ComposeDraft? LoadDraft(MailAccountData account, MailMessageSummary summary)
+        {
+            byte[]? bytes = MessageStore.TryLoadFullMessage(account.Id, LocalDraftsFullName, summary.Uid);
+            if (bytes == null) return null;
+
+            using var stream = new MemoryStream(bytes);
+            var message = MimeMessage.Load(stream);
+            return new ComposeDraft
+            {
+                DraftId = summary.MessageId.StartsWith(DraftMessageIdPrefix) ? summary.MessageId[DraftMessageIdPrefix.Length..] : Guid.NewGuid().ToString("N"),
+                Account = account,
+                To = message.Headers[DraftToHeader] ?? string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
+                Cc = message.Headers[DraftCcHeader] ?? string.Empty,
+                Subject = message.Subject ?? string.Empty,
+                Body = message.TextBody ?? string.Empty
+            };
+        }
+
+        public static void DeleteDraft(ComposeDraft draft)
+        {
+            if (draft.Account is { } account)
+                MessageStore.RemoveMessages(account.Id, LocalDraftsFullName, [DraftUid(draft)]);
+        }
 
         public static ComposeDraft BuildNew(MailAccountData account) => new() { Account = account };
 
@@ -89,6 +167,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             await SmtpSendService.SendAsync(account, message, cancellationToken);
             await ArchiveToSentAsync(account, message, cancellationToken);
+            DeleteDraft(draft);
         }
 
         static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)

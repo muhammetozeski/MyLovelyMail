@@ -398,13 +398,64 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OpenMessageInReader(message);
         }
 
-        /// <summary>Ctrl+Click toggles selection for bulk actions; a plain click opens the message.</summary>
-        static void HandleRowClick(MouseEventArgs e, MailMessageSummary message)
+        /// <summary>Ctrl+Click toggles selection for bulk actions; a plain click opens the message (or its draft).</summary>
+        void HandleRowClick(MouseEventArgs e, MailMessageSummary message)
         {
             if (e.CtrlKey)
                 MailUiState.ToggleSelected(message.Uid);
             else
-                OpenMessage(message);
+                OpenMessageOrDraft(message);
+        }
+
+        System.Timers.Timer? draftAutosaveTimer;
+        DateTime? DraftSavedAt { get; set; }
+
+        /// <summary>Any keystroke in the compose fields re-arms a ~3s idle autosave.</summary>
+        void NoteComposeActivity()
+        {
+            draftAutosaveTimer?.Dispose();
+            draftAutosaveTimer = new System.Timers.Timer(3000) { AutoReset = false };
+            draftAutosaveTimer.Elapsed += (_, _) => SaveActiveDraft();
+            draftAutosaveTimer.Start();
+        }
+
+        void SaveActiveDraft()
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            if (draft.To.Length + draft.Subject.Length + draft.Body.Length == 0) return;
+            ComposeService.SaveDraft(draft);
+            DraftSavedAt = DateTime.Now;
+            InvokeAsync(StateHasChanged);
+        }
+
+        void SaveAndCloseCompose()
+        {
+            draftAutosaveTimer?.Dispose();
+            SaveActiveDraft();
+            DraftSavedAt = null;
+            MailUiState.CloseCompose();
+        }
+
+        void DiscardCompose()
+        {
+            draftAutosaveTimer?.Dispose();
+            if (MailUiState.ActiveCompose is { } draft)
+                ComposeService.DeleteDraft(draft);
+            DraftSavedAt = null;
+            MailUiState.CloseCompose();
+        }
+
+        /// <summary>Rows in the local Drafts folder reopen in the compose pane instead of the reader.</summary>
+        void OpenMessageOrDraft(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is { } account
+                && MailUiState.SelectedFolder is { IsLocal: true, Role: FolderRole.Drafts }
+                && ComposeService.LoadDraft(account, message) is { } draft)
+            {
+                MailUiState.OpenCompose(draft);
+                return;
+            }
+            OpenMessage(message);
         }
 
         List<MailMessageSummary> SelectedSummaries =>
@@ -511,6 +562,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         public void Dispose()
         {
+            draftAutosaveTimer?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             MessageStore.OnFolderChanged -= HandleFolderChanged;

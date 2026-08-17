@@ -172,16 +172,22 @@
         @if (MailUiState.ActiveCompose is { } draft)
         {
             <div class="mail-reader-header">
-                <BackButton OnClick="@MailUiState.CloseCompose" />
+                <BackButton OnClick="@SaveAndCloseCompose" />
                 <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
+                @if (DraftSavedAt != null)
+                {
+                    <span class="mail-compose-saved">💾 @DraftSavedAt?.ToString("HH:mm:ss")</span>
+                }
             </div>
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
+                <div class="mail-compose-fields" @oninput="NoteComposeActivity">
                 <div class="mail-compose-from">From: <b>@draft.Account?.EmailAddress</b></div>
                 <CoreInput Placeholder="To (comma separated)" Icon="👤" @bind-Value="draft.To" />
                 <CoreInput Placeholder="Cc" Icon="👥" @bind-Value="draft.Cc" />
                 <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
                 <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
+                </div>
 
                 @if (SendError != null)
                 {
@@ -189,7 +195,7 @@
                 }
 
                 <div class="mail-compose-actions">
-                    <SecondaryButton OnClick="@MailUiState.CloseCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
+                    <SecondaryButton OnClick="@DiscardCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
                     <PrimaryButton OnClick="@SendActiveDraftAsync" Disabled="@(Sending || string.IsNullOrWhiteSpace(draft.To))">
                         @if (Sending)
                         {

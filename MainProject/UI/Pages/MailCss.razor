@@ -516,6 +516,21 @@
         flex: 1;
     }
 
+    .mail-compose-fields {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px10)px;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .mail-compose-saved {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @textMuted;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
     .mail-compose-from {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;
