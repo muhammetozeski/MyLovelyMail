@@ -34,6 +34,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             AccountStore.OnAccountsChanged += HandleStateChanged;
             MessageStore.OnFolderChanged += HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
+            ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
 
             if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
                 SelectAccount(AccountStore.Accounts[0]);
@@ -635,6 +636,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             MessageStore.OnFolderChanged -= HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
+            ImapSyncService.OnFolderSyncStateChanged -= HandleSyncStateChanged;
         }
     }
 }

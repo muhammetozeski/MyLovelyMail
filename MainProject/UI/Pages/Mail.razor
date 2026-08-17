@@ -104,10 +104,22 @@
         }
         else if (FilteredSummaries.Count == 0)
         {
-            <div class="mail-empty">
-                <div class="mail-empty-icon">🕊️</div>
-                <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
-            </div>
+            @if (string.IsNullOrWhiteSpace(SearchText)
+                 && MailUiState.SelectedFolder is { } waitedFolder
+                 && ImapSyncService.IsFolderSyncing(waitedFolder.AccountId, waitedFolder.FullName))
+            {
+                <div class="mail-empty">
+                    <CoreSpinner />
+                    <div class="mail-empty-text">Fetching this folder from the server…</div>
+                </div>
+            }
+            else
+            {
+                <div class="mail-empty">
+                    <div class="mail-empty-icon">🕊️</div>
+                    <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+                </div>
+            }
         }
         else
         {

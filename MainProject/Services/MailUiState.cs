@@ -1,4 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services
 {
@@ -57,6 +59,12 @@ namespace MyLovelyMail.MainProject.Services
             OpenMessage = null;
             SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
+
+            // The scheduled pass only fills the Inbox, so any other server folder is fetched
+            // the moment the user opens it (incremental — repeat visits only pull what's new).
+            if (folder is { IsLocal: false }
+                && AccountStore.GetById(folder.AccountId) is { Enabled: true, Protocol: IncomingProtocol.Imap } account)
+                ImapSyncService.KickFolderSync(account, folder.FullName);
         }
 
         public static void ToggleSelected(uint uid)

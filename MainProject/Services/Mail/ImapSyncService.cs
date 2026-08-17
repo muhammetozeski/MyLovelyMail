@@ -23,6 +23,49 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Raised after a sync stored NEW messages: (accountId, folderFullName, newMessageCount).</summary>
         public static event Action<string, string, int>? OnNewMail;
 
+        /// <summary>Raised when an on-demand folder sync starts or finishes (drives the folder loading state).</summary>
+        public static event Action? OnFolderSyncStateChanged;
+
+        /// <summary>Folders currently being synced on demand, keyed accountId + '\u001F' + folderFullName.</summary>
+        static readonly HashSet<string> onDemandInFlight = [];
+
+        public static bool IsFolderSyncing(string accountId, string folderFullName)
+        {
+            lock (onDemandInFlight)
+                return onDemandInFlight.Contains(accountId + '\u001F' + folderFullName);
+        }
+
+        /// <summary>
+        /// Fire-and-forget sync of one folder, used when the user opens it. The scheduled pass only
+        /// fills the Inbox, so without this every other server folder would stay empty forever.
+        /// Repeat calls while a sync is already running are ignored.
+        /// </summary>
+        public static void KickFolderSync(MailAccountData account, string folderFullName)
+        {
+            string key = account.Id + '\u001F' + folderFullName;
+            lock (onDemandInFlight)
+                if (!onDemandInFlight.Add(key)) return;
+
+            OnFolderSyncStateChanged?.Invoke();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SyncFolderAsync(account, folderFullName);
+                }
+                catch (Exception ex)
+                {
+                    Log($"On-demand sync of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
+                }
+                finally
+                {
+                    lock (onDemandInFlight)
+                        onDemandInFlight.Remove(key);
+                    OnFolderSyncStateChanged?.Invoke();
+                }
+            });
+        }
+
         /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
