@@ -96,6 +96,24 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🧰 Diagnostics</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Enable logging</span>
+                <span class="settings-row-hint">Buffers app logs in memory for the log viewer</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.EnableLogging.Value" CheckedChanged="@SetLogging" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Log viewer</span>
+                <span class="settings-row-hint">Inspect, filter and export buffered logs</span>
+            </div>
+            <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.Logs.RoutePath))">🧾 Open</SecondaryButton>
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🔐 Vault protection</div>
         <div class="settings-row">
             <div class="settings-row-text">
@@ -195,6 +213,12 @@
     }
 
     static readonly string[] DensityOptions = ["Cozy", "Comfortable", "Compact"];
+
+    static void SetLogging(bool enabled)
+    {
+        SetAndSave(GlobalSettings.EnableLogging, enabled);
+        Logger.ActivateLogging = enabled;
+    }
 
     static void SetDensity(string density)
     {
