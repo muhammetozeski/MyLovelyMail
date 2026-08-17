@@ -43,6 +43,12 @@ short, concrete, English, only where the code does not explain itself.
 - [ ] Static-helper sweep: make helpers static where they capture nothing (principle 42).
 - [ ] UI pages comment pass after the structural work settles.
 
+## Feature work landed alongside the rebuild
+- Compose attachments (dropzone + chips + MIME parts + draft round-trip) — 531ee9b,
+  verified end-to-end (sent to Gmail, arrived with HasAttachments=true).
+- Threading data core: InReplyTo/ReferenceIds captured on both protocols,
+  ThreadingService union-find + reply-prefix subject fallback, /threads debug endpoint.
+
 ## Rules picked up mid-work
 - Editing tool JSON-decodes `\uXXXX` escapes: writing `'\u001F'` through it lands as a
   raw control char in source. Use PowerShell ReadAllText/Replace for such edits.

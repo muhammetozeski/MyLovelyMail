@@ -24,6 +24,7 @@ namespace MyLovelyMail.MainProject.ZTests
     ///   POST /send       {accountId,to,cc,subject,body,attachmentPaths}   send through SMTP
     ///   POST /open       ?accountId=&amp;folder=&amp;uid=     select + open the message in the reader
     ///   POST /compose    ?accountId=&amp;attachmentPath=   open the compose pane (optionally pre-attach a file)
+    ///   GET  /threads    ?accountId=&amp;folder=&amp;take=     conversations built by ThreadingService
     ///   GET  /logs       ?filter=&amp;take=                in-memory log lines
     /// </summary>
     public static class DebugApi
@@ -206,6 +207,22 @@ namespace MyLovelyMail.MainProject.ZTests
                         bodyHtml = MailBodyRenderer.Render(account, folder, summary)?.Html,
                         attachments = AttachmentService.List(account, folder, summary)
                     };
+                }
+
+                case ("GET", "/threads"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string folder = query["folder"] ?? "INBOX";
+                    int take = int.TryParse(query["take"], out int parsed) ? parsed : 10;
+                    return ThreadingService.BuildThreads(MessageStore.GetSummaries(accountId, folder)).Take(take)
+                        .Select(t => new
+                        {
+                            subject = t.Newest.Subject,
+                            count = t.Messages.Count,
+                            unread = t.UnreadCount,
+                            participants = t.ParticipantAddresses,
+                            uids = t.Messages.Select(m => m.Uid)
+                        });
                 }
 
                 case ("GET", "/logs"):
