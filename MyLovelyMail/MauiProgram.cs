@@ -19,6 +19,9 @@ namespace MyLovelyMail
             FilterRuleStore.Load();
             TagStore.Load();
             NotificationBridge.Initialize();
+#if DEBUG
+            MainProject.ZTests.DebugApi.Start();
+#endif
             MainProject.Services.Mail.SyncScheduler.Start();
 
             var builder = MauiApp.CreateBuilder();
