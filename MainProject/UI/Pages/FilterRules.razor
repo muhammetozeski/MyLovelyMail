@@ -1,0 +1,165 @@
+@attribute [Route(RoutePath)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@inject NavigationManager Navigation
+<PageTitle>Filters — My Lovely Mail</PageTitle>
+
+<div class="filters-screen">
+    <div class="filters-header">
+        <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
+        <h1 class="filters-title">🧹 Mail filters</h1>
+        <PrimaryButton OnClick="@StartNewRule">➕ New rule</PrimaryButton>
+    </div>
+
+    @if (EditingRule is { } rule)
+    {
+        <GlassCard CustomClass="filters-card">
+            <div class="filters-section-title">@(IsNewRule ? "New rule" : $"Edit: {rule.Name}")</div>
+
+            <div class="filters-field">
+                <span class="filters-label">Rule name</span>
+                <CoreInput Placeholder="e.g. Newsletters to archive" @bind-Value="rule.Name" />
+            </div>
+
+            <div class="filters-grid">
+                <div class="filters-field">
+                    <span class="filters-label">Applies to</span>
+                    <select class="filters-select" @bind="rule.AccountId">
+                        <option value="">All accounts</option>
+                        @foreach (var account in AccountStore.Accounts)
+                        {
+                            <option value="@account.Id">@account.EmailAddress</option>
+                        }
+                    </select>
+                </div>
+                <div class="filters-field">
+                    <span class="filters-label">Conditions must match</span>
+                    <select class="filters-select" @bind="rule.MatchMode">
+                        <option value="@FilterMatchMode.All">ALL (and)</option>
+                        <option value="@FilterMatchMode.Any">ANY (or)</option>
+                    </select>
+                </div>
+                <div class="filters-field filters-field--toggle">
+                    <span class="filters-label">Stop after this rule</span>
+                    <CoreToggle Checked="@rule.StopProcessing" CheckedChanged="@(v => rule.StopProcessing = v)" />
+                </div>
+            </div>
+
+            <div class="filters-section-title">Conditions</div>
+            @foreach (var condition in rule.Conditions)
+            {
+                <div class="filters-rowline">
+                    <select class="filters-select" @bind="condition.Field">
+                        @foreach (var field in Enum.GetValues<FilterField>())
+                        {
+                            <option value="@field">@field</option>
+                        }
+                    </select>
+                    <select class="filters-select" @bind="condition.Operator">
+                        @foreach (var op in Enum.GetValues<FilterOperator>())
+                        {
+                            <option value="@op">@op</option>
+                        }
+                    </select>
+                    <input class="filters-input" placeholder="Value" @bind="condition.Value" />
+                    <button class="filters-remove" @onclick="() => rule.Conditions.Remove(condition)">✕</button>
+                </div>
+            }
+            <button class="filters-add" @onclick="() => rule.Conditions.Add(new FilterCondition())">➕ Add condition</button>
+
+            <div class="filters-section-title">Actions</div>
+            @foreach (var action in rule.Actions)
+            {
+                <div class="filters-rowline">
+                    <select class="filters-select" @bind="action.Type">
+                        @foreach (var type in Enum.GetValues<FilterActionType>())
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                    <input class="filters-input" placeholder="@ArgumentPlaceholder(action.Type)" @bind="action.Argument" />
+                    <button class="filters-remove" @onclick="() => rule.Actions.Remove(action)">✕</button>
+                </div>
+            }
+            <button class="filters-add" @onclick="() => rule.Actions.Add(new FilterAction())">➕ Add action</button>
+
+            <div class="filters-actions">
+                <SecondaryButton OnClick="@(() => EditingRule = null)">Cancel</SecondaryButton>
+                <PrimaryButton OnClick="@SaveRule" Disabled="@(rule.Name.Trim().Length == 0 || rule.Conditions.Count == 0 || rule.Actions.Count == 0)">💾 Save rule</PrimaryButton>
+            </div>
+        </GlassCard>
+    }
+
+    @if (FilterRuleStore.Rules.Count == 0 && EditingRule == null)
+    {
+        <div class="mail-empty">
+            <div class="mail-empty-icon">🧹</div>
+            <div class="mail-empty-text">No filters yet — create one and incoming mail will sort itself.</div>
+        </div>
+    }
+
+    @foreach (var existingRule in FilterRuleStore.Rules)
+    {
+        <GlassCard CustomClass="filters-card filters-card--row">
+            <div class="filters-rule-main">
+                <span class="filters-rule-name">@existingRule.Name</span>
+                <span class="filters-rule-summary">@Summarize(existingRule)</span>
+            </div>
+            <div class="filters-rule-tools">
+                <CoreToggle Checked="@existingRule.Enabled" CheckedChanged="@(v => SetEnabled(existingRule, v))" />
+                <button class="filters-remove" title="Move up" @onclick="() => FilterRuleStore.MoveRule(existingRule.Id, up: true)">↑</button>
+                <button class="filters-remove" title="Move down" @onclick="() => FilterRuleStore.MoveRule(existingRule.Id, up: false)">↓</button>
+                <button class="filters-remove" title="Edit" @onclick="() => StartEdit(existingRule)">✏️</button>
+                <button class="filters-remove" title="Delete" @onclick="() => FilterRuleStore.Remove(existingRule.Id)">🗑️</button>
+            </div>
+        </GlassCard>
+    }
+</div>
+
+<FilterRulesCss />
+<MailCss />
+
+@code {
+    public const string RoutePath = "/Settings/Filters";
+
+    FilterRule? EditingRule { get; set; }
+    bool IsNewRule { get; set; }
+
+    void StartNewRule()
+    {
+        EditingRule = new FilterRule { Conditions = [new FilterCondition()], Actions = [new FilterAction()] };
+        IsNewRule = true;
+    }
+
+    void StartEdit(FilterRule rule)
+    {
+        // Edit a clone so Cancel never leaves half-typed changes in the store.
+        EditingRule = System.Text.Json.JsonSerializer.Deserialize<FilterRule>(System.Text.Json.JsonSerializer.Serialize(rule));
+        IsNewRule = false;
+    }
+
+    void SaveRule()
+    {
+        if (EditingRule == null) return;
+        FilterRuleStore.Save(EditingRule);
+        EditingRule = null;
+    }
+
+    static void SetEnabled(FilterRule rule, bool enabled)
+    {
+        rule.Enabled = enabled;
+        FilterRuleStore.Save(rule);
+    }
+
+    static string ArgumentPlaceholder(FilterActionType type) => type switch
+    {
+        FilterActionType.MoveToRemoteFolder => "Server folder (e.g. Archive)",
+        FilterActionType.MoveToLocalFolder => "Local folder name",
+        FilterActionType.SetNotificationSound => "Sound name or 'none'",
+        FilterActionType.AddTag => "Tag name",
+        _ => "(no argument needed)"
+    };
+
+    static string Summarize(FilterRule rule) =>
+        $"{rule.Conditions.Count} condition(s) → {string.Join(", ", rule.Actions.Select(a => a.Type))}" +
+        (rule.AccountId.Length > 0 ? $" · {AccountStore.GetById(rule.AccountId)?.EmailAddress}" : " · all accounts");
+}

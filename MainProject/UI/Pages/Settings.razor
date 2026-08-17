@@ -96,6 +96,17 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🧹 Filters</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Mail filters</span>
+                <span class="settings-row-hint">@FilterRuleStore.Rules.Count rule(s) — sort, tag, mute and move incoming mail automatically</span>
+            </div>
+            <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.FilterRules.RoutePath))">🧹 Manage</SecondaryButton>
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🧰 Diagnostics</div>
         <div class="settings-row">
             <div class="settings-row-text">
