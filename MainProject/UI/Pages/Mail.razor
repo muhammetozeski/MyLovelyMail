@@ -208,6 +208,31 @@
                 <DangerButton OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
             </div>
 
+            @if (OpenAttachments.Count > 0)
+            {
+                <div class="mail-attachments">
+                    @foreach (var attachment in OpenAttachments)
+                    {
+                        <button class="mail-attachment-chip" title="Save to Downloads"
+                                @onclick="() => SaveAttachmentAsync(attachment.Index)">
+                            @AttachmentService.IconFor(attachment) @attachment.FileName
+                            @if (attachment.HumanSize.Length > 0)
+                            {
+                                <span class="mail-attachment-size">@attachment.HumanSize</span>
+                            }
+                        </button>
+                    }
+                    @if (OpenAttachments.Count > 1)
+                    {
+                        <button class="mail-attachment-chip mail-attachment-chip--all" @onclick="SaveAllAttachmentsAsync">📦 Save all</button>
+                    }
+                </div>
+            }
+            @if (SaveStatus != null)
+            {
+                <div class="mail-save-status">@SaveStatus</div>
+            }
+
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
                 @if (OpenBodyLoading)
                 {

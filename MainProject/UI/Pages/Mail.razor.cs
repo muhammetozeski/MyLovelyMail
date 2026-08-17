@@ -106,8 +106,42 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             OpenBodyHtml = html;
             OpenBodyLoading = false;
+            OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
             MarkOpenAsRead(account, folderName, open);
             await InvokeAsync(StateHasChanged);
+        }
+
+        List<AttachmentInfo> OpenAttachments { get; set; } = [];
+        string? SaveStatus { get; set; }
+
+        async Task SaveAttachmentAsync(int attachmentIndex)
+        {
+            if (MailUiState.SelectedAccount is not { } account || MailUiState.OpenMessage is not { } open) return;
+            if (ResolveFolderOf(open) is not { } folderName) return;
+            try
+            {
+                string path = await AttachmentService.SaveAsync(account, folderName, open, attachmentIndex);
+                SaveStatus = $"💾 Saved to {path}";
+            }
+            catch (Exception ex)
+            {
+                SaveStatus = $"❌ {ex.Message}";
+            }
+        }
+
+        async Task SaveAllAttachmentsAsync()
+        {
+            if (MailUiState.SelectedAccount is not { } account || MailUiState.OpenMessage is not { } open) return;
+            if (ResolveFolderOf(open) is not { } folderName) return;
+            try
+            {
+                string folder = await AttachmentService.SaveAllAsync(account, folderName, open);
+                SaveStatus = $"💾 All attachments saved to {folder}";
+            }
+            catch (Exception ex)
+            {
+                SaveStatus = $"❌ {ex.Message}";
+            }
         }
 
         /// <summary>Applies the opened-equals-read behavior, honoring the configured delay.</summary>
