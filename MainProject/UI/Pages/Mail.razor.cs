@@ -405,8 +405,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("Search", "from: to: tag: has:attachment is:unread is:starred")
         ];
 
-        static void OpenMessage(MailMessageSummary message)
+        void OpenMessage(MailMessageSummary message)
         {
+            // A click while composing looked dead: the compose pane owns the right side, so the
+            // reader never appeared. Autosave the draft and close compose, then open the message.
+            if (MailUiState.ActiveCompose != null)
+                SaveAndCloseCompose();
             MailUiState.FocusMessage(message);
             MailUiState.OpenMessageInReader(message);
         }
