@@ -117,6 +117,11 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Launch MyLovelyMail automatically at Windows sign-in.</summary>
         public static readonly Setting<bool> StartWithWindows = new(false);
 
+        // ---- Search ----
+
+        /// <summary>Saved search queries, separated by the unit-separator control char (it cannot occur in typed text).</summary>
+        public static readonly Setting<string> SavedSearches = new("");
+
         // ---- Security ----
 
         /// <summary>How the credential vault encrypts account passwords on disk.</summary>

@@ -128,6 +128,83 @@
         white-space: nowrap;
     }
 
+    /* ---- Search tools and saved searches ---- */
+
+    .mail-search {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .mail-search-tools {
+        display: flex;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .mail-search-toggle {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textSecondary;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-search-toggle:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-search-toggle--on {
+        background: linear-gradient(135deg, @primary, @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
+    }
+
+    .mail-saved-searches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: 0 @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-saved-chip {
+        display: inline-flex;
+        align-items: center;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        overflow: hidden;
+    }
+
+    .mail-saved-run,
+    .mail-saved-remove {
+        border: none;
+        background: transparent;
+        color: @textSecondary;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        max-width: @(AppMeasures.Size.Px180)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+        .mail-saved-run:hover,
+        .mail-saved-remove:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-row-folder {
+        color: @primary;
+        margin-right: @(AppMeasures.Space.Px6)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
     /* ---- Message list ---- */
 
     .mail-list {

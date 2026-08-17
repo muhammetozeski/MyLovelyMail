@@ -16,6 +16,19 @@
             <PrimaryButton IsFullWidth="true" OnClick="@StartCompose" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
         }
 
+        @if (SavedSearchList.Count > 0)
+        {
+            <div class="mail-saved-searches">
+                @foreach (var saved in SavedSearchList)
+                {
+                    <span class="mail-saved-chip">
+                        <button class="mail-saved-run" @onclick="() => RunSavedSearch(saved)">🔍 @saved</button>
+                        <button class="mail-saved-remove" @onclick="() => RemoveSavedSearch(saved)">✕</button>
+                    </span>
+                }
+            </div>
+        }
+
         @if (AccountStore.Accounts.Count == 0)
         {
             <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
@@ -63,7 +76,14 @@
     @* ---- Middle: message list ---- *@
     <section class="mail-list">
         <div class="mail-search">
-            <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+            <CoreInput Placeholder="Search mail...  (from: to: tag: has:attachment is:unread is:starred)" Icon="🔍" @bind-Value="SearchText" />
+            @if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                <div class="mail-search-tools">
+                    <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
+                    <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                </div>
+            }
         </div>
 
         @if (MailUiState.SelectedFolder == null)
@@ -104,6 +124,10 @@
                                 @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
                             </span>
                             <span class="mail-row-preview">
+                                @if (HitFolderDisplay(message) is { } hitFolder)
+                                {
+                                    <span class="mail-row-folder">📁 @hitFolder</span>
+                                }
                                 @if (message.HasAttachments)
                                 {
                                     <span class="mail-row-attach">📎</span>

@@ -4,6 +4,7 @@ using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
@@ -62,11 +63,25 @@ namespace MyLovelyMail.MainProject.UI.Pages
             InvokeAsync(StateHasChanged);
         }
 
+        bool SearchAllFolders { get; set; }
+
+        /// <summary>Search-hit summary → (folder full name, display name), filled only in all-folders mode.</summary>
+        Dictionary<MailMessageSummary, (string FullName, string Display)> HitFolders { get; set; } = [];
+
         void RefreshLists()
         {
             var account = MailUiState.SelectedAccount;
             Folders = account == null ? [] : SortFolders(MessageStore.GetFolders(account.Id));
 
+            if (account != null && SearchAllFolders && !string.IsNullOrWhiteSpace(SearchText))
+            {
+                var hits = SearchService.Search(account.Id, SearchText);
+                HitFolders = hits.ToDictionary(h => h.Summary, h => (h.FolderFullName, h.FolderDisplayName));
+                FilteredSummaries = [.. hits.Select(h => h.Summary)];
+                return;
+            }
+
+            HitFolders = [];
             var folder = MailUiState.SelectedFolder;
             if (account == null || folder == null)
             {
@@ -78,6 +93,50 @@ namespace MyLovelyMail.MainProject.UI.Pages
             FilteredSummaries = string.IsNullOrWhiteSpace(SearchText)
                 ? summaries
                 : [.. summaries.Where(MatchesSearch)];
+        }
+
+        /// <summary>The folder a listed message actually lives in (differs from the selection in all-folders search).</summary>
+        string? ResolveFolderOf(MailMessageSummary message) =>
+            HitFolders.TryGetValue(message, out var hit) ? hit.FullName : MailUiState.SelectedFolder?.FullName;
+
+        string? HitFolderDisplay(MailMessageSummary message) =>
+            HitFolders.TryGetValue(message, out var hit) ? hit.Display : null;
+
+        void ToggleSearchAllFolders()
+        {
+            SearchAllFolders = !SearchAllFolders;
+            RefreshLists();
+        }
+
+        List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
+
+        void SaveCurrentSearch()
+        {
+            if (string.IsNullOrWhiteSpace(SearchText)) return;
+            var saved = SavedSearchList;
+            if (saved.Contains(SearchText)) return;
+            saved.Add(SearchText);
+            PersistSavedSearches(saved);
+        }
+
+        void RemoveSavedSearch(string query)
+        {
+            var saved = SavedSearchList;
+            if (saved.Remove(query))
+                PersistSavedSearches(saved);
+        }
+
+        static void PersistSavedSearches(List<string> saved)
+        {
+            GlobalSettings.SavedSearches.Set(string.Join('\u001F', saved));
+            SettingsManager.SaveSettings();
+        }
+
+        void RunSavedSearch(string query)
+        {
+            _searchText = query;
+            SearchAllFolders = true;
+            RefreshLists();
         }
 
         bool MatchesSearch(MailMessageSummary message) =>
@@ -128,35 +187,35 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 MailUiState.OpenCompose(ComposeService.BuildNew(account));
         }
 
-        static void StartReply(MailMessageSummary message, bool replyAll)
+        void StartReply(MailMessageSummary message, bool replyAll)
         {
-            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
-                MailUiState.OpenCompose(ComposeService.BuildReply(account, folder.FullName, message, replyAll));
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+                MailUiState.OpenCompose(ComposeService.BuildReply(account, folderName, message, replyAll));
         }
 
-        static void StartForward(MailMessageSummary message)
+        void StartForward(MailMessageSummary message)
         {
-            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
-                MailUiState.OpenCompose(ComposeService.BuildForward(account, folder.FullName, message));
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+                MailUiState.OpenCompose(ComposeService.BuildForward(account, folderName, message));
         }
 
-        static void ToggleOpenFlagged(MailMessageSummary message)
+        void ToggleOpenFlagged(MailMessageSummary message)
         {
-            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
-                MessageActions.ToggleFlagged(account, folder.FullName, message);
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+                MessageActions.ToggleFlagged(account, folderName, message);
         }
 
-        static void ToggleOpenImportant(MailMessageSummary message)
+        void ToggleOpenImportant(MailMessageSummary message)
         {
-            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
-                MessageActions.ToggleImportant(account, folder.FullName, message);
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+                MessageActions.ToggleImportant(account, folderName, message);
         }
 
-        static void DeleteOpen(MailMessageSummary message)
+        void DeleteOpen(MailMessageSummary message)
         {
-            if (MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder)
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
             {
-                MessageActions.Delete(account, folder.FullName, message);
+                MessageActions.Delete(account, folderName, message);
                 MailUiState.CloseMessage();
             }
         }
@@ -204,10 +263,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void HandleListKeyDown(KeyboardEventArgs e)
         {
             var account = MailUiState.SelectedAccount;
-            var folder = MailUiState.SelectedFolder;
-            if (account == null || folder == null) return;
+            if (account == null) return;
 
             var focused = MailUiState.FocusedMessage;
+            string? focusedFolder = focused == null ? null : ResolveFolderOf(focused);
             switch (e.Key)
             {
                 case "j" or "J" or "ArrowDown":
@@ -219,17 +278,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 case "Enter" when focused != null:
                     MailUiState.OpenMessageInReader(focused);
                     break;
-                case "u" or "U" when focused != null:
-                    MessageActions.ToggleRead(account, folder.FullName, focused);
+                case "u" or "U" when focusedFolder != null:
+                    MessageActions.ToggleRead(account, focusedFolder, focused!);
                     break;
-                case "s" or "S" when focused != null:
-                    MessageActions.ToggleFlagged(account, folder.FullName, focused);
+                case "s" or "S" when focusedFolder != null:
+                    MessageActions.ToggleFlagged(account, focusedFolder, focused!);
                     break;
-                case "i" or "I" when focused != null:
-                    MessageActions.ToggleImportant(account, folder.FullName, focused);
+                case "i" or "I" when focusedFolder != null:
+                    MessageActions.ToggleImportant(account, focusedFolder, focused!);
                     break;
-                case "Delete" when focused != null:
-                    MessageActions.Delete(account, folder.FullName, focused);
+                case "Delete" when focusedFolder != null:
+                    MessageActions.Delete(account, focusedFolder, focused!);
                     MailUiState.FocusMessage(null);
                     break;
                 case "Escape":
