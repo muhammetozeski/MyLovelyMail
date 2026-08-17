@@ -17,16 +17,17 @@ short, concrete, English, only where the code does not explain itself.
 - [x] Tray menu items driven by Command (Clicked never arrives from tray flyout) — dff59e0
 
 ## Next waves (in order)
-- [ ] Mail.razor.cs (565 lines): split by responsibility — list/reader state, compose,
-      bloom tracking, keyboard nav. Candidate: partial classes or extracted services.
-      Watch principle "don't split when splitting hurts readability".
+- [x] Mail.razor.cs split into focused partials (core list/search, Reader, Compose,
+      Interaction) — pure move, no behavior change, smoke-tested — 1c62bcc
 - [ ] Comment pass, Services\Mail: rewrite summaries as notes-to-self; kill any
       summary that restates the code (principles 39/40). Files: ComposeService,
       AttachmentService, MessageActions, MailBodyRenderer, SmtpSendService, RuleEngine.
+- [x] Settings quartet verified: Setting (type infra), SettingsFile (shared key=value
+      format used by global AND per-account stores), SettingsManager (global registry),
+      Settings (declarations) — each earns its place, no merge needed. Half-qualified
+      Storage.AppPaths trimmed with a using.
 - [ ] Comment pass + principle sweep, Stores: CredentialVault (276 lines — check for
-      dup crypto helpers), Setting/Settings/SettingsManager/SettingsFile overlap check:
-      four files for settings may violate "merge what can be merged" — verify each earns
-      its place, merge if not.
+      dup crypto helpers).
 - [ ] Null-handling sweep (principle 16): audit `!` uses and unguarded `?.` chains in
       Services and Stores.
 - [x] Accessibility-modifier sweep (principle 29): checked — only 7 `private` uses exist

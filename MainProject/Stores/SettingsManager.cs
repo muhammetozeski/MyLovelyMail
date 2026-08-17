@@ -1,17 +1,18 @@
 using System.Reflection;
+using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Stores
 {
     /// <summary>
     /// Registers, loads and saves all <see cref="Settings"/> fields against the single global
-    /// config file in <see cref="Storage.AppPaths.UserData"/>. Per-account settings are handled by
+    /// config file in <see cref="AppPaths.UserData"/>. Per-account settings are handled by
     /// <see cref="AccountSettings"/>, which reuses the same registration and file format.
     /// </summary>
     public static class SettingsManager
     {
         public const string ConfigFileName = "config.txt";
 
-        public static string ConfigPath => Path.Combine(Storage.AppPaths.UserData, ConfigFileName);
+        public static string ConfigPath => Path.Combine(AppPaths.UserData, ConfigFileName);
 
         static readonly Dictionary<string, ISettingSetup> iSettingSetups = [];
         static readonly Dictionary<string, ISetting> iSettings = [];
