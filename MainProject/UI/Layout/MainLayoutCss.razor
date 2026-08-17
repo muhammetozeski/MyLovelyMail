@@ -40,6 +40,8 @@
         flex-direction: column;
         min-height: @(AppMeasures.Viewport.Full)vh;
         position: relative;
+        /* Padding (the bottom-nav clearance) must count INTO the 100vh, or every page overflows by exactly that padding. */
+        box-sizing: border-box;
     }
 
         .app-page.has-bottom-nav {
