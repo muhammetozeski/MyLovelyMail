@@ -203,6 +203,40 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Re-encrypts the vault in the newly selected mode (call after changing <see cref="Settings.CredentialVaultMode"/>).</summary>
         public static void ReencryptInCurrentMode() => Save();
 
+        /// <summary>True when a vault file exists on disk (distinguishes "set a NEW master password" from "unlock").</summary>
+        public static bool VaultFileExists => File.Exists(VaultPath);
+
+        /// <summary>Switches an unlocked vault to master-password protection under the given password.</summary>
+        public static void SwitchToMasterPassword(string newMasterPassword)
+        {
+            Settings.CredentialVaultMode.Set(VaultMode.MasterPassword);
+            SettingsManager.SaveSettings();
+            SetMasterPassword(newMasterPassword);
+        }
+
+        /// <summary>Switches an unlocked vault back to DPAPI. False when locked or not on Windows.</summary>
+        public static bool SwitchToDpapi()
+        {
+            if (!IsUnlocked || !OperatingSystem.IsWindows()) return false;
+            Settings.CredentialVaultMode.Set(VaultMode.Dpapi);
+            SettingsManager.SaveSettings();
+            masterKey = null;
+            Save();
+            OnVaultStateChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>Drops the in-memory key and secrets; the unlock screen takes over (master mode only).</summary>
+        public static void LockNow()
+        {
+            if (Settings.CredentialVaultMode.Value != VaultMode.MasterPassword) return;
+            secrets = [];
+            masterKey = null;
+            IsUnlocked = false;
+            NeedsMasterPassword = true;
+            OnVaultStateChanged?.Invoke();
+        }
+
         #endregion
 
         #region Portable migration bundle

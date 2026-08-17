@@ -1,5 +1,6 @@
 @attribute [Route(NavigationConstants.Settings.Link)]
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@implements IDisposable
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>Settings — My Lovely Mail</PageTitle>
 
@@ -82,6 +83,47 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🔐 Vault protection</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Current mode: @(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Windows account (DPAPI)" : "Master password (AES)")</span>
+                <span class="settings-row-hint">@(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Unlocks automatically on this Windows account; not portable to other machines." : "Portable, but asks for the master password.")</span>
+            </div>
+            @if (GlobalSettings.CredentialVaultMode.Value == VaultMode.MasterPassword && CredentialVault.IsUnlocked)
+            {
+                <SecondaryButton OnClick="@CredentialVault.LockNow">🔒 Lock now</SecondaryButton>
+            }
+        </div>
+        @if (!CredentialVault.IsUnlocked)
+        {
+            <p class="settings-empty-text">Unlock the vault to change its protection mode.</p>
+        }
+        else if (GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi)
+        {
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Switch to a master password</span>
+                    <span class="settings-row-hint">Re-encrypts stored passwords under a password you choose</span>
+                </div>
+            </div>
+            <div class="settings-vault-switch">
+                <CoreInput Type="password" Placeholder="New master password" Icon="🗝️" @bind-Value="NewMasterPassword" />
+                <PrimaryButton OnClick="@SwitchVaultToMaster" Disabled="@(NewMasterPassword.Length == 0)">🔁 Switch</PrimaryButton>
+            </div>
+        }
+        else
+        {
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Switch back to Windows account (DPAPI)</span>
+                    <span class="settings-row-hint">No more password prompts on this machine</span>
+                </div>
+                <SecondaryButton OnClick="@SwitchVaultToDpapi">🔁 Switch</SecondaryButton>
+            </div>
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">👤 Accounts</div>
         @if (AccountStore.Accounts.Count == 0)
         {
@@ -112,6 +154,21 @@
 <SettingsCss />
 
 @code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        CredentialVault.OnVaultStateChanged += HandleVaultChanged;
+        AccountStore.OnAccountsChanged += HandleVaultChanged;
+    }
+
+    void HandleVaultChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        CredentialVault.OnVaultStateChanged -= HandleVaultChanged;
+        AccountStore.OnAccountsChanged -= HandleVaultChanged;
+    }
+
     static void SetAndSave<T>(Setting<T> setting, T value)
     {
         setting.Set(value);
@@ -123,6 +180,16 @@
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
     }
+
+    string NewMasterPassword { get; set; } = string.Empty;
+
+    void SwitchVaultToMaster()
+    {
+        CredentialVault.SwitchToMasterPassword(NewMasterPassword);
+        NewMasterPassword = string.Empty;
+    }
+
+    static void SwitchVaultToDpapi() => CredentialVault.SwitchToDpapi();
 
     void RemoveAccount(string accountId)
     {

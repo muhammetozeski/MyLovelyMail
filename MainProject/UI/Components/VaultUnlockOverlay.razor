@@ -1,0 +1,85 @@
+@implements IDisposable
+
+@* Full-screen gate shown while the master-password vault is locked. Covers every page (it lives
+   in MainLayout), so no routing guard is needed. Also handles the very first master-password
+   setup when the mode is selected but no vault file exists yet. *@
+
+@if (CredentialVault.NeedsMasterPassword && !CredentialVault.IsUnlocked)
+{
+    <div class="vault-overlay">
+        <GlassCard Level="AcrylicLevel.Strong" CustomClass="@_cardClass">
+            <div class="vault-icon">🔐</div>
+            @if (CredentialVault.VaultFileExists)
+            {
+                <div class="vault-title">Unlock your vault</div>
+                <p class="vault-text">Your account passwords are protected by a master password.</p>
+                <CoreInput Type="password" Placeholder="Master password" Icon="🗝️" @bind-Value="_password" />
+                @if (_error != null)
+                {
+                    <p class="vault-error">@_error</p>
+                }
+                <PrimaryButton IsFullWidth="true" OnClick="@TryUnlock" Disabled="@(_password.Length == 0)">🔓 Unlock</PrimaryButton>
+            }
+            else
+            {
+                <div class="vault-title">Set a master password</div>
+                <p class="vault-text">Choose the password that will protect your account passwords on this machine.</p>
+                <CoreInput Type="password" Placeholder="New master password" Icon="🗝️" @bind-Value="_password" />
+                <CoreInput Type="password" Placeholder="Repeat password" Icon="🗝️" @bind-Value="_passwordRepeat" />
+                @if (_error != null)
+                {
+                    <p class="vault-error">@_error</p>
+                }
+                <PrimaryButton IsFullWidth="true" OnClick="@SetInitialPassword" Disabled="@(_password.Length == 0)">💾 Save &amp; unlock</PrimaryButton>
+            }
+        </GlassCard>
+    </div>
+}
+
+<VaultUnlockOverlayCss />
+
+@code {
+    string _cardClass => _shaking ? "vault-card vault-card--shake" : "vault-card";
+
+    string _password = string.Empty;
+    string _passwordRepeat = string.Empty;
+    string? _error;
+    bool _shaking;
+    int _attempts;
+
+    protected override void OnInitialized() => CredentialVault.OnVaultStateChanged += HandleVaultChanged;
+
+    void HandleVaultChanged() => InvokeAsync(StateHasChanged);
+
+    async Task TryUnlock()
+    {
+        if (CredentialVault.UnlockWithMasterPassword(_password))
+        {
+            _password = string.Empty;
+            _error = null;
+            return;
+        }
+
+        _attempts++;
+        _error = $"Wrong master password. Attempt {_attempts}.";
+        _password = string.Empty;
+        _shaking = true;
+        StateHasChanged();
+        await Task.Delay(600);
+        _shaking = false;
+    }
+
+    void SetInitialPassword()
+    {
+        if (_password != _passwordRepeat)
+        {
+            _error = "The passwords do not match.";
+            return;
+        }
+        CredentialVault.SetMasterPassword(_password);
+        _password = _passwordRepeat = string.Empty;
+        _error = null;
+    }
+
+    public void Dispose() => CredentialVault.OnVaultStateChanged -= HandleVaultChanged;
+}
