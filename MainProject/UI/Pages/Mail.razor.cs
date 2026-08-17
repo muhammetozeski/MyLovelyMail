@@ -33,6 +33,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OnSelectionChanged += HandleStateChanged;
             AccountStore.OnAccountsChanged += HandleStateChanged;
             MessageStore.OnFolderChanged += HandleFolderChanged;
+            SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
 
             if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
                 SelectAccount(AccountStore.Accounts[0]);
@@ -624,12 +625,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return local.ToString("dd MMM yyyy");
         }
 
+        void HandleSyncStateChanged() => InvokeAsync(StateHasChanged);
+
         public void Dispose()
         {
             draftAutosaveTimer?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             MessageStore.OnFolderChanged -= HandleFolderChanged;
+            SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
         }
     }
 }

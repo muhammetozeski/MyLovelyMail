@@ -162,6 +162,30 @@
         gap: @(AppMeasures.Space.Px6)px;
     }
 
+    /* Indeterminate sync line: a soft accent runner sweeping under the search bar while syncing. */
+    .mail-sync-line {
+        height: @(AppMeasures.Size.Px4)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .mail-sync-line-runner {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: @(AppMeasures.Percent.Half)%;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: linear-gradient(90deg, transparent, var(--account-accent, @primary), transparent);
+        animation: sync-sweep @(AppMeasures.Duration.Longer)s ease-in-out infinite;
+    }
+
+    @@keyframes sync-sweep {
+        0% { left: -@(AppMeasures.Percent.Half)%; }
+        100% { left: @(AppMeasures.Percent.Full)%; }
+    }
+
     .mail-search-tools {
         display: flex;
         gap: @(AppMeasures.Space.Px6)px;

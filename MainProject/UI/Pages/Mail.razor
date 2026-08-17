@@ -82,6 +82,10 @@
     <section class="mail-list">
         <div class="mail-search">
             <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+            @if (SyncScheduler.IsSyncing)
+            {
+                <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
+            }
             @if (!string.IsNullOrWhiteSpace(SearchText))
             {
                 <div class="mail-search-tools">
