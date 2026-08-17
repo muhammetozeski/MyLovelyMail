@@ -106,7 +106,11 @@ namespace MyLovelyMail
         }
 
         /// <summary>Fire-and-forget manual sync used by the tray menu.</summary>
-        public static void SyncNow() => _ = SyncScheduler.SyncNowAsync();
+        public static void SyncNow()
+        {
+            Logger.Log("Tray menu: Sync now clicked.");
+            _ = SyncScheduler.SyncNowAsync();
+        }
 
         /// <summary>Smallest believable size for a real (non-minimized) app window, in DIP.</summary>
         const int MinSaneWindowWidth = 400;

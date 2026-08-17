@@ -22,11 +22,13 @@ namespace MyLovelyMail
         {
             var menu = new MenuFlyout();
 
-            var openItem = new MenuFlyoutItem { Text = "💌 Open My Lovely Mail" };
+            // Proven by log evidence: H.NotifyIcon never delivers MenuFlyoutItem.Clicked for the
+            // tray flyout, but it does execute Command. Keep both wired — whichever fires, wins.
+            var openItem = new MenuFlyoutItem { Text = "💌 Open My Lovely Mail", Command = new Command(static () => TrayService.ShowMainWindow()) };
             openItem.Clicked += static (_, _) => TrayService.ShowMainWindow();
-            var syncItem = new MenuFlyoutItem { Text = "🔄 Sync now" };
+            var syncItem = new MenuFlyoutItem { Text = "🔄 Sync now", Command = new Command(static () => TrayService.SyncNow()) };
             syncItem.Clicked += static (_, _) => TrayService.SyncNow();
-            var exitItem = new MenuFlyoutItem { Text = "❌ Exit" };
+            var exitItem = new MenuFlyoutItem { Text = "❌ Exit", Command = new Command(static () => TrayService.ExitApplication()) };
             exitItem.Clicked += static (_, _) => TrayService.ExitApplication();
 
             menu.Add(openItem);
