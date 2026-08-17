@@ -23,6 +23,7 @@ namespace MyLovelyMail
         public static void AttachWindow(Window window)
         {
             mainWindow = window;
+            RestoreWindowBounds(window);
 #if WINDOWS
             window.HandlerChanged += (_, _) =>
             {
@@ -79,9 +80,15 @@ namespace MyLovelyMail
 
                 if (enable)
                 {
+                    // Only a DEPLOYED install (launcher present at the root) may own the Run entry.
+                    // Dev/debug sandboxes otherwise hijack the user's autostart with a bin\ path.
                     string launcherPath = Path.Combine(MainProject.Storage.AppPaths.Root, "MyLovelyMail.exe");
-                    string exePath = File.Exists(launcherPath) ? launcherPath : Environment.ProcessPath ?? launcherPath;
-                    runKey.SetValue(AutostartValueName, $"\"{exePath}\" {AutostartMinimizedArgument}");
+                    if (!File.Exists(launcherPath))
+                    {
+                        Logger.Log("Autostart write skipped: not a deployed install (no root launcher).");
+                        return;
+                    }
+                    runKey.SetValue(AutostartValueName, $"\"{launcherPath}\" {AutostartMinimizedArgument}");
                 }
                 else
                 {
@@ -97,5 +104,38 @@ namespace MyLovelyMail
 
         /// <summary>Fire-and-forget manual sync used by the tray menu.</summary>
         public static void SyncNow() => _ = SyncScheduler.SyncNowAsync();
+
+        /// <summary>Applies saved window bounds (first run keeps defaults) and persists them debounced on move/resize.</summary>
+        static void RestoreWindowBounds(Window window)
+        {
+            if (Settings.WindowWidth.Value > 0 && Settings.WindowHeight.Value > 0)
+            {
+                // Clamp so a monitor removed since last run cannot leave the window off-screen.
+                var screen = DeviceDisplay.MainDisplayInfo;
+                double maxX = Math.Max(0, screen.Width / screen.Density - 200);
+                double maxY = Math.Max(0, screen.Height / screen.Density - 200);
+                window.X = Math.Min(Settings.WindowX.Value, maxX);
+                window.Y = Math.Min(Settings.WindowY.Value, maxY);
+                window.Width = Settings.WindowWidth.Value;
+                window.Height = Settings.WindowHeight.Value;
+            }
+
+            System.Timers.Timer? saveDebounce = null;
+            window.SizeChanged += (_, _) =>
+            {
+                saveDebounce?.Dispose();
+                saveDebounce = new System.Timers.Timer(800) { AutoReset = false };
+                saveDebounce.Elapsed += (_, _) =>
+                {
+                    if (window.Width <= 0 || window.Height <= 0) return;
+                    Settings.WindowX.Set((int)window.X);
+                    Settings.WindowY.Set((int)window.Y);
+                    Settings.WindowWidth.Set((int)window.Width);
+                    Settings.WindowHeight.Set((int)window.Height);
+                    SettingsManager.SaveSettings();
+                };
+                saveDebounce.Start();
+            };
+        }
     }
 }

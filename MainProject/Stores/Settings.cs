@@ -122,6 +122,13 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Saved search queries, separated by the unit-separator control char (it cannot occur in typed text).</summary>
         public static readonly Setting<string> SavedSearches = new("");
 
+        // ---- Window bounds (0 width/height = first run, keep platform defaults) ----
+
+        public static readonly Setting<int> WindowX = new(0);
+        public static readonly Setting<int> WindowY = new(0);
+        public static readonly Setting<int> WindowWidth = new(0);
+        public static readonly Setting<int> WindowHeight = new(0);
+
         // ---- Security ----
 
         /// <summary>How the credential vault encrypts account passwords on disk.</summary>
