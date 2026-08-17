@@ -16,6 +16,9 @@ namespace MyLovelyMail.MainProject.Services
         static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(30);
         static readonly TimeSpan TotalTimeout = TimeSpan.FromSeconds(120);
 
+        /// <summary>Guard for ONE protocol round-trip inside an already-open connection (see <see cref="GuardStep"/>).</summary>
+        static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(30);
+
         /// <summary>Outer total timeout → retries with exponential backoff → per-attempt timeout.</summary>
         public static readonly ResiliencePipeline Network = new ResiliencePipelineBuilder()
             .AddTimeout(TotalTimeout)
@@ -39,5 +42,18 @@ namespace MyLovelyMail.MainProject.Services
 
         public static async Task RunNetwork(Func<CancellationToken, Task> action, CancellationToken cancellationToken = default) =>
             await Network.ExecuteAsync(async ct => await action(ct).WaitAsync(ct), cancellationToken);
+
+        /// <summary>
+        /// Guards a SINGLE round-trip of a long multi-step session (e.g. one POP3 header fetch out
+        /// of hundreds). No retry and no total budget here on purpose: the caller loops over many
+        /// steps, persists progress as it goes, and decides itself what one failed step means —
+        /// this only guarantees that no single step can hang the whole session forever.
+        /// </summary>
+        public static Task<T> GuardStep<T>(Task<T> step, CancellationToken cancellationToken) =>
+            step.WaitAsync(StepTimeout, cancellationToken);
+
+        /// <inheritdoc cref="GuardStep{T}(Task{T},CancellationToken)"/>
+        public static Task GuardStep(Task step, CancellationToken cancellationToken) =>
+            step.WaitAsync(StepTimeout, cancellationToken);
     }
 }
