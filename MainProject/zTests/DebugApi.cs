@@ -204,6 +204,23 @@ namespace MyLovelyMail.MainProject.ZTests
                     };
                 }
 
+                case ("POST", "/open"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string folderFullName = query["folder"] ?? "INBOX";
+                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
+                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName)
+                        ?? throw new InvalidOperationException("Unknown folder.");
+                    var summary = MessageStore.GetSummary(accountId, folderFullName, uid)
+                        ?? throw new InvalidOperationException("Unknown message.");
+
+                    MailUiState.SelectAccount(account);
+                    MailUiState.SelectFolder(folder);
+                    MailUiState.OpenMessageInReader(summary);
+                    return new { ok = true };
+                }
+
                 case ("POST", "/send"):
                 {
                     var body = await JsonSerializer.DeserializeAsync<SendRequest>(request.InputStream, Json)
