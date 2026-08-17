@@ -24,10 +24,11 @@ namespace MyLovelyMail
         {
             try
             {
+                // The user rejected the old long success.wav outright — nothing maps to it anymore.
                 string fileName = soundName.ToLowerInvariant() switch
                 {
                     "spin" => "spin.wav",
-                    _ => "success.wav"
+                    _ => "notify.wav"
                 };
 
                 string cachedPath = Path.Combine(AppPaths.AppCache, "Sounds", fileName);
