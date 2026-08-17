@@ -26,8 +26,9 @@ short, concrete, English, only where the code does not explain itself.
       format used by global AND per-account stores), SettingsManager (global registry),
       Settings (declarations) — each earns its place, no merge needed. Half-qualified
       Storage.AppPaths trimmed with a using.
-- [ ] Comment pass + principle sweep, Stores: CredentialVault (276 lines — check for
-      dup crypto helpers).
+- [x] CredentialVault audited: crypto helpers already centralized (DeriveKey /
+      EncryptAesGcm / DecryptAesGcm, single copies), comments concrete. Trimmed two
+      fully-qualified ProtectedData references.
 - [ ] Null-handling sweep (principle 16): audit `!` uses and unguarded `?.` chains in
       Services and Stores.
 - [x] Accessibility-modifier sweep (principle 29): checked — only 7 `private` uses exist
