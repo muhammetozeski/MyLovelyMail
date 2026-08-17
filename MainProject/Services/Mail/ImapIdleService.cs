@@ -73,32 +73,46 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         // Server cannot push at all; nothing more this connection can do for "live" mail.
                         Log($"IMAP IDLE not supported by '{account.IncomingHost}' — account stays on periodic sync.", LogLevel.Warning);
                         await client.DisconnectAsync(true, cancellationToken);
+                        lock (gate) running.Remove(account.Id);
                         return;
                     }
 
                     backoff = ReconnectDelayMin;
                     bool arrived = false;
-                    void OnCountChanged(object? sender, EventArgs e) => arrived = true;
+                    CancellationTokenSource? activeIdleDone = null;
+                    void OnCountChanged(object? sender, EventArgs e)
+                    {
+                        arrived = true;
+                        // IdleAsync only returns when its done-token fires — without this cancel
+                        // the "instant" push would sit inside IDLE until the reissue interval.
+                        try { activeIdleDone?.Cancel(); } catch (ObjectDisposedException) { }
+                    }
                     inbox.CountChanged += OnCountChanged;
+                    Log($"IMAP IDLE active: {account.EmailAddress}");
 
                     try
                     {
                         while (!cancellationToken.IsCancellationRequested && !arrived)
                         {
                             using var doneSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                            activeIdleDone = doneSource;
                             doneSource.CancelAfter(IdleReissueInterval);
                             await client.IdleAsync(doneSource.Token, cancellationToken);
                         }
                     }
                     finally
                     {
+                        activeIdleDone = null;
                         inbox.CountChanged -= OnCountChanged;
                     }
 
                     await client.DisconnectAsync(true, cancellationToken);
 
                     if (arrived && !cancellationToken.IsCancellationRequested)
+                    {
+                        Log($"IMAP IDLE new-mail signal: {account.EmailAddress} — syncing now.");
                         await ImapSyncService.SyncAccountAsync(account, cancellationToken);
+                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
