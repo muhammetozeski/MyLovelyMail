@@ -652,6 +652,43 @@
         box-sizing: border-box;
     }
 
+    /* Undo-send bar: slides in above the reader while a queued send counts down. */
+    .mail-undo-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px12)px;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px16)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: linear-gradient(135deg, @AppColors.Primary.WithAlpha(0.18f).ToRgbaHex(true), @AppColors.Accent.WithAlpha(0.18f).ToRgbaHex(true));
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Normal)px;
+        animation: reader-open @(AppMeasures.Duration.Normal)s ease;
+    }
+
+    .mail-undo-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-undo-button {
+        border: none;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px16)px;
+        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Bold);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: transform @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-undo-button:hover {
+            transform: scale(1.05);
+        }
+
     /* Attachment dropzone: the invisible file input stretches over the whole label so both
        clicking anywhere and dropping files onto it reach the same input. */
     .mail-compose-dropzone {

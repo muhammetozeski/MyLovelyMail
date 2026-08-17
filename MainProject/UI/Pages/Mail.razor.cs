@@ -41,6 +41,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MessageStore.OnFolderChanged += HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
+            OutboxService.OnChanged += HandleOutboxChanged;
 
             if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
                 SelectAccount(AccountStore.Accounts[0]);
@@ -51,11 +52,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
         public void Dispose()
         {
             draftAutosaveTimer?.Dispose();
+            undoCountdownTimer?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             MessageStore.OnFolderChanged -= HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged -= HandleSyncStateChanged;
+            OutboxService.OnChanged -= HandleOutboxChanged;
         }
 
         void SelectAccount(MailAccountData account)

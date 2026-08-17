@@ -188,6 +188,13 @@
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
+        @if (OutboxService.Current is { } pendingSend)
+        {
+            <div class="mail-undo-bar">
+                <span class="mail-undo-text">✉️ Sending "@(string.IsNullOrWhiteSpace(pendingSend.Draft.Subject) ? "(no subject)" : pendingSend.Draft.Subject)" in @(UndoSecondsLeft(pendingSend))s…</span>
+                <button class="mail-undo-button" @onclick="UndoPendingSend">↩️ Undo</button>
+            </div>
+        }
         @if (MailUiState.ActiveCompose is { } draft)
         {
             <div class="mail-reader-header">
@@ -232,14 +239,8 @@
                 }
 
                 <div class="mail-compose-actions">
-                    <SecondaryButton OnClick="@DiscardCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
-                    <PrimaryButton OnClick="@SendActiveDraftAsync" Disabled="@(Sending || string.IsNullOrWhiteSpace(draft.To))">
-                        @if (Sending)
-                        {
-                            <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
-                        }
-                        📨 Send
-                    </PrimaryButton>
+                    <SecondaryButton OnClick="@DiscardCompose">🗑️ Discard</SecondaryButton>
+                    <PrimaryButton OnClick="@QueueActiveDraftSend" Disabled="@(string.IsNullOrWhiteSpace(draft.To))">📨 Send</PrimaryButton>
                 </div>
             </GlassCard>
         }

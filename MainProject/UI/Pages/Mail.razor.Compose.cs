@@ -10,10 +10,47 @@ namespace MyLovelyMail.MainProject.UI.Pages
         const int MaxComposeAttachments = 20;
         const long MaxComposeAttachmentBytes = 50 * 1024 * 1024;
 
-        bool Sending { get; set; }
         string? SendError { get; set; }
         System.Timers.Timer? draftAutosaveTimer;
+        System.Timers.Timer? undoCountdownTimer;
         DateTime? DraftSavedAt { get; set; }
+
+        /// <summary>Hands the draft to the outbox and closes the pane; the undo bar takes over.
+        /// The draft is saved first so a failed submit still leaves it in Drafts.</summary>
+        void QueueActiveDraftSend()
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            draftAutosaveTimer?.Dispose();
+            ComposeService.SaveDraft(draft);
+            MailUiState.CloseCompose();
+            OutboxService.Enqueue(draft);
+        }
+
+        void UndoPendingSend()
+        {
+            if (OutboxService.Undo() is { } draft)
+                MailUiState.OpenCompose(draft);
+        }
+
+        static int UndoSecondsLeft(PendingSend pending) =>
+            Math.Max(0, (int)Math.Ceiling((pending.DueUtc - DateTime.UtcNow).TotalSeconds));
+
+        /// <summary>Ticks the undo bar's countdown once a second while a send is pending.</summary>
+        void HandleOutboxChanged()
+        {
+            if (OutboxService.Current != null && undoCountdownTimer == null)
+            {
+                undoCountdownTimer = new System.Timers.Timer(1000) { AutoReset = true };
+                undoCountdownTimer.Elapsed += (_, _) => InvokeAsync(StateHasChanged);
+                undoCountdownTimer.Start();
+            }
+            else if (OutboxService.Current == null && undoCountdownTimer != null)
+            {
+                undoCountdownTimer.Dispose();
+                undoCountdownTimer = null;
+            }
+            InvokeAsync(StateHasChanged);
+        }
 
         async Task OnComposeFilesSelectedAsync(InputFileChangeEventArgs e)
         {
@@ -46,28 +83,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             if (MailUiState.SelectedAccount is { } account)
                 MailUiState.OpenCompose(ComposeService.BuildNew(account));
-        }
-
-        async Task SendActiveDraftAsync()
-        {
-            if (MailUiState.ActiveCompose is not { } draft) return;
-            Sending = true;
-            SendError = null;
-            StateHasChanged();
-            try
-            {
-                await ComposeService.SendAsync(draft);
-                SoundService.Play("success");
-                MailUiState.CloseCompose();
-            }
-            catch (Exception ex)
-            {
-                SendError = ex.Message;
-            }
-            finally
-            {
-                Sending = false;
-            }
         }
 
         /// <summary>Any keystroke in the compose fields re-arms a ~3s idle autosave.</summary>
