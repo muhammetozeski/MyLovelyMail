@@ -77,10 +77,10 @@
         }
         else
         {
-            <div class="mail-rows">
+            <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
                 <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
-                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "")"
-                            @onclick="() => MailUiState.OpenMessageInReader(message)">
+                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "")"
+                            @onclick="() => OpenMessage(message)">
                         <span class="mail-row-dot"></span>
                         <span class="mail-row-main">
                             <span class="mail-row-top">
@@ -151,5 +151,18 @@
         }
     </section>
 </div>
+
+<CoreModal IsVisible="ShowShortcutHelp" OnBackdropClick="@(() => ShowShortcutHelp = false)">
+    <div class="mail-shortcuts">
+        <div class="mail-shortcuts-title">⌨️ Keyboard shortcuts</div>
+        @foreach (var (keys, action) in ShortcutHelpRows)
+        {
+            <div class="mail-shortcuts-row">
+                <span class="mail-shortcuts-keys">@keys</span>
+                <span class="mail-shortcuts-action">@action</span>
+            </div>
+        }
+    </div>
+</CoreModal>
 
 <MailCss />

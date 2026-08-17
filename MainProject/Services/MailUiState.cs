@@ -13,7 +13,16 @@ namespace MyLovelyMail.MainProject.Services
         public static MailFolderData? SelectedFolder { get; private set; }
         public static MailMessageSummary? OpenMessage { get; private set; }
 
+        /// <summary>Row highlighted by keyboard navigation (independent of the opened message).</summary>
+        public static MailMessageSummary? FocusedMessage { get; private set; }
+
         public static event Action? OnSelectionChanged;
+
+        public static void FocusMessage(MailMessageSummary? message)
+        {
+            FocusedMessage = message;
+            OnSelectionChanged?.Invoke();
+        }
 
         public static void SelectAccount(MailAccountData? account)
         {

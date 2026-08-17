@@ -172,6 +172,46 @@
         border-color: @primary;
     }
 
+    /* Keyboard-focused row: a soft accent outline distinct from the opened (active) row. */
+    .mail-row--focused {
+        outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
+        outline-offset: -@(AppMeasures.Border.Medium)px;
+    }
+
+    .mail-rows:focus {
+        outline: none;
+    }
+
+    .mail-shortcuts {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px8)px;
+        text-align: left;
+    }
+
+    .mail-shortcuts-title {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin-bottom: @(AppMeasures.Space.Px8)px;
+        text-align: center;
+    }
+
+    .mail-shortcuts-row {
+        display: flex;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px16)px;
+    }
+
+    .mail-shortcuts-keys {
+        font-weight: @(AppMeasures.Weight.Heavy);
+        color: @primary;
+        min-width: @(AppMeasures.Size.Px80)px;
+    }
+
+    .mail-shortcuts-action {
+        color: @textSecondary;
+    }
+
     .mail-row-dot {
         width: @(AppMeasures.Size.Px5)px;
         height: @(AppMeasures.Size.Px5)px;
