@@ -593,6 +593,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.FocusMessage(FilteredSummaries[next]);
         }
 
+        /// <summary>1-2 initials for the avatar circle: from the display name's words, else the address.</summary>
+        static string AvatarInitials(MailMessageSummary message)
+        {
+            string source = string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName;
+            var words = source.Split([' ', '.', '@', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+            return words.Length switch
+            {
+                0 => "?",
+                1 => char.ToUpperInvariant(words[0][0]).ToString(),
+                _ => $"{char.ToUpperInvariant(words[0][0])}{char.ToUpperInvariant(words[1][0])}"
+            };
+        }
+
+        /// <summary>Deterministic pastel gradient per sender: stable address hash into the theme's MonthGradients.</summary>
+        static string AvatarGradient(MailMessageSummary message)
+        {
+            var gradients = Constants.ThemeConstants.AppColors.MonthGradients;
+            var (start, end) = gradients[(int)(Pop3Service.Fnv1aHash(message.FromAddress.ToLowerInvariant()) % (uint)gradients.Length)];
+            return $"linear-gradient(135deg, {start.ToRgbaHex(true)}, {end.ToRgbaHex(true)})";
+        }
+
         /// <summary>Today → clock; this year → day+month; older → full date.</summary>
         static string FormatDate(DateTime dateUtc)
         {

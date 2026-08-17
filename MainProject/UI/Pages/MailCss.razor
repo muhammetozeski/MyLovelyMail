@@ -349,6 +349,26 @@
         color: var(--account-accent, @primary);
     }
 
+    .mail-row-avatar {
+        width: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
+        height: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Heavy);
+        flex-shrink: 0;
+        box-shadow: @AppStyles.ShadowSoft;
+    }
+
+    /* Unread: an accent ring around the avatar reinforces the dot without shouting. */
+    .mail-row-avatar--unread {
+        outline: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
+        outline-offset: @(AppMeasures.Border.Thin)px;
+    }
+
     .mail-row-dot {
         width: @(AppMeasures.Size.Px5)px;
         height: @(AppMeasures.Size.Px5)px;
