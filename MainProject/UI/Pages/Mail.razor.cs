@@ -375,7 +375,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("I", "Toggle important"),
             ("Delete", "Delete message"),
             ("Escape", "Close reader / dialog"),
-            ("?", "Show this help")
+            ("?", "Show this help"),
+            ("Search", "from: to: tag: has:attachment is:unread is:starred")
         ];
 
         static void OpenMessage(MailMessageSummary message)

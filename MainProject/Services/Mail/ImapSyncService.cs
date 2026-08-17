@@ -101,8 +101,23 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (folder.Attributes.HasFlag(FolderAttributes.Archive)) return FolderRole.Archive;
             if (folder.Attributes.HasFlag(FolderAttributes.Flagged)) return FolderRole.Flagged;
             if (folder.Attributes.HasFlag(FolderAttributes.All)) return FolderRole.AllMail;
-            return FolderRole.None;
+            return GuessRoleFromName(folder.Name);
         }
+
+        /// <summary>
+        /// Servers without SPECIAL-USE (RFC 6154) mark nothing, leaving every folder role-less —
+        /// which duplicates Sent handling and loses icons. Fall back to the near-universal names.
+        /// </summary>
+        internal static FolderRole GuessRoleFromName(string folderName) => folderName.ToLowerInvariant() switch
+        {
+            "sent" or "sent items" or "sent mail" or "sent messages" => FolderRole.Sent,
+            "drafts" or "draft" => FolderRole.Drafts,
+            "trash" or "deleted" or "deleted items" or "bin" => FolderRole.Trash,
+            "junk" or "spam" or "junk e-mail" => FolderRole.Junk,
+            "archive" or "archives" => FolderRole.Archive,
+            "outbox" => FolderRole.Outbox,
+            _ => FolderRole.None
+        };
 
         static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken)
         {

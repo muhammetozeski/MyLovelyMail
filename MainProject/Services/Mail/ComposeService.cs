@@ -97,7 +97,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 if (account.Protocol == IncomingProtocol.Imap)
                 {
-                    var sentFolder = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.Role == FolderRole.Sent);
+                    var folders = MessageStore.GetFolders(account.Id);
+                    // Prefer the marked Sent folder; fall back to the conventional name for servers without SPECIAL-USE.
+                    var sentFolder = folders.FirstOrDefault(f => f.Role == FolderRole.Sent && !f.IsLocal)
+                        ?? folders.FirstOrDefault(f => !f.IsLocal && ImapSyncService.GuessRoleFromName(f.DisplayName) == FolderRole.Sent);
                     if (sentFolder != null)
                     {
                         await ResiliencePolicy.RunNetwork(async ct =>

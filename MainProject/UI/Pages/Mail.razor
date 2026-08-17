@@ -77,7 +77,7 @@
     @* ---- Middle: message list ---- *@
     <section class="mail-list">
         <div class="mail-search">
-            <CoreInput Placeholder="Search mail...  (from: to: tag: has:attachment is:unread is:starred)" Icon="🔍" @bind-Value="SearchText" />
+            <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
             @if (!string.IsNullOrWhiteSpace(SearchText))
             {
                 <div class="mail-search-tools">
