@@ -52,6 +52,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleStateChanged()
         {
+            // An account added while the page is open (wizard save, debug API) selects itself,
+            // so folders and the compose button appear without re-entering the page.
+            if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
+            {
+                SelectAccount(AccountStore.Accounts[0]);
+                return;
+            }
             RefreshLists();
             _ = LoadOpenBodyIfNeededAsync();
             InvokeAsync(StateHasChanged);
