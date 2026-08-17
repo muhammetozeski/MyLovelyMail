@@ -204,13 +204,13 @@
             </div>
 
             <div class="mail-reader-actions">
-                <SecondaryButton OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
-                <SecondaryButton OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
-                <SecondaryButton OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
-                <SecondaryButton OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
-                <SecondaryButton OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
-                <SecondaryButton OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
-                <DangerButton OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
+                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
             </div>
 
             @if (open.Tags.Count > 0 || ShowTagPicker)

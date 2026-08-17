@@ -163,7 +163,19 @@ namespace MyLovelyMail.MainProject.Storage
             foreach (var summary in summaries)
                 index.Summaries[summary.Uid] = summary;
             SaveIndex(accountId, folderFullName, index);
+            RefreshUnreadCount(accountId, folderFullName, index);
             OnFolderChanged?.Invoke(accountId, folderFullName);
+        }
+
+        /// <summary>Keeps the folder's unread badge honest after local flag changes (sync overwrites with server truth later).</summary>
+        static void RefreshUnreadCount(string accountId, string folderFullName, FolderIndex index)
+        {
+            var info = GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
+            if (info == null) return;
+            int unread = index.Summaries.Values.Count(s => s.IsUnread);
+            if (info.UnreadCount == unread) return;
+            info.UnreadCount = unread;
+            SaveFolder(info);
         }
 
         /// <summary>Removes summaries and their cached .eml files, persists and notifies.</summary>
