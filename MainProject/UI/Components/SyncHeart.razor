@@ -1,0 +1,30 @@
+@implements IDisposable
+
+@* Living sync indicator: a CSS heart that beats while SyncScheduler works and rests with a soft
+   glow when idle. Clicking it triggers a manual sync. *@
+<button class="sync-heart @(SyncScheduler.IsSyncing ? "sync-heart--beating" : "")"
+        title="@Tooltip"
+        @onclick="@(() => _ = SyncScheduler.SyncNowAsync())">
+    <span class="sync-heart-shape"></span>
+</button>
+
+<SyncHeartCss />
+
+@code {
+    DateTime? lastSyncEnd;
+
+    string Tooltip => SyncScheduler.IsSyncing
+        ? "Syncing your mail..."
+        : lastSyncEnd == null ? "Click to sync now" : $"Last sync {lastSyncEnd:HH:mm:ss} — click to sync now";
+
+    protected override void OnInitialized() => SyncScheduler.OnSyncStateChanged += HandleSyncChanged;
+
+    void HandleSyncChanged()
+    {
+        if (!SyncScheduler.IsSyncing)
+            lastSyncEnd = DateTime.Now;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => SyncScheduler.OnSyncStateChanged -= HandleSyncChanged;
+}

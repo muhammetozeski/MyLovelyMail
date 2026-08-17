@@ -1,0 +1,347 @@
+@attribute [Route("/")]
+@attribute [Route(NavigationConstants.Mail.Link)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@implements IDisposable
+@inject NavigationManager Navigation
+<PageTitle>My Lovely Mail</PageTitle>
+
+<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
+     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))">
+
+    @* ---- Left: accounts + folders ---- *@
+    <aside class="mail-sidebar">
+        <div class="mail-logo">💌<span class="mail-logo-text">My Lovely Mail</span><SyncHeart /></div>
+
+        @if (MailUiState.SelectedAccount != null)
+        {
+            <PrimaryButton IsFullWidth="true" OnClick="@StartCompose" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
+        }
+
+        @if (SavedSearchList.Count > 0)
+        {
+            <div class="mail-saved-searches">
+                @foreach (var saved in SavedSearchList)
+                {
+                    <span class="mail-saved-chip">
+                        <button class="mail-saved-run" @onclick="() => RunSavedSearch(saved)">🔍 @saved</button>
+                        <button class="mail-saved-remove" @onclick="() => RemoveSavedSearch(saved)">✕</button>
+                    </span>
+                }
+            </div>
+        }
+
+        @if (AccountStore.Accounts.Count == 0)
+        {
+            <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
+                <div class="mail-welcome-icon">🌸</div>
+                <div class="mail-welcome-title">Welcome!</div>
+                <p class="mail-welcome-text">Add your first mail account and your inbox will bloom here.</p>
+                <PrimaryButton IsFullWidth="true" OnClick="@(() => Navigation.NavigateTo(AccountWizard.RoutePath))">
+                    ➕ Add account
+                </PrimaryButton>
+            </GlassCard>
+        }
+        else
+        {
+            @foreach (var account in AccountStore.Accounts)
+            {
+                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "")"
+                        @onclick="() => SelectAccount(account)">
+                    <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
+                    @if (AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    {
+                        <span class="mail-account-unread" style="background:@account.ColorHex">@accountUnread</span>
+                    }
+                </button>
+
+                @if (MailUiState.SelectedAccount?.Id == account.Id)
+                {
+                    @foreach (var folder in Folders)
+                    {
+                        <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                @onclick="() => MailUiState.SelectFolder(folder)">
+                            <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
+                            <span class="mail-folder-name">@folder.DisplayName</span>
+                            @if (folder.UnreadCount > 0)
+                            {
+                                <CoreChip Text="@folder.UnreadCount.ToString()"
+                                          Background="@AppColors.Primary"
+                                          TextColor="@AppColors.TextOnAccent"
+                                          FontSize="@AppMeasures.Font.XSmall"
+                                          PaddingX="8" PaddingY="2" />
+                            }
+                        </button>
+                    }
+                }
+            }
+        }
+    </aside>
+
+    @* ---- Middle: message list ---- *@
+    <section class="mail-list">
+        <div class="mail-search">
+            <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+            @if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                <div class="mail-search-tools">
+                    <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
+                    <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                </div>
+            }
+        </div>
+
+        @if (MailUiState.SelectedFolder == null)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">📮</div>
+                <div class="mail-empty-text">Pick a folder to see its mail</div>
+            </div>
+        }
+        else if (FilteredSummaries.Count == 0)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">🕊️</div>
+                <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+            </div>
+        }
+        else
+        {
+            @if (MailUiState.SelectedUids.Count > 0)
+            {
+                <div class="mail-bulk-bar">
+                    <span class="mail-bulk-count">@MailUiState.SelectedUids.Count selected</span>
+                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(true)">✅ Read</button>
+                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(false)">📩 Unread</button>
+                    <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
+                    <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
+                    <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
+                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid))">☑️ All</button>
+                    <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
+                </div>
+            }
+            <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
+                <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
+                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "")"
+                            @onclick="e => HandleRowClick(e, message)">
+                        <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
+                              @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">
+                            @(MailUiState.SelectedUids.Contains(message.Uid) ? "☑" : "☐")
+                        </span>
+                        <span class="mail-row-dot"></span>
+                        <span class="mail-row-main">
+                            <span class="mail-row-top">
+                                <span class="mail-row-from">@(string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName)</span>
+                                <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
+                            </span>
+                            <span class="mail-row-subject">
+                                @if (message.Flags.HasFlag(MailFlags.Important))
+                                {
+                                    <span class="mail-row-flag">❗</span>
+                                }
+                                @if (message.Flags.HasFlag(MailFlags.Flagged))
+                                {
+                                    <span class="mail-row-flag">⭐</span>
+                                }
+                                @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
+                            </span>
+                            <span class="mail-row-preview">
+                                @if (HitFolderDisplay(message) is { } hitFolder)
+                                {
+                                    <span class="mail-row-folder">📁 @hitFolder</span>
+                                }
+                                @foreach (var tag in message.Tags)
+                                {
+                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag)">@tag</span>
+                                }
+                                @if (message.HasAttachments)
+                                {
+                                    <span class="mail-row-attach">📎</span>
+                                }
+                                @message.PreviewText
+                            </span>
+                        </span>
+                    </button>
+                </Virtualize>
+            </div>
+        }
+    </section>
+
+    @* ---- Right: compose pane or reading pane ---- *@
+    <section class="mail-reader">
+        @if (MailUiState.ActiveCompose is { } draft)
+        {
+            <div class="mail-reader-header">
+                <BackButton OnClick="@SaveAndCloseCompose" />
+                <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
+                @if (DraftSavedAt != null)
+                {
+                    <span class="mail-compose-saved">💾 @DraftSavedAt?.ToString("HH:mm:ss")</span>
+                }
+            </div>
+
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
+                <div class="mail-compose-fields" @oninput="NoteComposeActivity">
+                <div class="mail-compose-from">From: <b>@draft.Account?.EmailAddress</b></div>
+                <CoreInput Placeholder="To (comma separated)" Icon="👤" @bind-Value="draft.To" />
+                <CoreInput Placeholder="Cc" Icon="👥" @bind-Value="draft.Cc" />
+                <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
+                <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
+                </div>
+
+                @if (SendError != null)
+                {
+                    <p class="mail-compose-error">❌ @SendError</p>
+                }
+
+                <div class="mail-compose-actions">
+                    <SecondaryButton OnClick="@DiscardCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
+                    <PrimaryButton OnClick="@SendActiveDraftAsync" Disabled="@(Sending || string.IsNullOrWhiteSpace(draft.To))">
+                        @if (Sending)
+                        {
+                            <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
+                        }
+                        📨 Send
+                    </PrimaryButton>
+                </div>
+            </GlassCard>
+        }
+        else if (MailUiState.OpenMessage is not { } open)
+        {
+            <div class="mail-empty">
+                <div class="mail-empty-icon">💌</div>
+                <div class="mail-empty-text">Select a message to read it here</div>
+            </div>
+        }
+        else
+        {
+            <div class="mail-reader-header">
+                <BackButton OnClick="@MailUiState.CloseMessage" />
+                <div class="mail-reader-titles">
+                    <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
+                    <div class="mail-reader-meta">
+                        <span class="mail-reader-from">@open.FromName &lt;@open.FromAddress&gt;</span>
+                        <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
+                    {
+                        <div class="mail-reader-to">to @open.ToAddresses</div>
+                    }
+                </div>
+            </div>
+
+            <div class="mail-reader-actions">
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
+                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
+            </div>
+
+            @if (open.Tags.Count > 0 || ShowTagPicker)
+            {
+                <div class="mail-attachments">
+                    @foreach (var tag in open.Tags)
+                    {
+                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag)"
+                                title="Search this tag" @onclick="() => SearchByTag(tag)">@tag</button>
+                    }
+                </div>
+            }
+
+            @if (ShowTagPicker)
+            {
+                <div class="mail-tag-picker">
+                    @foreach (var tag in TagStore.AllTags)
+                    {
+                        <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
+                                style="background:@TagStore.ColorOf(tag)"
+                                @onclick="() => ToggleTagOnOpen(open, tag)">
+                            @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
+                        </button>
+                    }
+                    <input class="mail-tag-input" placeholder="New tag..." @bind="NewTagName" @bind:event="oninput" />
+                    <button class="mail-search-toggle" @onclick="() => AddNewTag(open)" disabled="@(NewTagName.Trim().Length == 0)">➕ Add</button>
+                </div>
+            }
+
+            @if (OpenAttachments.Count > 0)
+            {
+                <div class="mail-attachments">
+                    @foreach (var attachment in OpenAttachments)
+                    {
+                        <button class="mail-attachment-chip" title="Save to Downloads"
+                                @onclick="() => SaveAttachmentAsync(attachment.Index)">
+                            @AttachmentService.IconFor(attachment) @attachment.FileName
+                            @if (attachment.HumanSize.Length > 0)
+                            {
+                                <span class="mail-attachment-size">@attachment.HumanSize</span>
+                            }
+                        </button>
+                    }
+                    @if (OpenAttachments.Count > 1)
+                    {
+                        <button class="mail-attachment-chip mail-attachment-chip--all" @onclick="SaveAllAttachmentsAsync">📦 Save all</button>
+                    }
+                </div>
+            }
+            @if (SaveStatus != null)
+            {
+                <div class="mail-save-status">@SaveStatus</div>
+            }
+
+            @if (OpenBodyBlockedImages)
+            {
+                <div class="mail-image-banner">
+                    🖼️ Remote images were blocked for your privacy.
+                    <button class="mail-search-toggle" @onclick="AllowImagesOnce">Show images once</button>
+                </div>
+            }
+
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
+                @if (OpenBodyLoading)
+                {
+                    <div class="mail-body-loading">
+                        <CoreSpinner />
+                    </div>
+                }
+                else if (OpenBodyHtml != null)
+                {
+                    <iframe class="mail-reader-frame" sandbox="allow-same-origin" srcdoc="@OpenBodyHtml"></iframe>
+                }
+                else
+                {
+                    @if (BodyError != null)
+                    {
+                        <p class="mail-compose-error">❌ @BodyError</p>
+                    }
+                    @if (string.IsNullOrWhiteSpace(open.PreviewText))
+                    {
+                        <p class="mail-reader-nobody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
+                    }
+                    else
+                    {
+                        <p class="mail-reader-preview">@open.PreviewText</p>
+                    }
+                }
+            </GlassCard>
+        }
+    </section>
+</div>
+
+<CoreModal IsVisible="ShowShortcutHelp" OnBackdropClick="@(() => ShowShortcutHelp = false)">
+    <div class="mail-shortcuts">
+        <div class="mail-shortcuts-title">⌨️ Keyboard shortcuts</div>
+        @foreach (var (keys, action) in ShortcutHelpRows)
+        {
+            <div class="mail-shortcuts-row">
+                <span class="mail-shortcuts-keys">@keys</span>
+                <span class="mail-shortcuts-action">@action</span>
+            </div>
+        }
+    </div>
+</CoreModal>
+
+<MailCss />

@@ -6,6 +6,14 @@ namespace MyLovelyMail
     {
         public static void Main(string[] args)
         {
+            MainProject.Storage.AppPaths.EnsureCreated();
+            MainProject.Stores.SettingsManager.LoadSettings();
+            MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
+            MainProject.Stores.AccountStore.Load();
+            MainProject.Stores.CredentialVault.Load();
+            MainProject.Stores.FilterRuleStore.Load();
+            MainProject.Stores.TagStore.Load();
+
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.

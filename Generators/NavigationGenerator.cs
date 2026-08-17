@@ -89,6 +89,18 @@ public class NavigationGenerator : IIncrementalGenerator
             """);
         }
 
+        builder.AppendLine("    /// <summary>");
+        builder.AppendLine("    /// Every page in declaration order, ready for menu/nav bars: (Title, Icon, Link) per page.");
+        builder.AppendLine("    /// </summary>");
+        builder.AppendLine("    public static readonly (string Title, string Icon, string Link)[] BottomNavigationItems =");
+        builder.AppendLine("    [");
+        foreach (KeyValuePair<string, string> entry in navigationEntries)
+        {
+            string className = ToPascalCase(entry.Key);
+            builder.AppendLine($"        ({className}.Label, {className}.Icon, {className}.Link),");
+        }
+        builder.AppendLine("    ];");
+
         builder.AppendLine("}");
         return builder.ToString();
     }

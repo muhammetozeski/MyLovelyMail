@@ -1,0 +1,141 @@
+@attribute [Route(RoutePath)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@inject NavigationManager Navigation
+<PageTitle>Add account — My Lovely Mail</PageTitle>
+
+<div class="wizard-screen">
+    <div class="wizard-header">
+        <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
+        <h1 class="wizard-title">💌 Add your mail account</h1>
+    </div>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Provider</div>
+        <div class="wizard-presets">
+            @foreach (var preset in ProviderPresets.All)
+            {
+                <button class="wizard-preset @(SelectedPreset == preset ? "wizard-preset--active" : "")"
+                        @onclick="() => PickPreset(preset)">
+                    <span class="wizard-preset-emoji">@preset.Emoji</span>
+                    <span>@preset.Name</span>
+                </button>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(SelectedPreset?.Hint))
+        {
+            <p class="wizard-hint">💡 @SelectedPreset.Hint</p>
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Identity</div>
+        <div class="wizard-field">
+            <span class="wizard-label">Email address</span>
+            <CoreInput Type="email" Placeholder="you@example.com" Icon="✉️" Value="@Email" ValueChanged="@OnEmailChanged" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Display name (shown to recipients)</span>
+            <CoreInput Placeholder="Your name" Icon="🙂" @bind-Value="DisplayName" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Password / app password</span>
+            <CoreInput Type="password" Placeholder="••••••••" Icon="🔑" @bind-Value="Password" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Account color (tints the workspace when this account is active)</span>
+            <div class="wizard-colors">
+                @foreach (var colorHex in AccountColors)
+                {
+                    <button class="wizard-color @(SelectedColorHex == colorHex ? "wizard-color--active" : "")"
+                            style="background:@colorHex"
+                            @onclick="() => SelectedColorHex = colorHex"></button>
+                }
+            </div>
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Servers</div>
+
+        <div class="wizard-field">
+            <span class="wizard-label">Receive protocol</span>
+            <div class="wizard-protocols">
+                <button class="wizard-preset @(Protocol == IncomingProtocol.Imap ? "wizard-preset--active" : "")"
+                        @onclick="() => PickProtocol(IncomingProtocol.Imap)">📥 IMAP (recommended)</button>
+                <button class="wizard-preset @(Protocol == IncomingProtocol.Pop3 ? "wizard-preset--active" : "")"
+                        @onclick="() => PickProtocol(IncomingProtocol.Pop3)">📪 POP3</button>
+            </div>
+        </div>
+
+        <div class="wizard-grid">
+            <div class="wizard-field">
+                <span class="wizard-label">Incoming host</span>
+                <CoreInput Placeholder="imap.example.com" @bind-Value="IncomingHost" />
+            </div>
+            <div class="wizard-field wizard-field--small">
+                <span class="wizard-label">Port</span>
+                <CoreInput Type="number" @bind-Value="IncomingPortText" />
+            </div>
+            <div class="wizard-field wizard-field--small">
+                <span class="wizard-label">Security</span>
+                <select class="wizard-select" @bind="IncomingSecurity">
+                    @foreach (var security in Enum.GetValues<ConnectionSecurity>())
+                    {
+                        <option value="@security">@security</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="wizard-grid">
+            <div class="wizard-field">
+                <span class="wizard-label">SMTP host</span>
+                <CoreInput Placeholder="smtp.example.com" @bind-Value="SmtpHost" />
+            </div>
+            <div class="wizard-field wizard-field--small">
+                <span class="wizard-label">Port</span>
+                <CoreInput Type="number" @bind-Value="SmtpPortText" />
+            </div>
+            <div class="wizard-field wizard-field--small">
+                <span class="wizard-label">Security</span>
+                <select class="wizard-select" @bind="SmtpSecurity">
+                    @foreach (var security in Enum.GetValues<ConnectionSecurity>())
+                    {
+                        <option value="@security">@security</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="wizard-field">
+            <span class="wizard-label">Username (empty = email address)</span>
+            <CoreInput Placeholder="Usually your full email address" @bind-Value="Username" />
+        </div>
+    </GlassCard>
+
+    @if (TestMessage != null)
+    {
+        <GlassCard CustomClass="wizard-card">
+            <p class="wizard-test @(TestSucceeded ? "wizard-test--ok" : "wizard-test--fail")">@TestMessage</p>
+        </GlassCard>
+    }
+
+    <div class="wizard-actions">
+        <SecondaryButton OnClick="@TestConnectionAsync" Disabled="@(Busy || !FormLooksComplete)">
+            @if (Busy && BusyAction == "test")
+            {
+                <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextPrimary" />
+            }
+            🧪 Test connection
+        </SecondaryButton>
+        <PrimaryButton OnClick="@SaveAsync" Disabled="@(Busy || !FormLooksComplete)">
+            @if (Busy && BusyAction == "save")
+            {
+                <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
+            }
+            💾 Save account
+        </PrimaryButton>
+    </div>
+</div>
+
+<AccountWizardCss />

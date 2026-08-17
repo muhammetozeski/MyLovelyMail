@@ -1,0 +1,97 @@
+@attribute [Route(RoutePath)]
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@implements IDisposable
+@inject NavigationManager Navigation
+<PageTitle>Logs — My Lovely Mail</PageTitle>
+
+<div class="logs-screen">
+    <div class="logs-header">
+        <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
+        <h1 class="logs-title">🧾 Logs</h1>
+        <div class="logs-tools">
+            <CoreToggle Checked="@AutoRefresh" CheckedChanged="@SetAutoRefresh" />
+            <span class="logs-tool-label">Auto-refresh</span>
+            <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@SaveToFile">💾 Save to file</SecondaryButton>
+            <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@ClearLogs">🗑️ Clear</DangerButton>
+        </div>
+    </div>
+
+    <div class="logs-filters">
+        <CoreInput Placeholder="Filter logs..." Icon="🔍" @bind-Value="FilterText" />
+        <div class="logs-levels">
+            @foreach (var level in Levels)
+            {
+                <button class="mail-search-toggle @(ActiveLevel == level ? "mail-search-toggle--on" : "")"
+                        @onclick="() => ActiveLevel = ActiveLevel == level ? null : level">@level</button>
+            }
+        </div>
+    </div>
+
+    @if (FilteredLines.Count == 0)
+    {
+        <div class="mail-empty">
+            <div class="mail-empty-icon">🧾</div>
+            <div class="mail-empty-text">@(Logger.ActivateLogging ? "No log lines match" : "Logging is disabled in Settings")</div>
+        </div>
+    }
+    else
+    {
+        <GlassCard Level="AcrylicLevel.Strong" CustomClass="logs-card">
+            <pre class="logs-text">@string.Join("\n", FilteredLines)</pre>
+        </GlassCard>
+    }
+</div>
+
+<LogsCss />
+<MailCss />
+
+@code {
+    public const string RoutePath = "/Logs";
+    const int MaxShownLines = 500;
+
+    static readonly string[] Levels = ["Info", "Debug", "Warning", "Error"];
+
+    string _filterText = string.Empty;
+    string FilterText
+    {
+        get => _filterText;
+        set => _filterText = value;
+    }
+
+    string? ActiveLevel { get; set; }
+    bool AutoRefresh { get; set; }
+    System.Threading.Timer? refreshTimer;
+
+    List<string> FilteredLines
+    {
+        get
+        {
+            IEnumerable<string> lines = Logger.AllLogs;
+            if (ActiveLevel != null)
+                lines = lines.Where(l => l.Contains($"[{ActiveLevel}]", StringComparison.Ordinal));
+            if (!string.IsNullOrWhiteSpace(FilterText))
+                lines = lines.Where(l => l.Contains(FilterText, StringComparison.OrdinalIgnoreCase));
+            return [.. lines.TakeLast(MaxShownLines)];
+        }
+    }
+
+    void SetAutoRefresh(bool enabled)
+    {
+        AutoRefresh = enabled;
+        refreshTimer?.Dispose();
+        refreshTimer = enabled
+            ? new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 2000, 2000)
+            : null;
+    }
+
+    void SaveToFile()
+    {
+        string path = Path.Combine(Storage.AppPaths.UserData, $"logs-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        File.WriteAllText(path, Logger.GetAllLogsText());
+        Log($"Logs exported to {path}");
+    }
+
+    static void ClearLogs() => Logger.ClearAllLogs();
+
+    public void Dispose() => refreshTimer?.Dispose();
+}

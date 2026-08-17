@@ -72,6 +72,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Tray icon is a Windows-only concern; other targets must not restore it. -->
+    <PackageReference Include="H.NotifyIcon.Maui" Version="2.4.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />

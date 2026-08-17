@@ -1,0 +1,156 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+
+<style>
+    .filters-screen {
+        max-width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px280)px;
+        margin: 0 auto;
+        padding: @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Px120)px;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px12)px;
+    }
+
+    .filters-header {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px12)px;
+        margin-top: @(AppMeasures.Space.Px12)px;
+    }
+
+    .filters-title {
+        font-size: @(AppMeasures.Font.Title)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        margin: 0;
+        flex: 1;
+    }
+
+    .filters-card {
+        text-align: left;
+    }
+
+    .filters-card--row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px12)px;
+    }
+
+    .filters-section-title {
+        font-size: @(AppMeasures.Font.Medium)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin: @(AppMeasures.Space.Px10)px 0 @(AppMeasures.Space.Px6)px;
+    }
+
+    .filters-field {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        flex: 1;
+        min-width: @(AppMeasures.Size.Px140)px;
+    }
+
+    .filters-field--toggle {
+        flex: 0 0 auto;
+        align-items: flex-start;
+    }
+
+    .filters-label {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+    }
+
+    .filters-grid {
+        display: flex;
+        gap: @(AppMeasures.Space.Px12)px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .filters-select,
+    .filters-input {
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Normal)px;
+        outline: none;
+    }
+
+    .filters-input {
+        flex: 1;
+        min-width: @(AppMeasures.Size.Px120)px;
+    }
+
+    .filters-rowline {
+        display: flex;
+        gap: @(AppMeasures.Space.Px8)px;
+        align-items: center;
+        margin-bottom: @(AppMeasures.Space.Px6)px;
+        flex-wrap: wrap;
+    }
+
+    .filters-remove {
+        border: none;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .filters-remove:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+            color: @AppColors.TextPrimary.ToRgbaHex(true);
+        }
+
+    .filters-add {
+        border: @(AppMeasures.Border.Thin)px dashed @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px12)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        align-self: flex-start;
+    }
+
+        .filters-add:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        }
+
+    .filters-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: @(AppMeasures.Space.Px8)px;
+        margin-top: @(AppMeasures.Space.Px10)px;
+    }
+
+    .filters-rule-main {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        min-width: 0;
+    }
+
+    .filters-rule-name {
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+
+    .filters-rule-summary {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+    }
+
+    .filters-rule-tools {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-shrink: 0;
+    }
+</style>

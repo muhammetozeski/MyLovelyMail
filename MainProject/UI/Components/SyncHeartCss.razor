@@ -1,0 +1,61 @@
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+
+<style>
+    .sync-heart {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        width: @(AppMeasures.Size.Px32)px;
+        height: @(AppMeasures.Size.Px32)px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* Heart = rotated square + two circles from its pseudo-elements. */
+    .sync-heart-shape {
+        position: relative;
+        width: @(AppMeasures.Size.Px14)px;
+        height: @(AppMeasures.Size.Px14)px;
+        background: @AppColors.Primary.ToRgbaHex(true);
+        transform: rotate(45deg);
+        filter: drop-shadow(0 0 4px @AppColors.Primary.WithAlpha(0.45f).ToRgbaHex(true));
+        transition: filter @(AppMeasures.Duration.Normal)s ease;
+    }
+
+        .sync-heart-shape::before,
+        .sync-heart-shape::after {
+            content: "";
+            position: absolute;
+            width: @(AppMeasures.Size.Px14)px;
+            height: @(AppMeasures.Size.Px14)px;
+            border-radius: @(AppMeasures.Radius.Circular)%;
+            background: @AppColors.Primary.ToRgbaHex(true);
+        }
+
+        .sync-heart-shape::before {
+            left: -@(AppMeasures.Space.Px6 + 1)px;
+        }
+
+        .sync-heart-shape::after {
+            top: -@(AppMeasures.Space.Px6 + 1)px;
+        }
+
+    .sync-heart--beating .sync-heart-shape {
+        animation: sync-heartbeat @(AppMeasures.Duration.Long)s ease-in-out infinite;
+        filter: drop-shadow(0 0 8px @AppColors.Primary.WithAlpha(0.8f).ToRgbaHex(true));
+    }
+
+    .sync-heart:hover .sync-heart-shape {
+        filter: drop-shadow(0 0 8px @AppColors.Primary.WithAlpha(0.7f).ToRgbaHex(true));
+    }
+
+    @@keyframes sync-heartbeat {
+        0%, 100% { transform: rotate(45deg) scale(1); }
+        15% { transform: rotate(45deg) scale(1.18); }
+        30% { transform: rotate(45deg) scale(1); }
+        45% { transform: rotate(45deg) scale(1.12); }
+        60% { transform: rotate(45deg) scale(1); }
+    }
+</style>

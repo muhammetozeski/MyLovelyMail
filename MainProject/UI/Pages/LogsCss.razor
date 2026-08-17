@@ -1,0 +1,67 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+
+<style>
+    .logs-screen {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px12)px;
+        padding: @(AppMeasures.Space.Medium)px;
+        box-sizing: border-box;
+        height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+    }
+
+    .logs-header {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px12)px;
+        flex-wrap: wrap;
+    }
+
+    .logs-title {
+        font-size: @(AppMeasures.Font.Title)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        margin: 0;
+        flex: 1;
+    }
+
+    .logs-tools {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .logs-tool-label {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+    }
+
+    .logs-filters {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .logs-levels {
+        display: flex;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .logs-card {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        text-align: left;
+    }
+
+    .logs-text {
+        margin: 0;
+        font-family: Consolas, 'Cascadia Mono', monospace;
+        font-size: @(AppMeasures.Font.Small)px;
+        line-height: @(AppMeasures.LineHeight.Snug);
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+</style>
