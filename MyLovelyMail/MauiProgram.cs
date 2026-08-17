@@ -13,6 +13,7 @@ namespace MyLovelyMail
             MainProject.Constants.ThemeConstants.ThemeManager.ApplyFromSettings();
             AccountStore.Load();
             CredentialVault.Load();
+            MainProject.Services.Mail.SyncScheduler.Start();
 
             var builder = MauiApp.CreateBuilder();
             builder
