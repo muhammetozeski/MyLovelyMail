@@ -39,11 +39,15 @@ namespace MyLovelyMail.MainProject.Services
             OnSelectionChanged?.Invoke();
         }
 
+        /// <summary>Uids checked for bulk actions in the CURRENT folder (cleared on any folder/account change).</summary>
+        public static readonly HashSet<uint> SelectedUids = [];
+
         public static void SelectAccount(MailAccountData? account)
         {
             SelectedAccount = account;
             SelectedFolder = null;
             OpenMessage = null;
+            SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
         }
 
@@ -51,6 +55,27 @@ namespace MyLovelyMail.MainProject.Services
         {
             SelectedFolder = folder;
             OpenMessage = null;
+            SelectedUids.Clear();
+            OnSelectionChanged?.Invoke();
+        }
+
+        public static void ToggleSelected(uint uid)
+        {
+            if (!SelectedUids.Remove(uid))
+                SelectedUids.Add(uid);
+            OnSelectionChanged?.Invoke();
+        }
+
+        public static void SelectMany(IEnumerable<uint> uids)
+        {
+            SelectedUids.UnionWith(uids);
+            OnSelectionChanged?.Invoke();
+        }
+
+        public static void ClearSelection()
+        {
+            if (SelectedUids.Count == 0) return;
+            SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
         }
 

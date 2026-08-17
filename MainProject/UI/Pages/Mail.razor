@@ -107,10 +107,27 @@
         }
         else
         {
+            @if (MailUiState.SelectedUids.Count > 0)
+            {
+                <div class="mail-bulk-bar">
+                    <span class="mail-bulk-count">@MailUiState.SelectedUids.Count selected</span>
+                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(true)">✅ Read</button>
+                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(false)">📩 Unread</button>
+                    <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
+                    <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
+                    <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
+                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid))">☑️ All</button>
+                    <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
+                </div>
+            }
             <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
                 <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
                     <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "")"
-                            @onclick="() => OpenMessage(message)">
+                            @onclick="e => HandleRowClick(e, message)">
+                        <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
+                              @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">
+                            @(MailUiState.SelectedUids.Contains(message.Uid) ? "☑" : "☐")
+                        </span>
                         <span class="mail-row-dot"></span>
                         <span class="mail-row-main">
                             <span class="mail-row-top">

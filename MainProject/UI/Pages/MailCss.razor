@@ -308,6 +308,40 @@
         color: @textSecondary;
     }
 
+    .mail-bulk-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid var(--account-accent, @primary);
+        background: @surfaceTint;
+    }
+
+    .mail-bulk-count {
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Heavy);
+        color: var(--account-accent, @primary);
+        margin-right: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-row-check {
+        font-size: @(AppMeasures.Font.Medium)px;
+        color: @textMuted;
+        flex-shrink: 0;
+        cursor: pointer;
+        line-height: @(AppMeasures.LineHeight.None);
+    }
+
+        .mail-row-check:hover {
+            color: @textPrimary;
+        }
+
+    .mail-row-check--on {
+        color: var(--account-accent, @primary);
+    }
+
     .mail-row-dot {
         width: @(AppMeasures.Size.Px5)px;
         height: @(AppMeasures.Size.Px5)px;

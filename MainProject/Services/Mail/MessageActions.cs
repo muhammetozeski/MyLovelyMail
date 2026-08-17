@@ -20,14 +20,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Seen, nowSeen);
         }
 
-        /// <summary>Marks an unread message as read (no-op when already read) — the "opened in reader" path.</summary>
-        public static void MarkRead(MailAccountData account, string folderFullName, MailMessageSummary summary)
+        /// <summary>Forces the read state to <paramref name="read"/> (no-op when already there) — bulk-action friendly.</summary>
+        public static void SetRead(MailAccountData account, string folderFullName, MailMessageSummary summary, bool read)
         {
-            if (!summary.IsUnread) return;
-            summary.Flags |= MailFlags.Seen;
+            if (summary.Flags.HasFlag(MailFlags.Seen) == read) return;
+            summary.Flags = read ? summary.Flags | MailFlags.Seen : summary.Flags & ~MailFlags.Seen;
             MessageStore.UpsertSummaries(account.Id, folderFullName, [summary]);
-            PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Seen, add: true);
+            PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Seen, add: read);
         }
+
+        /// <summary>Marks an unread message as read — the "opened in reader" path.</summary>
+        public static void MarkRead(MailAccountData account, string folderFullName, MailMessageSummary summary) =>
+            SetRead(account, folderFullName, summary, read: true);
 
         public static void ToggleFlagged(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {

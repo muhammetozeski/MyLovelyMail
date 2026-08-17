@@ -398,6 +398,54 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OpenMessageInReader(message);
         }
 
+        /// <summary>Ctrl+Click toggles selection for bulk actions; a plain click opens the message.</summary>
+        static void HandleRowClick(MouseEventArgs e, MailMessageSummary message)
+        {
+            if (e.CtrlKey)
+                MailUiState.ToggleSelected(message.Uid);
+            else
+                OpenMessage(message);
+        }
+
+        List<MailMessageSummary> SelectedSummaries =>
+            [.. FilteredSummaries.Where(s => MailUiState.SelectedUids.Contains(s.Uid))];
+
+        void BulkSetRead(bool read)
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            foreach (var summary in SelectedSummaries)
+                if (ResolveFolderOf(summary) is { } folderName)
+                    MessageActions.SetRead(account, folderName, summary, read);
+            MailUiState.ClearSelection();
+        }
+
+        void BulkToggleFlag()
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            foreach (var summary in SelectedSummaries)
+                if (ResolveFolderOf(summary) is { } folderName)
+                    MessageActions.ToggleFlagged(account, folderName, summary);
+            MailUiState.ClearSelection();
+        }
+
+        void BulkToggleImportant()
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            foreach (var summary in SelectedSummaries)
+                if (ResolveFolderOf(summary) is { } folderName)
+                    MessageActions.ToggleImportant(account, folderName, summary);
+            MailUiState.ClearSelection();
+        }
+
+        void BulkDelete()
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            foreach (var summary in SelectedSummaries)
+                if (ResolveFolderOf(summary) is { } folderName)
+                    MessageActions.Delete(account, folderName, summary);
+            MailUiState.ClearSelection();
+        }
+
         void HandleListKeyDown(KeyboardEventArgs e)
         {
             var account = MailUiState.SelectedAccount;
@@ -431,7 +479,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     break;
                 case "Escape":
                     if (ShowShortcutHelp) ShowShortcutHelp = false;
+                    else if (MailUiState.SelectedUids.Count > 0) MailUiState.ClearSelection();
                     else MailUiState.CloseMessage();
+                    break;
+                case "a" or "A" when e.CtrlKey:
+                    MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid));
                     break;
                 case "?":
                     ShowShortcutHelp = !ShowShortcutHelp;
