@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
+using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
@@ -28,6 +29,7 @@ namespace MyLovelyMail
             TagStore.Load();
             NotificationBridge.Initialize();
             SoundBridge.Initialize();
+            ClipboardService.Writer = static text => Clipboard.Default.SetTextAsync(text);
 #if DEBUG
             DebugApi.Start();
 #endif
