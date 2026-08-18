@@ -231,6 +231,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const string Longer = "1.5";
             public const string VerySlow = "2";
             public const string Slowest = "3";
+            /// <summary> Decorative particles crossing the screen (Inbox Zero hearts). </summary>
+            public const string Drift = "7";
+
             /// <summary> Ambient background motion (aurora drift) — long enough to be felt, not watched. </summary>
             public const string Glacial = "22";
         }
