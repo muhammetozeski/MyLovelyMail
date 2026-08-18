@@ -486,6 +486,29 @@
         box-shadow: @AppStyles.ShadowSoft;
     }
 
+    .mail-unsubscribe {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        margin-top: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-unsubscribe-chip {
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+        .mail-unsubscribe-chip:hover {
+            color: @AppColors.TextDanger.ToRgbaHex(true);
+            border-color: @AppColors.TextDanger.ToRgbaHex(true);
+        }
+
     .mail-reader-history {
         align-self: flex-start;
         margin-top: @(AppMeasures.Space.Px4)px;

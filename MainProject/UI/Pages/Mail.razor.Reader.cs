@@ -23,6 +23,33 @@ namespace MyLovelyMail.MainProject.UI.Pages
         bool ShowTagPicker { get; set; }
         string NewTagName { get; set; } = string.Empty;
 
+        /// <summary>Unsubscribe targets of the open message; filled with its body, cleared with it.</summary>
+        UnsubscribeTargets? unsubscribeTargets;
+
+        /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
+        void OpenUnsubscribePage(string url)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                SaveStatus = "🌐 Unsubscribe page opened in your browser";
+            }
+            catch (Exception ex)
+            {
+                SaveStatus = $"❌ {ex.Message}";
+            }
+        }
+
+        /// <summary>Prepares the unsubscribe mail as a normal draft — the user still presses Send.</summary>
+        void ComposeUnsubscribeMail(UnsubscribeTargets targets)
+        {
+            if (MailUiState.SelectedAccount is not { } account || targets.MailtoAddress is not { } address) return;
+            var draft = ComposeService.BuildNew(account);
+            draft.To = address;
+            draft.Subject = targets.MailtoSubject ?? "unsubscribe";
+            MailUiState.OpenCompose(draft);
+        }
+
         /// <summary>What the app already knows about the open message's sender.</summary>
         sealed record SenderHistory(int MessageCount, int UnreadCount, DateTime OldestUtc);
 
@@ -115,6 +142,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
             OpenBodyLoading = false;
             OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
+            unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
             MarkOpenAsRead(account, folderName, open);
             await InvokeAsync(StateHasChanged);
         }

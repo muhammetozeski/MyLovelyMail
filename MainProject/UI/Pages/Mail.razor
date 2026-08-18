@@ -362,6 +362,21 @@
                             💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
                         </button>
                     }
+                    @if (unsubscribeTargets is { } unsubscribe)
+                    {
+                        <div class="mail-unsubscribe">
+                            @if (unsubscribe.HttpUrl is { } unsubscribeUrl)
+                            {
+                                <button class="mail-unsubscribe-chip" title="@unsubscribeUrl"
+                                        @onclick="() => OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on the web</button>
+                            }
+                            @if (unsubscribe.MailtoAddress != null)
+                            {
+                                <button class="mail-unsubscribe-chip" title="Prepares the mail; you still press Send"
+                                        @onclick="() => ComposeUnsubscribeMail(unsubscribe)">✉️ Unsubscribe by mail</button>
+                            }
+                        </div>
+                    }
                     @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
                         <div class="mail-reader-to">to @open.ToAddresses</div>

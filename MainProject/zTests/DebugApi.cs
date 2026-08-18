@@ -351,6 +351,15 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { ok = true };
                 }
 
+                case ("GET", "/unsubscribe"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var targets = UnsubscribeService.Read(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid));
+                    return new { found = targets != null, targets?.HttpUrl, targets?.MailtoAddress, targets?.MailtoSubject };
+                }
+
                 case ("GET", "/contacts"):
                     return ContactIndexService
                         .Suggest(RequireQueryValue(query, "accountId"), query["prefix"] ?? string.Empty, ReadTake(query, 20))
