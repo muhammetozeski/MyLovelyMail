@@ -37,9 +37,6 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.DeleteAction"/>
         public readonly InheritedSetting<DeleteBehavior> DeleteAction = new(Settings.DeleteAction);
 
-        /// <inheritdoc cref="Settings.DefaultComposeFormat"/>
-        public readonly InheritedSetting<ComposeFormat> DefaultComposeFormat = new(Settings.DefaultComposeFormat);
-
         /// <inheritdoc cref="Settings.Signature"/>
         public readonly InheritedSetting<string> Signature = new(Settings.Signature);
 

@@ -23,13 +23,6 @@ namespace MyLovelyMail.MainProject.Stores
         MasterPassword
     }
 
-    /// <summary>Body format new messages start in.</summary>
-    public enum ComposeFormat
-    {
-        Html,
-        PlainText
-    }
-
     /// <summary>
     /// All globally accessible settings. Each public static readonly Setting&lt;T&gt; field is
     /// auto-registered by <see cref="SettingsManager"/> (its key is the field name). Per-account
@@ -89,9 +82,6 @@ namespace MyLovelyMail.MainProject.Stores
         public static readonly Setting<bool> FoldQuotedText = new(true);
 
         // ---- Composing ----
-
-        /// <summary>Body format new messages start in.</summary>
-        public static readonly Setting<ComposeFormat> DefaultComposeFormat = new(ComposeFormat.Html);
 
         /// <summary>Plain-text signature appended under new, reply and forward drafts, empty = none (the compose body is plain text, so it is not HTML).</summary>
         public static readonly Setting<string> Signature = new("");
