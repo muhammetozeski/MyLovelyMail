@@ -46,6 +46,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.UndoSendSeconds"/>
         public readonly InheritedSetting<int> UndoSendSeconds = new(Settings.UndoSendSeconds);
 
+        /// <inheritdoc cref="Settings.Pop3FetchLimit"/>
+        public readonly InheritedSetting<int> Pop3FetchLimit = new(Settings.Pop3FetchLimit);
+
         /// <inheritdoc cref="Settings.NotifyOnNewMail"/>
         public readonly InheritedSetting<bool> NotifyOnNewMail = new(Settings.NotifyOnNewMail);
 

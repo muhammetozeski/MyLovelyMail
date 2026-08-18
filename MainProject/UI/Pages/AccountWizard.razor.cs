@@ -2,6 +2,7 @@ using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
@@ -25,6 +26,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         IncomingProtocol Protocol { get; set; } = IncomingProtocol.Imap;
         string IncomingHost { get; set; } = string.Empty;
         string IncomingPortText { get; set; } = "993";
+        string Pop3FetchLimitText { get; set; } = GlobalSettings.Pop3FetchLimit.Value.ToString();
         ConnectionSecurity IncomingSecurity { get; set; } = ConnectionSecurity.SslOnConnect;
         string SmtpHost { get; set; } = string.Empty;
         string SmtpPortText { get; set; } = "465";
@@ -150,6 +152,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             var account = BuildAccount();
             CredentialVault.SetPassword(account.Id, Password);
             AccountStore.Save(account);
+
+            if (Protocol == IncomingProtocol.Pop3 && int.TryParse(Pop3FetchLimitText, out int fetchLimit) && fetchLimit >= 0)
+            {
+                var accountSettings = AccountStore.GetSettings(account.Id);
+                if (accountSettings.Pop3FetchLimit.Value != fetchLimit)
+                {
+                    accountSettings.Pop3FetchLimit.Value = fetchLimit;
+                    accountSettings.Save();
+                }
+            }
 
             // First sync runs in the background; the mail screen fills in as results land.
             _ = SyncScheduler.SyncNowAsync();

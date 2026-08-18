@@ -94,6 +94,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Seconds the outbox holds a sent message for "undo send" (0 = send immediately).</summary>
         public static readonly Setting<int> UndoSendSeconds = new(5);
 
+        /// <summary>How many newest messages a POP3 sync may fetch; 0 fetches the entire mailbox.</summary>
+        public static readonly Setting<int> Pop3FetchLimit = new(300);
+
         // ---- Notifications ----
 
         /// <summary>Show a Windows notification when new mail arrives.</summary>

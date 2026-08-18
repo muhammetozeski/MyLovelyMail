@@ -68,6 +68,11 @@
             @if (Protocol == IncomingProtocol.Pop3)
             {
                 <p class="wizard-hint">💡 POP3 exposes only the Inbox — the protocol has no server folders (Sent, Spam, custom folders stay invisible). Pick IMAP to see the full folder tree.</p>
+                <div class="wizard-field">
+                    <span class="wizard-label">Fetch at most (newest messages)</span>
+                    <CoreInput Type="number" @bind-Value="Pop3FetchLimitText" />
+                    <p class="wizard-hint">0 fetches the ENTIRE mailbox — thousands of messages can take a while on POP3.</p>
+                </div>
             }
         </div>
 
