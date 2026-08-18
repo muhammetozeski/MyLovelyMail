@@ -101,8 +101,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static readonly string[] HtmlQuoteMarkers =
             ["<blockquote", "gmail_quote", "moz-cite-prefix", "divRplyFwdMsg", "stopSpelling"];
 
+        /// <summary>Where quoted history starts in a plain-text body. Shared with the attachment-intent scan so both agree on what "quoted" means.</summary>
         [GeneratedRegex(@"^\s*(>|-{2,}\s*Original Message\s*-{2,}|On .{0,160}\bwrote:\s*)$", RegexOptions.IgnoreCase)]
-        private static partial Regex PlainQuoteStart();
+        internal static partial Regex PlainQuoteStart();
 
         /// <summary>
         /// Wraps everything from the first quote marker onward in a JS-free &lt;details&gt;. No tag

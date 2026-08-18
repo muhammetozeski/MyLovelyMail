@@ -25,9 +25,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         /// <summary>Hands the draft to the outbox and closes the pane; the undo bar takes over.
         /// The draft is saved first so a failed submit still leaves it in Drafts.</summary>
+        /// <summary>The word that made us suspect a missing attachment; null when there is nothing to warn about.</summary>
+        string? AttachmentHint { get; set; }
+
         void QueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
+
+            if (draft.AttachmentPaths.Count == 0
+                && AttachmentIntentService.FindTrigger(draft.Subject, draft.Body) is { } trigger)
+            {
+                AttachmentHint = trigger;
+                return;
+            }
+            ForceQueueActiveDraftSend();
+        }
+
+        /// <summary>Sends past the missing-attachment warning (or straight through when there was none).</summary>
+        void ForceQueueActiveDraftSend()
+        {
+            if (MailUiState.ActiveCompose is not { } draft) return;
+            AttachmentHint = null;
             draftAutosaveTimer?.Dispose();
             ComposeService.SaveDraft(draft);
             MailUiState.CloseCompose();
@@ -84,6 +102,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             {
                 SendError = $"A file is too big — the limit is {MaxComposeAttachmentBytes / (1024 * 1024)} MB.";
             }
+            AttachmentHint = null;
             NoteComposeActivity();
             StateHasChanged();
         }
@@ -129,6 +148,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void DiscardCompose()
         {
+            AttachmentHint = null;
             draftAutosaveTimer?.Dispose();
             if (MailUiState.ActiveCompose is { } draft)
                 ComposeService.DeleteDraft(draft);

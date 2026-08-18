@@ -833,6 +833,19 @@
         animation: reader-open @(AppMeasures.Duration.Normal)s ease;
     }
 
+    .mail-undo-bar--warning {
+        background: @AppColors.Warning.WithAlpha(0.18f).ToRgbaHex(true);
+        border-color: @AppColors.Warning.ToRgbaHex(true);
+    }
+
+        /* The attach control is a label wrapping a hidden input, so it needs the button's own layout. */
+        .mail-undo-bar--warning label.mail-undo-button {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
     .mail-undo-bar--failed {
         background: @AppColors.Error.WithAlpha(0.18f).ToRgbaHex(true);
         border-color: @AppColors.Error.ToRgbaHex(true);

@@ -345,6 +345,18 @@
                     <p class="mail-compose-error">❌ @SendError</p>
                 }
 
+                @if (AttachmentHint is { } hintWord)
+                {
+                    <div class="mail-undo-bar mail-undo-bar--warning">
+                        <span class="mail-undo-text">📎 You wrote "@hintWord" but nothing is attached.</span>
+                        <label class="mail-undo-button">
+                            <InputFile OnChange="OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                            Attach a file
+                        </label>
+                        <button class="mail-undo-button" @onclick="ForceQueueActiveDraftSend">Send anyway</button>
+                    </div>
+                }
+
                 <div class="mail-compose-actions">
                     <SecondaryButton OnClick="@DiscardCompose">🗑️ Discard</SecondaryButton>
                     <PrimaryButton OnClick="@QueueActiveDraftSend" Disabled="@(string.IsNullOrWhiteSpace(draft.To))">📨 Send</PrimaryButton>
