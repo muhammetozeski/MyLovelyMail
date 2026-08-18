@@ -156,6 +156,8 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// Canonical "on filled surface" text color — solid white, legible over Primary, Secondary, Accent, Error, Success, and Warning fills.
         /// All <c>TextOn*</c> and <c>EmojiOn*</c> aliases resolve to this; override an individual channel only if a specific filled surface needs a non-white legend (e.g. a light-amber button needing dark text).
         /// </summary>
+        // Instance on purpose (an analyzer suggests static): every TextOn* alias below reads it
+        // through the theme instance, and a future theme may want a non-white value here.
         public Color TextOnFilledSurface => Colors.White;
 
         /// <summary> Text painted onto Primary / Secondary / Accent gradient buttons — PrimaryButton label, "YOU" chip on Primary, active-tab label. </summary>

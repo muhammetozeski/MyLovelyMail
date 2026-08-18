@@ -27,14 +27,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OutboxService.Enqueue(draft);
         }
 
-        void UndoPendingSend()
+        static void UndoPendingSend()
         {
             if (OutboxService.Undo() is { } draft)
                 MailUiState.OpenCompose(draft);
         }
 
         /// <summary>Reopens the failed draft for editing and takes the failure bar down.</summary>
-        void EditFailedSend()
+        static void EditFailedSend()
         {
             if (OutboxService.LastFailure is not { } failure) return;
             MailUiState.OpenCompose(failure.Draft);

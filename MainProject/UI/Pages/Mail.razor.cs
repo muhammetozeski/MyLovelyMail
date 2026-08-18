@@ -179,7 +179,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
-        List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
+        static List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
 
         void SaveCurrentSearch()
         {
@@ -190,7 +190,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             PersistSavedSearches(saved);
         }
 
-        void RemoveSavedSearch(string query)
+        static void RemoveSavedSearch(string query)
         {
             var saved = SavedSearchList;
             if (saved.Remove(query))

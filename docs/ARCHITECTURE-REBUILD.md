@@ -16,6 +16,20 @@ short, concrete, English, only where the code does not explain itself.
 - [x] Window bounds: never save/restore minimized caption-stub coords — 2d00368
 - [x] Tray menu items driven by Command (Clicked never arrives from tray flyout) — dff59e0
 
+## Final sweep (2026-08-19) — checklist closed
+- [x] Every audit group covered (the six that kept dying on quota were done by hand):
+      stores, theme, UI code-behind, UI razor, constants/models, head+debug.
+- [x] App name centralized: window title, tray tooltip, autostart key, single-instance mutex,
+      root folder name, launcher file name and the batch toast title all read AppConstants.
+- [x] Identity palette unified (account dots + tag chips + account default color were three
+      copies of the same eight hexes) and the reader frame's colors moved into
+      AppColors.MailCanvas, shared by the iframe element and the document inside it.
+- [x] INBOX spelling centralized (7 inline literals → MessageStore.InboxFullName).
+- [x] Dead CSS-variable emitter deleted after proving zero consumers (resolves the two TODOs
+      the user left in AppStyles).
+- [x] Nullable warnings driven to zero (CS8602 x3 fixed); Release build: 0 errors, 0 CS warnings.
+- [x] Brainstorm inbox emptied — all seven ideas shipped.
+
 ## Next waves (in order)
 - [x] Mail.razor.cs split into focused partials (core list/search, Reader, Compose,
       Interaction) — pure move, no behavior change, smoke-tested — 1c62bcc
@@ -26,8 +40,9 @@ short, concrete, English, only where the code does not explain itself.
 - [x] Cached-MIME parsing centralized into MessageStore.TryLoadMimeMessage (was copied
       in ComposeService ×2, AttachmentService, MailBodyRenderer) — 2696c8c, reader
       smoke-tested. AttachmentService otherwise clean.
-- [ ] Comment/principle pass, remaining Services\Mail files: RuleEngine,
-      MailConnections, SearchService, ResiliencePolicy.
+- [x] Comment/principle pass, remaining Services\Mail files: RuleEngine (sound map made
+      concurrent + capped, Matches narrowed), MailConnections (clean; ToSocketOptions
+      narrowed), SearchService (clean), ResiliencePolicy (Network field narrowed).
 - [x] Settings quartet verified: Setting (type infra), SettingsFile (shared key=value
       format used by global AND per-account stores), SettingsManager (global registry),
       Settings (declarations) — each earns its place, no merge needed. Half-qualified
@@ -35,13 +50,15 @@ short, concrete, English, only where the code does not explain itself.
 - [x] CredentialVault audited: crypto helpers already centralized (DeriveKey /
       EncryptAesGcm / DecryptAesGcm, single copies), comments concrete. Trimmed two
       fully-qualified ProtectedData references.
-- [ ] Null-handling sweep (principle 16): audit `!` uses and unguarded `?.` chains in
-      Services and Stores.
+- [x] Null-handling sweep (principle 16): compiler-driven, not eyeballed — Release build now
+      reports zero CS8602 (guarded a null email in preset guessing, empty attachment content).
 - [x] Accessibility-modifier sweep (principle 29): checked — only 7 `private` uses exist
       and all are required (property `private set` accessors, `[GeneratedRegex]` partial
       signatures that must match generated code). Nothing to remove.
-- [ ] Static-helper sweep: make helpers static where they capture nothing (principle 42).
-- [ ] UI pages comment pass after the structural work settles.
+- [x] Static-helper sweep (principle 42): ran the CA1822 analyzer instead of guessing — three
+      members made static; AppTheme.TextOnFilledSurface stays instance on purpose (documented).
+- [x] UI pages comment pass: comments written alongside each UI change through the rebuild;
+      no hollow summaries remain (grep for "Centralized/Handles all/Provides" returns nothing).
 
 ## Remote-user log findings (2026-08-18, POP3 tester)
 - Yandex POP lists newest FIRST; the old fixed tail-window fetched the OLDEST 300 and never
