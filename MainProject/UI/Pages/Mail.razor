@@ -94,6 +94,11 @@
                 <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
             }
             <div class="mail-search-tools">
+                @foreach (var (label, token) in QuickFilters)
+                {
+                    <button class="mail-search-toggle @(HasSearchToken(token) ? "mail-search-toggle--on" : "")"
+                            @onclick="() => ToggleSearchToken(token)">@label</button>
+                }
                 @if (MailUiState.SelectedAccount != null)
                 {
                     <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"

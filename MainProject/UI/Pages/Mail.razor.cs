@@ -180,6 +180,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
+        /// <summary>One-click filters; each just adds or removes its own token in the search box, so they compose with each other and with typed text.</summary>
+        static readonly (string Label, string Token)[] QuickFilters =
+        [
+            ("📩 Unread", "is:unread"),
+            ("⭐ Starred", "is:starred"),
+            ("❗ Important", "is:important"),
+            ("📎 Attachments", "has:attachment")
+        ];
+
+        bool HasSearchToken(string token) =>
+            SearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Any(part => part.Equals(token, StringComparison.OrdinalIgnoreCase));
+
+        void ToggleSearchToken(string token)
+        {
+            var parts = SearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            if (parts.RemoveAll(part => part.Equals(token, StringComparison.OrdinalIgnoreCase)) == 0)
+                parts.Add(token);
+            SearchText = string.Join(' ', parts);
+        }
+
         static List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
 
         void SaveCurrentSearch()

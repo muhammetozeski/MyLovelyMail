@@ -212,6 +212,8 @@
         border-radius: @(AppMeasures.Radius.Pill)px;
         cursor: pointer;
         font-size: @(AppMeasures.Font.Small)px;
+        /* Without this the emoji wraps onto its own line above the label inside the pill. */
+        white-space: nowrap;
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
