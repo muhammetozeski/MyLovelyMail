@@ -1,3 +1,4 @@
+using MyLovelyMail.MainProject.Constants;
 #if WINDOWS
 using H.NotifyIcon;
 #endif
@@ -31,7 +32,7 @@ namespace MyLovelyMail
 
             trayIcon = new TaskbarIcon
             {
-                ToolTipText = "My Lovely Mail",
+                ToolTipText = AppConstants.AppNameHumanReadable,
                 LeftClickCommand = new Command(static () => TrayService.ShowMainWindow()),
                 NoLeftClickDelay = true
             };

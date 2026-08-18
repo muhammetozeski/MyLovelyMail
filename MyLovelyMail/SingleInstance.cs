@@ -1,3 +1,4 @@
+using MyLovelyMail.MainProject.Constants;
 #if WINDOWS
 using System.Runtime.InteropServices;
 using MyLovelyMail.MainProject.Storage;
@@ -32,9 +33,9 @@ namespace MyLovelyMail
 #if DEBUG
             // The dev sandbox must coexist with the user's deployed install (separate UserData,
             // separate window) — sharing one mutex would treat them as duplicates of each other.
-            const string MutexName = @"Local\MyLovelyMail-single-instance-debug";
+            const string MutexName = $@"Local\{AppConstants.AppName}-single-instance-debug";
 #else
-            const string MutexName = @"Local\MyLovelyMail-single-instance";
+            const string MutexName = $@"Local\{AppConstants.AppName}-single-instance";
 #endif
             claimedMutex = new Mutex(initiallyOwned: true, MutexName, out bool createdNew);
             if (createdNew) return true;
@@ -52,7 +53,7 @@ namespace MyLovelyMail
 
             if (!TrayService.LaunchedMinimized)
             {
-                IntPtr window = FindWindowW(null, "My Lovely Mail");
+                IntPtr window = FindWindowW(null, AppConstants.AppNameHumanReadable);
                 if (window != IntPtr.Zero)
                 {
                     ShowWindow(window, SW_RESTORE);

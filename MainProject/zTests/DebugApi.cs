@@ -9,6 +9,7 @@ using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.Constants;
 
 namespace MyLovelyMail.MainProject.ZTests
 {
@@ -163,7 +164,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/status"):
                     return new
                     {
-                        app = "MyLovelyMail",
+                        app = AppConstants.AppName,
                         vaultUnlocked = CredentialVault.IsUnlocked,
                         syncing = SyncScheduler.IsSyncing,
                         userDataRoot = AppPaths.Root,

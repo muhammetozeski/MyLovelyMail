@@ -1,6 +1,7 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.Constants;
 
 namespace MyLovelyMail.MainProject.Services
 {
@@ -51,7 +52,7 @@ namespace MyLovelyMail.MainProject.Services
             var single = audible.Count == 1 ? audible[0] : null;
             var toast = new MailToast
             {
-                Title = single == null ? "My Lovely Mail"
+                Title = single == null ? AppConstants.AppNameHumanReadable
                     : string.IsNullOrWhiteSpace(single.FromName) ? single.FromAddress : single.FromName,
                 Body = single == null ? $"💌 {audible.Count} new messages for {account.EmailAddress}"
                     : string.IsNullOrWhiteSpace(single.Subject) ? "(no subject)" : single.Subject,
