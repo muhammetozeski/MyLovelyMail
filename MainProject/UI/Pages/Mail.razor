@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>My Lovely Mail</PageTitle>
 
 <div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
@@ -56,7 +57,7 @@
                         <span class="mail-account-ordinal">@(accountIndex + 1)</span>
                     }
                     <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
-                    @if (AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    @if (GlobalSettings.ShowUnreadBadge.Value && AccountUnreadCount(account.Id) is > 0 and var accountUnread)
                     {
                         <span class="mail-account-unread" style="background:@account.ColorHex">@accountUnread</span>
                     }
@@ -72,7 +73,7 @@
                                     @onclick="() => MailUiState.SelectFolder(folder)">
                                 <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
                                 <span class="mail-folder-name">@folder.DisplayName</span>
-                                @if (folder.UnreadCount > 0)
+                                @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value)
                                 {
                                     <CoreChip Text="@folder.UnreadCount.ToString()"
                                               Background="@AppColors.Primary"

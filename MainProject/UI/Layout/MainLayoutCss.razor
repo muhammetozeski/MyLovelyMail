@@ -1,5 +1,6 @@
 @namespace MyLovelyMail.MainProject.UI.Layout
 @inherits ThemedComponentBase
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 
 @{
     string auroraBase = $"background:linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
@@ -25,6 +26,8 @@
         padding: 0;
         min-height: @(AppMeasures.Viewport.Full)vh;
         overflow-x: hidden;
+        /* One knob scales the whole app: zoom (not font-size) because every measure is in px. */
+        zoom: @(GlobalSettings.UiScalePercent.Value)%;
         font-family: "Noto Color Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: @textColor;
         @((MarkupString)auroraBase)

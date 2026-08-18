@@ -31,6 +31,22 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Interface scale (%)</span>
+                <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.UiScalePercent.Value.ToString()" ValueChanged="@SetUiScale" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Unread count badges</span>
+                <span class="settings-row-hint">Shows the number of unread messages on accounts and folders</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.ShowUnreadBadge.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.ShowUnreadBadge, v))" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Message list density</span>
                 <span class="settings-row-hint">Cozy shows two preview lines; Compact fits the most rows</span>
             </div>
@@ -281,6 +297,15 @@
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
+    }
+
+    /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
+    static void SetUiScale(string text)
+    {
+        const int MinScalePercent = 50;
+        const int MaxScalePercent = 200;
+        if (int.TryParse(text, out int percent))
+            SetAndSave(GlobalSettings.UiScalePercent, Math.Clamp(percent, MinScalePercent, MaxScalePercent));
     }
 
     static void SetUndoSendSeconds(string text)
