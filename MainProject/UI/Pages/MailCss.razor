@@ -350,6 +350,47 @@
         background: @surfaceTint;
     }
 
+    /* Move popover anchors to its wrapper span so it opens right under the Move button. */
+    .mail-bulk-move {
+        position: relative;
+    }
+
+    .mail-move-popover {
+        position: absolute;
+        top: @(AppMeasures.Percent.Full)%;
+        left: 0;
+        margin-top: @(AppMeasures.Space.Px4)px;
+        z-index: @(AppMeasures.ZLayer.Popover);
+        display: flex;
+        flex-direction: column;
+        min-width: @(AppMeasures.Size.Px200)px;
+        max-height: @(AppMeasures.Size.Px300)px;
+        overflow-y: auto;
+        padding: @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
+        box-shadow: @AppStyles.ShadowMedium;
+    }
+
+    .mail-move-option {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        text-align: left;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .mail-move-option:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        }
+
     .mail-bulk-count {
         font-size: @(AppMeasures.Font.Small)px;
         font-weight: @(AppMeasures.Weight.Heavy);

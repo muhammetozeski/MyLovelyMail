@@ -108,6 +108,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.ClearSelection();
         }
 
+        bool ShowMovePicker { get; set; }
+
+        /// <summary>Server folders the selection can move to: everything except the open folder and app-local ones. Empty for POP3 accounts, which hides the Move button entirely.</summary>
+        List<MailFolderData> MoveTargets =>
+            MailUiState.SelectedAccount is { Protocol: IncomingProtocol.Imap }
+            && MailUiState.SelectedFolder is { IsLocal: false } current
+                ? [.. Folders.Where(f => !f.IsLocal && f.FullName != current.FullName)]
+                : [];
+
+        void BulkMoveTo(MailFolderData targetFolder)
+        {
+            ShowMovePicker = false;
+            if (MailUiState.SelectedAccount is not { } account || MailUiState.SelectedFolder is not { } current) return;
+            MessageActions.MoveToFolder(account, current.FullName, SelectedSummaries, targetFolder.FullName);
+            MailUiState.ClearSelection();
+        }
+
         void HandleListKeyDown(KeyboardEventArgs e)
         {
             var account = MailUiState.SelectedAccount;

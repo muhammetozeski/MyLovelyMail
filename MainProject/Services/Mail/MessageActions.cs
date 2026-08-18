@@ -89,6 +89,22 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 });
         }
 
+        /// <summary>
+        /// Optimistic bulk move to another server folder: rows leave the local store instantly,
+        /// the batched IMAP MoveToAsync follows in the background (same shape as rule moves).
+        /// </summary>
+        public static void MoveToFolder(MailAccountData account, string folderFullName, IReadOnlyList<MailMessageSummary> summaries, string targetFullName)
+        {
+            MessageStore.RemoveMessages(account.Id, folderFullName, [.. summaries.Select(s => s.Uid)]);
+            RunServerActionInBackground(account, folderFullName, $"Server move to '{targetFullName}' failed", LogLevel.Error,
+                async (client, folder, ct) =>
+                {
+                    var target = await client.GetFolderAsync(targetFullName, ct);
+                    await folder.MoveToAsync([.. summaries.Select(s => new UniqueId(s.Uid))], target, ct);
+                    Log($"Moved {summaries.Count} messages from '{folderFullName}' to '{targetFullName}'.");
+                });
+        }
+
         static void PushFlagInBackground(MailAccountData account, string folderFullName, uint uid, MessageFlags flag, bool add) =>
             RunServerActionInBackground(account, folderFullName, $"Flag push failed for uid {uid}", LogLevel.Warning,
                 async (_, folder, ct) =>

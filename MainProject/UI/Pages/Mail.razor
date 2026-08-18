@@ -134,6 +134,23 @@
                     <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
                     <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
                     <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
+                    @if (MoveTargets.Count > 0)
+                    {
+                        <span class="mail-bulk-move">
+                            <button class="mail-search-toggle" @onclick="() => ShowMovePicker = !ShowMovePicker">📂 Move</button>
+                            @if (ShowMovePicker)
+                            {
+                                <div class="mail-move-popover">
+                                    @foreach (var targetFolder in MoveTargets)
+                                    {
+                                        <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
+                                            @FolderIcon(targetFolder.Role) @targetFolder.DisplayName
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </span>
+                    }
                     <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid))">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
