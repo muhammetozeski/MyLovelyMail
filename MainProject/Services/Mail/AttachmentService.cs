@@ -81,13 +81,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
+        /// <summary>Writes one attachment to disk. A part with no content (or an attached message
+        /// that failed to parse) leaves an empty file rather than throwing mid-save.</summary>
         static async Task WriteEntityAsync(MimeEntity attachment, string path)
         {
             await using var output = File.Create(path);
             if (attachment is MimePart part)
-                await part.Content.DecodeToAsync(output);
-            else
-                await ((MessagePart)attachment).Message.WriteToAsync(output);
+            {
+                if (part.Content != null)
+                    await part.Content.DecodeToAsync(output);
+            }
+            else if (attachment is MessagePart { Message: { } inner })
+            {
+                await inner.WriteToAsync(output);
+            }
         }
 
         /// <summary>Shared by attachment saves and message exports (MessageExportService).</summary>

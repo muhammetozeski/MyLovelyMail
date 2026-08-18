@@ -57,10 +57,10 @@ namespace MyLovelyMail.MainProject.Constants
         public static readonly ProviderPreset[] All = [Gmail, Outlook, Yahoo, ICloud, Yandex, Custom];
 
         /// <summary>Guesses the preset from the mail address domain (null → Custom is a safe pick).</summary>
-        public static ProviderPreset? GuessFromEmail(string email)
+        public static ProviderPreset? GuessFromEmail(string? email)
         {
             int atIndex = email?.IndexOf('@') ?? -1;
-            if (atIndex < 0) return null;
+            if (email == null || atIndex < 0) return null;
             return email[(atIndex + 1)..].ToLowerInvariant() switch
             {
                 "gmail.com" or "googlemail.com" => Gmail,
