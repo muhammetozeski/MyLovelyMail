@@ -9,6 +9,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
     {
         public required string Name { get; init; }
 
+        /// <summary>True for palettes meant for dark surroundings; lets the app follow the Windows app theme.</summary>
+        public bool IsDark { get; init; }
+
         // Page background — the aurora-lit night sky behind every screen.
 
         /// <summary> Deepest tone of the page background — the near-black night-sky color that shows where the aurora glow stops fade out. </summary>

@@ -94,6 +94,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static readonly AppTheme PlayfulStarlight = new()
         {
             Name = "Playful Starlight",
+            IsDark = true,
 
             BackgroundDeep = Color.FromArgb("#070A1A"),
             BackgroundBase = Color.FromArgb("#0E1230"),

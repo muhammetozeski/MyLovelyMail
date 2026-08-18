@@ -31,6 +31,13 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Follow the Windows theme</span>
+                <span class="settings-row-hint">Picks the light or dark palette automatically instead of the one chosen above</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FollowSystemTheme.Value" CheckedChanged="@SetFollowSystemTheme" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Interface scale (%)</span>
                 <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
             </div>
@@ -297,6 +304,13 @@
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
+    }
+
+    /// <summary>Switching this on re-picks the palette immediately, so the effect is visible without restarting.</summary>
+    static void SetFollowSystemTheme(bool follow)
+    {
+        SetAndSave(GlobalSettings.FollowSystemTheme, follow);
+        ThemeManager.ApplyFromSettings();
     }
 
     /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
