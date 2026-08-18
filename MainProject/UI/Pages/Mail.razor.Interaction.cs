@@ -4,6 +4,7 @@ using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
@@ -23,6 +24,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("I", "Toggle important"),
             ("Delete", "Delete message"),
             ("Escape", "Close reader / dialog"),
+            ("Ctrl+1..9", "Switch account"),
             ("?", "Show this help"),
             ("Search", "from: to: tag: has:attachment is:unread is:starred")
         ];
@@ -166,6 +168,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     break;
                 case "?":
                     ShowShortcutHelp = !ShowShortcutHelp;
+                    break;
+                case var digit when e.CtrlKey && digit.Length == 1 && digit[0] is >= '1' and <= '9':
+                    int accountIndex = digit[0] - '1';
+                    if (accountIndex < AccountStore.Accounts.Count)
+                        SelectAccount(AccountStore.Accounts[accountIndex]);
                     break;
             }
         }

@@ -45,11 +45,16 @@
         }
         else
         {
-            @foreach (var account in AccountStore.Accounts)
+            @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
                 <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "")"
+                        title="@(accountIndex < 9 ? $"Ctrl+{accountIndex + 1}" : null)"
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                    @if (accountIndex < 9)
+                    {
+                        <span class="mail-account-ordinal">@(accountIndex + 1)</span>
+                    }
                     <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
                     @if (AccountUnreadCount(account.Id) is > 0 and var accountUnread)
                     {

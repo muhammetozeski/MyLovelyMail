@@ -105,6 +105,19 @@
         flex-shrink: 0;
     }
 
+    /* Ctrl+N ordinal so the keyboard mapping is discoverable at a glance. */
+    .mail-account-ordinal {
+        flex-shrink: 0;
+        min-width: @(AppMeasures.Size.Px16)px;
+        text-align: center;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Px4)px;
+        padding: 0 @(AppMeasures.Space.Px2)px;
+    }
+
     .mail-account-name {
         flex: 1;
         overflow: hidden;
