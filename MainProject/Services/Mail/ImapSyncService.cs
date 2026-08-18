@@ -67,6 +67,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
             });
         }
 
+        /// <summary>
+        /// Throws the folder's cache away and refills it. Incremental sync only ever asks for uids
+        /// ABOVE LastSeenUid, so a folder whose cache was truncated can never heal itself — this is
+        /// the way back. The refill lands in the usual slices, so the list repaints while it runs.
+        /// </summary>
+        public static void KickFolderResync(MailAccountData account, string folderFullName)
+        {
+            MessageStore.ClearFolderCache(account.Id, folderFullName);
+            KickFolderSync(account, folderFullName);
+        }
+
         /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {

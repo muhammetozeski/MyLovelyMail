@@ -99,6 +99,41 @@ namespace MyLovelyMail.MainProject.Storage
             AtomicFile.WriteAllText(Path.Combine(dir, FolderInfoFileName), JsonSerializer.Serialize(folder, JsonDefaults.Indented));
         }
 
+        /// <summary>
+        /// Throws the folder's cache away — RAM index, index.jsonl and the cached .eml files — and
+        /// rewinds LastSeenUid so the next sync refills from scratch. UidValidity is KEPT: the
+        /// sync's invalidation branch must stay quiet so the plain first-fill path runs.
+        /// Dropping the RAM entry is mandatory, since a loaded index would otherwise survive the
+        /// file deletion and keep serving stale summaries.
+        /// </summary>
+        public static void ClearFolderCache(string accountId, string folderFullName)
+        {
+            Indexes.TryRemove(FolderKey(accountId, folderFullName), out _);
+
+            string dir = FolderCachePath(accountId, folderFullName);
+            try
+            {
+                string indexPath = Path.Combine(dir, IndexFileName);
+                if (File.Exists(indexPath)) File.Delete(indexPath);
+                string messagesDir = Path.Combine(dir, MessagesFolderName);
+                if (Directory.Exists(messagesDir)) Directory.Delete(messagesDir, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not clear the cache of '{folderFullName}': {ex.Message}", LogLevel.Warning);
+            }
+
+            if (GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName) is { } folder)
+            {
+                folder.LastSeenUid = 0;
+                folder.UnreadCount = 0;
+                folder.TotalCount = 0;
+                SaveFolder(folder);
+            }
+            Log($"Folder cache cleared for '{folderFullName}'; next sync refills it.");
+            OnFolderChanged?.Invoke(accountId, folderFullName);
+        }
+
         #endregion
 
         #region Summaries (the RAM mapping)

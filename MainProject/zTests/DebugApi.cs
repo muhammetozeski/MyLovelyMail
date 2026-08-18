@@ -343,6 +343,14 @@ namespace MyLovelyMail.MainProject.ZTests
                         .Select(s => new { s.Uid, s.Subject, s.FromAddress, unread = s.IsUnread, s.HasAttachments });
                 }
 
+                case ("POST", "/resync"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    ImapSyncService.KickFolderResync(RequireAccount(accountId), folder);
+                    return new { ok = true };
+                }
+
                 case ("GET", "/contacts"):
                     return ContactIndexService
                         .Suggest(RequireQueryValue(query, "accountId"), query["prefix"] ?? string.Empty, ReadTake(query, 20))

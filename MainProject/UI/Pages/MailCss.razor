@@ -134,6 +134,38 @@
         flex-shrink: 0;
     }
 
+    /* Wrapper so the resync control can sit beside the folder button (a button cannot nest). */
+    .mail-folder-row {
+        display: flex;
+        align-items: center;
+    }
+
+        .mail-folder-row > .mail-folder {
+            flex: 1;
+            min-width: 0;
+        }
+
+    .mail-folder-resync {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        opacity: 0;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: opacity @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-folder-row:hover .mail-folder-resync {
+            opacity: @(AppMeasures.Opacity.Muted);
+        }
+
+        .mail-folder-resync:hover {
+            opacity: 1;
+            background: @surfaceTint;
+        }
+
     .mail-folder {
         display: flex;
         align-items: center;

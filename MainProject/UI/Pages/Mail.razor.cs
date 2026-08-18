@@ -180,6 +180,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
+        /// <summary>Drops the folder's cache and refills it — the way back from a truncated folder that incremental sync can never heal.</summary>
+        void ResyncFolder(MailFolderData folder)
+        {
+            if (AccountStore.GetById(folder.AccountId) is not { } account) return;
+            MailUiState.SelectFolder(folder);
+            ImapSyncService.KickFolderResync(account, folder.FullName);
+        }
+
         /// <summary>One-click filters; each just adds or removes its own token in the search box, so they compose with each other and with typed text.</summary>
         static readonly (string Label, string Token)[] QuickFilters =
         [

@@ -66,19 +66,27 @@
                 {
                     @foreach (var folder in Folders)
                     {
-                        <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
-                                @onclick="() => MailUiState.SelectFolder(folder)">
-                            <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
-                            <span class="mail-folder-name">@folder.DisplayName</span>
-                            @if (folder.UnreadCount > 0)
+                        @* The row is itself a button, so the resync control has to be a SIBLING inside this wrapper. *@
+                        <div class="mail-folder-row">
+                            <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                    @onclick="() => MailUiState.SelectFolder(folder)">
+                                <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
+                                <span class="mail-folder-name">@folder.DisplayName</span>
+                                @if (folder.UnreadCount > 0)
+                                {
+                                    <CoreChip Text="@folder.UnreadCount.ToString()"
+                                              Background="@AppColors.Primary"
+                                              TextColor="@AppColors.TextOnAccent"
+                                              FontSize="@AppMeasures.Font.XSmall"
+                                              PaddingX="8" PaddingY="2" />
+                                }
+                            </button>
+                            @if (!folder.IsLocal)
                             {
-                                <CoreChip Text="@folder.UnreadCount.ToString()"
-                                          Background="@AppColors.Primary"
-                                          TextColor="@AppColors.TextOnAccent"
-                                          FontSize="@AppMeasures.Font.XSmall"
-                                          PaddingX="8" PaddingY="2" />
+                                <button class="mail-folder-resync" title="Redownload this folder (newest 300 messages)"
+                                        @onclick="() => ResyncFolder(folder)">🔄</button>
                             }
-                        </button>
+                        </div>
                     }
                 }
             }
