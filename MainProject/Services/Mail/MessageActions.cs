@@ -84,7 +84,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     else
                     {
                         await folder.AddFlagsAsync(uid, MessageFlags.Deleted, silent: true, ct);
-                        await folder.ExpungeAsync(ct);
+                        // Targeted expunge: the parameterless ExpungeAsync would purge EVERY
+                        // \Deleted message in the folder, including ones another client soft-deleted.
+                        await folder.ExpungeAsync([uid], ct);
                     }
                 });
         }
