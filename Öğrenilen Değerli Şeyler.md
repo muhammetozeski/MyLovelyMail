@@ -70,6 +70,10 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
 - **Aranan metin yanlış bölgede eşleşebilir.** Alıntı katlamayı doğrularken `mlm-quote` metnini
   tüm HTML'de aradım; `<style>` bloğundaki CSS kuralına takıldı ve "çalışıyor" sandım. Kontrol
   her zaman ilgilenilen bölgede yapılmalı (burada `<body>` sonrası).
+- **Anahtar adının varlığı, değerin varlığı demek değildir.** Snooze kalıcılığını denerken
+  `index.jsonl` satırında "Snoozed" kelimesini aradım ve "kaydediliyor" sandım; oysa satır
+  `"SnoozedUntilUtc":null` içeriyordu. Doğru kontrol değeri okur, adı değil. Bu, sync'in
+  uygulama-yerel alanları (etiketler, "önemli", snooze) sildiğini ortaya çıkardı.
 - **PowerShell tek elemanlı diziyi düzleştirir.** `@(Invoke-RestMethod ...).Count` her sorgu için
   1 döndürdü; API doğruydu, sayım yanlıştı. Bütün sayılar birbirinin aynı çıkıyorsa önce ölçüm
   yöntemini şüphelen — gerçek sayılar 313/149/27 idi.
