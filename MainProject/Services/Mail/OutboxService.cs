@@ -1,5 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
@@ -84,7 +85,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             try
             {
-                await ComposeService.SendAsync(draft);
+                var outcome = await ComposeService.SendAsync(draft);
+                if (outcome == SendOutcome.QueuedOffline)
+                {
+                    NotificationService.Presenter?.Invoke(new MailToast
+                    {
+                        Title = "Queued — you seem offline",
+                        Body = $"'{draft.Subject}' is waiting in Outbox and will be sent automatically.",
+                        SoundName = "default"
+                    });
+                    return;
+                }
                 SoundService.Play("success");
             }
             catch (Exception ex)
@@ -96,6 +107,40 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Body = $"'{draft.Subject}' could not be sent — it is still in Drafts. {ex.Message}",
                     SoundName = "default"
                 });
+            }
+        }
+
+        /// <summary>
+        /// Retries everything parked in each account's local Outbox. Runs after a successful sync
+        /// pass (being able to sync means we are online again). Failures stay queued for the next
+        /// pass; a summary whose MIME file vanished is dropped as unrecoverable.
+        /// </summary>
+        public static async Task FlushAsync(CancellationToken cancellationToken = default)
+        {
+            string outboxFullName = MessageStore.LocalFolderPrefix + ComposeService.LocalOutboxFolderName;
+            foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
+            {
+                foreach (var queued in MessageStore.GetSummaries(account.Id, outboxFullName))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        if (MessageStore.TryLoadMimeMessage(account.Id, outboxFullName, queued.Uid) is not { } message)
+                        {
+                            MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
+                            Log($"Outbox flush: dropped '{queued.Subject}' — its MIME file is gone.", LogLevel.Warning);
+                            continue;
+                        }
+                        await SmtpSendService.SendAsync(account, message, cancellationToken);
+                        MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
+                        await ComposeService.ArchiveToSentAsync(account, message, cancellationToken);
+                        Log($"Outbox flush: sent '{queued.Subject}'.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Outbox flush: '{queued.Subject}' still failing, stays queued: {ex.Message}", LogLevel.Warning);
+                    }
+                }
             }
         }
     }

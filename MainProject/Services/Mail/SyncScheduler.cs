@@ -102,6 +102,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
             }
 
+            // A completed pass is the online signal — retry anything parked in the Outboxes.
+            try
+            {
+                await OutboxService.FlushAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) { }
+
             passRunning = false;
             Log("Sync pass finished for all enabled accounts.");
         }

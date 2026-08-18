@@ -6,6 +6,9 @@ using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
+    /// <summary>What SendAsync actually did: submitted over SMTP, or parked in the local Outbox for the next flush.</summary>
+    public enum SendOutcome { Sent, QueuedOffline }
+
     /// <summary>
     /// Builds reply/forward drafts from cached MIME and sends drafts: SMTP first, then a
     /// best-effort copy into the account's Sent folder (IMAP append, or a local Sent folder for
@@ -15,6 +18,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     {
         public const string LocalSentFolderName = "Sent";
         public const string LocalDraftsFolderName = "Drafts";
+        public const string LocalOutboxFolderName = "Outbox";
 
         /// <summary>Raw recipient text survives in headers even when it is not yet a parseable address.</summary>
         const string DraftToHeader = "X-LovelyDraft-To";
@@ -176,8 +180,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return summary.PreviewText;
         }
 
-        /// <summary>Sends the draft and archives a copy to Sent. Throws with a readable message on invalid addresses.</summary>
-        public static async Task SendAsync(ComposeDraft draft, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Sends the draft and archives a copy to Sent. A connection-level failure parks the built
+        /// message in the local Outbox instead of throwing (the periodic flush retries it);
+        /// permanent errors (bad addresses, auth) still throw with a readable message.
+        /// </summary>
+        public static async Task<SendOutcome> SendAsync(ComposeDraft draft, CancellationToken cancellationToken = default)
         {
             var account = draft.Account ?? throw new InvalidOperationException("The draft has no sending account.");
 
@@ -194,13 +202,34 @@ namespace MyLovelyMail.MainProject.Services.Mail
             message.Body = builder.ToMessageBody();
 
             Log($"Compose send started: '{draft.Subject}' -> {draft.To}");
-            await SmtpSendService.SendAsync(account, message, cancellationToken);
+            try
+            {
+                await SmtpSendService.SendAsync(account, message, cancellationToken);
+            }
+            catch (Exception ex) when (IsConnectionFailure(ex))
+            {
+                await StoreAsMessageInLocalFolderAsync(account, message, LocalOutboxFolderName, FolderRole.Outbox, cancellationToken);
+                DeleteDraft(draft);
+                Log($"Offline: '{draft.Subject}' queued to Outbox ({ex.Message}).", LogLevel.Warning);
+                return SendOutcome.QueuedOffline;
+            }
             await ArchiveToSentAsync(account, message, cancellationToken);
             DeleteDraft(draft);
             Log($"Compose send finished: '{draft.Subject}'");
+            return SendOutcome.Sent;
         }
 
-        static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)
+        /// <summary>
+        /// Connection-level = worth retrying later. Auth failures and SMTP command rejections are
+        /// permanent — retrying those forever would spin, so they surface to the caller instead.
+        /// </summary>
+        static bool IsConnectionFailure(Exception ex) =>
+            ex is System.Net.Sockets.SocketException or IOException or TimeoutException
+                or MailKit.ServiceNotConnectedException or Polly.Timeout.TimeoutRejectedException
+            || ex.InnerException is System.Net.Sockets.SocketException;
+
+        /// <summary>Also used by the outbox flush, which re-sends a stored MimeMessage without a draft.</summary>
+        internal static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)
         {
             try
             {
@@ -224,22 +253,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
 
                 // POP3 (or IMAP without a known Sent folder): keep the copy in a local Sent folder.
-                using var buffer = new MemoryStream();
-                await message.WriteToAsync(buffer, cancellationToken);
-                uint uid = Pop3Service.Fnv1aHash(message.MessageId ?? Guid.NewGuid().ToString());
-                StoreInLocalFolder(account, LocalSentFolderName, FolderRole.Sent, uid, buffer.ToArray(),
-                    new MailMessageSummary
-                    {
-                        Uid = uid,
-                        MessageId = message.MessageId ?? string.Empty,
-                        Subject = message.Subject ?? string.Empty,
-                        FromName = account.DisplayName,
-                        FromAddress = account.EmailAddress,
-                        ToAddresses = string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
-                        DateUtc = DateTime.UtcNow,
-                        Flags = MailFlags.Seen,
-                        PreviewText = Preview(message.TextBody)
-                    });
+                await StoreAsMessageInLocalFolderAsync(account, message, LocalSentFolderName, FolderRole.Sent, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -251,6 +265,27 @@ namespace MyLovelyMail.MainProject.Services.Mail
         const int PreviewChars = 160;
         static string Preview(string? body) =>
             body == null ? string.Empty : body.Length > PreviewChars ? body[..PreviewChars] : body;
+
+        /// <summary>Serializes a built MimeMessage into an app-local folder with its summary row (Sent archive + Outbox queue).</summary>
+        static async Task StoreAsMessageInLocalFolderAsync(MailAccountData account, MimeMessage message, string folderName, FolderRole role, CancellationToken cancellationToken)
+        {
+            using var buffer = new MemoryStream();
+            await message.WriteToAsync(buffer, cancellationToken);
+            uint uid = Pop3Service.Fnv1aHash(message.MessageId ?? Guid.NewGuid().ToString());
+            StoreInLocalFolder(account, folderName, role, uid, buffer.ToArray(),
+                new MailMessageSummary
+                {
+                    Uid = uid,
+                    MessageId = message.MessageId ?? string.Empty,
+                    Subject = message.Subject ?? string.Empty,
+                    FromName = account.DisplayName,
+                    FromAddress = account.EmailAddress,
+                    ToAddresses = string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
+                    DateUtc = DateTime.UtcNow,
+                    Flags = MailFlags.Seen,
+                    PreviewText = Preview(message.TextBody)
+                });
+        }
 
         /// <summary>
         /// Ensures the app-local folder exists, then stores the MIME plus its summary row —
