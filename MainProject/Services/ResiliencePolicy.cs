@@ -20,7 +20,7 @@ namespace MyLovelyMail.MainProject.Services
         static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>Outer total timeout → retries with exponential backoff → per-attempt timeout.</summary>
-        public static readonly ResiliencePipeline Network = new ResiliencePipelineBuilder()
+        static readonly ResiliencePipeline Network = new ResiliencePipelineBuilder()
             .AddTimeout(TotalTimeout)
             .AddRetry(new RetryStrategyOptions
             {

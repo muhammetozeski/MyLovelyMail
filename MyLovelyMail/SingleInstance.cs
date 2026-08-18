@@ -1,5 +1,6 @@
 #if WINDOWS
 using System.Runtime.InteropServices;
+using MyLovelyMail.MainProject.Storage;
 #endif
 
 namespace MyLovelyMail
@@ -42,7 +43,7 @@ namespace MyLovelyMail
             // it identifies WHO keeps launching argument-less copies at boot (shortcut vs restore).
             try
             {
-                string tracePath = Path.Combine(MainProject.Storage.AppPaths.AppCache, "second-instance-trace.log");
+                string tracePath = Path.Combine(AppPaths.AppCache, "second-instance-trace.log");
                 Directory.CreateDirectory(Path.GetDirectoryName(tracePath)!);
                 File.AppendAllText(tracePath,
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} duplicate start, args=[{string.Join(' ', Environment.GetCommandLineArgs().Skip(1))}]{Environment.NewLine}");

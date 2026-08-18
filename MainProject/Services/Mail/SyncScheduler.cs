@@ -49,12 +49,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
             _ = LoopAsync(loopCancellation.Token);
         }
 
-        public static void Stop()
-        {
-            loopCancellation?.Cancel();
-            loopCancellation = null;
-        }
-
         static async Task LoopAsync(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)

@@ -15,7 +15,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class MailConnections
     {
-        public static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
+        static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
         {
             ConnectionSecurity.SslOnConnect => SecureSocketOptions.SslOnConnect,
             ConnectionSecurity.StartTls => SecureSocketOptions.StartTls,

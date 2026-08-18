@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Stores;
@@ -22,8 +23,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class RuleEngine
     {
-        /// <summary>Message-id → custom notification sound chosen by a SetNotificationSound action.</summary>
-        static readonly Dictionary<string, string> customSoundByMessageId = [];
+        /// <summary>Message-id → custom notification sound chosen by a SetNotificationSound action.
+        /// Concurrent: IMAP and POP3 sync passes for different accounts can write simultaneously.</summary>
+        static readonly ConcurrentDictionary<string, string> customSoundByMessageId = [];
 
         /// <summary>The sound only matters for the toast fired seconds after arrival, so the map is
         /// simply dropped when it grows past this instead of tracking entry age.</summary>
@@ -50,7 +52,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>True when the rule's conditions match under its AND/OR mode (a rule without conditions never matches).</summary>
-        public static bool Matches(FilterRule rule, MailMessageSummary summary)
+        static bool Matches(FilterRule rule, MailMessageSummary summary)
         {
             if (rule.Conditions.Count == 0) return false;
             return rule.MatchMode == FilterMatchMode.All

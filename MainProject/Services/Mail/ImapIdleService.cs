@@ -23,11 +23,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static readonly Dictionary<string, CancellationTokenSource> running = [];
         static readonly Lock gate = new();
 
+        /// <summary>Hosts that answered "no IDLE capability" — retrying those every sync pass would just burn a connection each time.</summary>
+        static readonly HashSet<string> idleUnsupportedAccountIds = [];
+
         /// <summary>Starts/stops loops so the running set matches which accounts currently want IDLE. Cheap to call often.</summary>
         public static void Refresh()
         {
             var desired = AccountStore.Accounts
-                .Where(a => a.Enabled && a.Protocol == IncomingProtocol.Imap && AccountStore.GetSettings(a.Id).UseImapIdle.Value)
+                .Where(a => a.Enabled && a.Protocol == IncomingProtocol.Imap
+                    && AccountStore.GetSettings(a.Id).UseImapIdle.Value
+                    && !idleUnsupportedAccountIds.Contains(a.Id))
                 .ToDictionary(a => a.Id);
 
             lock (gate)
@@ -48,15 +53,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        public static void StopAll()
-        {
-            lock (gate)
-            {
-                foreach (var cts in running.Values) cts.Cancel();
-                running.Clear();
-            }
-        }
-
         static async Task RunIdleLoopAsync(MailAccountData account, CancellationToken cancellationToken)
         {
             TimeSpan backoff = ReconnectDelayMin;
@@ -71,10 +67,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
                     if (!client.Capabilities.HasFlag(ImapCapabilities.Idle))
                     {
-                        // Server cannot push at all; nothing more this connection can do for "live" mail.
+                        // Server cannot push at all. Remember that, or the next Refresh() (every
+                        // sync pass calls it) would reconnect and rediscover the same answer forever.
                         Log($"IMAP IDLE not supported by '{account.IncomingHost}' — account stays on periodic sync.", LogLevel.Warning);
                         await client.DisconnectAsync(true, cancellationToken);
-                        lock (gate) running.Remove(account.Id);
+                        lock (gate)
+                        {
+                            idleUnsupportedAccountIds.Add(account.Id);
+                            running.Remove(account.Id);
+                        }
                         return;
                     }
 

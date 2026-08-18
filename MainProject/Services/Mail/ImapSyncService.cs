@@ -24,9 +24,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
             MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText |
             MessageSummaryItems.References;
 
-        /// <summary>Raised after a sync stored NEW messages: (accountId, folderFullName, newMessageCount).</summary>
-        public static event Action<string, string, int>? OnNewMail;
-
         /// <summary>Raised when an on-demand folder sync starts or finishes (drives the folder loading state).</summary>
         public static event Action? OnFolderSyncStateChanged;
 
@@ -85,8 +82,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             Log($"IMAP sync finished: {account.EmailAddress}");
         }
 
-        /// <summary>Syncs one folder's messages (used when the user opens a folder).</summary>
-        public static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
+        /// <summary>Syncs one folder's messages; reached through <see cref="KickFolderSync"/> when the user opens a folder.</summary>
+        static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
         {
             using var syncScope = SyncScheduler.EnterSyncScope();
             await ResiliencePolicy.RunNetwork(async ct =>
@@ -245,11 +242,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             });
 
             if (newCount > 0 && lastSeenUid > 0)
-            {
-                OnNewMail?.Invoke(account.Id, folder.FullName, newCount);
                 NotificationService.NotifyNewMessages(account, folder.FullName,
                     [.. summaries.Where(s => s.Uid > lastSeenUid)]);
-            }
         }
 
         /// <summary>Executes the move requests a rule pass produced — local ones via the store, remote ones over the still-open connection.</summary>

@@ -18,8 +18,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class ComposeService
     {
-        public const string LocalSentFolderName = "Sent";
-        public const string LocalDraftsFolderName = "Drafts";
+        const string LocalSentFolderName = "Sent";
+        const string LocalDraftsFolderName = "Drafts";
         public const string LocalOutboxFolderName = "Outbox";
 
         /// <summary>Raw recipient text survives in headers even when it is not yet a parseable address.</summary>
@@ -35,7 +35,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         static string LocalDraftsFullName => MessageStore.LocalFolderPrefix + LocalDraftsFolderName;
 
-        public static uint DraftUid(ComposeDraft draft) => Pop3Service.Fnv1aHash(DraftMessageIdPrefix + draft.DraftId);
+        static uint DraftUid(ComposeDraft draft) => Pop3Service.Fnv1aHash(DraftMessageIdPrefix + draft.DraftId);
 
         /// <summary>Writes/overwrites the draft in the local Drafts folder (autosave + close paths).</summary>
         public static void SaveDraft(ComposeDraft draft)
@@ -161,7 +161,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>The cached message's text body; falls back to tag-stripped HTML, then to the stored preview.</summary>
-        public static string LoadPlainBody(MailAccountData account, string folderFullName, MailMessageSummary summary)
+        static string LoadPlainBody(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {
             try
             {
