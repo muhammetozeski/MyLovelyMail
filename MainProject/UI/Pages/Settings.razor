@@ -101,6 +101,17 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">📖 Reading</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Fold quoted history</span>
+                <span class="settings-row-hint">Collapses the older thread under a "Show quoted text" line in the reader</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FoldQuotedText.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.FoldQuotedText, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">✍️ Composing</div>
         <div class="settings-row">
             <div class="settings-row-text">

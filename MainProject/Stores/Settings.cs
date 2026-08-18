@@ -83,6 +83,11 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>What happens when the user deletes a message.</summary>
         public static readonly Setting<DeleteBehavior> DeleteAction = new(DeleteBehavior.MoveToTrash);
 
+        // ---- Reading ----
+
+        /// <summary>Collapses the quoted history under a reply behind a "Show quoted text" fold.</summary>
+        public static readonly Setting<bool> FoldQuotedText = new(true);
+
         // ---- Composing ----
 
         /// <summary>Body format new messages start in.</summary>

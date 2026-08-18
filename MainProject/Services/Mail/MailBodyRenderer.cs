@@ -8,8 +8,8 @@ using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
-    /// <summary>Rendered document plus whether remote images were stripped (drives the allow-once banner).</summary>
-    public sealed record RenderedBody(string Html, bool RemoteImagesBlocked);
+    /// <summary>Rendered document, whether remote images were stripped (drives the allow-once banner) and whether a quoted-history fold was inserted.</summary>
+    public sealed record RenderedBody(string Html, bool RemoteImagesBlocked, bool QuotedTextFolded = false);
 
     /// <summary>
     /// Turns a cached .eml into a sanitized HTML document for the reader's sandboxed iframe.
@@ -41,7 +41,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// The sanitized HTML document for the message, or null when the full body is not cached
         /// yet (caller downloads it first). Never throws — a broken MIME falls back to the preview.
         /// </summary>
-        public static RenderedBody? Render(MailAccountData account, string folderFullName, MailMessageSummary summary, bool allowRemoteImages = false)
+        public static RenderedBody? Render(MailAccountData account, string folderFullName, MailMessageSummary summary,
+            bool allowRemoteImages = false, bool foldQuotedText = true)
         {
             try
             {
@@ -49,11 +50,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     return null;
 
                 bool blocked = false;
-                string body = !string.IsNullOrWhiteSpace(message.HtmlBody)
-                    ? Sanitize(message.HtmlBody, message, allowRemoteImages, ref blocked)
-                    : $"<pre>{WebUtility.HtmlEncode(message.TextBody ?? summary.PreviewText)}</pre>";
+                bool folded = false;
+                bool fold = foldQuotedText && Settings.FoldQuotedText.Value;
+                string body;
+                if (!string.IsNullOrWhiteSpace(message.HtmlBody))
+                {
+                    body = Sanitize(message.HtmlBody, message, allowRemoteImages, ref blocked);
+                    if (fold) body = FoldHtmlQuotes(body, ref folded);
+                }
+                else
+                {
+                    body = BuildPlainBody(message.TextBody ?? summary.PreviewText, fold, ref folded);
+                }
 
-                return new RenderedBody(WrapDocument(body), blocked);
+                return new RenderedBody(WrapDocument(body), blocked, folded);
             }
             catch (Exception ex)
             {
@@ -79,6 +89,62 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return html;
         }
 
+        #region Quoted-history folding
+
+        /// <summary>Below this many characters of new text there is nothing worth folding away — a message that IS a quote must not collapse to an empty body.</summary>
+        const int MinimumHeadLength = 40;
+
+        const string FoldOpen = "<details class=\"mlm-quote\"><summary>Show quoted text</summary>";
+        const string FoldClose = "</details>";
+
+        /// <summary>Markers every major client puts at the head of the quoted history it appends.</summary>
+        static readonly string[] HtmlQuoteMarkers =
+            ["<blockquote", "gmail_quote", "moz-cite-prefix", "divRplyFwdMsg", "stopSpelling"];
+
+        [GeneratedRegex(@"^\s*(>|-{2,}\s*Original Message\s*-{2,}|On .{0,160}\bwrote:\s*)$", RegexOptions.IgnoreCase)]
+        private static partial Regex PlainQuoteStart();
+
+        /// <summary>
+        /// Wraps everything from the first quote marker onward in a JS-free &lt;details&gt;. No tag
+        /// balancing is attempted (regex cannot balance HTML, same accepted constraint as Sanitize):
+        /// the closing tag lands at the very end, which the browser reconciles.
+        /// </summary>
+        static string FoldHtmlQuotes(string html, ref bool folded)
+        {
+            int cut = HtmlQuoteMarkers
+                .Select(marker => html.IndexOf(marker, StringComparison.OrdinalIgnoreCase))
+                .Where(index => index >= MinimumHeadLength)
+                .DefaultIfEmpty(-1)
+                .Min();
+            if (cut < 0) return html;
+
+            folded = true;
+            return html[..cut] + FoldOpen + html[cut..] + FoldClose;
+        }
+
+        /// <summary>Plain-text bodies: the head stays visible, the attribution line and everything under it move into the fold.</summary>
+        static string BuildPlainBody(string text, bool fold, ref bool folded)
+        {
+            if (fold)
+            {
+                var lines = text.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (!PlainQuoteStart().IsMatch(lines[i].TrimEnd('\r'))) continue;
+
+                    string head = string.Join('\n', lines[..i]);
+                    if (head.Trim().Length < MinimumHeadLength) break;
+
+                    folded = true;
+                    return $"<pre>{WebUtility.HtmlEncode(head)}</pre>" +
+                           FoldOpen + $"<pre>{WebUtility.HtmlEncode(string.Join('\n', lines[i..]))}</pre>" + FoldClose;
+                }
+            }
+            return $"<pre>{WebUtility.HtmlEncode(text)}</pre>";
+        }
+
+        #endregion
+
         /// <summary>Replaces cid: image references with data: URIs built from the message's own inline parts.</summary>
         static string InlineCidImages(string html, MimeMessage message)
         {
@@ -103,6 +169,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
             "margin:12px;line-height:1.55;font-size:14px;word-break:break-word;}" +
             "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;}" +
             $"a{{color:{AppColors.MailCanvas.Link};}}blockquote{{border-left:3px solid {AppColors.MailCanvas.QuoteBorder};margin-left:0;padding-left:12px;color:{AppColors.MailCanvas.QuoteText};}}" +
+            $"details.mlm-quote>summary{{cursor:pointer;list-style:none;display:inline-block;margin:8px 0;padding:2px 10px;border-radius:9999px;" +
+            $"background:{AppColors.MailCanvas.QuoteBorder};color:{AppColors.MailCanvas.QuoteText};font-size:12px;}}" +
+            "details.mlm-quote>summary::-webkit-details-marker{display:none;}" +
             "</style></head><body>" + body + "</body></html>";
     }
 }

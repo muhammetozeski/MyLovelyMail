@@ -28,7 +28,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Writes the rendered body as a standalone HTML document and returns the saved path.</summary>
         public static string ExportHtml(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {
-            var rendered = MailBodyRenderer.Render(account, folderFullName, summary, allowRemoteImages: true)
+            // Saved/printed copies stay whole: no folded-away history, same reason images are allowed.
+            var rendered = MailBodyRenderer.Render(account, folderFullName, summary, allowRemoteImages: true, foldQuotedText: false)
                 ?? throw new InvalidOperationException("The message body is not cached yet.");
 
             string headerBlock =
