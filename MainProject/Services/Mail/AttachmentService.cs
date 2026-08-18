@@ -91,13 +91,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await ((MessagePart)attachment).Message.WriteToAsync(output);
         }
 
-        static string DownloadsFolder()
+        /// <summary>Shared by attachment saves and message exports (MessageExportService).</summary>
+        internal static string DownloadsFolder()
         {
             string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             return Directory.Exists(downloads) ? downloads : AppPaths.UserData;
         }
 
-        static string UniquePath(string folder, string fileName)
+        /// <summary>Sanitizes the name and dodges collisions with " (2)"-style suffixes.</summary>
+        internal static string UniquePath(string folder, string fileName)
         {
             string sanitized = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
             string path = Path.Combine(folder, sanitized);

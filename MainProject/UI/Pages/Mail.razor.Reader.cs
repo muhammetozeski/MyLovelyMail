@@ -168,6 +168,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 MessageActions.ToggleImportant(account, folderName, message);
         }
 
+        /// <summary>Saves the open message to Downloads as .eml (raw MIME) or .html (rendered snapshot).</summary>
+        void ExportOpen(MailMessageSummary message, bool asHtml)
+        {
+            if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
+            try
+            {
+                string path = asHtml
+                    ? MessageExportService.ExportHtml(account, folderName, message)
+                    : MessageExportService.ExportEml(account, folderName, message);
+                SaveStatus = $"💾 Saved to {path}";
+            }
+            catch (Exception ex)
+            {
+                SaveStatus = $"❌ {ex.Message}";
+            }
+        }
+
         void DeleteOpen(MailMessageSummary message)
         {
             if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
