@@ -289,6 +289,18 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { undone = draft != null };
                 }
 
+                case ("POST", "/move"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string folder = query["folder"] ?? "INBOX";
+                    string target = query["target"] ?? throw new InvalidOperationException("target is required.");
+                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
+                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var summary = MessageStore.GetSummary(accountId, folder, uid) ?? throw new InvalidOperationException("Unknown message.");
+                    MessageActions.MoveToFolder(account, folder, [summary], target);
+                    return new { ok = true };
+                }
+
                 case ("POST", "/compose"):
                 {
                     string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
