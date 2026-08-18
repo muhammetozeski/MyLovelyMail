@@ -42,7 +42,7 @@ namespace MyLovelyMail.MainProject.Services
                 }
             }
 
-            return [.. hits.OrderByDescending(h => h.Summary.DateUtc).Take(MaxHits)];
+            return [.. hits.OrderByDescending(static h => h.Summary.DateUtc).Take(MaxHits)];
         }
 
         static (List<string> TextTokens, List<Func<MailMessageSummary, bool>> Predicates) ParseQuery(string query)

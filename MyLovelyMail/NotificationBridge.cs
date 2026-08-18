@@ -1,6 +1,10 @@
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+#if WINDOWS
+using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
+#endif
 
 namespace MyLovelyMail
 {
@@ -16,7 +20,7 @@ namespace MyLovelyMail
 #if WINDOWS
             try
             {
-                var manager = Microsoft.Windows.AppNotifications.AppNotificationManager.Default;
+                var manager = AppNotificationManager.Default;
                 manager.NotificationInvoked += HandleNotificationInvoked;
                 manager.Register();
                 NotificationService.Presenter = ShowToast;
@@ -32,7 +36,7 @@ namespace MyLovelyMail
 #if WINDOWS
         static void ShowToast(MailToast toast)
         {
-            var builder = new Microsoft.Windows.AppNotifications.Builder.AppNotificationBuilder()
+            var builder = new AppNotificationBuilder()
                 .AddText(toast.Title)
                 .AddText(toast.Body)
                 .AddArgument("accountId", toast.AccountId)
@@ -43,14 +47,14 @@ namespace MyLovelyMail
             // rule-customized) sound instead, so per-rule sounds actually differ.
             builder.MuteAudio();
 
-            Microsoft.Windows.AppNotifications.AppNotificationManager.Default.Show(builder.BuildNotification());
+            AppNotificationManager.Default.Show(builder.BuildNotification());
             Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
 
             if (!toast.Mute)
                 SoundService.Play(toast.SoundName);
         }
 
-        static void HandleNotificationInvoked(object sender, Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs args)
+        static void HandleNotificationInvoked(object sender, AppNotificationActivatedEventArgs args)
         {
             TrayService.ShowMainWindow();
 

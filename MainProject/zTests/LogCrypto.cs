@@ -12,11 +12,18 @@ public static class LogCrypto
 {
     static readonly byte[] Key = Encoding.UTF8.GetBytes("MyLovelyMail-log-scramble-key-v1");
 
+    /// <summary>XORs the buffer in place with the repeating key; running it twice restores the original bytes.</summary>
+    static void ApplyKeystream(byte[] data)
+    {
+        for (int i = 0; i < data.Length; i++)
+            data[i] ^= Key[i % Key.Length];
+    }
+
+    /// <summary>Turns one log entry into one Base64 line for the log file.</summary>
     public static string Encrypt(string plainText)
     {
         byte[] data = Encoding.UTF8.GetBytes(plainText);
-        for (int i = 0; i < data.Length; i++)
-            data[i] ^= Key[i % Key.Length];
+        ApplyKeystream(data);
         return Convert.ToBase64String(data);
     }
 
@@ -26,8 +33,7 @@ public static class LogCrypto
         try
         {
             byte[] data = Convert.FromBase64String(encryptedLine);
-            for (int i = 0; i < data.Length; i++)
-                data[i] ^= Key[i % Key.Length];
+            ApplyKeystream(data);
             return Encoding.UTF8.GetString(data);
         }
         catch (FormatException)

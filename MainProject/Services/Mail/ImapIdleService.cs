@@ -1,14 +1,15 @@
 using MailKit;
 using MailKit.Net.Imap;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
     /// <summary>
     /// Keeps one persistent IMAP IDLE connection per enabled account that opts in via
-    /// <see cref="AccountSettings.UseImapIdle"/>, so new mail lands in <see cref="Storage.MessageStore"/>
-    /// (and the UI, through <see cref="Storage.MessageStore.OnFolderChanged"/>) within seconds instead
+    /// <see cref="AccountSettings.UseImapIdle"/>, so new mail lands in <see cref="MessageStore"/>
+    /// (and the UI, through <see cref="MessageStore.OnFolderChanged"/>) within seconds instead
     /// of waiting for the next periodic <see cref="SyncScheduler"/> pass. POP3 has no push mechanism in
     /// the protocol itself, so POP3 accounts are never eligible here — they stay on periodic polling.
     /// </summary>

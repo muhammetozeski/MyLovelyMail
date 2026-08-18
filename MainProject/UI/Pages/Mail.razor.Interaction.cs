@@ -74,41 +74,24 @@ namespace MyLovelyMail.MainProject.UI.Pages
         List<MailMessageSummary> SelectedSummaries =>
             [.. FilteredSummaries.Where(s => MailUiState.SelectedUids.Contains(s.Uid))];
 
-        void BulkSetRead(bool read)
+        /// <summary>Runs the action on every selected row (each with its real folder resolved), then clears the selection.</summary>
+        void ForEachSelected(Action<MailAccountData, string, MailMessageSummary> action)
         {
             if (MailUiState.SelectedAccount is not { } account) return;
             foreach (var summary in SelectedSummaries)
                 if (ResolveFolderOf(summary) is { } folderName)
-                    MessageActions.SetRead(account, folderName, summary, read);
+                    action(account, folderName, summary);
             MailUiState.ClearSelection();
         }
 
-        void BulkToggleFlag()
-        {
-            if (MailUiState.SelectedAccount is not { } account) return;
-            foreach (var summary in SelectedSummaries)
-                if (ResolveFolderOf(summary) is { } folderName)
-                    MessageActions.ToggleFlagged(account, folderName, summary);
-            MailUiState.ClearSelection();
-        }
+        void BulkSetRead(bool read) =>
+            ForEachSelected((account, folderName, summary) => MessageActions.SetRead(account, folderName, summary, read));
 
-        void BulkToggleImportant()
-        {
-            if (MailUiState.SelectedAccount is not { } account) return;
-            foreach (var summary in SelectedSummaries)
-                if (ResolveFolderOf(summary) is { } folderName)
-                    MessageActions.ToggleImportant(account, folderName, summary);
-            MailUiState.ClearSelection();
-        }
+        void BulkToggleFlag() => ForEachSelected(MessageActions.ToggleFlagged);
 
-        void BulkDelete()
-        {
-            if (MailUiState.SelectedAccount is not { } account) return;
-            foreach (var summary in SelectedSummaries)
-                if (ResolveFolderOf(summary) is { } folderName)
-                    MessageActions.Delete(account, folderName, summary);
-            MailUiState.ClearSelection();
-        }
+        void BulkToggleImportant() => ForEachSelected(MessageActions.ToggleImportant);
+
+        void BulkDelete() => ForEachSelected(MessageActions.Delete);
 
         bool ShowMovePicker { get; set; }
 

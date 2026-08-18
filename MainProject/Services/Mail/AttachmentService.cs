@@ -24,15 +24,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             int index = 0;
             foreach (var attachment in message.Attachments)
             {
-                string name = attachment is MimePart part
-                    ? part.FileName ?? $"attachment-{index + 1}"
-                    : ((MessagePart)attachment).Message?.Subject is { Length: > 0 } subject ? subject + ".eml" : $"message-{index + 1}.eml";
                 long size = attachment is MimePart sized ? EstimateSize(sized) : 0;
-                result.Add(new AttachmentInfo(index, name, attachment.ContentType.MimeType, HumanSize(size)));
+                result.Add(new AttachmentInfo(index, DisplayName(attachment, index), attachment.ContentType.MimeType, HumanSize(size)));
                 index++;
             }
             return result;
         }
+
+        /// <summary>Filename shown for the part: its own FileName, an attached message's subject + ".eml", or a numbered fallback.</summary>
+        static string DisplayName(MimeEntity attachment, int index) =>
+            attachment is MimePart part
+                ? part.FileName ?? $"attachment-{index + 1}"
+                : ((MessagePart)attachment).Message?.Subject is { Length: > 0 } subject ? subject + ".eml" : $"message-{index + 1}.eml";
 
         /// <summary>Decodes one attachment into the Downloads folder and returns the saved path.</summary>
         public static async Task<string> SaveAsync(MailAccountData account, string folderFullName, MailMessageSummary summary, int attachmentIndex)
@@ -42,7 +45,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var attachment = message.Attachments.ElementAtOrDefault(attachmentIndex)
                 ?? throw new InvalidOperationException("Attachment not found in the message.");
 
-            string target = UniquePath(DownloadsFolder(), List(account, folderFullName, summary)[attachmentIndex].FileName);
+            string target = UniquePath(DownloadsFolder(), DisplayName(attachment, attachmentIndex));
             await WriteEntityAsync(attachment, target);
             return target;
         }
@@ -53,17 +56,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var message = TryLoadMessage(account, folderFullName, summary)
                 ?? throw new InvalidOperationException("The message is not cached yet.");
 
-            string folderName = string.Join("_", (summary.Subject.Length > 0 ? summary.Subject : "attachments")
-                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Trim();
-            if (folderName.Length > 60) folderName = folderName[..60];
-            string targetFolder = Path.Combine(DownloadsFolder(), folderName);
+            string targetFolder = Path.Combine(DownloadsFolder(), SafeFileStem(summary.Subject, "attachments"));
             Directory.CreateDirectory(targetFolder);
 
-            var infos = List(account, folderFullName, summary);
             int index = 0;
             foreach (var attachment in message.Attachments)
             {
-                await WriteEntityAsync(attachment, UniquePath(targetFolder, infos[index].FileName));
+                await WriteEntityAsync(attachment, UniquePath(targetFolder, DisplayName(attachment, index)));
                 index++;
             }
             return targetFolder;
@@ -96,6 +95,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             return Directory.Exists(downloads) ? downloads : AppPaths.UserData;
+        }
+
+        /// <summary>Filesystem-safe stem from <paramref name="text"/> (invalid chars become "_", capped at 60 chars); <paramref name="fallback"/> replaces an empty text. Shared with MessageExportService.</summary>
+        internal static string SafeFileStem(string text, string fallback)
+        {
+            const int MaxStemLength = 60;
+            string stem = string.Join("_", (text.Length > 0 ? text : fallback)
+                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Trim();
+            return stem.Length > MaxStemLength ? stem[..MaxStemLength] : stem;
         }
 
         /// <summary>Sanitizes the name and dodges collisions with " (2)"-style suffixes.</summary>

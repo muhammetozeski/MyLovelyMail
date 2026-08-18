@@ -47,26 +47,20 @@ namespace MyLovelyMail.MainProject.Services
                 ?? AccountStore.GetSettings(account.Id).NotificationSound.Value;
             bool mute = soundName.Equals(SilentSoundName, StringComparison.OrdinalIgnoreCase);
 
-            var toast = audible.Count == 1
-                ? new MailToast
-                {
-                    Title = string.IsNullOrWhiteSpace(audible[0].FromName) ? audible[0].FromAddress : audible[0].FromName,
-                    Body = string.IsNullOrWhiteSpace(audible[0].Subject) ? "(no subject)" : audible[0].Subject,
-                    Mute = mute,
-                    SoundName = soundName,
-                    AccountId = account.Id,
-                    FolderFullName = folderFullName,
-                    Uid = audible[0].Uid
-                }
-                : new MailToast
-                {
-                    Title = "My Lovely Mail",
-                    Body = $"💌 {audible.Count} new messages for {account.EmailAddress}",
-                    Mute = mute,
-                    SoundName = soundName,
-                    AccountId = account.Id,
-                    FolderFullName = folderFullName
-                };
+            // single != null: sender/subject toast opening that message; null: batch count toast (Uid 0).
+            var single = audible.Count == 1 ? audible[0] : null;
+            var toast = new MailToast
+            {
+                Title = single == null ? "My Lovely Mail"
+                    : string.IsNullOrWhiteSpace(single.FromName) ? single.FromAddress : single.FromName,
+                Body = single == null ? $"💌 {audible.Count} new messages for {account.EmailAddress}"
+                    : string.IsNullOrWhiteSpace(single.Subject) ? "(no subject)" : single.Subject,
+                Mute = mute,
+                SoundName = soundName,
+                AccountId = account.Id,
+                FolderFullName = folderFullName,
+                Uid = single?.Uid ?? 0
+            };
 
             try
             {

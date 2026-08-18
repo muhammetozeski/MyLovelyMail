@@ -95,12 +95,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static void MoveToFolder(MailAccountData account, string folderFullName, IReadOnlyList<MailMessageSummary> summaries, string targetFullName)
         {
-            MessageStore.RemoveMessages(account.Id, folderFullName, [.. summaries.Select(s => s.Uid)]);
+            MessageStore.RemoveMessages(account.Id, folderFullName, [.. summaries.Select(static s => s.Uid)]);
             RunServerActionInBackground(account, folderFullName, $"Server move to '{targetFullName}' failed", LogLevel.Error,
                 async (client, folder, ct) =>
                 {
                     var target = await client.GetFolderAsync(targetFullName, ct);
-                    await folder.MoveToAsync([.. summaries.Select(s => new UniqueId(s.Uid))], target, ct);
+                    await folder.MoveToAsync([.. summaries.Select(static s => new UniqueId(s.Uid))], target, ct);
                     Log($"Moved {summaries.Count} messages from '{folderFullName}' to '{targetFullName}'.");
                 });
         }

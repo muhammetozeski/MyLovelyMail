@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Forms;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
+using Timer = System.Timers.Timer;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {

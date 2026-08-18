@@ -124,8 +124,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 if (folder.Attributes.HasFlag(FolderAttributes.NonExistent) || folder.Attributes.HasFlag(FolderAttributes.NoSelect))
                     continue;
 
-                var status = StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity;
-                await folder.StatusAsync(status, cancellationToken);
+                await folder.StatusAsync(StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity, cancellationToken);
 
                 MessageStore.SaveFolder(new MailFolderData
                 {

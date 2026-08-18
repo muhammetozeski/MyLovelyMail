@@ -1,6 +1,13 @@
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+// Aliased because the implicit usings already import System.Threading.Timer under the same name.
+using Timer = System.Timers.Timer;
+#if WINDOWS
+using Microsoft.Win32;
+// Aliased because MAUI's Window (the type of mainWindow) owns the plain name here.
+using WinUiWindow = Microsoft.UI.Xaml.Window;
+#endif
 
 namespace MyLovelyMail
 {
@@ -28,7 +35,7 @@ namespace MyLovelyMail
 #if WINDOWS
             window.HandlerChanged += (_, _) =>
             {
-                if (window.Handler?.PlatformView is not Microsoft.UI.Xaml.Window platformWindow) return;
+                if (window.Handler?.PlatformView is not WinUiWindow platformWindow) return;
 
                 platformWindow.AppWindow.Closing += (_, e) =>
                 {
@@ -52,7 +59,7 @@ namespace MyLovelyMail
 #if WINDOWS
             mainWindow?.Dispatcher.Dispatch(() =>
             {
-                if (mainWindow?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window platformWindow) return;
+                if (mainWindow?.Handler?.PlatformView is not WinUiWindow platformWindow) return;
                 // A window restored from poisoned bounds sits far off-screen — showing it there
                 // looks exactly like "nothing happens", so always pull it back first.
                 ClampToWorkArea(mainWindow);
@@ -78,7 +85,7 @@ namespace MyLovelyMail
 #if WINDOWS
             try
             {
-                using var runKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                using var runKey = Registry.CurrentUser.OpenSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
                 if (runKey == null) return;
 
@@ -147,11 +154,11 @@ namespace MyLovelyMail
                 ClampToWorkArea(window);
             }
 
-            System.Timers.Timer? saveDebounce = null;
+            Timer? saveDebounce = null;
             window.SizeChanged += (_, _) =>
             {
                 saveDebounce?.Dispose();
-                saveDebounce = new System.Timers.Timer(800) { AutoReset = false };
+                saveDebounce = new Timer(800) { AutoReset = false };
                 saveDebounce.Elapsed += (_, _) =>
                 {
                     if (!BoundsLookSane(window.X, window.Y, window.Width, window.Height)) return;

@@ -57,7 +57,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         static void Persist()
         {
-            AtomicFile.WriteAllText(TagsPath, JsonSerializer.Serialize(colorByName, new JsonSerializerOptions { WriteIndented = true }));
+            AtomicFile.WriteAllText(TagsPath, JsonSerializer.Serialize(colorByName, JsonDefaults.Indented));
             OnTagsChanged?.Invoke();
         }
     }

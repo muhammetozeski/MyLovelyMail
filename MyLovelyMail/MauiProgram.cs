@@ -48,7 +48,6 @@ namespace MyLovelyMail
 
             builder.Services.AddMauiBlazorWebView();
 
-
             return builder.Build();
         }
     }

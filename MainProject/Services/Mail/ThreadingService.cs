@@ -8,9 +8,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
     {
         public required List<MailMessageSummary> Messages { get; init; }
         public MailMessageSummary Newest => Messages[^1];
-        public int UnreadCount => Messages.Count(m => m.IsUnread);
+        public int UnreadCount => Messages.Count(static m => m.IsUnread);
         public List<string> ParticipantAddresses =>
-            [.. Messages.Select(m => m.FromAddress).Where(a => a.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];
+            [.. Messages.Select(static m => m.FromAddress).Where(static a => a.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>
@@ -79,9 +79,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             return [.. summaries
                 .Select((summary, index) => (summary, root: Find(index)))
-                .GroupBy(pair => pair.root)
-                .Select(group => new MailThread { Messages = [.. group.Select(p => p.summary).OrderBy(s => s.DateUtc)] })
-                .OrderByDescending(thread => thread.Newest.DateUtc)];
+                .GroupBy(static pair => pair.root)
+                .Select(static group => new MailThread { Messages = [.. group.Select(static p => p.summary).OrderBy(static s => s.DateUtc)] })
+                .OrderByDescending(static thread => thread.Newest.DateUtc)];
         }
     }
 }

@@ -59,8 +59,9 @@ namespace MyLovelyMail.MainProject.Constants
         /// <summary>Guesses the preset from the mail address domain (null → Custom is a safe pick).</summary>
         public static ProviderPreset? GuessFromEmail(string email)
         {
-            string domain = email.Contains('@') ? email[(email.IndexOf('@') + 1)..].ToLowerInvariant() : string.Empty;
-            return domain switch
+            int atIndex = email?.IndexOf('@') ?? -1;
+            if (atIndex < 0) return null;
+            return email[(atIndex + 1)..].ToLowerInvariant() switch
             {
                 "gmail.com" or "googlemail.com" => Gmail,
                 "outlook.com" or "hotmail.com" or "live.com" or "msn.com" => Outlook,

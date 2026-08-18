@@ -18,7 +18,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             byte[] mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid)
                 ?? throw new InvalidOperationException("The message body is not cached yet.");
-            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(), FileStem(summary) + ".eml");
+            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(),
+                AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".eml");
             File.WriteAllBytes(path, mimeBytes);
             Log($"Exported uid {summary.Uid} as eml: {path}");
             return path;
@@ -37,17 +38,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 $"<div><b>Date:</b> {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}</div>" +
                 $"<div><b>Subject:</b> {WebUtility.HtmlEncode(summary.Subject)}</div></div>";
 
-            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(), FileStem(summary) + ".html");
+            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(),
+                AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".html");
             File.WriteAllText(path, headerBlock + rendered.Html);
             Log($"Exported uid {summary.Uid} as html: {path}");
             return path;
-        }
-
-        static string FileStem(MailMessageSummary summary)
-        {
-            string stem = string.Join("_", (summary.Subject.Length > 0 ? summary.Subject : $"message-{summary.Uid}")
-                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries)).Trim();
-            return stem.Length > 60 ? stem[..60] : stem;
         }
     }
 }

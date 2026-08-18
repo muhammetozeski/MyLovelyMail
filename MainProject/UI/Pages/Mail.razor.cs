@@ -43,9 +43,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
             OutboxService.OnChanged += HandleOutboxChanged;
 
-            if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
-                SelectAccount(AccountStore.Accounts[0]);
-            else
+            if (!TrySelectFirstAccount())
                 RefreshLists();
         }
 
@@ -71,15 +69,19 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 MailUiState.SelectFolder(inbox);
         }
 
+        /// <summary>Selects the first account when none is selected yet; returns whether it did.</summary>
+        bool TrySelectFirstAccount()
+        {
+            if (MailUiState.SelectedAccount != null || AccountStore.Accounts.Count == 0) return false;
+            SelectAccount(AccountStore.Accounts[0]);
+            return true;
+        }
+
         void HandleStateChanged()
         {
             // An account added while the page is open (wizard save, debug API) selects itself,
             // so folders and the compose button appear without re-entering the page.
-            if (MailUiState.SelectedAccount == null && AccountStore.Accounts.Count > 0)
-            {
-                SelectAccount(AccountStore.Accounts[0]);
-                return;
-            }
+            if (TrySelectFirstAccount()) return;
             RefreshLists();
             _ = LoadOpenBodyIfNeededAsync();
             InvokeAsync(StateHasChanged);

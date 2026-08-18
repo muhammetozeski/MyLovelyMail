@@ -99,85 +99,34 @@ namespace MyLovelyMail.MainProject.UI.Pages
             });
         }
 
-        void ToggleTagOnOpen(MailMessageSummary message, string tagName)
+        /// <summary>Shared guard of the single-message actions: runs the action with the selected
+        /// account and the message's real folder, or does nothing when either is missing.</summary>
+        void WithAccountAndFolder(MailMessageSummary message, Action<MailAccountData, string> action)
         {
             if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
-                MessageActions.ToggleTag(account, folderName, message, tagName);
+                action(account, folderName);
         }
+
+        void ToggleTagOnOpen(MailMessageSummary message, string tagName) =>
+            WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleTag(account, folderName, message, tagName));
 
         void AddNewTag(MailMessageSummary message)
         {
             string tagName = NewTagName.Trim();
             if (tagName.Length == 0) return;
-            TagStore.ColorOf(tagName);
+            TagStore.ColorOf(tagName); // registers the new tag's chip color before first render
             ToggleTagOnOpen(message, tagName);
             NewTagName = string.Empty;
         }
 
-        async Task SaveAttachmentAsync(int attachmentIndex)
-        {
-            if (MailUiState.SelectedAccount is not { } account || MailUiState.OpenMessage is not { } open) return;
-            if (ResolveFolderOf(open) is not { } folderName) return;
-            try
-            {
-                string path = await AttachmentService.SaveAsync(account, folderName, open, attachmentIndex);
-                SaveStatus = $"💾 Saved to {path}";
-            }
-            catch (Exception ex)
-            {
-                SaveStatus = $"❌ {ex.Message}";
-            }
-        }
-
-        async Task SaveAllAttachmentsAsync()
-        {
-            if (MailUiState.SelectedAccount is not { } account || MailUiState.OpenMessage is not { } open) return;
-            if (ResolveFolderOf(open) is not { } folderName) return;
-            try
-            {
-                string folder = await AttachmentService.SaveAllAsync(account, folderName, open);
-                SaveStatus = $"💾 All attachments saved to {folder}";
-            }
-            catch (Exception ex)
-            {
-                SaveStatus = $"❌ {ex.Message}";
-            }
-        }
-
-        void StartReply(MailMessageSummary message, bool replyAll)
-        {
-            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
-                MailUiState.OpenCompose(ComposeService.BuildReply(account, folderName, message, replyAll));
-        }
-
-        void StartForward(MailMessageSummary message)
-        {
-            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
-                MailUiState.OpenCompose(ComposeService.BuildForward(account, folderName, message));
-        }
-
-        void ToggleOpenFlagged(MailMessageSummary message)
-        {
-            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
-                MessageActions.ToggleFlagged(account, folderName, message);
-        }
-
-        void ToggleOpenImportant(MailMessageSummary message)
-        {
-            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
-                MessageActions.ToggleImportant(account, folderName, message);
-        }
-
-        /// <summary>Saves the open message to Downloads as .eml (raw MIME) or .html (rendered snapshot).</summary>
-        void ExportOpen(MailMessageSummary message, bool asHtml)
+        /// <summary>Guard-plus-status shell of the save/export buttons: resolves the message's account
+        /// and folder, runs the save, and puts the returned path (or the failure) into <see cref="SaveStatus"/>.</summary>
+        async Task ReportSaveAsync(MailMessageSummary message, Func<MailAccountData, string, Task<string>> save, string successText = "Saved to")
         {
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
             try
             {
-                string path = asHtml
-                    ? MessageExportService.ExportHtml(account, folderName, message)
-                    : MessageExportService.ExportEml(account, folderName, message);
-                SaveStatus = $"💾 Saved to {path}";
+                SaveStatus = $"💾 {successText} {await save(account, folderName)}";
             }
             catch (Exception ex)
             {
@@ -185,14 +134,44 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
         }
 
-        void DeleteOpen(MailMessageSummary message)
+        async Task SaveAttachmentAsync(int attachmentIndex)
         {
-            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
+            if (MailUiState.OpenMessage is { } open)
+                await ReportSaveAsync(open, (account, folderName) => AttachmentService.SaveAsync(account, folderName, open, attachmentIndex));
+        }
+
+        async Task SaveAllAttachmentsAsync()
+        {
+            if (MailUiState.OpenMessage is { } open)
+                await ReportSaveAsync(open, (account, folderName) => AttachmentService.SaveAllAsync(account, folderName, open), "All attachments saved to");
+        }
+
+        void StartReply(MailMessageSummary message, bool replyAll) =>
+            WithAccountAndFolder(message, (account, folderName) =>
+                MailUiState.OpenCompose(ComposeService.BuildReply(account, folderName, message, replyAll)));
+
+        void StartForward(MailMessageSummary message) =>
+            WithAccountAndFolder(message, (account, folderName) =>
+                MailUiState.OpenCompose(ComposeService.BuildForward(account, folderName, message)));
+
+        void ToggleOpenFlagged(MailMessageSummary message) =>
+            WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleFlagged(account, folderName, message));
+
+        void ToggleOpenImportant(MailMessageSummary message) =>
+            WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleImportant(account, folderName, message));
+
+        /// <summary>Saves the open message to Downloads as .eml (raw MIME) or .html (rendered snapshot).</summary>
+        Task ExportOpen(MailMessageSummary message, bool asHtml) =>
+            ReportSaveAsync(message, (account, folderName) => Task.FromResult(asHtml
+                ? MessageExportService.ExportHtml(account, folderName, message)
+                : MessageExportService.ExportEml(account, folderName, message)));
+
+        void DeleteOpen(MailMessageSummary message) =>
+            WithAccountAndFolder(message, (account, folderName) =>
             {
                 MessageActions.Delete(account, folderName, message);
                 MailUiState.CloseMessage();
-            }
-        }
+            });
 
         void OpenMessage(MailMessageSummary message)
         {

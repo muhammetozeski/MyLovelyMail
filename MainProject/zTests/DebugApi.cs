@@ -1,7 +1,9 @@
+using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Web;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
@@ -21,11 +23,16 @@ namespace MyLovelyMail.MainProject.ZTests
     ///   GET  /folders?accountId=                      cached folders of the account
     ///   GET  /messages?accountId=&amp;folder=&amp;take=      newest summaries of a folder
     ///   GET  /message?accountId=&amp;folder=&amp;uid=        rendered body + attachments of one message
-    ///   POST /send       {accountId,to,cc,subject,body,attachmentPaths}   send through SMTP
+    ///   POST /send       {accountId,to,cc,subject,body,attachmentPaths,queued}   send through SMTP (queued=true goes via OutboxService)
     ///   POST /open       ?accountId=&amp;folder=&amp;uid=     select + open the message in the reader
     ///   POST /compose    ?accountId=&amp;attachmentPath=   open the compose pane (optionally pre-attach a file)
     ///   GET  /threads    ?accountId=&amp;folder=&amp;take=     conversations built by ThreadingService
     ///   GET  /logs       ?filter=&amp;take=                in-memory log lines
+    ///   GET  /export     ?accountId=&amp;folder=&amp;uid=&amp;format=   save the message as .eml (format=html for .html), returns the path
+    ///   POST /move       ?accountId=&amp;folder=&amp;uid=&amp;target=   move the message to another folder
+    ///   POST /flush-outbox                             send everything waiting in the outbox now
+    ///   POST /undo                                     cancel the queued send and reopen the draft
+    ///   DELETE /accounts ?accountId=                   remove the account
     /// </summary>
     public static class DebugApi
     {
@@ -124,10 +131,29 @@ namespace MyLovelyMail.MainProject.ZTests
             public bool Queued { get; set; }
         }
 
+        /// <summary>Returns the query parameter's value; a missing parameter throws "&lt;key&gt; is required.".</summary>
+        static string RequireQueryValue(NameValueCollection query, string key) =>
+            query[key] ?? throw new InvalidOperationException($"{key} is required.");
+
+        /// <summary>Parses the mandatory "uid" query parameter.</summary>
+        static uint RequireUid(NameValueCollection query) => uint.Parse(RequireQueryValue(query, "uid"));
+
+        /// <summary>Looks the account up in <see cref="AccountStore"/>; throws when the id is unknown.</summary>
+        static MailAccountData RequireAccount(string accountId) =>
+            AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+
+        /// <summary>Looks the cached summary up in <see cref="MessageStore"/>; throws when the message is unknown.</summary>
+        static MailMessageSummary RequireSummary(string accountId, string folderFullName, uint uid) =>
+            MessageStore.GetSummary(accountId, folderFullName, uid) ?? throw new InvalidOperationException("Unknown message.");
+
+        /// <summary>Reads the optional "take" query parameter, falling back to the endpoint's default.</summary>
+        static int ReadTake(NameValueCollection query, int fallback) =>
+            int.TryParse(query["take"], out int parsed) ? parsed : fallback;
+
         static async Task<object?> RouteAsync(HttpListenerRequest request)
         {
             string path = request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant() ?? string.Empty;
-            var query = System.Web.HttpUtility.ParseQueryString(request.Url?.Query ?? string.Empty);
+            var query = HttpUtility.ParseQueryString(request.Url?.Query ?? string.Empty);
 
             switch (request.HttpMethod, path)
             {
@@ -170,27 +196,26 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("GET", "/folders"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     return MessageStore.GetFolders(accountId)
                         .Select(f => new { f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal });
                 }
 
                 case ("GET", "/messages"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folder = query["folder"] ?? "INBOX";
-                    int take = int.TryParse(query["take"], out int parsed) ? parsed : 20;
-                    return MessageStore.GetSummaries(accountId, folder).Take(take)
+                    return MessageStore.GetSummaries(accountId, folder).Take(ReadTake(query, 20))
                         .Select(s => new { s.Uid, s.Subject, s.FromAddress, s.DateUtc, s.Flags, s.HasAttachments, s.PreviewText });
                 }
 
                 case ("GET", "/message"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folder = query["folder"] ?? "INBOX";
-                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
-                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
-                    var summary = MessageStore.GetSummary(accountId, folder, uid) ?? throw new InvalidOperationException("Unknown message.");
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
+                    var summary = RequireSummary(accountId, folder, uid);
 
                     if (!MessageStore.HasFullMessage(accountId, folder, uid))
                     {
@@ -213,10 +238,9 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("GET", "/threads"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folder = query["folder"] ?? "INBOX";
-                    int take = int.TryParse(query["take"], out int parsed) ? parsed : 10;
-                    return ThreadingService.BuildThreads(MessageStore.GetSummaries(accountId, folder)).Take(take)
+                    return ThreadingService.BuildThreads(MessageStore.GetSummaries(accountId, folder)).Take(ReadTake(query, 10))
                         .Select(t => new
                         {
                             subject = t.Newest.Subject,
@@ -229,24 +253,22 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("GET", "/logs"):
                 {
-                    int take = int.TryParse(query["take"], out int parsed) ? parsed : 100;
                     string? filter = query["filter"];
                     IEnumerable<string> lines = Logger.AllLogs;
                     if (!string.IsNullOrEmpty(filter))
                         lines = lines.Where(l => l.Contains(filter, StringComparison.OrdinalIgnoreCase));
-                    return lines.TakeLast(take).ToArray();
+                    return lines.TakeLast(ReadTake(query, 100)).ToArray();
                 }
 
                 case ("POST", "/open"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folderFullName = query["folder"] ?? "INBOX";
-                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
-                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
                     var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName)
                         ?? throw new InvalidOperationException("Unknown folder.");
-                    var summary = MessageStore.GetSummary(accountId, folderFullName, uid)
-                        ?? throw new InvalidOperationException("Unknown message.");
+                    var summary = RequireSummary(accountId, folderFullName, uid);
 
                     MailUiState.SelectAccount(account);
                     MailUiState.SelectFolder(folder);
@@ -258,7 +280,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 {
                     var body = await JsonSerializer.DeserializeAsync<SendRequest>(request.InputStream, Json)
                         ?? throw new InvalidOperationException("Empty request body.");
-                    var account = AccountStore.GetById(body.AccountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var account = RequireAccount(body.AccountId);
                     var draft = new ComposeDraft
                     {
                         Account = account,
@@ -284,8 +306,7 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("DELETE", "/accounts"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
-                    AccountStore.Remove(accountId);
+                    AccountStore.Remove(RequireQueryValue(query, "accountId"));
                     return new { ok = true };
                 }
 
@@ -302,11 +323,11 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("GET", "/export"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folder = query["folder"] ?? "INBOX";
-                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
-                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
-                    var summary = MessageStore.GetSummary(accountId, folder, uid) ?? throw new InvalidOperationException("Unknown message.");
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
+                    var summary = RequireSummary(accountId, folder, uid);
                     if (!MessageStore.HasFullMessage(accountId, folder, uid))
                         await ImapSyncService.DownloadMessageAsync(account, folder, uid);
                     string exportPath = query["format"] == "html"
@@ -317,20 +338,19 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("POST", "/move"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string accountId = RequireQueryValue(query, "accountId");
                     string folder = query["folder"] ?? "INBOX";
-                    string target = query["target"] ?? throw new InvalidOperationException("target is required.");
-                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
-                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
-                    var summary = MessageStore.GetSummary(accountId, folder, uid) ?? throw new InvalidOperationException("Unknown message.");
+                    string target = RequireQueryValue(query, "target");
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
+                    var summary = RequireSummary(accountId, folder, uid);
                     MessageActions.MoveToFolder(account, folder, [summary], target);
                     return new { ok = true };
                 }
 
                 case ("POST", "/compose"):
                 {
-                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
-                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
                     var draft = ComposeService.BuildNew(account);
                     if (query["attachmentPath"] is { Length: > 0 } attachmentPath)
                     {

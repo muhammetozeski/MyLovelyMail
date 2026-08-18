@@ -1,4 +1,3 @@
-using System.Reflection;
 using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Stores
@@ -64,16 +63,7 @@ namespace MyLovelyMail.MainProject.Stores
         public AccountSettings(string accountId)
         {
             AccountId = accountId;
-            foreach (var field in GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (field.GetValue(this) is ISettingSetup setupSetting)
-                {
-                    setupSetting.InitializeKey(field.Name);
-                    iSettingSetups.Add(field.Name, setupSetting);
-                    if (setupSetting is ISetting setting)
-                        iSettings[field.Name] = setting;
-                }
-            }
+            SettingRegistration.RegisterFields(GetType(), this, iSettingSetups, iSettings);
         }
 
         public ISetting[] GetAllSettings() => [.. iSettings.Values];

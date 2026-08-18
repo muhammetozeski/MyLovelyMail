@@ -1,8 +1,10 @@
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using MailKit;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
+using Polly.Timeout;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -77,7 +79,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 DraftId = summary.MessageId.StartsWith(DraftMessageIdPrefix) ? summary.MessageId[DraftMessageIdPrefix.Length..] : Guid.NewGuid().ToString("N"),
                 Account = account,
-                To = message.Headers[DraftToHeader] ?? string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
+                To = message.Headers[DraftToHeader] ?? string.Join(", ", message.To.Mailboxes.Select(static m => m.Address)),
                 Cc = message.Headers[DraftCcHeader] ?? string.Empty,
                 Subject = message.Subject ?? string.Empty,
                 Body = message.TextBody ?? string.Empty,
@@ -108,10 +110,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             string folder = AttachmentStageFolder(draft);
             Directory.CreateDirectory(folder);
-            string sanitized = string.Join("_", fileName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-            string target = Path.Combine(folder, sanitized);
-            for (int copy = 2; File.Exists(target); copy++)
-                target = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(sanitized)} ({copy}){Path.GetExtension(sanitized)}");
+            string target = AttachmentService.UniquePath(folder, fileName);
 
             await using (var output = File.Create(target))
                 await source.CopyToAsync(output);
@@ -224,9 +223,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// permanent — retrying those forever would spin, so they surface to the caller instead.
         /// </summary>
         static bool IsConnectionFailure(Exception ex) =>
-            ex is System.Net.Sockets.SocketException or IOException or TimeoutException
-                or MailKit.ServiceNotConnectedException or Polly.Timeout.TimeoutRejectedException
-            || ex.InnerException is System.Net.Sockets.SocketException;
+            ex is SocketException or IOException or TimeoutException
+                or ServiceNotConnectedException or TimeoutRejectedException
+            || ex.InnerException is SocketException;
 
         /// <summary>Also used by the outbox flush, which re-sends a stored MimeMessage without a draft.</summary>
         internal static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)
@@ -237,8 +236,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 {
                     var folders = MessageStore.GetFolders(account.Id);
                     // Prefer the marked Sent folder; fall back to the conventional name for servers without SPECIAL-USE.
-                    var sentFolder = folders.FirstOrDefault(f => f.Role == FolderRole.Sent && !f.IsLocal)
-                        ?? folders.FirstOrDefault(f => !f.IsLocal && ImapSyncService.GuessRoleFromName(f.DisplayName) == FolderRole.Sent);
+                    var sentFolder = folders.FirstOrDefault(static f => f.Role == FolderRole.Sent && !f.IsLocal)
+                        ?? folders.FirstOrDefault(static f => !f.IsLocal && ImapSyncService.GuessRoleFromName(f.DisplayName) == FolderRole.Sent);
                     if (sentFolder != null)
                     {
                         await ResiliencePolicy.RunNetwork(async ct =>
@@ -280,7 +279,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Subject = message.Subject ?? string.Empty,
                     FromName = account.DisplayName,
                     FromAddress = account.EmailAddress,
-                    ToAddresses = string.Join(", ", message.To.Mailboxes.Select(m => m.Address)),
+                    ToAddresses = string.Join(", ", message.To.Mailboxes.Select(static m => m.Address)),
                     DateUtc = DateTime.UtcNow,
                     Flags = MailFlags.Seen,
                     PreviewText = Preview(message.TextBody)

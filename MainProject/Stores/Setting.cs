@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace MyLovelyMail.MainProject.Stores
@@ -20,6 +22,35 @@ namespace MyLovelyMail.MainProject.Stores
         void InitializeKey(string key);
         void LoadFromStr(string value);
         string Serialize();
+    }
+
+    static class SettingRegistration
+    {
+        /// <summary>
+        /// The one reflection pass both settings stores run at construction: every public
+        /// Setting/InheritedSetting field gets its field name as key and lands in the two lookup
+        /// dictionaries the store uses for file I/O (<paramref name="setups"/>) and for the
+        /// settings UI (<paramref name="settings"/>).
+        /// </summary>
+        /// <param name="ownerType">Type whose fields are scanned (typeof(Settings), or the AccountSettings instance's type).</param>
+        /// <param name="instance">Owning object for instance fields; null scans static fields.</param>
+        /// <param name="setups">Filled with every discovered setting, keyed by field name.</param>
+        /// <param name="settings">Filled with the subset that also implements <see cref="ISetting"/>.</param>
+        internal static void RegisterFields(Type ownerType, object? instance,
+            Dictionary<string, ISettingSetup> setups, Dictionary<string, ISetting> settings)
+        {
+            var bindingFlags = BindingFlags.Public | (instance == null ? BindingFlags.Static : BindingFlags.Instance);
+            foreach (var field in ownerType.GetFields(bindingFlags))
+            {
+                if (field.GetValue(instance) is ISettingSetup setupSetting)
+                {
+                    setupSetting.InitializeKey(field.Name);
+                    setups.Add(field.Name, setupSetting);
+                    if (setupSetting is ISetting setting)
+                        settings[field.Name] = setting;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -80,7 +111,7 @@ namespace MyLovelyMail.MainProject.Stores
         internal static string SerializeValue(T? value) => value switch
         {
             bool b => b.ToString(),
-            IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
             _ => value?.ToString() ?? string.Empty
         };
 
@@ -90,7 +121,7 @@ namespace MyLovelyMail.MainProject.Stores
             {
                 if (typeof(T).IsEnum)
                     return (T)Enum.Parse(typeof(T), text, ignoreCase: true);
-                return (T)Convert.ChangeType(text, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+                return (T)Convert.ChangeType(text, typeof(T), CultureInfo.InvariantCulture);
             }
             catch
             {

@@ -1,4 +1,3 @@
-using System.Reflection;
 using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Stores
@@ -19,20 +18,8 @@ namespace MyLovelyMail.MainProject.Stores
 
         public static ISetting[] GetAllSettings() => [.. iSettings.Values];
 
-        static SettingsManager()
-        {
-            foreach (var field in typeof(Settings).GetFields(BindingFlags.Public | BindingFlags.Static))
-            {
-                object? value = field.GetValue(null);
-                if (value is ISettingSetup setupSetting)
-                {
-                    setupSetting.InitializeKey(field.Name);
-                    iSettingSetups.Add(field.Name, setupSetting);
-                    if (value is ISetting setting)
-                        iSettings[field.Name] = setting;
-                }
-            }
-        }
+        static SettingsManager() =>
+            SettingRegistration.RegisterFields(typeof(Settings), null, iSettingSetups, iSettings);
 
         /// <summary>Loads settings from the config file, creating it with defaults if missing.</summary>
         public static void LoadSettings()

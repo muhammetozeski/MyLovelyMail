@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Storage
 {
@@ -23,17 +23,6 @@ namespace MyLovelyMail.MainProject.Storage
         public const string FolderInfoFileName = "folder.json";
         public const string IndexFileName = "index.jsonl";
         public const string MessageExtension = ".eml";
-
-        static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            Converters = { new JsonStringEnumConverter() },
-            WriteIndented = true
-        };
-
-        static readonly JsonSerializerOptions IndexLineOptions = new()
-        {
-            Converters = { new JsonStringEnumConverter() }
-        };
 
         sealed class FolderIndex
         {
@@ -92,7 +81,7 @@ namespace MyLovelyMail.MainProject.Storage
                 if (!File.Exists(infoPath)) continue;
                 try
                 {
-                    var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonOptions);
+                    var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonDefaults.Indented);
                     if (folder != null) result.Add(folder);
                 }
                 catch (Exception ex)
@@ -107,7 +96,7 @@ namespace MyLovelyMail.MainProject.Storage
         {
             string dir = FolderCachePath(folder.AccountId, folder.FullName);
             Directory.CreateDirectory(dir);
-            AtomicWrite(Path.Combine(dir, FolderInfoFileName), JsonSerializer.Serialize(folder, JsonOptions));
+            AtomicFile.WriteAllText(Path.Combine(dir, FolderInfoFileName), JsonSerializer.Serialize(folder, JsonDefaults.Indented));
         }
 
         #endregion
@@ -141,7 +130,7 @@ namespace MyLovelyMail.MainProject.Storage
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 try
                 {
-                    var summary = JsonSerializer.Deserialize<MailMessageSummary>(line, IndexLineOptions);
+                    var summary = JsonSerializer.Deserialize<MailMessageSummary>(line, JsonDefaults.SingleLine);
                     if (summary != null) index.Summaries[summary.Uid] = summary;
                 }
                 catch (Exception ex)
@@ -201,10 +190,10 @@ namespace MyLovelyMail.MainProject.Storage
             Directory.CreateDirectory(dir);
             var sb = new StringBuilder();
             foreach (var summary in index.Summaries.Values)
-                sb.AppendLine(JsonSerializer.Serialize(summary, IndexLineOptions));
+                sb.AppendLine(JsonSerializer.Serialize(summary, JsonDefaults.SingleLine));
 
             lock (index.SaveLock)
-                AtomicWrite(Path.Combine(dir, IndexFileName), sb.ToString());
+                AtomicFile.WriteAllText(Path.Combine(dir, IndexFileName), sb.ToString());
         }
 
         #endregion
@@ -276,7 +265,5 @@ namespace MyLovelyMail.MainProject.Storage
         }
 
         #endregion
-
-        static void AtomicWrite(string path, string content) => Stores.AtomicFile.WriteAllText(path, content);
     }
 }

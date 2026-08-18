@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 
@@ -9,12 +8,6 @@ namespace MyLovelyMail.MainProject.Stores
     public static class FilterRuleStore
     {
         public const string FiltersFileName = "filters.json";
-
-        static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            Converters = { new JsonStringEnumConverter() },
-            WriteIndented = true
-        };
 
         static string FiltersPath => Path.Combine(AppPaths.UserData, FiltersFileName);
 
@@ -30,7 +23,7 @@ namespace MyLovelyMail.MainProject.Stores
             if (!File.Exists(FiltersPath)) return;
             try
             {
-                rules = JsonSerializer.Deserialize<List<FilterRule>>(File.ReadAllText(FiltersPath), JsonOptions) ?? [];
+                rules = JsonSerializer.Deserialize<List<FilterRule>>(File.ReadAllText(FiltersPath), JsonDefaults.Indented) ?? [];
             }
             catch (Exception ex)
             {
@@ -40,7 +33,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         static void Persist()
         {
-            AtomicFile.WriteAllText(FiltersPath, JsonSerializer.Serialize(rules, JsonOptions));
+            AtomicFile.WriteAllText(FiltersPath, JsonSerializer.Serialize(rules, JsonDefaults.Indented));
             OnRulesChanged?.Invoke();
         }
 

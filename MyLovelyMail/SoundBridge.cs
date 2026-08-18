@@ -1,5 +1,9 @@
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Storage;
+#if WINDOWS
+using Windows.Media.Core;
+using Windows.Media.Playback;
+#endif
 
 namespace MyLovelyMail
 {
@@ -13,12 +17,12 @@ namespace MyLovelyMail
         public static void Initialize()
         {
 #if WINDOWS
-            SoundService.Player = soundName => _ = PlayAsync(soundName);
+            SoundService.Player = static soundName => _ = PlayAsync(soundName);
 #endif
         }
 
 #if WINDOWS
-        static Windows.Media.Playback.MediaPlayer? cachedPlayer;
+        static MediaPlayer? cachedPlayer;
 
         static async Task PlayAsync(string soundName)
         {
@@ -40,8 +44,8 @@ namespace MyLovelyMail
                     await packaged.CopyToAsync(output);
                 }
 
-                cachedPlayer ??= new Windows.Media.Playback.MediaPlayer();
-                cachedPlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(cachedPath));
+                cachedPlayer ??= new MediaPlayer();
+                cachedPlayer.Source = MediaSource.CreateFromUri(new Uri(cachedPath));
                 cachedPlayer.Play();
             }
             catch (Exception ex)

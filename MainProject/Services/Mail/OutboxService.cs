@@ -1,5 +1,4 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
-using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
@@ -118,7 +117,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static async Task FlushAsync(CancellationToken cancellationToken = default)
         {
             string outboxFullName = MessageStore.LocalFolderPrefix + ComposeService.LocalOutboxFolderName;
-            foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
+            foreach (var account in AccountStore.Accounts.Where(static a => a.Enabled))
             {
                 foreach (var queued in MessageStore.GetSummaries(account.Id, outboxFullName))
                 {

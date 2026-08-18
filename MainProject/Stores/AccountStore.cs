@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 
@@ -14,12 +13,6 @@ namespace MyLovelyMail.MainProject.Stores
     public static class AccountStore
     {
         public const string AccountFileName = "account.json";
-
-        static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            Converters = { new JsonStringEnumConverter() },
-            WriteIndented = true
-        };
 
         static readonly List<MailAccountData> accounts = [];
         static readonly ConcurrentDictionary<string, AccountSettings> settingsById = [];
@@ -44,7 +37,7 @@ namespace MyLovelyMail.MainProject.Stores
                 if (!File.Exists(path)) continue;
                 try
                 {
-                    var account = JsonSerializer.Deserialize<MailAccountData>(File.ReadAllText(path), JsonOptions);
+                    var account = JsonSerializer.Deserialize<MailAccountData>(File.ReadAllText(path), JsonDefaults.Indented);
                     if (account != null) accounts.Add(account);
                 }
                 catch (Exception ex)
@@ -64,7 +57,7 @@ namespace MyLovelyMail.MainProject.Stores
         {
             string dir = AccountFolder(account.Id);
             Directory.CreateDirectory(dir);
-            AtomicFile.WriteAllText(Path.Combine(dir, AccountFileName), JsonSerializer.Serialize(account, JsonOptions));
+            AtomicFile.WriteAllText(Path.Combine(dir, AccountFileName), JsonSerializer.Serialize(account, JsonDefaults.Indented));
 
             if (!accounts.Any(a => a.Id == account.Id))
                 accounts.Add(account);
