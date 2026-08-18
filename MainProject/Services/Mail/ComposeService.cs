@@ -4,6 +4,7 @@ using MailKit;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 using Polly.Timeout;
 
 namespace MyLovelyMail.MainProject.Services.Mail
@@ -123,7 +124,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             try { File.Delete(path); } catch { /* stage cleanup is best-effort */ }
         }
 
-        public static ComposeDraft BuildNew(MailAccountData account) => new() { Account = account };
+        /// <summary>RFC 3676 signature delimiter; mail clients fold everything under it.</summary>
+        const string SignatureDelimiter = "\n\n-- \n";
+
+        /// <summary>The account's signature block, or empty when no signature is configured.</summary>
+        static string SignatureBlock(MailAccountData account)
+        {
+            string signature = AccountStore.GetSettings(account.Id).Signature.Value;
+            return signature.Length == 0 ? string.Empty : SignatureDelimiter + signature;
+        }
+
+        public static ComposeDraft BuildNew(MailAccountData account) =>
+            new() { Account = account, Body = SignatureBlock(account) };
 
         public static ComposeDraft BuildReply(MailAccountData account, string folderFullName, MailMessageSummary summary, bool replyAll)
         {
@@ -132,7 +144,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 Account = account,
                 To = summary.FromAddress,
                 Subject = summary.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Re: {summary.Subject}",
-                Body = QuoteBody(account, folderFullName, summary)
+                // Signature sits ABOVE the quote, where the reply is typed.
+                Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary)
             };
 
             if (replyAll)
@@ -149,7 +162,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             Account = account,
             Subject = summary.Subject.StartsWith("Fwd:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Fwd: {summary.Subject}",
-            Body = QuoteBody(account, folderFullName, summary)
+            Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary)
         };
 
         /// <summary>"On (date), (sender) wrote:" header plus the original body prefixed with "&gt; ".</summary>

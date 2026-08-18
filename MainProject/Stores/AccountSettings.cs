@@ -40,8 +40,8 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.DefaultComposeFormat"/>
         public readonly InheritedSetting<ComposeFormat> DefaultComposeFormat = new(Settings.DefaultComposeFormat);
 
-        /// <inheritdoc cref="Settings.SignatureHtml"/>
-        public readonly InheritedSetting<string> SignatureHtml = new(Settings.SignatureHtml);
+        /// <inheritdoc cref="Settings.Signature"/>
+        public readonly InheritedSetting<string> Signature = new(Settings.Signature);
 
         /// <inheritdoc cref="Settings.UndoSendSeconds"/>
         public readonly InheritedSetting<int> UndoSendSeconds = new(Settings.UndoSendSeconds);

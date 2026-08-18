@@ -88,8 +88,8 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Body format new messages start in.</summary>
         public static readonly Setting<ComposeFormat> DefaultComposeFormat = new(ComposeFormat.Html);
 
-        /// <summary>HTML signature appended to outgoing mail (empty = none).</summary>
-        public static readonly Setting<string> SignatureHtml = new("");
+        /// <summary>Plain-text signature appended under new, reply and forward drafts, empty = none (the compose body is plain text, so it is not HTML).</summary>
+        public static readonly Setting<string> Signature = new("");
 
         /// <summary>Seconds the outbox holds a sent message for "undo send" (0 = send immediately).</summary>
         public static readonly Setting<int> UndoSendSeconds = new(5);

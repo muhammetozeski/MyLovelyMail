@@ -101,6 +101,27 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">✍️ Composing</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Signature</span>
+                <span class="settings-row-hint">Added under new messages and above the quoted text in replies; empty = none</span>
+            </div>
+        </div>
+        <textarea class="settings-signature" placeholder="Muhammet&#10;muhammet@example.com"
+                  @bind="SignatureText" @bind:event="oninput" @onblur="SaveSignature"></textarea>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Undo send window (seconds)</span>
+                <span class="settings-row-hint">A sent message waits this long behind an Undo bar; 0 sends immediately</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.UndoSendSeconds.Value.ToString()" ValueChanged="@SetUndoSendSeconds" />
+            </div>
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🧹 Filters</div>
         <div class="settings-row">
             <div class="settings-row-text">
@@ -250,6 +271,17 @@
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
     }
+
+    static void SetUndoSendSeconds(string text)
+    {
+        if (int.TryParse(text, out int seconds) && seconds >= 0)
+            SetAndSave(GlobalSettings.UndoSendSeconds, seconds);
+    }
+
+    /// <summary>Edited live in the textarea, written to disk on blur so typing does not hit the file per keystroke.</summary>
+    string SignatureText { get; set; } = GlobalSettings.Signature.Value;
+
+    void SaveSignature() => SetAndSave(GlobalSettings.Signature, SignatureText);
 
     static readonly string[] DensityOptions = ["Cozy", "Comfortable", "Compact"];
 
