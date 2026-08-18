@@ -16,6 +16,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Newest messages fetched for a folder that has never been synced (older mail loads when scrolled later).</summary>
         const int InitialFetchCount = 300;
 
+        /// <summary>First-fill fetches land in slices this big, each painted into the UI on arrival.</summary>
+        const int FirstFillSliceSize = 50;
+
         const MessageSummaryItems SummaryItems =
             MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.Flags |
             MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText |
@@ -185,39 +188,46 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 lastSeenUid = 0;
             }
 
-            IList<IMessageSummary> fetched;
+            int newCount = 0;
+            uint maxUid = lastSeenUid;
+            List<MailMessageSummary> summaries = [];
             if (lastSeenUid == 0)
             {
+                // First fill: newest slice first, each slice stored (and painted) as it lands
+                // instead of after the whole fetch finishes.
                 int startIndex = Math.Max(0, folder.Count - InitialFetchCount);
-                fetched = folder.Count == 0
-                    ? []
-                    : await folder.FetchAsync(startIndex, -1, SummaryItems, cancellationToken);
+                for (int sliceEnd = folder.Count - 1; sliceEnd >= startIndex; sliceEnd -= FirstFillSliceSize)
+                {
+                    int sliceStart = Math.Max(startIndex, sliceEnd - FirstFillSliceSize + 1);
+                    var slice = await folder.FetchAsync(sliceStart, sliceEnd, SummaryItems, cancellationToken);
+                    List<MailMessageSummary> sliceSummaries = [.. slice.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
+                    if (sliceSummaries.Count == 0) continue;
+                    MessageStore.UpsertSummaries(account.Id, folder.FullName, sliceSummaries);
+                    summaries.AddRange(sliceSummaries);
+                    maxUid = Math.Max(maxUid, sliceSummaries.Max(static s => s.Uid));
+                }
             }
             else
             {
                 var range = new UniqueIdRange(new UniqueId(lastSeenUid + 1), UniqueId.MaxValue);
-                fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);
-            }
-
-            int newCount = 0;
-            uint maxUid = lastSeenUid;
-            List<MailMessageSummary> summaries = [];
-            foreach (var item in fetched)
-            {
-                if (!item.UniqueId.IsValid) continue;
-                summaries.Add(ToSummary(item));
-                maxUid = Math.Max(maxUid, item.UniqueId.Id);
-                if (item.UniqueId.Id > lastSeenUid) newCount++;
+                var fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);
+                foreach (var item in fetched)
+                {
+                    if (!item.UniqueId.IsValid) continue;
+                    summaries.Add(ToSummary(item));
+                    maxUid = Math.Max(maxUid, item.UniqueId.Id);
+                    if (item.UniqueId.Id > lastSeenUid) newCount++;
+                }
             }
             Log($"IMAP folder '{folder.FullName}': fetched {summaries.Count} summaries ({newCount} new), server count {folder.Count}");
 
             // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
             RuleProcessResult? ruleResult = null;
             if (lastSeenUid > 0 && summaries.Count > 0)
+            {
                 ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, summaries);
-
-            if (summaries.Count > 0)
                 MessageStore.UpsertSummaries(account.Id, folder.FullName, summaries);
+            }
 
             if (ruleResult != null)
                 await ExecuteRuleMovesAsync(account, client, folder, ruleResult, cancellationToken);
