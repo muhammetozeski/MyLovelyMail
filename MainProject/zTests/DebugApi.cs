@@ -331,6 +331,18 @@ namespace MyLovelyMail.MainProject.ZTests
                     };
                 }
 
+                case ("GET", "/list"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    string searchQuery = query["query"] ?? string.Empty;
+                    var matcher = SearchService.BuildMatcher(searchQuery);
+                    return MessageStore.GetSummaries(accountId, folder)
+                        .Where(s => searchQuery.Length == 0 || matcher(s))
+                        .Take(ReadTake(query, 20))
+                        .Select(s => new { s.Uid, s.Subject, s.FromAddress, unread = s.IsUnread, s.HasAttachments });
+                }
+
                 case ("GET", "/outbox"):
                     return new
                     {

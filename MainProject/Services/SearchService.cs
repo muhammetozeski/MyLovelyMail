@@ -21,17 +21,31 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>Upper bound on returned hits so a broad query cannot flood the list.</summary>
         const int MaxHits = 500;
 
-        public static List<SearchHit> Search(string accountId, string query)
+        /// <summary>
+        /// The query compiled into one predicate. Both search paths (all-folders and the open
+        /// folder) run this, so the token language the help modal advertises works everywhere
+        /// instead of only in all-folders mode.
+        /// </summary>
+        public static Func<MailMessageSummary, bool> BuildMatcher(string query)
         {
             var (textTokens, predicates) = ParseQuery(query);
+            return summary => predicates.All(matches => matches(summary))
+                && textTokens.All(token => MatchesAnywhere(summary, token));
+        }
+
+        /// <summary>True when the query carries plain words on top of its tokens (a pure-token query keeps conversation grouping on).</summary>
+        public static bool HasFreeText(string query) => ParseQuery(query).TextTokens.Count > 0;
+
+        public static List<SearchHit> Search(string accountId, string query)
+        {
+            var matcher = BuildMatcher(query);
             List<SearchHit> hits = [];
 
             foreach (var folder in MessageStore.GetFolders(accountId))
             {
                 foreach (var summary in MessageStore.GetSummaries(accountId, folder.FullName))
                 {
-                    if (!predicates.All(matches => matches(summary))) continue;
-                    if (!textTokens.All(token => MatchesAnywhere(summary, token))) continue;
+                    if (!matcher(summary)) continue;
 
                     hits.Add(new SearchHit
                     {
@@ -75,6 +89,9 @@ namespace MyLovelyMail.MainProject.Services
                         break;
                     case "is" when value.Equals("starred", StringComparison.OrdinalIgnoreCase):
                         predicates.Add(static s => s.Flags.HasFlag(MailFlags.Flagged));
+                        break;
+                    case "is" when value.Equals("important", StringComparison.OrdinalIgnoreCase):
+                        predicates.Add(static s => s.Flags.HasFlag(MailFlags.Important));
                         break;
                     default:
                         textTokens.Add(token);

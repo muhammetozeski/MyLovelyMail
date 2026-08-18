@@ -119,7 +119,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             var summaries = MessageStore.GetSummaries(account.Id, folder.FullName);
             FilteredSummaries = string.IsNullOrWhiteSpace(SearchText)
                 ? summaries
-                : [.. summaries.Where(MatchesSearch)];
+                : [.. summaries.Where(SearchService.BuildMatcher(SearchText))];
             BuildRows();
         }
 
@@ -130,11 +130,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         List<MailRow> Rows { get; set; } = [];
 
-        /// <summary>Grouping is on when the (already shipped) ConversationView setting says so and no search is narrowing the list — a search must keep every hit visible.</summary>
+        /// <summary>Grouping is on when the ConversationView setting says so and no free-text search
+        /// is narrowing the list; a pure-token query (is:unread) keeps conversations grouped.</summary>
         bool ConversationMode =>
             MailUiState.SelectedAccount is { } account
             && AccountStore.GetSettings(account.Id).ConversationView.Value
-            && string.IsNullOrWhiteSpace(SearchText);
+            && !SearchService.HasFreeText(SearchText);
 
         void BuildRows() =>
             Rows = ConversationMode
@@ -209,12 +210,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SearchAllFolders = true;
             RefreshLists();
         }
-
-        bool MatchesSearch(MailMessageSummary message) =>
-            message.Subject.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            || message.FromName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            || message.FromAddress.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            || message.PreviewText.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>Well-known folders first (Inbox on top), then the rest alphabetically.</summary>
         static List<MailFolderData> SortFolders(List<MailFolderData> folders) =>

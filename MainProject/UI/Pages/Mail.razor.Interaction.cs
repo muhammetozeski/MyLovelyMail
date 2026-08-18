@@ -27,7 +27,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("Escape", "Close reader / dialog"),
             ("Ctrl+1..9", "Switch account"),
             ("?", "Show this help"),
-            ("Search", "from: to: tag: has:attachment is:unread is:starred")
+            ("Search", "from: to: tag: has:attachment is:unread is:starred is:important")
         ];
 
         /// <summary>Uids that arrived in the open folder since the previous refresh — they bloom once, then join the seen set.</summary>
