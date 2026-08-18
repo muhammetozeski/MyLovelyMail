@@ -187,10 +187,29 @@ namespace MyLovelyMail.MainProject.Storage
         {
             var index = GetIndex(accountId, folderFullName);
             foreach (var summary in summaries)
+            {
+                if (index.Summaries.TryGetValue(summary.Uid, out var stored) && !ReferenceEquals(stored, summary))
+                    CarryOverLocalState(stored, summary);
                 index.Summaries[summary.Uid] = summary;
+            }
             SaveIndex(accountId, folderFullName, index);
             RefreshUnreadCount(accountId, folderFullName, index);
             OnFolderChanged?.Invoke(accountId, folderFullName);
+        }
+
+        /// <summary>
+        /// Tags, the Important/Muted markers and the snooze time exist ONLY here — no server knows
+        /// them. A sync rebuilds summaries from the server and would silently wipe all of it, so a
+        /// freshly built summary inherits the app-local state of the row it replaces. Server-owned
+        /// fields (Seen, Flagged, subject, dates) keep coming from the incoming copy.
+        /// The app's own edits mutate the stored instance itself, and that case is skipped by the
+        /// caller's reference check — otherwise clearing a marker would immediately undo itself.
+        /// </summary>
+        static void CarryOverLocalState(MailMessageSummary stored, MailMessageSummary incoming)
+        {
+            incoming.SnoozedUntilUtc ??= stored.SnoozedUntilUtc;
+            if (incoming.Tags.Count == 0 && stored.Tags.Count > 0) incoming.Tags = stored.Tags;
+            incoming.Flags |= stored.Flags & (MailFlags.Important | MailFlags.Muted);
         }
 
         /// <summary>Keeps the folder's unread badge honest after local flag changes (sync overwrites with server truth later).</summary>
