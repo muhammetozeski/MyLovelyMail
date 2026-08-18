@@ -38,6 +38,17 @@ namespace MyLovelyMail
             claimedMutex = new Mutex(initiallyOwned: true, MutexName, out bool createdNew);
             if (createdNew) return true;
 
+            // Logger is not up this early, so the duplicate leaves a plain-text trace instead —
+            // it identifies WHO keeps launching argument-less copies at boot (shortcut vs restore).
+            try
+            {
+                string tracePath = Path.Combine(MainProject.Storage.AppPaths.AppCache, "second-instance-trace.log");
+                Directory.CreateDirectory(Path.GetDirectoryName(tracePath)!);
+                File.AppendAllText(tracePath,
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} duplicate start, args=[{string.Join(' ', Environment.GetCommandLineArgs().Skip(1))}]{Environment.NewLine}");
+            }
+            catch { /* tracing must never block startup */ }
+
             if (!TrayService.LaunchedMinimized)
             {
                 IntPtr window = FindWindowW(null, "My Lovely Mail");
