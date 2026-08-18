@@ -278,9 +278,20 @@ namespace MyLovelyMail.MainProject.ZTests
                         OutboxService.Enqueue(draft);
                         return new { ok = true, queued = true, dueUtc = OutboxService.Current?.DueUtc };
                     }
-                    await ComposeService.SendAsync(draft);
-                    return new { ok = true, attachments = draft.AttachmentPaths.Count };
+                    var outcome = await ComposeService.SendAsync(draft);
+                    return new { ok = true, outcome = outcome.ToString(), attachments = draft.AttachmentPaths.Count };
                 }
+
+                case ("DELETE", "/accounts"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    AccountStore.Remove(accountId);
+                    return new { ok = true };
+                }
+
+                case ("POST", "/flush-outbox"):
+                    await OutboxService.FlushAsync();
+                    return new { ok = true };
 
                 case ("POST", "/undo"):
                 {
