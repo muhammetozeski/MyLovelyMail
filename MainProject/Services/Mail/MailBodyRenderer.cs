@@ -4,6 +4,7 @@ using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -95,13 +96,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return html;
         }
 
-        /// <summary>Neutral readable defaults so plain messages look tidy inside the frame in any app theme.</summary>
+        /// <summary>Wraps the sanitized body in a minimal document whose colors come from <see cref="AppColors.MailCanvas"/>, the same source the iframe element uses.</summary>
         static string WrapDocument(string body) =>
             "<!DOCTYPE html><html><head><style>" +
-            "body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#33333a;background:#ffffff;" +
+            $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
             "margin:12px;line-height:1.55;font-size:14px;word-break:break-word;}" +
             "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;}" +
-            "a{color:#d14d8b;}blockquote{border-left:3px solid #f0c0d4;margin-left:0;padding-left:12px;color:#7d5a6e;}" +
+            $"a{{color:{AppColors.MailCanvas.Link};}}blockquote{{border-left:3px solid {AppColors.MailCanvas.QuoteBorder};margin-left:0;padding-left:12px;color:{AppColors.MailCanvas.QuoteText};}}" +
             "</style></head><body>" + body + "</body></html>";
     }
 }

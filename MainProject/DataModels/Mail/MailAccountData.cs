@@ -1,3 +1,5 @@
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
+
 namespace MyLovelyMail.MainProject.DataModels.Mail
 {
     /// <summary>Protocol used to receive mail for an account.</summary>
@@ -63,7 +65,7 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public MailAuthMethod AuthMethod { get; set; } = MailAuthMethod.Password;
 
         /// <summary>Accent color of this account in the UI (folder dot, avatar ring).</summary>
-        public string ColorHex { get; set; } = "#EC6FA9";
+        public string ColorHex { get; set; } = AppColors.IdentityPalette[0];
 
         /// <summary>Disabled accounts stay configured but are skipped by sync.</summary>
         public bool Enabled { get; set; } = true;

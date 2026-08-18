@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.Stores
 {
@@ -12,8 +13,8 @@ namespace MyLovelyMail.MainProject.Stores
     {
         public const string TagsFileName = "tags.json";
 
-        /// <summary>Pastel chip palette assigned round-robin to newly created tags.</summary>
-        static readonly string[] TagPalette = ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+        /// <summary>Chip colors handed to new tags round-robin; shared with account dots via <see cref="AppColors.IdentityPalette"/>.</summary>
+        static string[] TagPalette => AppColors.IdentityPalette;
 
         static Dictionary<string, string> colorByName = new(StringComparer.OrdinalIgnoreCase);
 

@@ -8,6 +8,29 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
     /// </summary>
     public static class AppColors
     {
+        /// <summary>
+        /// Identity colors that must stay stable across themes: account dots and tag chips both
+        /// pick from this one list round-robin, so an account and a tag never end up with two
+        /// different "pinks" and a palette edit reaches both features at once.
+        /// </summary>
+        public static readonly string[] IdentityPalette =
+            ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+
+        /// <summary>
+        /// The reader frame paints mail on a LIGHT canvas in every theme, because mail HTML is
+        /// authored for white backgrounds and turns unreadable on a dark one. Both the iframe
+        /// element (MailCss) and the document inside it (MailBodyRenderer) read these, so the two
+        /// halves of the same surface can never drift apart.
+        /// </summary>
+        public static class MailCanvas
+        {
+            public const string Background = "#ffffff";
+            public const string Text = "#33333a";
+            public const string Link = "#d14d8b";
+            public const string QuoteBorder = "#f0c0d4";
+            public const string QuoteText = "#7d5a6e";
+        }
+
         /// <inheritdoc cref="AppTheme.Primary"/>
         public static Color Primary => ThemeManager.Current.Primary;
 

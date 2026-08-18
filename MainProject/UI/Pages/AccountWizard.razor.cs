@@ -3,6 +3,7 @@ using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
@@ -10,8 +11,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
     {
         public const string RoutePath = "/Settings/AddAccount";
 
-        /// <summary>Pastel palette offered in the wizard; the default rotates so each account differs.</summary>
-        internal static readonly string[] AccountColors = ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+        /// <summary>Swatches offered in the wizard; the preselected one rotates so each new account differs.</summary>
+        internal static string[] AccountColors => AppColors.IdentityPalette;
 
         string SelectedColorHex { get; set; } = AccountColors[AccountStore.Accounts.Count % AccountColors.Length];
 
