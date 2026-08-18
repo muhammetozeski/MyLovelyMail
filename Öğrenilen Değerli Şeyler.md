@@ -47,6 +47,20 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
 - **Sorun üretilmeden açıklanmaz.** "Muhtemelen X yüzünden" yazmak yasak; mock sunucu, log
   kanıtı veya piksel karşılaştırması gibi bir kanıt üretilir, sonra konuşulur.
 
+## Ayar varsa karşılığı da olmalı
+
+- **Tanımlanmış ama hiçbir yerin okumadığı ayar, kullanıcıya verilmiş boş sözdür.** Projede 8
+  tane çıktı (ConversationView, SignatureHtml, FollowSystemTheme, UiScalePercent,
+  ShowUnreadBadge, DownloadAttachmentsAutomatically, OfflineKeepDays, DefaultComposeFormat).
+  Her biri ya gerçekten uygulandı ya da silindi — arada kalan yok. Bunu düzenli tara:
+  `Settings.cs`'teki her alan adını tüm projede ara, sıfır sonuç veren varsa karar ver.
+- **Ayarın adı yaptığı işi söylemeli.** `SignatureHtml` düz metin gövdeye ekleniyordu;
+  `DefaultComposeFormat` HTML seçeneği sunuyordu ama HTML yazma yok. Biri yeniden adlandırıldı,
+  diğeri silindi.
+- **Platform API'si "hazır" sanılmamalı.** `Application.Current.RequestedTheme`, tema seçimi
+  yapılırken henüz null (MAUI uygulaması kurulmamış); sessizce "açık tema" cevabı veriyordu.
+  Doğrulama snapshot'ı yakaladı; sonda doğrudan işletim sisteminden okuyacak şekilde değişti.
+
 ## Doğrulama tuzakları (hepsi gerçekten yaşandı)
 
 - **Aynı anda iki kopya çalışıyorsa snapshot yanlış pencereyi çeker.** Kullanıcının kurulumu
