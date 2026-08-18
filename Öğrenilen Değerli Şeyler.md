@@ -1,0 +1,55 @@
+# Öğrenilen Değerli Şeyler
+
+Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
+
+## UI tasarımı
+
+- **"0 = hepsi" programcı mantığıdır, kullanıcı arayüzüne koyulmaz.** Sihirli değerler yerine
+  açık bir kontrol kullan: "Fetch everything" toggle'ı açılınca sayı kutusu disable olur.
+  (Vaka: POP3 fetch limitinde "0 = tüm posta kutusu" hint'i yazılmıştı.)
+- **Kullanıcıya gösterilen hiçbir metin elle yazılmaz; kaynağındaki nesneden türetilir.**
+  Protokol adı, host örneği, port — hepsi seçili enum'un/nesnenin üzerinden gelir. String'ler
+  yalnızca UI'a çıkarken üretilir; veri taşımada asla string kullanılmaz. (Vaka: wizard'da
+  POP3 seçilince kutular hâlâ "imap.example.com" ve IMAP portu gösteriyordu, çünkü metinler
+  tek tek elle yazılmıştı.)
+
+## Loglama
+
+- **Render içinde veya sıkı döngü içinde log yazılmaz.** Bir uzak kullanıcının 10 dakikalık
+  oturumunda 1118 log satırının 1031'i tek bir butonun her render'da yazdığı satırdı; işe
+  yarayan 87 satır gürültüye gömüldü.
+- **Log dosyası kanıt kaynağıdır.** POP3 sıralama bug'ı yalnızca uzak kullanıcının log'undaki
+  "0 new of 2276 → 2277" deseninden yakalandı. Loglara zaman damgası + sunucu sayısı gibi
+  karşılaştırılabilir değerler koy.
+
+## Protokol varsayımları
+
+- **RFC geleneği garanti değildir; sunucu davranışı ölçülür.** POP3'te "mesaj 1 = en eski"
+  varsayımı Yandex'te tersti (1 = en yeni). Sıra artık iki uçtaki Date başlığından ölçülüyor.
+- **"Son N" penceresi yeni-mail tespiti için kullanılamaz.** Yeni mail listenin herhangi bir
+  ucuna düşebilir; tespit her zaman TÜM kimlik listesine karşı yapılır, limit sonra uygulanır.
+
+## Dağıtım
+
+- **`dotnet publish -r <rid>` artık self-contained anlamına gelmez.** Bayrak açıkça
+  yazılmazsa çıktı sessizce framework-dependent olur ve .NET kurulu olmayan makinede açılmaz.
+  Geliştirme makinesinde fark edilmez, çünkü orada runtime hep vardır.
+- **Autostart/registry gibi makine-genel kayıtlara dev build asla yazmamalı.** Debug sandbox
+  bir kez kullanıcının gerçek autostart kaydını kendi bin\ yoluyla ezdi.
+
+## Hata ayıklama disiplini
+
+- **Kesin bilinmeyen şeye "bilmiyorum" denir ve kanıt toplayacak iz bırakılır.** Boot'ta
+  argümansız kopyayı neyin başlattığı bilinmiyordu; tahmin sunmak yerine ikinci kopyaların
+  argümanlarını dosyaya yazan bir iz eklendi — sonraki açılış kesin cevabı verecek.
+- **Ekrana tıklayarak test yapılmaz.** Kullanıcı makineyi aktif kullanıyor olabilir. Uygulama
+  DebugApi (127.0.0.1:52539) üzerinden sürülür; eksik endpoint varsa endpoint eklenir.
+- **Sorun üretilmeden açıklanmaz.** "Muhtemelen X yüzünden" yazmak yasak; mock sunucu, log
+  kanıtı veya piksel karşılaştırması gibi bir kanıt üretilir, sonra konuşulur.
+
+## Süreç
+
+- **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
+  kötü olan geri alınamaz hale gelir.
+- **İşler biriktirilmez.** Yarım işler yığın olduktan sonra toparlamak, anında bitirmekten
+  pahalıdır; her turda eldeki iş bitirilip commit'lenir.

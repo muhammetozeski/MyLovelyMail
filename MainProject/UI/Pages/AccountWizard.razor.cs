@@ -27,6 +27,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         string IncomingHost { get; set; } = string.Empty;
         string IncomingPortText { get; set; } = "993";
         string Pop3FetchLimitText { get; set; } = GlobalSettings.Pop3FetchLimit.Value.ToString();
+
+        /// <summary>UI face of "limit = 0": on disables the number field and downloads everything.</summary>
+        bool Pop3FetchEverything { get; set; }
         ConnectionSecurity IncomingSecurity { get; set; } = ConnectionSecurity.SslOnConnect;
         string SmtpHost { get; set; } = string.Empty;
         string SmtpPortText { get; set; } = "465";
@@ -153,8 +156,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
             CredentialVault.SetPassword(account.Id, Password);
             AccountStore.Save(account);
 
-            if (Protocol == IncomingProtocol.Pop3 && int.TryParse(Pop3FetchLimitText, out int fetchLimit) && fetchLimit >= 0)
+            if (Protocol == IncomingProtocol.Pop3)
             {
+                int fetchLimit = Pop3FetchEverything ? 0
+                    : int.TryParse(Pop3FetchLimitText, out int parsed) && parsed > 0 ? parsed : GlobalSettings.Pop3FetchLimit.Value;
                 var accountSettings = AccountStore.GetSettings(account.Id);
                 if (accountSettings.Pop3FetchLimit.Value != fetchLimit)
                 {
