@@ -3,6 +3,7 @@ using MailKit.Net.Imap;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -154,6 +155,31 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
+        /// <summary>
+        /// Downloads the bodies of newly arrived messages that carry attachments, so opening them
+        /// offline works. Only runs when the account asks for it; a failed prefetch is harmless —
+        /// the reader downloads on demand exactly as before.
+        /// </summary>
+        static async Task PrefetchAttachmentBodiesAsync(MailAccountData account, string folderFullName,
+            List<MailMessageSummary> arrived, CancellationToken cancellationToken)
+        {
+            if (!AccountStore.GetSettings(account.Id).DownloadAttachmentsAutomatically.Value) return;
+
+            foreach (var summary in arrived.Where(static s => s.HasAttachments))
+            {
+                if (MessageStore.HasFullMessage(account.Id, folderFullName, summary.Uid)) continue;
+                try
+                {
+                    await DownloadMessageAsync(account, folderFullName, summary.Uid, cancellationToken);
+                    Log($"Prefetched attachment body for uid {summary.Uid} in '{folderFullName}'.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Attachment prefetch failed for uid {summary.Uid}: {ex.Message}", LogLevel.Warning);
+                }
+            }
+        }
+
         static FolderRole ResolveRole(ImapClient client, IMailFolder folder)
         {
             if (folder == client.Inbox) return FolderRole.Inbox;
@@ -253,8 +279,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
             });
 
             if (newCount > 0 && lastSeenUid > 0)
-                NotificationService.NotifyNewMessages(account, folder.FullName,
-                    [.. summaries.Where(s => s.Uid > lastSeenUid)]);
+            {
+                var arrived = summaries.Where(s => s.Uid > lastSeenUid).ToList();
+                NotificationService.NotifyNewMessages(account, folder.FullName, arrived);
+                await PrefetchAttachmentBodiesAsync(account, folder.FullName, arrived, cancellationToken);
+            }
         }
 
         /// <summary>Executes the move requests a rule pass produced — local ones via the store, remote ones over the still-open connection.</summary>
