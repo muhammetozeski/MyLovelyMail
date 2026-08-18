@@ -12,6 +12,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
         internal CancellationTokenSource Cancellation { get; } = new();
     }
 
+    /// <summary>A send that permanently failed after its compose pane closed; shown as a persistent bar.</summary>
+    public sealed class FailedSend
+    {
+        public required ComposeDraft Draft { get; init; }
+        public required string Reason { get; init; }
+        public required DateTime FailedAtUtc { get; init; }
+    }
+
     /// <summary>
     /// Undo-send: queued drafts wait <see cref="AccountSettings.UndoSendSeconds"/> before the real
     /// <see cref="ComposeService.SendAsync"/> runs, and <see cref="Undo"/> hands the untouched
@@ -24,7 +32,26 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>The send currently counting down; null when idle. One at a time is enough for a mail client.</summary>
         public static PendingSend? Current { get; private set; }
 
+        /// <summary>The most recent permanent send failure; a toast vanishes, this stays until Retry/Dismiss.</summary>
+        public static FailedSend? LastFailure { get; private set; }
+
         public static event Action? OnChanged;
+
+        /// <summary>Puts the failed draft back on the queue and clears the failure bar.</summary>
+        public static void RetryFailed()
+        {
+            var failure = LastFailure;
+            if (failure == null) return;
+            LastFailure = null;
+            Enqueue(failure.Draft);
+        }
+
+        /// <summary>Clears the failure bar; the draft itself stays safe in Drafts.</summary>
+        public static void DismissFailed()
+        {
+            LastFailure = null;
+            OnChanged?.Invoke();
+        }
 
         /// <summary>Queues the draft (or sends immediately when the undo window is 0).</summary>
         public static void Enqueue(ComposeDraft draft)
@@ -100,6 +127,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             catch (Exception ex)
             {
                 Log($"Queued send failed: {ex.Message}", LogLevel.Error);
+                LastFailure = new FailedSend { Draft = draft, Reason = ex.Message, FailedAtUtc = DateTime.UtcNow };
+                OnChanged?.Invoke();
                 NotificationService.Presenter?.Invoke(new MailToast
                 {
                     Title = "Send failed",

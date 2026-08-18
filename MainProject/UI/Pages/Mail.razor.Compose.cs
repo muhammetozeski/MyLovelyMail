@@ -33,6 +33,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 MailUiState.OpenCompose(draft);
         }
 
+        /// <summary>Reopens the failed draft for editing and takes the failure bar down.</summary>
+        void EditFailedSend()
+        {
+            if (OutboxService.LastFailure is not { } failure) return;
+            MailUiState.OpenCompose(failure.Draft);
+            OutboxService.DismissFailed();
+        }
+
         static int UndoSecondsLeft(PendingSend pending) =>
             Math.Max(0, (int)Math.Ceiling((pending.DueUtc - DateTime.UtcNow).TotalSeconds));
 
