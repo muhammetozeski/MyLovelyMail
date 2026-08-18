@@ -336,9 +336,11 @@ namespace MyLovelyMail.MainProject.ZTests
                     string accountId = RequireQueryValue(query, "accountId");
                     string folder = ReadFolder(query);
                     string searchQuery = query["query"] ?? string.Empty;
+                    // Always through the matcher, exactly like the list page: an empty query is not
+                    // "no filtering" — it is still what hides snoozed mail.
                     var matcher = SearchService.BuildMatcher(searchQuery);
                     return MessageStore.GetSummaries(accountId, folder)
-                        .Where(s => searchQuery.Length == 0 || matcher(s))
+                        .Where(matcher)
                         .Take(ReadTake(query, 20))
                         .Select(s => new { s.Uid, s.Subject, s.FromAddress, unread = s.IsUnread, s.HasAttachments });
                 }
@@ -350,6 +352,30 @@ namespace MyLovelyMail.MainProject.ZTests
                     ImapSyncService.KickFolderResync(RequireAccount(accountId), folder);
                     return new { ok = true };
                 }
+
+                case ("POST", "/snooze"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    int minutes = int.TryParse(query["minutes"], out int parsedMinutes) ? parsedMinutes : 60;
+                    SnoozeService.Snooze(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid),
+                        DateTime.UtcNow.AddMinutes(minutes));
+                    return new { ok = true, dueUtc = DateTime.UtcNow.AddMinutes(minutes) };
+                }
+
+                case ("POST", "/snooze/wake"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    SnoozeService.Wake(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid));
+                    return new { ok = true };
+                }
+
+                case ("GET", "/snoozed"):
+                    return SnoozeService.Snoozed(RequireQueryValue(query, "accountId"))
+                        .Select(entry => new { folder = entry.FolderFullName, entry.Summary.Uid, entry.Summary.Subject, entry.Summary.SnoozedUntilUtc });
 
                 case ("GET", "/unsubscribe"):
                 {

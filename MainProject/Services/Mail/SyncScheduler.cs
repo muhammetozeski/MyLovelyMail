@@ -106,6 +106,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
                 catch (OperationCanceledException) { }
 
+                SnoozeService.WakeDue();
                 OfflineCacheTrimmer.TrimAll();
             }
             finally

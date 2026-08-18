@@ -116,10 +116,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 return;
             }
 
-            var summaries = MessageStore.GetSummaries(account.Id, folder.FullName);
-            FilteredSummaries = string.IsNullOrWhiteSpace(SearchText)
-                ? summaries
-                : [.. summaries.Where(SearchService.BuildMatcher(SearchText))];
+            // The matcher runs even for an empty query: it is also what hides snoozed mail.
+            FilteredSummaries = [.. MessageStore.GetSummaries(account.Id, folder.FullName)
+                .Where(SearchService.BuildMatcher(SearchText))];
             BuildRows();
         }
 
@@ -194,7 +193,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("📩 Unread", "is:unread"),
             ("⭐ Starred", "is:starred"),
             ("❗ Important", "is:important"),
-            ("📎 Attachments", "has:attachment")
+            ("📎 Attachments", "has:attachment"),
+            ("💤 Snoozed", "is:snoozed")
         ];
 
         bool HasSearchToken(string token) =>

@@ -52,6 +52,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>User-assigned tag names (colored labels). Empty when untagged.</summary>
         public List<string> Tags { get; set; } = [];
 
+        /// <summary>Hidden from the lists until this moment, then it comes back unread. Null = not snoozed.</summary>
+        public DateTime? SnoozedUntilUtc { get; set; }
+
         public bool IsUnread => !Flags.HasFlag(MailFlags.Seen);
     }
 }

@@ -200,6 +200,18 @@
                             }
                         </span>
                     }
+                    <span class="mail-bulk-move">
+                        <button class="mail-search-toggle" @onclick="() => ShowSnoozePicker = !ShowSnoozePicker">💤 Snooze</button>
+                        @if (ShowSnoozePicker)
+                        {
+                            <div class="mail-move-popover">
+                                @foreach (var (label, dueUtc) in SnoozeService.Presets)
+                                {
+                                    <button class="mail-move-option" @onclick="() => BulkSnooze(dueUtc)">@label</button>
+                                }
+                            </div>
+                        }
+                    </span>
                     <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(Rows.Select(r => r.Message.Uid))">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
@@ -250,6 +262,11 @@
                                 @if (message.HasAttachments)
                                 {
                                     <span class="mail-row-attach">📎</span>
+                                }
+                                @if (message.SnoozedUntilUtc is { } snoozedUntil)
+                                {
+                                    <button class="mail-row-snoozed" title="Bring it back now"
+                                            @onclick="() => WakeMessage(message)" @onclick:stopPropagation="true">@SnoozeLabel(snoozedUntil)</button>
                                 }
                                 @message.PreviewText
                             </span>

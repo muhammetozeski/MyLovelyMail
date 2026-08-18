@@ -103,6 +103,34 @@ namespace MyLovelyMail.MainProject.UI.Pages
         static string InboxZeroHeartStyle(int heartIndex) => string.Create(CultureInfo.InvariantCulture,
             $"left:{10 + heartIndex * 18}%;animation-delay:{heartIndex * 0.7:0.0}s;font-size:{14 + heartIndex % 3 * 6}px;");
 
+        bool ShowSnoozePicker { get; set; }
+
+        /// <summary>Hides every checked row until the chosen moment; they come back unread.</summary>
+        void BulkSnooze(Func<DateTime> dueUtc)
+        {
+            ShowSnoozePicker = false;
+            if (MailUiState.SelectedAccount is not { } account) return;
+            var due = dueUtc();
+            foreach (var summary in SelectedSummaries)
+                if (ResolveFolderOf(summary) is { } folderName)
+                    SnoozeService.Snooze(account, folderName, summary, due);
+            MailUiState.ClearSelection();
+        }
+
+        /// <summary>Pulls a snoozed message back into the list right away.</summary>
+        void WakeMessage(MailMessageSummary summary)
+        {
+            if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(summary) is { } folderName)
+                SnoozeService.Wake(account, folderName, summary);
+        }
+
+        /// <summary>Row chip text: when this message is due back.</summary>
+        static string SnoozeLabel(DateTime dueUtc)
+        {
+            var due = dueUtc.ToLocalTime();
+            return due.Date == DateTime.Today ? $"💤 {due:HH:mm}" : $"💤 {due:dd MMM HH:mm}";
+        }
+
         bool ShowMovePicker { get; set; }
 
         /// <summary>

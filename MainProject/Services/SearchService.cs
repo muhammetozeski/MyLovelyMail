@@ -29,9 +29,15 @@ namespace MyLovelyMail.MainProject.Services
         public static Func<MailMessageSummary, bool> BuildMatcher(string query)
         {
             var (textTokens, predicates) = ParseQuery(query);
-            return summary => predicates.All(matches => matches(summary))
+            // Snoozed mail is hidden EVERYWHERE unless the query asks for it. Living here means the
+            // folder list, the all-folders search and the debug list can never disagree about it.
+            bool showSnoozed = query.Contains(SnoozedToken, StringComparison.OrdinalIgnoreCase);
+            return summary => (showSnoozed || summary.SnoozedUntilUtc == null)
+                && predicates.All(matches => matches(summary))
                 && textTokens.All(token => MatchesAnywhere(summary, token));
         }
+
+        const string SnoozedToken = "is:snoozed";
 
         /// <summary>True when the query carries plain words on top of its tokens (a pure-token query keeps conversation grouping on).</summary>
         public static bool HasFreeText(string query) => ParseQuery(query).TextTokens.Count > 0;
@@ -92,6 +98,9 @@ namespace MyLovelyMail.MainProject.Services
                         break;
                     case "is" when value.Equals("important", StringComparison.OrdinalIgnoreCase):
                         predicates.Add(static s => s.Flags.HasFlag(MailFlags.Important));
+                        break;
+                    case "is" when value.Equals("snoozed", StringComparison.OrdinalIgnoreCase):
+                        predicates.Add(static s => s.SnoozedUntilUtc != null);
                         break;
                     default:
                         textTokens.Add(token);
