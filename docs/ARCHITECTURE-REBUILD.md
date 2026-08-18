@@ -43,6 +43,16 @@ short, concrete, English, only where the code does not explain itself.
 - [ ] Static-helper sweep: make helpers static where they capture nothing (principle 42).
 - [ ] UI pages comment pass after the structural work settles.
 
+## Remote-user log findings (2026-08-18, POP3 tester)
+- Yandex POP lists newest FIRST; the old fixed tail-window fetched the OLDEST 300 and never
+  saw new arrivals ("0 new of 2276/2277" while the server count grew). Fixed: order probed
+  from Date headers of both ends, candidates = unknown uids over the WHOLE list, newest-first.
+- Pop3FetchLimit setting (global + per-account, wizard field, 0 = whole mailbox) replaces the
+  hardcoded 300.
+- Fetches now flow through SummaryPump (parallel POP3 connections with single-session
+  fallback) / 50-message IMAP first-fill slices, so the list paints per arrival burst.
+- CoreButton render log produced 1031 of a session's 1118 log lines — switched off.
+
 ## Feature work landed alongside the rebuild
 - Compose attachments (dropzone + chips + MIME parts + draft round-trip) — 531ee9b,
   verified end-to-end (sent to Gmail, arrived with HasAttachments=true).

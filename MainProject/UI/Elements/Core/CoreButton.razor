@@ -6,7 +6,9 @@
 
 @code {
     /// <summary> Toggles this component's Log output without touching every individual Log call. </summary>
-    const bool ActivateCoreButtonLogs = true;
+    // Off: with it on, every render of every button logs a line — a remote user's 10-minute
+    // session produced 1031 of these against 87 useful entries.
+    const bool ActivateCoreButtonLogs = false;
 
     /// <summary> Modifier class appended when IsFullWidth is on; defined in CoreButtonCss as a block-level flex box that fills 100% of the parent. </summary>
     const string FullWidthClass = "core-btn--full";
