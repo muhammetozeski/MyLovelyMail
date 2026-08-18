@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components.Web;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 using MyLovelyMail.MainProject.DataModels.Mail;
@@ -93,20 +94,42 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void BulkDelete() => ForEachSelected(MessageActions.Delete);
 
+        /// <summary>Hearts drifting up behind the Inbox Zero headline.</summary>
+        const int InboxZeroHeartCount = 5;
+
+        /// <summary>Spreads the hearts across the width and staggers their loop so they never drift in lockstep.
+        /// Invariant formatting is mandatory: a Turkish decimal comma would make the CSS delay invalid.</summary>
+        static string InboxZeroHeartStyle(int heartIndex) => string.Create(CultureInfo.InvariantCulture,
+            $"left:{10 + heartIndex * 18}%;animation-delay:{heartIndex * 0.7:0.0}s;font-size:{14 + heartIndex % 3 * 6}px;");
+
         bool ShowMovePicker { get; set; }
 
-        /// <summary>Server folders the selection can move to: everything except the open folder and app-local ones. Empty for POP3 accounts, which hides the Move button entirely.</summary>
-        List<MailFolderData> MoveTargets =>
-            MailUiState.SelectedAccount is { Protocol: IncomingProtocol.Imap }
-            && MailUiState.SelectedFolder is { IsLocal: false } current
-                ? [.. Folders.Where(f => !f.IsLocal && f.FullName != current.FullName)]
-                : [];
+        /// <summary>
+        /// Where the selection may go: from an IMAP server folder anywhere else (server or local),
+        /// from a local folder or a POP3 account only into other local folders — nothing can be
+        /// pushed UP to a server, since no upload path exists.
+        /// </summary>
+        List<MailFolderData> MoveTargets
+        {
+            get
+            {
+                if (MailUiState.SelectedAccount is not { } account || MailUiState.SelectedFolder is not { } current)
+                    return [];
+
+                bool serverSource = account.Protocol == IncomingProtocol.Imap && !current.IsLocal;
+                return [.. Folders.Where(f => f.FullName != current.FullName && (serverSource || f.IsLocal))];
+            }
+        }
 
         void BulkMoveTo(MailFolderData targetFolder)
         {
             ShowMovePicker = false;
             if (MailUiState.SelectedAccount is not { } account || MailUiState.SelectedFolder is not { } current) return;
-            MessageActions.MoveToFolder(account, current.FullName, SelectedSummaries, targetFolder.FullName);
+
+            if (targetFolder.IsLocal)
+                MessageActions.MoveToLocalFolder(account, current.FullName, SelectedSummaries, targetFolder.DisplayName);
+            else
+                MessageActions.MoveToFolder(account, current.FullName, SelectedSummaries, targetFolder.FullName);
             MailUiState.ClearSelection();
         }
 

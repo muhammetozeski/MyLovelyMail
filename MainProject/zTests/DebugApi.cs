@@ -150,6 +150,9 @@ namespace MyLovelyMail.MainProject.ZTests
         static int ReadTake(NameValueCollection query, int fallback) =>
             int.TryParse(query["take"], out int parsed) ? parsed : fallback;
 
+        /// <summary>Reads the optional "folder" query parameter, defaulting to INBOX.</summary>
+        static string ReadFolder(NameValueCollection query) => query["folder"] ?? "INBOX";
+
         static async Task<object?> RouteAsync(HttpListenerRequest request)
         {
             string path = request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant() ?? string.Empty;
@@ -314,6 +317,19 @@ namespace MyLovelyMail.MainProject.ZTests
                     await OutboxService.FlushAsync();
                     return new { ok = true };
 
+                case ("GET", "/outbox"):
+                    return new
+                    {
+                        pending = OutboxService.Current is { } pending ? new { pending.Draft.Subject, pending.DueUtc } : null,
+                        failure = OutboxService.LastFailure is { } failure
+                            ? new { failure.Draft.Subject, failure.Reason, failure.FailedAtUtc }
+                            : null
+                    };
+
+                case ("POST", "/outbox/retry"):
+                    OutboxService.RetryFailed();
+                    return new { ok = true };
+
                 case ("POST", "/undo"):
                 {
                     var draft = OutboxService.Undo();
@@ -344,7 +360,11 @@ namespace MyLovelyMail.MainProject.ZTests
                     uint uid = RequireUid(query);
                     var account = RequireAccount(accountId);
                     var summary = RequireSummary(accountId, folder, uid);
-                    MessageActions.MoveToFolder(account, folder, [summary], target);
+                    // Mirrors the bulk bar's branch: a "Local/x" target files locally, anything else moves on the server.
+                    if (target.StartsWith(MessageStore.LocalFolderPrefix))
+                        MessageActions.MoveToLocalFolder(account, folder, [summary], target[MessageStore.LocalFolderPrefix.Length..]);
+                    else
+                        MessageActions.MoveToFolder(account, folder, [summary], target);
                     return new { ok = true };
                 }
 

@@ -91,6 +91,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 });
         }
 
+        /// <summary>Bulk move into an app-local folder; the server copy (if any) stays untouched by design.</summary>
+        public static void MoveToLocalFolder(MailAccountData account, string folderFullName, IReadOnlyList<MailMessageSummary> summaries, string localFolderName)
+        {
+            foreach (var summary in summaries)
+                MessageStore.MoveToLocalFolder(account.Id, folderFullName, summary.Uid, localFolderName);
+        }
+
         /// <summary>
         /// Optimistic bulk move to another server folder: rows leave the local store instantly,
         /// the batched IMAP MoveToAsync follows in the background (same shape as rule moves).

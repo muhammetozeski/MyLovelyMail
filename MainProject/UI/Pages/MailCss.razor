@@ -386,6 +386,14 @@
         box-shadow: @AppStyles.ShadowMedium;
     }
 
+    .mail-move-divider {
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px2)px;
+        margin-top: @(AppMeasures.Space.Px4)px;
+        border-top: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+    }
+
     .mail-move-option {
         border: none;
         background: transparent;
@@ -721,6 +729,11 @@
         animation: reader-open @(AppMeasures.Duration.Normal)s ease;
     }
 
+    .mail-undo-bar--failed {
+        background: @AppColors.Error.WithAlpha(0.18f).ToRgbaHex(true);
+        border-color: @AppColors.Error.ToRgbaHex(true);
+    }
+
     .mail-undo-text {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -939,6 +952,45 @@
         gap: @(AppMeasures.Space.Px8)px;
         color: @textMuted;
         min-height: @(AppMeasures.Size.Px200)px;
+    }
+
+    /* Inbox Zero: the reward state for an emptied inbox — hearts drift up behind the headline. */
+    .mail-inbox-zero {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .mail-inbox-zero-hearts {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
+
+    .mail-inbox-zero-heart {
+        position: absolute;
+        bottom: -@(AppMeasures.Space.Px32)px;
+        opacity: 0;
+        animation: inbox-zero-drift @(AppMeasures.Duration.Drift)s linear infinite;
+    }
+
+    @@keyframes inbox-zero-drift {
+        0% { transform: translateY(0) scale(0.8); opacity: 0; }
+        15% { opacity: @(AppMeasures.Opacity.Muted); }
+        85% { opacity: @(AppMeasures.Opacity.Muted); }
+        100% { transform: translateY(-@(AppMeasures.Size.Px300)px) scale(1.1); opacity: 0; }
+    }
+
+    .mail-inbox-zero-headline {
+        position: relative;
+        font-size: @(AppMeasures.Font.Hero)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+    }
+
+    .mail-inbox-zero-title {
+        background: linear-gradient(135deg, var(--account-accent, @primary), @AppColors.Accent.ToRgbaHex(true));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
     .mail-empty-icon {

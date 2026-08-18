@@ -120,6 +120,20 @@
                     <div class="mail-empty-text">Fetching this folder from the server…</div>
                 </div>
             }
+            else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { Role: FolderRole.Inbox })
+            {
+                <div class="mail-empty mail-inbox-zero">
+                    <div class="mail-inbox-zero-hearts">
+                        @for (int heartIndex = 0; heartIndex < InboxZeroHeartCount; heartIndex++)
+                        {
+                            <span class="mail-inbox-zero-heart" style="@InboxZeroHeartStyle(heartIndex)">💗</span>
+                        }
+                    </div>
+                    @* Emoji stays OUTSIDE the gradient span: background-clip:text turns color emoji into flat blocks. *@
+                    <div class="mail-inbox-zero-headline"><span class="mail-inbox-zero-title">Inbox Zero</span> 💖</div>
+                    <div class="mail-empty-text">Nothing left to read — enjoy the quiet.</div>
+                </div>
+            }
             else
             {
                 <div class="mail-empty">
@@ -139,18 +153,28 @@
                     <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
                     <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
                     <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
-                    @if (MoveTargets.Count > 0)
+                    @{
+                        var moveTargets = MoveTargets;
+                    }
+                    @if (moveTargets.Count > 0)
                     {
                         <span class="mail-bulk-move">
                             <button class="mail-search-toggle" @onclick="() => ShowMovePicker = !ShowMovePicker">📂 Move</button>
                             @if (ShowMovePicker)
                             {
                                 <div class="mail-move-popover">
-                                    @foreach (var targetFolder in MoveTargets)
+                                    @foreach (var targetGroup in moveTargets.GroupBy(f => f.IsLocal).OrderBy(g => g.Key))
                                     {
-                                        <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
-                                            @FolderIcon(targetFolder.Role) @targetFolder.DisplayName
-                                        </button>
+                                        @if (targetGroup.Key && moveTargets.Any(f => !f.IsLocal))
+                                        {
+                                            <div class="mail-move-divider">📁 On this machine</div>
+                                        }
+                                        @foreach (var targetFolder in targetGroup)
+                                        {
+                                            <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
+                                                @FolderIcon(targetFolder.Role) @targetFolder.DisplayName
+                                            </button>
+                                        }
                                     }
                                 </div>
                             }
@@ -210,6 +234,15 @@
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
+        @if (OutboxService.LastFailure is { } failedSend)
+        {
+            <div class="mail-undo-bar mail-undo-bar--failed">
+                <span class="mail-undo-text">❌ Send failed: "@(string.IsNullOrWhiteSpace(failedSend.Draft.Subject) ? "(no subject)" : failedSend.Draft.Subject)" — @failedSend.Reason</span>
+                <button class="mail-undo-button" @onclick="OutboxService.RetryFailed">🔁 Retry</button>
+                <button class="mail-undo-button" @onclick="EditFailedSend">✏️ Edit</button>
+                <button class="mail-undo-button" @onclick="OutboxService.DismissFailed">✕ Dismiss</button>
+            </div>
+        }
         @if (OutboxService.Current is { } pendingSend)
         {
             <div class="mail-undo-bar">
