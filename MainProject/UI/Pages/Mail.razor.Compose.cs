@@ -11,6 +11,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
         const int MaxComposeAttachments = 20;
         const long MaxComposeAttachmentBytes = 50 * 1024 * 1024;
 
+        /// <summary>Datalist element id shared by the To and Cc fields.</summary>
+        const string ContactListId = "mail-contacts";
+
+        /// <summary>Addresses offered while typing a recipient, harvested from the account's own mail.</summary>
+        List<Contact> KnownContacts =>
+            MailUiState.SelectedAccount is { } account ? ContactIndexService.Suggest(account.Id) : [];
+
         string? SendError { get; set; }
         System.Timers.Timer? draftAutosaveTimer;
         System.Timers.Timer? undoCountdownTimer;

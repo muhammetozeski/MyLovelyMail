@@ -343,6 +343,11 @@ namespace MyLovelyMail.MainProject.ZTests
                         .Select(s => new { s.Uid, s.Subject, s.FromAddress, unread = s.IsUnread, s.HasAttachments });
                 }
 
+                case ("GET", "/contacts"):
+                    return ContactIndexService
+                        .Suggest(RequireQueryValue(query, "accountId"), query["prefix"] ?? string.Empty, ReadTake(query, 20))
+                        .Select(c => new { c.Address, c.DisplayName, c.Suggestion });
+
                 case ("GET", "/outbox"):
                     return new
                     {

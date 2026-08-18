@@ -201,7 +201,9 @@
 
     .mail-search-tools {
         display: flex;
+        flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
+        /* Without wrapping, the filter pills run past the list column and slide under the reader. */
     }
 
     .mail-search-toggle {
