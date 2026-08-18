@@ -201,6 +201,9 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>Prefix marking folders that exist only on this machine (created by rules/user).</summary>
         public const string LocalFolderPrefix = "Local/";
 
+        /// <summary>The one spelling of the inbox path: IMAP's mandated name and POP3's single mailbox mirror it.</summary>
+        public const string InboxFullName = "INBOX";
+
         /// <summary>
         /// Moves one message into a local-only folder: creates the folder info on first use,
         /// carries the cached .eml along when present, and removes the source entry.

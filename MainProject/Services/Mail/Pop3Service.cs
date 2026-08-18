@@ -14,7 +14,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class Pop3Service
     {
-        public const string InboxFullName = "INBOX";
+        const string InboxFullName = MessageStore.InboxFullName;
 
         /// <summary>Extra POP3 sessions opened for parallel header fetching. Servers that lock the
         /// maildrop to one session simply refuse the extras and the sync continues on fewer.</summary>

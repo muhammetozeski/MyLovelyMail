@@ -152,7 +152,7 @@ namespace MyLovelyMail.MainProject.ZTests
             int.TryParse(query["take"], out int parsed) ? parsed : fallback;
 
         /// <summary>Reads the optional "folder" query parameter, defaulting to INBOX.</summary>
-        static string ReadFolder(NameValueCollection query) => query["folder"] ?? "INBOX";
+        static string ReadFolder(NameValueCollection query) => query["folder"] ?? MessageStore.InboxFullName;
 
         static async Task<object?> RouteAsync(HttpListenerRequest request)
         {
@@ -208,7 +208,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/messages"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folder = query["folder"] ?? "INBOX";
+                    string folder = ReadFolder(query);
                     return MessageStore.GetSummaries(accountId, folder).Take(ReadTake(query, 20))
                         .Select(s => new { s.Uid, s.Subject, s.FromAddress, s.DateUtc, s.Flags, s.HasAttachments, s.PreviewText });
                 }
@@ -216,7 +216,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/message"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folder = query["folder"] ?? "INBOX";
+                    string folder = ReadFolder(query);
                     uint uid = RequireUid(query);
                     var account = RequireAccount(accountId);
                     var summary = RequireSummary(accountId, folder, uid);
@@ -243,7 +243,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/threads"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folder = query["folder"] ?? "INBOX";
+                    string folder = ReadFolder(query);
                     return ThreadingService.BuildThreads(MessageStore.GetSummaries(accountId, folder)).Take(ReadTake(query, 10))
                         .Select(t => new
                         {
@@ -267,7 +267,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("POST", "/open"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folderFullName = query["folder"] ?? "INBOX";
+                    string folderFullName = ReadFolder(query);
                     uint uid = RequireUid(query);
                     var account = RequireAccount(accountId);
                     var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName)
@@ -354,7 +354,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/export"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folder = query["folder"] ?? "INBOX";
+                    string folder = ReadFolder(query);
                     uint uid = RequireUid(query);
                     var account = RequireAccount(accountId);
                     var summary = RequireSummary(accountId, folder, uid);
@@ -369,7 +369,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("POST", "/move"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
-                    string folder = query["folder"] ?? "INBOX";
+                    string folder = ReadFolder(query);
                     string target = RequireQueryValue(query, "target");
                     uint uid = RequireUid(query);
                     var account = RequireAccount(accountId);

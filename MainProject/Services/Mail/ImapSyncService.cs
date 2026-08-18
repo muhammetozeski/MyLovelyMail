@@ -234,7 +234,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 AccountId = account.Id,
                 FullName = folder.FullName,
                 DisplayName = folder.Name,
-                Role = cached?.Role ?? (folder.FullName.Equals("INBOX", StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
+                Role = cached?.Role ?? (folder.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
                 TotalCount = folder.Count,
