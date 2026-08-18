@@ -78,38 +78,44 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             if (passRunning) return;
             passRunning = true;
-
-            // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
-            // polling cycle even though nothing explicitly notifies this scheduler about them.
-            ImapIdleService.Refresh();
-
-            foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
-            {
-                try
-                {
-                    if (account.Protocol == IncomingProtocol.Imap)
-                        await ImapSyncService.SyncAccountAsync(account, cancellationToken);
-                    else
-                        await Pop3Service.SyncAccountAsync(account, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Log($"Sync failed for '{account.EmailAddress}': {ex.Message}", LogLevel.Error);
-                }
-            }
-
-            // A completed pass is the online signal — retry anything parked in the Outboxes.
+            // The finally is load-bearing: any exception escaping this body would otherwise leave
+            // passRunning stuck at true and silently kill every future sync pass.
             try
             {
-                await OutboxService.FlushAsync(cancellationToken);
-            }
-            catch (OperationCanceledException) { }
+                // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
+                // polling cycle even though nothing explicitly notifies this scheduler about them.
+                ImapIdleService.Refresh();
 
-            passRunning = false;
+                foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
+                {
+                    try
+                    {
+                        if (account.Protocol == IncomingProtocol.Imap)
+                            await ImapSyncService.SyncAccountAsync(account, cancellationToken);
+                        else
+                            await Pop3Service.SyncAccountAsync(account, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Sync failed for '{account.EmailAddress}': {ex.Message}", LogLevel.Error);
+                    }
+                }
+
+                // A completed pass is the online signal — retry anything parked in the Outboxes.
+                try
+                {
+                    await OutboxService.FlushAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) { }
+            }
+            finally
+            {
+                passRunning = false;
+            }
             Log("Sync pass finished for all enabled accounts.");
         }
     }
