@@ -61,9 +61,9 @@
             <span class="wizard-label">Receive protocol</span>
             <div class="wizard-protocols">
                 <button class="wizard-preset @(Protocol == IncomingProtocol.Imap ? "wizard-preset--active" : "")"
-                        @onclick="() => PickProtocol(IncomingProtocol.Imap)">📥 IMAP (recommended)</button>
+                        @onclick="() => PickProtocol(IncomingProtocol.Imap)">📥 @IncomingProtocol.Imap.DisplayName() (recommended)</button>
                 <button class="wizard-preset @(Protocol == IncomingProtocol.Pop3 ? "wizard-preset--active" : "")"
-                        @onclick="() => PickProtocol(IncomingProtocol.Pop3)">📪 POP3</button>
+                        @onclick="() => PickProtocol(IncomingProtocol.Pop3)">📪 @IncomingProtocol.Pop3.DisplayName()</button>
             </div>
             @if (Protocol == IncomingProtocol.Pop3)
             {
@@ -73,8 +73,8 @@
 
         <div class="wizard-grid">
             <div class="wizard-field">
-                <span class="wizard-label">Incoming host</span>
-                <CoreInput Placeholder="imap.example.com" @bind-Value="IncomingHost" />
+                <span class="wizard-label">Incoming host (@Protocol.DisplayName())</span>
+                <CoreInput Placeholder="@($"{Protocol.HostPrefix()}.example.com")" @bind-Value="IncomingHost" />
             </div>
             <div class="wizard-field wizard-field--small">
                 <span class="wizard-label">Port</span>

@@ -7,6 +7,18 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         Pop3
     }
 
+    /// <summary>The single home of protocol display strings, so UI text always follows the selected enum value.</summary>
+    public static class IncomingProtocolNames
+    {
+        /// <summary>Human-facing name: "IMAP" / "POP3" (the enum members render as "Imap"/"Pop3").</summary>
+        public static string DisplayName(this IncomingProtocol protocol) =>
+            protocol == IncomingProtocol.Imap ? "IMAP" : "POP3";
+
+        /// <summary>Conventional incoming-host prefix: "imap" / "pop".</summary>
+        public static string HostPrefix(this IncomingProtocol protocol) =>
+            protocol == IncomingProtocol.Imap ? "imap" : "pop";
+    }
+
     /// <summary>Socket security for a mail server connection.</summary>
     public enum ConnectionSecurity
     {
