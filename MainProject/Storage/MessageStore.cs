@@ -293,6 +293,26 @@ namespace MyLovelyMail.MainProject.Storage
             }
         }
 
+        /// <summary>
+        /// Deletes only the cached body of a message, leaving its summary in the list — the row
+        /// stays, and opening it downloads the body again. True when a file was actually removed.
+        /// </summary>
+        public static bool DeleteCachedBody(string accountId, string folderFullName, uint uid)
+        {
+            string path = MessagePath(accountId, folderFullName, uid);
+            try
+            {
+                if (!File.Exists(path)) return false;
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not drop cached body '{path}': {ex.Message}", LogLevel.Warning);
+                return false;
+            }
+        }
+
         /// <summary>The cached MIME parsed, or null when not cached. Parse failures throw — callers decide how to handle them.</summary>
         public static MimeMessage? TryLoadMimeMessage(string accountId, string folderFullName, uint uid)
         {

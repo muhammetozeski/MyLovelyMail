@@ -105,6 +105,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     await OutboxService.FlushAsync(cancellationToken);
                 }
                 catch (OperationCanceledException) { }
+
+                OfflineCacheTrimmer.TrimAll();
             }
             finally
             {
