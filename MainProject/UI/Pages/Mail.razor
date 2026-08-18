@@ -93,13 +93,19 @@
             {
                 <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
             }
-            @if (!string.IsNullOrWhiteSpace(SearchText))
-            {
-                <div class="mail-search-tools">
+            <div class="mail-search-tools">
+                @if (MailUiState.SelectedAccount != null)
+                {
+                    <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
+                            title="Group replies into conversations"
+                            @onclick="ToggleConversationMode">💬 Conversations</button>
+                }
+                @if (!string.IsNullOrWhiteSpace(SearchText))
+                {
                     <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
                     <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
-                </div>
-            }
+                }
+            </div>
         </div>
 
         @if (MailUiState.SelectedFolder == null)
@@ -180,23 +186,31 @@
                             }
                         </span>
                     }
-                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid))">☑️ All</button>
+                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(Rows.Select(r => r.Message.Uid))">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
             }
             <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
-                <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
-                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
+                <Virtualize Items="Rows" Context="row" ItemSize="76">
+                    @{
+                        var message = row.Message;
+                        bool rowUnread = row.UnreadCount > 0;
+                    }
+                    <button class="mail-row @(rowUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
                             @onclick="e => HandleRowClick(e, message)">
                         <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
                               @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">
                             @(MailUiState.SelectedUids.Contains(message.Uid) ? "☑" : "☐")
                         </span>
-                        <span class="mail-row-avatar @(message.IsUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
+                        <span class="mail-row-avatar @(rowUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
                         <span class="mail-row-dot"></span>
                         <span class="mail-row-main">
                             <span class="mail-row-top">
-                                <span class="mail-row-from">@(string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName)</span>
+                                <span class="mail-row-from">@row.SenderText</span>
+                                @if (row.ConversationCount > 1)
+                                {
+                                    <span class="mail-row-thread-count" title="@row.ConversationCount messages in this conversation">@row.ConversationCount</span>
+                                }
                                 <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
                             </span>
                             <span class="mail-row-subject">

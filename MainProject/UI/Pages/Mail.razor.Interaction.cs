@@ -72,8 +72,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 OpenMessageOrDraft(message);
         }
 
+        /// <summary>Checked rows' messages. In conversation mode a checked row means its newest message, matching what the row shows.</summary>
         List<MailMessageSummary> SelectedSummaries =>
-            [.. FilteredSummaries.Where(s => MailUiState.SelectedUids.Contains(s.Uid))];
+            [.. Rows.Select(static r => r.Message).Where(s => MailUiState.SelectedUids.Contains(s.Uid))];
 
         /// <summary>Runs the action on every selected row (each with its real folder resolved), then clears the selection.</summary>
         void ForEachSelected(Action<MailAccountData, string, MailMessageSummary> action)
@@ -170,7 +171,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     else MailUiState.CloseMessage();
                     break;
                 case "a" or "A" when e.CtrlKey:
-                    MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid));
+                    MailUiState.SelectMany(Rows.Select(static r => r.Message.Uid));
                     break;
                 case "?":
                     ShowShortcutHelp = !ShowShortcutHelp;
@@ -183,12 +184,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
         }
 
+        /// <summary>Walks the rendered rows, so j/k steps conversation by conversation when grouping is on.</summary>
         void MoveFocus(int delta)
         {
-            if (FilteredSummaries.Count == 0) return;
-            int index = MailUiState.FocusedMessage == null ? -1 : FilteredSummaries.IndexOf(MailUiState.FocusedMessage);
-            int next = Math.Clamp(index + delta, 0, FilteredSummaries.Count - 1);
-            MailUiState.FocusMessage(FilteredSummaries[next]);
+            if (Rows.Count == 0) return;
+            var focusable = Rows.Select(static r => r.Message).ToList();
+            int index = MailUiState.FocusedMessage == null ? -1 : focusable.IndexOf(MailUiState.FocusedMessage);
+            int next = Math.Clamp(index + delta, 0, focusable.Count - 1);
+            MailUiState.FocusMessage(focusable[next]);
         }
 
         /// <summary>1-2 initials for the avatar circle: from the display name's words, else the address.</summary>

@@ -7,6 +7,10 @@ using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
+    /// <summary>One rendered list row. <paramref name="ConversationCount"/> is 1 in flat mode, so the
+    /// same markup serves both modes; the count pill appears only above 1.</summary>
+    public sealed record MailRow(MailMessageSummary Message, int ConversationCount, int UnreadCount, string SenderText);
+
     // Core of the mail screen: lifecycle/event wiring plus the folder list, message list and
     // search. The reader, compose and interaction members live in the sibling partials.
     public partial class Mail
@@ -99,6 +103,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 var hits = SearchService.Search(account.Id, SearchText);
                 HitFolders = hits.ToDictionary(h => h.Summary, h => (h.FolderFullName, h.FolderDisplayName));
                 FilteredSummaries = [.. hits.Select(h => h.Summary)];
+                BuildRows();
                 return;
             }
 
@@ -107,6 +112,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (account == null || folder == null)
             {
                 FilteredSummaries = [];
+                BuildRows();
                 return;
             }
 
@@ -114,6 +120,42 @@ namespace MyLovelyMail.MainProject.UI.Pages
             FilteredSummaries = string.IsNullOrWhiteSpace(SearchText)
                 ? summaries
                 : [.. summaries.Where(MatchesSearch)];
+            BuildRows();
+        }
+
+        /// <summary>
+        /// The rows the list actually renders. Conversation mode collapses the summaries into one
+        /// row per thread; flat mode maps them one-to-one. Both feed the SAME row markup, so the
+        /// two modes can never drift apart visually.
+        /// </summary>
+        List<MailRow> Rows { get; set; } = [];
+
+        /// <summary>Grouping is on when the (already shipped) ConversationView setting says so and no search is narrowing the list — a search must keep every hit visible.</summary>
+        bool ConversationMode =>
+            MailUiState.SelectedAccount is { } account
+            && AccountStore.GetSettings(account.Id).ConversationView.Value
+            && string.IsNullOrWhiteSpace(SearchText);
+
+        void BuildRows() =>
+            Rows = ConversationMode
+                ? [.. ThreadingService.BuildThreads(FilteredSummaries).Select(static thread => new MailRow(
+                    thread.Newest,
+                    thread.Messages.Count,
+                    thread.UnreadCount,
+                    string.Join(", ", thread.Messages.Select(static m => string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName).Distinct()) ))]
+                : [.. FilteredSummaries.Select(static summary => new MailRow(
+                    summary,
+                    1,
+                    summary.IsUnread ? 1 : 0,
+                    string.IsNullOrWhiteSpace(summary.FromName) ? summary.FromAddress : summary.FromName))];
+
+        void ToggleConversationMode()
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            var conversationView = AccountStore.GetSettings(account.Id).ConversationView;
+            conversationView.Value = !conversationView.Value;
+            AccountStore.GetSettings(account.Id).Save();
+            RefreshLists();
         }
 
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
