@@ -289,6 +289,21 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { undone = draft != null };
                 }
 
+                case ("GET", "/export"):
+                {
+                    string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
+                    string folder = query["folder"] ?? "INBOX";
+                    uint uid = uint.Parse(query["uid"] ?? throw new InvalidOperationException("uid is required."));
+                    var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("Unknown account.");
+                    var summary = MessageStore.GetSummary(accountId, folder, uid) ?? throw new InvalidOperationException("Unknown message.");
+                    if (!MessageStore.HasFullMessage(accountId, folder, uid))
+                        await ImapSyncService.DownloadMessageAsync(account, folder, uid);
+                    string exportPath = query["format"] == "html"
+                        ? MessageExportService.ExportHtml(account, folder, summary)
+                        : MessageExportService.ExportEml(account, folder, summary);
+                    return new { path = exportPath };
+                }
+
                 case ("POST", "/move"):
                 {
                     string accountId = query["accountId"] ?? throw new InvalidOperationException("accountId is required.");
