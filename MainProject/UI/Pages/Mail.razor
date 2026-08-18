@@ -346,12 +346,21 @@
             <div class="mail-reader-content" @key="open.Uid">
             <div class="mail-reader-header">
                 <BackButton OnClick="@MailUiState.CloseMessage" />
+                @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
+                <span class="mail-reader-avatar" style="background:@AvatarGradient(open)">@AvatarInitials(open)</span>
                 <div class="mail-reader-titles">
                     <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
                     <div class="mail-reader-meta">
                         <span class="mail-reader-from">@open.FromName &lt;@open.FromAddress&gt;</span>
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                     </div>
+                    @if (HistoryOfOpenSender(open) is { } history)
+                    {
+                        <button class="mail-reader-history" title="Show everything from this sender"
+                                @onclick='() => RunSavedSearch("from:" + open.FromAddress)'>
+                            💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
+                        </button>
+                    }
                     @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
                         <div class="mail-reader-to">to @open.ToAddresses</div>

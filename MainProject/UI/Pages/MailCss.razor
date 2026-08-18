@@ -471,6 +471,39 @@
         color: var(--account-accent, @primary);
     }
 
+    /* Reader twin of the row avatar, one size up since it identifies the message being read. */
+    .mail-reader-avatar {
+        width: @(AppMeasures.Size.Px44)px;
+        height: @(AppMeasures.Size.Px44)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Medium)px;
+        font-weight: @(AppMeasures.Weight.Heavy);
+        flex-shrink: 0;
+        box-shadow: @AppStyles.ShadowSoft;
+    }
+
+    .mail-reader-history {
+        align-self: flex-start;
+        margin-top: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @surfaceTint;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+        .mail-reader-history:hover {
+            color: @AppColors.TextPrimary.ToRgbaHex(true);
+            border-color: var(--account-accent, @primary);
+        }
+
     .mail-row-avatar {
         width: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
         height: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
