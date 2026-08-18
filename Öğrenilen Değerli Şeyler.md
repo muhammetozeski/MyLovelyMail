@@ -47,6 +47,21 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
 - **Sorun üretilmeden açıklanmaz.** "Muhtemelen X yüzünden" yazmak yasak; mock sunucu, log
   kanıtı veya piksel karşılaştırması gibi bir kanıt üretilir, sonra konuşulur.
 
+## Doğrulama tuzakları (hepsi gerçekten yaşandı)
+
+- **Aynı anda iki kopya çalışıyorsa snapshot yanlış pencereyi çeker.** Kullanıcının kurulumu
+  ile geliştirme derlemesi yan yana çalışıyordu; snapshot script'i pencere bulan ilk process'i
+  aldığı için hiç dokunulmamış bir derlemeyi "doğruladı". Script artık `bin\Debug` yoluna
+  sabitli ve hedefi ekrana yazıyor.
+- **Aranan metin yanlış bölgede eşleşebilir.** Alıntı katlamayı doğrularken `mlm-quote` metnini
+  tüm HTML'de aradım; `<style>` bloğundaki CSS kuralına takıldı ve "çalışıyor" sandım. Kontrol
+  her zaman ilgilenilen bölgede yapılmalı (burada `<body>` sonrası).
+- **PowerShell tek elemanlı diziyi düzleştirir.** `@(Invoke-RestMethod ...).Count` her sorgu için
+  1 döndürdü; API doğruydu, sayım yanlıştı. Bütün sayılar birbirinin aynı çıkıyorsa önce ölçüm
+  yöntemini şüphelen — gerçek sayılar 313/149/27 idi.
+- **Razor, çift tırnaklı attribute içinde iç içe `$"..."` ayrıştıramaz.** Attribute'u tek tırnakla
+  yaz (`@onclick='() => F("x" + y)'`) ya da ifadeyi code-behind'a taşı.
+
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
