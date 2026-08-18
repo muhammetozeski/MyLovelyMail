@@ -132,35 +132,5 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static string BuildAuroraStopsLayer() =>
             "background:" + string.Join(", ", AppColors.AuroraStops.Select(s =>
                 $"radial-gradient(ellipse {s.Size} at {s.Position}, {s.Color.WithAlpha(0.55f).ToRgbaHex(true)} 0%, transparent 70%)")) + ";";
-
-        //TODO: improve this comment. do we use these css variables or they are only for bootstrap and other css stuff?
-        //yani demek istediğim: bu değişkenler MainProject içinde herhangi bir yerde kullanılıyor mu? bunun cevabını summary'ye ekle kesin ve net bir şekilde emin olarak. sonra da bu todo'yu sil.
-        /// <summary>
-        /// Emits a <c>:root { --color-*: ...; --blur-*: ...; }</c> block. Single emitter for global CSS
-        /// variables so legacy <c>var(--color-*)</c> consumers and Bootstrap styles read from one place.
-        /// </summary>
-        public static string BuildCssVariables()
-        {
-            // TODO: bu fonksiyonu ve içindekileri silmek bir sorun çıkartmayacaksa silelim gitsin. biz direkt c#'taki renkleri kullanıyoruz zaten. "kara düzen" bir kod görmek istemiyorum projede
-            return ":root{" +
-                   $"--color-primary:{AppColors.Primary.ToRgbaHex(true)};" +
-                   $"--color-primary-light:{AppColors.PrimaryLight.ToRgbaHex(true)};" +
-                   $"--color-primary-dark:{AppColors.PrimaryDark.ToRgbaHex(true)};" +
-                   $"--color-secondary:{AppColors.Secondary.ToRgbaHex(true)};" +
-                   $"--color-accent:{AppColors.Accent.ToRgbaHex(true)};" +
-                   $"--color-background:{AppColors.BackgroundDeep.ToRgbaHex(true)};" +
-                   $"--color-surface:{AppColors.SurfaceNormal.ToRgbaHex(true)};" +
-                   $"--color-text-primary:{AppColors.TextPrimary.ToRgbaHex(true)};" +
-                   $"--color-text-secondary:{AppColors.TextSecondary.ToRgbaHex(true)};" +
-                   $"--color-text-muted:{AppColors.TextMuted.ToRgbaHex(true)};" +
-                   $"--color-success:{AppColors.Success.ToRgbaHex(true)};" +
-                   $"--color-error:{AppColors.Error.ToRgbaHex(true)};" +
-                   $"--color-warning:{AppColors.Warning.ToRgbaHex(true)};" +
-                   $"--blur-subtle:{AppMeasures.Blur.Subtle}px;" +
-                   $"--blur-normal:{AppMeasures.Blur.Normal}px;" +
-                   $"--blur-strong:{AppMeasures.Blur.Strong}px;" +
-                   $"--blur-heavy:{AppMeasures.Blur.Heavy}px;" +
-                   "}";
-        }
     }
 }

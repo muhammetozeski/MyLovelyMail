@@ -2,7 +2,6 @@
 @inherits ThemedComponentBase
 
 @{
-    string cssVars = AppStyles.BuildCssVariables();
     string auroraBase = $"background:linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
     string auroraStops = AppStyles.BuildAuroraStopsLayer();
     string textColor = AppColors.TextPrimary.ToRgbaHex(true);
@@ -11,8 +10,6 @@
 }
 
 <style>
-    @((MarkupString)cssVars)
-
     /* Emoji font (Resources/Fonts copied to wwwroot/fonts). unicode-range pins it to emoji codepoints ONLY, so it can sit
        FIRST in font-family and win every emoji glyph (overriding the OS emoji font) while every text glyph still falls
        through to the system stack — Noto Color Emoji has no Latin glyphs, so text is never affected. */
