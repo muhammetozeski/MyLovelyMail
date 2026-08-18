@@ -317,6 +317,19 @@ namespace MyLovelyMail.MainProject.ZTests
                     await OutboxService.FlushAsync();
                     return new { ok = true };
 
+                case ("GET", "/source"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var mime = MessageStore.TryLoadMimeMessage(accountId, folder, uid);
+                    return new
+                    {
+                        cached = mime != null,
+                        headers = mime?.Headers.Select(h => new { name = h.Field, value = h.Value })
+                    };
+                }
+
                 case ("GET", "/outbox"):
                     return new
                     {

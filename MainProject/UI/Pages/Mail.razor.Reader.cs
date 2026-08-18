@@ -1,3 +1,4 @@
+using System.Text;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
@@ -159,6 +160,36 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void ToggleOpenImportant(MailMessageSummary message) =>
             WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleImportant(account, folderName, message));
+
+        /// <summary>Raw MIME shown in the source modal is capped here; a 20 MB newsletter would otherwise freeze the render.</summary>
+        const int MaxShownSourceChars = 256 * 1024;
+
+        bool ShowMessageSource { get; set; }
+        bool ShowRawSource { get; set; }
+        List<(string Name, string Value)> SourceHeaders { get; set; } = [];
+        string SourceRaw { get; set; } = string.Empty;
+
+        /// <summary>Reads headers and raw MIME straight from the cached .eml — no protocol traffic, works offline.</summary>
+        void OpenMessageSource(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
+
+            SourceHeaders = MessageStore.TryLoadMimeMessage(account.Id, folderName, message.Uid) is { } mime
+                ? [.. mime.Headers.Select(h => (h.Field, h.Value))]
+                : [];
+
+            byte[]? rawBytes = MessageStore.TryLoadFullMessage(account.Id, folderName, message.Uid);
+            string raw = rawBytes == null ? string.Empty : Encoding.UTF8.GetString(rawBytes);
+            SourceRaw = raw.Length > MaxShownSourceChars
+                ? raw[..MaxShownSourceChars] + $"\n\n… truncated at {MaxShownSourceChars / 1024} KB"
+                : raw;
+
+            ShowRawSource = false;
+            ShowMessageSource = true;
+        }
+
+        Task CopySourceAsync() => ClipboardService.CopyAsync(ShowRawSource ? SourceRaw
+            : string.Join('\n', SourceHeaders.Select(h => $"{h.Name}: {h.Value}")));
 
         /// <summary>Saves the open message to Downloads as .eml (raw MIME) or .html (rendered snapshot).</summary>
         Task ExportOpen(MailMessageSummary message, bool asHtml) =>

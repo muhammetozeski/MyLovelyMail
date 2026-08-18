@@ -954,6 +954,54 @@
         min-height: @(AppMeasures.Size.Px200)px;
     }
 
+    /* Source modal: parsed headers table and the raw MIME, both read from the cached .eml. */
+    .mail-source {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px12)px;
+        width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px300)px;
+        max-width: @(AppMeasures.Percent.Most)vw;
+        max-height: @(AppMeasures.Viewport.Most)vh;
+    }
+
+    .mail-source-tabs {
+        display: flex;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-wrap: wrap;
+    }
+
+    .mail-source-headers {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px12)px;
+        overflow: auto;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-source-header-name {
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textSecondary;
+        white-space: nowrap;
+    }
+
+    .mail-source-header-value {
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        word-break: break-all;
+    }
+
+    .mail-source-raw {
+        margin: 0;
+        overflow: auto;
+        max-height: @(AppMeasures.Viewport.Most)vh;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.SurfaceDarken.ToRgbaHex(true);
+        font-family: Consolas, monospace;
+        font-size: @(AppMeasures.Font.Small)px;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
     /* Inbox Zero: the reward state for an emptied inbox — hearts drift up behind the headline. */
     .mail-inbox-zero {
         position: relative;
