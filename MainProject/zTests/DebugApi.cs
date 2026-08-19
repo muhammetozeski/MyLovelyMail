@@ -394,6 +394,12 @@ namespace MyLovelyMail.MainProject.ZTests
                 {
                     string accountId = RequireQueryValue(query, "accountId");
                     int budgetMb = int.Parse(RequireQueryValue(query, "mb"));
+                    // Keep-days is lendable too: the AGE stage is the one that reaches mail
+                    // filed into a local folder, which the size stage may never get to.
+                    var keepDays = AccountStore.GetSettings(accountId).OfflineKeepDays;
+                    bool keepWasOverridden = keepDays.IsOverridden;
+                    int keepPrevious = keepDays.Value;
+                    if (query["keepDays"] is { Length: > 0 } lentDays) keepDays.Value = int.Parse(lentDays);
                     var budget = AccountStore.GetSettings(accountId).OfflineMaxCacheMb;
                     bool wasOverridden = budget.IsOverridden;
                     int previous = budget.Value;
@@ -405,6 +411,7 @@ namespace MyLovelyMail.MainProject.ZTests
                     finally
                     {
                         if (wasOverridden) budget.Value = previous; else budget.ClearOverride();
+                        if (keepWasOverridden) keepDays.Value = keepPrevious; else keepDays.ClearOverride();
                     }
                 }
 
