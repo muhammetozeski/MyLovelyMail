@@ -38,6 +38,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             void Union(int a, int b) => parent[Find(a)] = Find(b);
 
+            // Days apart before two same-subject messages stop counting as one conversation.
+            const int SubjectWindowDays = 30;
+
+            // Messages a subject-only bucket may hold before a new one starts.
+            const int SubjectBucketCap = 50;
+
             // Pass 1: id links. Map every known Message-Id to its index, then union each
             // message with everything its InReplyTo/References point at.
             Dictionary<string, int> indexByMessageId = new(StringComparer.OrdinalIgnoreCase);
@@ -58,7 +64,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             // dropped by the sending client. Two independent messages that merely share a
             // subject must NOT merge, so a link is only made when at least one side carries
             // a Re:/Fwd: prefix.
-            Dictionary<string, int> indexBySubject = new(StringComparer.OrdinalIgnoreCase);
+            // The fallback is WINDOWED and CAPPED. Without that, automated mail — a nightly
+            // "Re: Backup report", a shop's "RE: Your order" — carries a fresh Message-Id and no
+            // References, so every one of them looks like a reply and they all merge into a single
+            // bucket: three years of a daily job became ONE row with a 1095 count pill and 1094
+            // messages simply missing from the list. Pass 1 stays unbounded; a real References
+            // chain is evidence, a shared subject is only a guess.
+            Dictionary<string, List<int>> bucketsBySubject = new(StringComparer.OrdinalIgnoreCase);
             bool[] replyLike = new bool[summaries.Count];
             for (int i = 0; i < summaries.Count; i++)
             {
@@ -66,14 +78,35 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 replyLike[i] = subjectKey.Length != summaries[i].Subject.Trim().Length;
                 if (subjectKey.Length == 0) continue;
 
-                if (indexBySubject.TryGetValue(subjectKey, out int existing))
+                if (!bucketsBySubject.TryGetValue(subjectKey, out var bucket))
                 {
-                    if (replyLike[i] || replyLike[existing])
-                        Union(i, existing);
+                    bucketsBySubject[subjectKey] = [i];
+                    continue;
+                }
+
+                // Walked by hand rather than with FindLast: that returns the ELEMENT, and its
+                // not-found value is 0 — a perfectly legal index here, so every unmatched message
+                // would silently union with the first one, which is the bug being fixed.
+                int? neighbour = null;
+                for (int back = bucket.Count - 1; back >= 0; back--)
+                {
+                    int member = bucket[back];
+                    if (!replyLike[i] && !replyLike[member]) continue;
+                    if (Math.Abs((summaries[i].DateUtc - summaries[member].DateUtc).TotalDays) > SubjectWindowDays) continue;
+                    neighbour = member;
+                    break;
+                }
+
+                if (neighbour is { } linked && bucket.Count < SubjectBucketCap)
+                {
+                    Union(i, linked);
+                    bucket.Add(i);
                 }
                 else
                 {
-                    indexBySubject[subjectKey] = i;
+                    // Out of the window or over the cap: start a fresh conversation under the same
+                    // subject rather than growing one forever.
+                    bucketsBySubject[subjectKey] = [i];
                 }
             }
 
