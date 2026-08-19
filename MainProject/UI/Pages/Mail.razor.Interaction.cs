@@ -176,6 +176,19 @@ namespace MyLovelyMail.MainProject.UI.Pages
         static string InboxZeroHeartStyle(int heartIndex) => string.Create(CultureInfo.InvariantCulture,
             $"left:{10 + heartIndex * 18}%;animation-delay:{heartIndex * 0.7:0.0}s;font-size:{14 + heartIndex % 3 * 6}px;");
 
+        /// <summary>The occupants that actually have state behind them, in the order they are offered.</summary>
+        List<(MailUiState.PaneOccupant Occupant, string Label)> PaneTabs
+        {
+            get
+            {
+                List<(MailUiState.PaneOccupant, string)> tabs = [];
+                if (MailUiState.OpenMessage != null) tabs.Add((MailUiState.PaneOccupant.Reader, "📖 Message"));
+                if (MailUiState.ActiveCompose != null) tabs.Add((MailUiState.PaneOccupant.Compose, "✏️ Draft"));
+                if (MailUiState.OpenPersonAddress != null) tabs.Add((MailUiState.PaneOccupant.Person, "👤 Person"));
+                return tabs;
+            }
+        }
+
         bool ShowBulkTagPicker { get; set; }
 
         /// <summary>Its own field: the reader's tag input is bound to the OPEN message, not to a selection.</summary>

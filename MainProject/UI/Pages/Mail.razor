@@ -8,7 +8,10 @@
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>My Lovely Mail</PageTitle>
 
-<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
+@* The narrow-window rule asked only about OpenMessage, so under the two-pane breakpoint the
+   sidebar Compose button rendered its card inside a display:none column and the autosave timer
+   wrote a draft nobody could see. It asks about the pane itself now. *@
+<div class="mail-screen @(MailUiState.ThirdPane != null ? "mail-screen--pane-open" : "")"
      style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     @* ---- Left: accounts + folders ---- *@
@@ -366,9 +369,23 @@
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
+        @* Exactly one occupant at a time, with a strip listing the ones that exist. The sheet used
+           to render above the reader body in the same scrolling column, pushing the message below
+           the fold; switching here only moves ThirdPane, so the draft and the open message keep
+           their state. *@
+        @if (PaneTabs.Count > 1)
+        {
+            <div class="mail-pane-tabs">
+                @foreach (var (occupant, label) in PaneTabs)
+                {
+                    <button class="mail-pane-tab @(MailUiState.ThirdPane == occupant ? "mail-pane-tab--on" : "")"
+                            @onclick="() => MailUiState.ShowPane(occupant)">@label</button>
+                }
+            </div>
+        }
         @* The sheet lives INSIDE the reader pane rather than beside it: .mail-screen is a
            three-column grid, and a fourth child pushed the message list into the reader's slot. *@
-        @if (MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
+        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person && MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
         {
             <div class="mail-person-sheet">
                 <div class="mail-person-head">
@@ -433,7 +450,7 @@
                 <button class="mail-undo-button" @onclick="UndoPendingSend">↩️ Undo</button>
             </div>
         }
-        @if (MailUiState.ActiveCompose is { } draft)
+        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Compose && MailUiState.ActiveCompose is { } draft)
         {
             <div class="mail-reader-header">
                 <BackButton OnClick="@SaveAndCloseCompose" />

@@ -1180,6 +1180,29 @@
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
+    /* Which of the three the pane is showing; only rendered when more than one exists. */
+    .mail-pane-tabs {
+        display: flex;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-bottom: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-pane-tab {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        cursor: pointer;
+        color: @textSecondary;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-pane-tab--on {
+        background: @surfaceTint;
+        color: @textPrimary;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
     /* One panel for everything the cache knows about a correspondent. */
     .mail-person-sheet {
         display: flex;
@@ -1518,7 +1541,7 @@
             display: none;
         }
 
-        .mail-screen--reading .mail-reader {
+        .mail-screen--pane-open .mail-reader {
             display: flex;
             position: fixed;
             inset: 0;
