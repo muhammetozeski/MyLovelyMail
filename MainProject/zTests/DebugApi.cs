@@ -519,6 +519,25 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { deleted = uid, folder };
                 }
 
+                // Ticks rows the way Ctrl+Click does, so the bulk bar - which only exists while
+                // something is selected - can be audited at all.
+                case ("POST", "/select"):
+                {
+                    var uids = (query["uids"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToList();
+                    if (uids.Count == 0) MailUiState.ClearSelection(); else MailUiState.SelectMany(uids);
+                    return new { selected = MailUiState.SelectedUids.Count };
+                }
+
+                case ("POST", "/tag"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    var uids = (query["uids"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToHashSet();
+                    var targets = MessageStore.GetSummaries(accountId, folder).Where(s => uids.Contains(s.Uid));
+                    int changed = MessageActions.SetTagOnMany(RequireAccount(accountId), folder, targets, RequireQueryValue(query, "tag"), query["remove"] != "true");
+                    return new { changed };
+                }
+
                 case ("POST", "/read"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
