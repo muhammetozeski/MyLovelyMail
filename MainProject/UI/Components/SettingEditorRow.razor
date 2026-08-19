@@ -1,0 +1,73 @@
+@* One editable row for any ISetting, picking the control from the value's runtime type. Both the
+   account overrides card and the Settings catch-all card render through this, so a setting type
+   gains an editor in one place instead of two. *@
+<div class="settings-row">
+    <div class="settings-row-text">
+        <span class="settings-row-label">
+            @Setting.KeyHumanReadable
+            @if (BadgeText is { Length: > 0 } badge)
+            {
+                <span class="account-badge @(Setting.IsDefault ? "account-badge--inherited" : "account-badge--overridden")">@badge</span>
+            }
+        </span>
+        @if (Hint is { Length: > 0 } hint)
+        {
+            <span class="settings-row-hint">@hint</span>
+        }
+    </div>
+    <div class="account-setting-controls">
+        @if (Setting.Value is bool boolValue)
+        {
+            <CoreToggle Checked="@boolValue" CheckedChanged="@(v => Commit(v.ToString()))" />
+        }
+        else if (Setting.Value is Enum enumValue)
+        {
+            <select class="filters-select" value="@enumValue.ToString()"
+                    @onchange="@(e => Commit(e.Value?.ToString() ?? string.Empty))">
+                @foreach (var option in Enum.GetValues(enumValue.GetType()))
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+        }
+        else
+        {
+            <input class="filters-input account-setting-input"
+                   type="@(Setting.Value is int ? "number" : "text")"
+                   value="@Setting.Value"
+                   @onchange="@(e => Commit(e.Value?.ToString() ?? string.Empty))" />
+        }
+        @if (!Setting.IsDefault)
+        {
+            <button class="filters-remove" title="@ResetTitle" @onclick="Reset">↩︎</button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ISetting Setting { get; set; } = default!;
+
+    /// <summary>Runs after a write that actually landed — the owner persists its own store here.</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    /// <summary>Optional one-line explanation under the label.</summary>
+    [Parameter] public string? Hint { get; set; }
+
+    /// <summary>Optional inherited/overridden pill; empty hides it (global settings have no parent).</summary>
+    [Parameter] public string? BadgeText { get; set; }
+
+    [Parameter] public string ResetTitle { get; set; } = "Reset to default";
+
+    /// <summary>Text that is not a value of the setting's type changes nothing and saves nothing.</summary>
+    async Task Commit(string text)
+    {
+        if (!Setting.TrySetFromText(text)) return;
+        await OnSaved.InvokeAsync();
+    }
+
+    async Task Reset()
+    {
+        Setting.ResetToDefault();
+        await OnSaved.InvokeAsync();
+    }
+}

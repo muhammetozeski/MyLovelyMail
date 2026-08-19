@@ -63,48 +63,10 @@
             </p>
             @foreach (var setting in AccountSettingsOf.GetAllSettings())
             {
-                <div class="settings-row">
-                    <div class="settings-row-text">
-                        <span class="settings-row-label">
-                            @setting.KeyHumanReadable
-                            @if (setting.IsDefault)
-                            {
-                                <span class="account-badge account-badge--inherited">inherited</span>
-                            }
-                            else
-                            {
-                                <span class="account-badge account-badge--overridden">overridden</span>
-                            }
-                        </span>
-                    </div>
-                    <div class="account-setting-controls">
-                        @if (setting.Value is bool boolValue)
-                        {
-                            <CoreToggle Checked="@boolValue" CheckedChanged="@(v => SetValue(setting, v.ToString()))" />
-                        }
-                        else if (setting.Value is Enum enumValue)
-                        {
-                            <select class="filters-select" value="@enumValue.ToString()"
-                                    @onchange="@(e => SetValue(setting, e.Value?.ToString() ?? string.Empty))">
-                                @foreach (var option in Enum.GetValues(enumValue.GetType()))
-                                {
-                                    <option value="@option">@option</option>
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            <input class="filters-input account-setting-input"
-                                   type="@(setting.Value is int ? "number" : "text")"
-                                   value="@setting.Value"
-                                   @onchange="@(e => SetValue(setting, e.Value?.ToString() ?? string.Empty))" />
-                        }
-                        @if (!setting.IsDefault)
-                        {
-                            <button class="filters-remove" title="Reset to inherited" @onclick="() => ResetSetting(setting)">↩︎</button>
-                        }
-                    </div>
-                </div>
+                <SettingEditorRow Setting="@setting"
+                                  BadgeText="@(setting.IsDefault ? "inherited" : "overridden")"
+                                  ResetTitle="Reset to inherited"
+                                  OnSaved="@(() => AccountSettingsOf.Save())" />
             }
         </GlassCard>
     }
@@ -147,16 +109,4 @@
         AccountStore.Save(account);
     }
 
-    /// <summary>A value that does not parse changes nothing — no override, no save.</summary>
-    void SetValue(ISetting setting, string text)
-    {
-        if (!setting.TrySetFromText(text)) return;
-        AccountSettingsOf.Save();
-    }
-
-    void ResetSetting(ISetting setting)
-    {
-        setting.ResetToDefault();
-        AccountSettingsOf.Save();
-    }
 }
