@@ -27,7 +27,7 @@ namespace MyLovelyMail.MainProject.Services
                 MaxRetryAttempts = MaxRetryAttempts,
                 BackoffType = DelayBackoffType.Exponential,
                 Delay = FirstRetryDelay,
-                ShouldHandle = new PredicateBuilder().Handle<Exception>(static ex => ex is not OperationCanceledException),
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(static ex => IsWorthRetrying(ex)),
                 OnRetry = static args =>
                 {
                     Log($"Network retry {args.AttemptNumber + 1}/{MaxRetryAttempts} after: {args.Outcome.Exception?.Message}", LogLevel.Warning);
@@ -36,6 +36,20 @@ namespace MyLovelyMail.MainProject.Services
             })
             .AddTimeout(AttemptTimeout)
             .Build();
+
+        /// <summary>
+        /// Whether trying again could plausibly help. A refused password will be refused three
+        /// more times, so retrying it only turns one mistyped password into four failed logins —
+        /// against Gmail or Yahoo, on every scheduled pass, which is how a provider starts
+        /// rate-limiting the account. Sockets, TLS and timeouts stay retryable: those do heal.
+        /// </summary>
+        static bool IsWorthRetrying(Exception exception) => exception switch
+        {
+            OperationCanceledException => false,
+            MailKit.Security.AuthenticationException => false,
+            MailKit.ServiceNotAuthenticatedException => false,
+            _ => true
+        };
 
         public static async Task<T> RunNetwork<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default) =>
             await Network.ExecuteAsync(async ct => await action(ct).WaitAsync(ct), cancellationToken);
