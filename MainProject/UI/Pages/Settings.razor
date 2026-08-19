@@ -132,6 +132,15 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Other folders refreshed per sync</span>
+                <span class="settings-row-hint">Keeps folders you rarely open findable by search; 0 syncs the inbox only</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.BackgroundFolderRefreshCount.Value.ToString()" ValueChanged="@SetBackgroundFolderRefresh" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Instant push (IMAP IDLE)</span>
                 <span class="settings-row-hint">Keep a live connection so mail arrives immediately</span>
             </div>
@@ -344,6 +353,14 @@
     static void SetFollowSystemMotion(bool follow) => SetAndSave(GlobalSettings.FollowSystemMotion, follow);
 
     static void SetReduceMotion(bool reduce) => SetAndSave(GlobalSettings.ReduceMotion, reduce);
+
+    /// <summary>Clamped: a negative count is meaningless and a big one turns every sync into a full-mailbox pass.</summary>
+    static void SetBackgroundFolderRefresh(string text)
+    {
+        const int MaxFolders = 10;
+        if (int.TryParse(text, out int parsed))
+            SetAndSave(GlobalSettings.BackgroundFolderRefreshCount, Math.Clamp(parsed, 0, MaxFolders));
+    }
 
     /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
     static void SetUiScale(string text)

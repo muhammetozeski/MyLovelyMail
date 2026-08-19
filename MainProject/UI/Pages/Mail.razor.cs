@@ -186,6 +186,26 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SearchText = rescue.Query;
         }
 
+        /// <summary>
+        /// Hover text answering "how old is what I am looking at". The folder-list pass keeps every
+        /// unread badge current while the messages behind it can be weeks old, so the badge alone
+        /// cannot tell the user that.
+        /// </summary>
+        static string FolderFreshness(MailFolderData folder)
+        {
+            if (folder.IsLocal) return "Local folder — nothing to sync";
+            if (folder.LastSyncedUtc is not { } synced) return "Messages not fetched yet";
+
+            var age = DateTime.UtcNow - synced;
+            return age switch
+            {
+                { TotalMinutes: < 2 } => "Messages up to date",
+                { TotalHours: < 1 } => $"Messages from {(int)age.TotalMinutes} minutes ago",
+                { TotalDays: < 1 } => $"Messages from {(int)age.TotalHours} hours ago",
+                _ => $"Messages from {(int)age.TotalDays} days ago"
+            };
+        }
+
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
         static int AccountUnreadCount(string accountId) =>
             MessageStore.GetFolders(accountId)

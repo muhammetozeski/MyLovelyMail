@@ -80,6 +80,7 @@
                         @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper. *@
                         <div class="mail-folder-row">
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                    title="@FolderFreshness(folder)"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
                                 <span class="mail-folder-icon">@FolderIcon(folder)</span>
                                 <span class="mail-folder-name">@FolderLabel(folder)</span>
