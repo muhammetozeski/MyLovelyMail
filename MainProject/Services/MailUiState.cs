@@ -21,11 +21,33 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>The draft open in the compose pane; null = compose pane closed.</summary>
         public static ComposeDraft? ActiveCompose { get; private set; }
 
+        /// <summary>What the third column is showing. Three different things can live there and its
+        /// visibility rule only ever asked about one of them.</summary>
+        public enum PaneOccupant { Reader, Compose, Person }
+
+        /// <summary>The occupant on screen, or null when the pane is empty.</summary>
+        public static PaneOccupant? ThirdPane { get; private set; }
+
+        /// <summary>Whichever occupant still has state behind it, so closing one falls back instead of blanking.</summary>
+        static PaneOccupant? SurvivingOccupant() =>
+            ActiveCompose != null ? PaneOccupant.Compose
+            : OpenMessage != null ? PaneOccupant.Reader
+            : OpenPersonAddress != null ? PaneOccupant.Person
+            : null;
+
+        /// <summary>Switches which occupant is shown without disturbing the other two.</summary>
+        public static void ShowPane(PaneOccupant occupant)
+        {
+            ThirdPane = occupant;
+            OnSelectionChanged?.Invoke();
+        }
+
         public static event Action? OnSelectionChanged;
 
         public static void OpenCompose(ComposeDraft draft)
         {
             ActiveCompose = draft;
+            ThirdPane = PaneOccupant.Compose;
             OnSelectionChanged?.Invoke();
         }
 
@@ -35,18 +57,21 @@ namespace MyLovelyMail.MainProject.Services
         public static void OpenPerson(string address)
         {
             OpenPersonAddress = address;
+            ThirdPane = PaneOccupant.Person;
             OnSelectionChanged?.Invoke();
         }
 
         public static void ClosePerson()
         {
             OpenPersonAddress = null;
+            ThirdPane = SurvivingOccupant();
             OnSelectionChanged?.Invoke();
         }
 
         public static void CloseCompose()
         {
             ActiveCompose = null;
+            ThirdPane = SurvivingOccupant();
             OnSelectionChanged?.Invoke();
         }
 
@@ -64,6 +89,8 @@ namespace MyLovelyMail.MainProject.Services
             SelectedAccount = account;
             SelectedFolder = null;
             OpenMessage = null;
+            // The pane must not keep pointing at a message that is no longer listed.
+            ThirdPane = SurvivingOccupant();
             SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
         }
@@ -72,6 +99,7 @@ namespace MyLovelyMail.MainProject.Services
         {
             SelectedFolder = folder;
             OpenMessage = null;
+            ThirdPane = SurvivingOccupant();
             SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
 
@@ -110,12 +138,14 @@ namespace MyLovelyMail.MainProject.Services
         public static void OpenMessageInReader(MailMessageSummary message)
         {
             OpenMessage = message;
+            ThirdPane = PaneOccupant.Reader;
             OnSelectionChanged?.Invoke();
         }
 
         public static void CloseMessage()
         {
             OpenMessage = null;
+            ThirdPane = SurvivingOccupant();
             OnSelectionChanged?.Invoke();
         }
     }
