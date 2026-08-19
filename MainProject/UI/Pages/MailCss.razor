@@ -1166,6 +1166,23 @@
         word-break: break-all;
     }
 
+    /* What a rule did to this message — the only trace a working rule leaves. */
+    .mail-rule-trace {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        cursor: pointer;
+        margin-left: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+        .mail-rule-trace:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
     /* Sender-trust chip: shown only when something is wrong, so it never becomes wallpaper. */
     .mail-auth-chip {
         display: inline-flex;

@@ -485,6 +485,13 @@
                     {
                         <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
                     }
+                    @* A rule that works leaves no other trace: mail simply arrives already-read,
+                       tagged, or missing from the folder it was addressed to. *@
+                    @foreach (var trace in ruleTrace)
+                    {
+                        <button class="mail-rule-trace" title="Open the filter rules"
+                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>🧭 @trace.Action by “@trace.RuleName”</button>
+                    }
                     @if (unsubscribeTargets is { } unsubscribe)
                     {
                         <div class="mail-unsubscribe">
