@@ -103,6 +103,11 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   `WindowMetrics\MinAnimate` REG_SZ ("1"/"0"). Çalışan bir prob'u kopyalayıp tip desenini
   aynen bırakmak sessizce her kullanıcı için yanlış cevap üretirdi; değeri önce oku, sonra yaz.
 
+- **Bir sayının tek bir anlamı olmalı; iki kaynaktan yazılan alan er geç yalan söyler.** Klasörün
+  okunmamış rozetini senkron sunucunun sayısıyla (9.624 mesajın 8.607'si), yerel işlemler ise
+  yalnızca önbellekteki dilimle (513 mesaj) yazıyordu. Tek bir mail açmak rozeti 8.607'den
+  149'a düşürüyor, sonraki senkron geri koyuyordu. Alanın sahibi tek bir katman olmalı; ötekiler
+  ona delta bildirir. Yeniden-hesap ancak önbellek tüm klasörü tutuyorsa doğrudur.
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
