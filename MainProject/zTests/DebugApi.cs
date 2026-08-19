@@ -174,7 +174,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         selectedFolder = MailUiState.SelectedFolder?.FullName,
                         rememberedFolder = MailUiState.SelectedAccount is { } open ? FolderMemoryStore.FolderOf(open.Id) : null,
                         rememberedAccountId = FolderMemoryStore.LastAccountId,
-                        accounts = AccountStore.Accounts.Select(a => new { a.Id, a.EmailAddress, a.Protocol, a.IncomingHost, a.Enabled })
+                        accounts = AccountStore.Accounts.Select(a => new { a.Id, a.EmailAddress, a.Protocol, a.IncomingHost, a.Enabled, a.SortOrder })
                     };
 
                 // Drives the same selection path the sidebar uses, so the folder memory can be
@@ -307,6 +307,23 @@ namespace MyLovelyMail.MainProject.ZTests
                             f.LastSeenUid, f.OldestFetchedUid,
                             CachedCount = MessageStore.GetSummaries(accountId, f.FullName).Count
                         });
+                }
+
+                case ("POST", "/accounts/order"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    AccountStore.Move(accountId, int.Parse(RequireQueryValue(query, "delta")));
+                    return new { order = AccountStore.Accounts.Select(a => new { a.EmailAddress, a.SortOrder }) };
+                }
+
+                // Flips the account's Enabled flag through the same store path the settings page
+                // uses, so the paused rendering can be checked without opening that page.
+                case ("POST", "/accounts/enabled"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    account.Enabled = RequireQueryValue(query, "enabled") == "true";
+                    AccountStore.Save(account);
+                    return new { account.EmailAddress, account.Enabled };
                 }
 
                 case ("POST", "/read"):
