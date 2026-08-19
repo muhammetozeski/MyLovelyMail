@@ -1116,6 +1116,20 @@
         gap: @(AppMeasures.Space.Px6)px;
     }
 
+    /* Sender-trust chip: shown only when something is wrong, so it never becomes wallpaper. */
+    .mail-auth-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        margin-left: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.Warning.ToRgbaHex(true);
+        color: @AppColors.TextOnWarning.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
     /* A muted conversation is present but not shouting. */
     .mail-row-flag--muted {
         opacity: @(AppMeasures.Opacity.Muted);

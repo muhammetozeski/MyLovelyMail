@@ -440,6 +440,12 @@
                             💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
                         </button>
                     }
+                    @* Only ever what is WRONG. A dkim=pass line can be prepended by anyone, so a
+                       reassuring green badge would launder a forged header. *@
+                    @foreach (var finding in authFindings)
+                    {
+                        <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
+                    }
                     @if (unsubscribeTargets is { } unsubscribe)
                     {
                         <div class="mail-unsubscribe">

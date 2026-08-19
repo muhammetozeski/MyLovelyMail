@@ -26,6 +26,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// <summary>Unsubscribe targets of the open message; filled with its body, cleared with it.</summary>
         UnsubscribeTargets? unsubscribeTargets;
 
+        /// <summary>What does not add up about the open message's sender; same lifetime as the body.</summary>
+        IReadOnlyList<AuthFinding> authFindings = [];
+
         /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
         void OpenUnsubscribePage(string url)
         {
@@ -183,6 +186,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OpenBodyLoading = false;
             OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
             unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
+            authFindings = MessageAuthService.Read(account, folderName, open);
             MarkOpenAsRead(account, folderName, open);
             await InvokeAsync(StateHasChanged);
         }
