@@ -388,6 +388,68 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { GlobalSettings.ReduceMotion.Value, followSystem = GlobalSettings.FollowSystemMotion.Value, effective = MotionPreference.IsCalm, css = AppStyles.BuildCalmMotionLayer() };
                 }
 
+                // Every registered setting with its value and whether it still follows the default.
+                // ?accountId= switches to that account's inherited set. This is what makes "does a
+                // control exist for every key" a checkable question instead of an eyeballed one.
+                case ("GET", "/settings"):
+                {
+                    var all = query["accountId"] is { Length: > 0 } settingsAccount
+                        ? AccountStore.GetSettings(settingsAccount).GetAllSettings()
+                        : SettingsManager.GetAllSettings();
+                    return all
+                        .OrderBy(static s => s.Key, StringComparer.Ordinal)
+                        .Select(static s => new
+                        {
+                            s.Key,
+                            value = s.Value.ToString(),
+                            @default = s.DefaultValue.ToString(),
+                            s.IsDefault,
+                            type = s.Value.GetType().Name
+                        });
+                }
+
+                // Writes through ISetting.TrySetFromText — the editor's path, not the file loader's
+                // — so a rejected value can be observed as "nothing changed" rather than inferred.
+                case ("POST", "/settings/set"):
+                {
+                    string key = RequireQueryValue(query, "key");
+                    string value = RequireQueryValue(query, "value");
+                    string? targetAccount = query["accountId"];
+
+                    var owner = targetAccount is { Length: > 0 }
+                        ? AccountStore.GetSettings(targetAccount).GetAllSettings()
+                        : SettingsManager.GetAllSettings();
+                    var setting = owner.FirstOrDefault(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        ?? throw new InvalidOperationException($"Unknown setting '{key}'.");
+
+                    bool applied = setting.TrySetFromText(value);
+                    if (applied)
+                    {
+                        if (targetAccount is { Length: > 0 }) AccountStore.GetSettings(targetAccount).Save();
+                        else SettingsManager.SaveSettings();
+                    }
+                    return new { setting.Key, applied, value = setting.Value.ToString(), setting.IsDefault };
+                }
+
+                // The other half of /settings/set: back to the shipped default globally, back to
+                // inheriting on an account. Without it a probe cannot undo the override it made.
+                case ("POST", "/settings/reset"):
+                {
+                    string key = RequireQueryValue(query, "key");
+                    string? targetAccount = query["accountId"];
+
+                    var owner = targetAccount is { Length: > 0 }
+                        ? AccountStore.GetSettings(targetAccount).GetAllSettings()
+                        : SettingsManager.GetAllSettings();
+                    var setting = owner.FirstOrDefault(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        ?? throw new InvalidOperationException($"Unknown setting '{key}'.");
+
+                    setting.ResetToDefault();
+                    if (targetAccount is { Length: > 0 }) AccountStore.GetSettings(targetAccount).Save();
+                    else SettingsManager.SaveSettings();
+                    return new { setting.Key, value = setting.Value.ToString(), setting.IsDefault };
+                }
+
                 // Rehearses the size stage against a real cache by lending one account a budget for
                 // the duration of a dry run, then putting its setting back exactly as it was.
                 case ("POST", "/trim-rehearsal"):
