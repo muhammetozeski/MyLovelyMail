@@ -52,6 +52,12 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.UndoSendSeconds"/>
         public readonly InheritedSetting<int> UndoSendSeconds = new(Settings.UndoSendSeconds);
 
+        /// <inheritdoc cref="Settings.ReplyQuoteStyle"/>
+        public readonly InheritedSetting<QuoteStyle> ReplyQuoteStyle = new(Settings.ReplyQuoteStyle);
+
+        /// <inheritdoc cref="Settings.QuoteTrimLines"/>
+        public readonly InheritedSetting<int> QuoteTrimLines = new(Settings.QuoteTrimLines);
+
         /// <inheritdoc cref="Settings.Pop3FetchLimit"/>
         public readonly InheritedSetting<int> Pop3FetchLimit = new(Settings.Pop3FetchLimit);
 

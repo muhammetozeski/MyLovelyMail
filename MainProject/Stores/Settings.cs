@@ -16,6 +16,14 @@ namespace MyLovelyMail.MainProject.Stores
         AllowAlways
     }
 
+    /// <summary>How much of the original a reply carries forward.</summary>
+    public enum QuoteStyle
+    {
+        Full,
+        Trimmed,
+        None
+    }
+
     /// <summary>How the credential vault encrypts stored passwords.</summary>
     public enum VaultMode
     {
@@ -103,6 +111,12 @@ namespace MyLovelyMail.MainProject.Stores
 
         /// <summary>Plain-text signature appended under new, reply and forward drafts, empty = none (the compose body is plain text, so it is not HTML).</summary>
         public static readonly Setting<string> Signature = new("");
+
+        /// <summary>How much of the original a reply or forward quotes back.</summary>
+        public static readonly Setting<QuoteStyle> ReplyQuoteStyle = new(QuoteStyle.Full);
+
+        /// <summary>Lines of the original kept in Trimmed mode before the rest is summarised away.</summary>
+        public static readonly Setting<int> QuoteTrimLines = new(30);
 
         /// <summary>Seconds the outbox holds a sent message for "undo send" (0 = send immediately).</summary>
         public static readonly Setting<int> UndoSendSeconds = new(5);

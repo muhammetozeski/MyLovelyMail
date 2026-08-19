@@ -143,6 +143,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 Account = account,
                 To = summary.FromAddress,
+                SourceFolder = folderFullName,
+                SourceUid = summary.Uid,
                 Subject = summary.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Re: {summary.Subject}",
                 // Signature sits ABOVE the quote, where the reply is typed.
                 Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary)
@@ -161,16 +163,53 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static ComposeDraft BuildForward(MailAccountData account, string folderFullName, MailMessageSummary summary) => new()
         {
             Account = account,
+            SourceFolder = folderFullName,
+            SourceUid = summary.Uid,
             Subject = summary.Subject.StartsWith("Fwd:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Fwd: {summary.Subject}",
             Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary)
         };
 
-        /// <summary>"On (date), (sender) wrote:" header plus the original body prefixed with "&gt; ".</summary>
-        static string QuoteBody(MailAccountData account, string folderFullName, MailMessageSummary summary)
+        /// <summary>
+        /// The attribution line plus as much of the original as the account's quote style asks
+        /// for. Every reply used to carry the whole history forward, so a five-round thread
+        /// shipped a body several times bigger than what was actually written — and the only way
+        /// to shorten it was deleting lines by hand. The reader already folds that history away
+        /// behind FoldQuotedText; this is the matching control on the writing side.
+        /// </summary>
+        public static string QuoteBody(MailAccountData account, string folderFullName, MailMessageSummary summary, QuoteStyle? styleOverride = null)
         {
-            string original = LoadPlainBody(account, folderFullName, summary);
-            string quoted = string.Join("\n", original.Split('\n').Select(static line => "> " + line.TrimEnd('\r')));
-            return $"\n\nOn {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}, {summary.FromName} <{summary.FromAddress}> wrote:\n{quoted}";
+            var settings = AccountStore.GetSettings(account.Id);
+            var style = styleOverride ?? settings.ReplyQuoteStyle.Value;
+            string attribution = $"\n\nOn {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}, {summary.FromName} <{summary.FromAddress}> wrote:";
+            if (style == QuoteStyle.None) return attribution;
+
+            string[] lines = LoadPlainBody(account, folderFullName, summary).Split('\n');
+            if (style == QuoteStyle.Trimmed)
+                lines = TrimToOwnWords(lines, settings.QuoteTrimLines.Value);
+
+            return attribution + "\n" + string.Join("\n", lines.Select(static line => "> " + line.TrimEnd('\r')));
+        }
+
+        /// <summary>
+        /// Keeps the head of the message and drops the history it was already carrying, replacing
+        /// it with one line that still reads as part of the quote. The boundary comes from
+        /// <see cref="MailBodyRenderer.PlainQuoteStart"/> — the same definition of "quoted" the
+        /// reader fold and the attachment scan use, so the three cannot disagree.
+        /// </summary>
+        static string[] TrimToOwnWords(string[] lines, int keepLines)
+        {
+            int cut = lines.Length;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].TrimEnd('\r');
+                if (!MailBodyRenderer.PlainQuoteStart().IsMatch(line) && !line.TrimStart().StartsWith(">>")) continue;
+                cut = i;
+                break;
+            }
+            cut = Math.Min(cut, Math.Max(1, keepLines));
+            if (cut >= lines.Length) return lines;
+
+            return [.. lines[..cut], $"[... {lines.Length - cut} earlier quoted lines trimmed]"];
         }
 
         /// <summary>The cached message's text body; falls back to tag-stripped HTML, then to the stored preview.</summary>
