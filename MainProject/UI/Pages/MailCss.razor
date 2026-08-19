@@ -1166,6 +1166,14 @@
         word-break: break-all;
     }
 
+    /* New-tag row inside the bulk tag menu. */
+    .mail-bulk-tag-new {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-top: @(AppMeasures.Space.Px4)px;
+    }
+
     /* How a queued message is doing, on its own row. */
     .mail-row-outbox {
         color: @AppColors.TextWarning.ToRgbaHex(true);

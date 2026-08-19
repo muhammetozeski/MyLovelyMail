@@ -247,6 +247,24 @@
                             </div>
                         }
                     </span>
+                    @* Tagging was the one local triage action with no bulk path: forty receipts
+                       meant opening forty messages and using the reader picker forty times. *@
+                    <span class="mail-bulk-move">
+                        <button class="mail-search-toggle" @onclick="() => ShowBulkTagPicker = !ShowBulkTagPicker">🏷️ Tag</button>
+                        @if (ShowBulkTagPicker)
+                        {
+                            <div class="mail-move-popover">
+                                @foreach (string tag in TagStore.AllTags)
+                                {
+                                    <button class="mail-move-option" @onclick="() => BulkTag(tag, add: true)">🏷️ @tag</button>
+                                }
+                                <div class="mail-bulk-tag-new">
+                                    <CoreInput Placeholder="New tag…" @bind-Value="BulkTagName" />
+                                    <button class="mail-move-option" @onclick="() => BulkTag(BulkTagName, add: true)">Add</button>
+                                </div>
+                            </div>
+                        }
+                    </span>
                     <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(Rows.Select(r => r.Message.Uid))">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>

@@ -24,6 +24,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("S", "Toggle star (flag)"),
             ("I", "Toggle important"),
             ("M", "Mute / unmute the conversation"),
+            ("T", "Tag the selection (or the focused row)"),
             ("X", "Tick / untick the focused row"),
             ("Ctrl+A", "Tick every listed row"),
             ("Ctrl+- / Ctrl+= / Ctrl+0", "Reader text smaller / larger / reset"),
@@ -175,6 +176,35 @@ namespace MyLovelyMail.MainProject.UI.Pages
         static string InboxZeroHeartStyle(int heartIndex) => string.Create(CultureInfo.InvariantCulture,
             $"left:{10 + heartIndex * 18}%;animation-delay:{heartIndex * 0.7:0.0}s;font-size:{14 + heartIndex % 3 * 6}px;");
 
+        bool ShowBulkTagPicker { get; set; }
+
+        /// <summary>Its own field: the reader's tag input is bound to the OPEN message, not to a selection.</summary>
+        string BulkTagName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Tags the checked rows, or the focused row when nothing is checked, so the 't' key
+        /// works the same way the other single-row keys do. One index write per folder.
+        /// </summary>
+        void BulkTag(string tagName, bool add)
+        {
+            ShowBulkTagPicker = false;
+            if (MailUiState.SelectedAccount is not { } account || tagName.Trim().Length == 0) return;
+
+            // Registers the tag's chip colour before it is shown anywhere.
+            TagStore.ColorOf(tagName.Trim());
+
+            var targets = SelectedSummaries.Count > 0
+                ? SelectedSummaries
+                : MailUiState.FocusedMessage is { } focused ? [focused] : new List<MailMessageSummary>();
+
+            foreach (var perFolder in targets.GroupBy(ResolveFolderOf).Where(static g => g.Key != null))
+                MessageActions.SetTagOnMany(account, perFolder.Key!, perFolder, tagName.Trim(), add);
+
+            BulkTagName = string.Empty;
+            MailUiState.ClearSelection();
+            RefreshLists();
+        }
+
         bool ShowSnoozePicker { get; set; }
 
         /// <summary>Hides every checked row until the chosen moment; they come back unread.</summary>
@@ -266,6 +296,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 case "m" or "M" when focusedFolder != null:
                     MessageActions.ToggleMuted(account, focusedFolder, focused!);
                     break;
+                case "t" or "T" when focused != null:
+                    ShowBulkTagPicker = !ShowBulkTagPicker;
+                    break;
                 case "x" or "X" when focused != null:
                     MailUiState.ToggleSelected(focused.Uid);
                     break;
@@ -280,7 +313,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     MailUiState.FocusMessage(null);
                     break;
                 case "Escape":
-                    if (ShowShortcutHelp) ShowShortcutHelp = false;
+                    if (ShowBulkTagPicker) ShowBulkTagPicker = false;
+                    else if (ShowShortcutHelp) ShowShortcutHelp = false;
                     else if (MailUiState.SelectedUids.Count > 0) MailUiState.ClearSelection();
                     else MailUiState.CloseMessage();
                     break;
