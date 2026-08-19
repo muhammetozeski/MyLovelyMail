@@ -162,6 +162,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         userDataRoot = AppPaths.Root,
                         selectedAccountId = MailUiState.SelectedAccount?.Id,
                         selectedFolder = MailUiState.SelectedFolder?.FullName,
+                        openMessageUid = MailUiState.OpenMessage?.Uid,
                         rememberedFolder = MailUiState.SelectedAccount is { } open ? FolderMemoryStore.FolderOf(open.Id) : null,
                         rememberedAccountId = FolderMemoryStore.LastAccountId,
                         accounts = AccountStore.Accounts.Select(a => new { a.Id, a.EmailAddress, a.Protocol, a.IncomingHost, a.Enabled, a.SortOrder })
