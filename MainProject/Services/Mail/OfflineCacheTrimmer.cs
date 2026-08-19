@@ -18,6 +18,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         /// <summary>Accounts skipped because neither a keep-days nor a size budget was set.</summary>
         public List<string> SkippedAccounts { get; set; } = [];
+
+        /// <summary>Bodies left alone because they are the only copy that exists.</summary>
+        public int ProtectedLocalBodies { get; set; }
+
+        /// <summary>The local folders those bodies live in.</summary>
+        public List<string> ProtectedFolders { get; set; } = [];
     }
 
     /// <summary>
@@ -84,7 +90,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     continue;
                 }
 
-                var bodies = MeasureCachedBodies(account.Id);
+                var bodies = MeasureCachedBodies(account.Id, report);
 
                 if (keepDays > 0)
                 {
@@ -111,18 +117,43 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             Log($"Offline trim {(dryRun ? "dry run" : "pass")}: {report.BodiesDropped} bodies, "
                 + $"{report.BytesFreed / BytesPerMegabyte} MB across {report.ByFolder.Count} folder(s); "
-                + $"{report.SkippedAccounts.Count} account(s) had no budget set.");
+                + $"{report.SkippedAccounts.Count} account(s) had no budget set; "
+                + $"{report.ProtectedLocalBodies} local-only body(ies) protected.");
 
             if (!dryRun) Persist(report);
             return report;
         }
 
-        /// <summary>Every cached body of an account with its size; summaries whose body is not on disk are skipped.</summary>
-        static List<CachedBody> MeasureCachedBodies(string accountId)
+        /// <summary>
+        /// Every TRIMMABLE cached body of an account with its size; summaries whose body is not on
+        /// disk are skipped, and local folders are left out entirely.
+        /// <para>
+        /// This whole service rests on DeleteCachedBody's promise — "the row stays, and opening it
+        /// downloads the body again". That is true of a server folder and false of Local/Drafts,
+        /// Local/Outbox, Local/Sent and anything filed there by hand or by a rule: there the .eml
+        /// IS the message. Dropping one destroys mail outright — a draft loses its body and
+        /// reopens empty, and an outbox message the user already pressed Send on is deleted by the
+        /// next flush with nothing but a warning in the log.
+        /// </para>
+        /// </summary>
+        static List<CachedBody> MeasureCachedBodies(string accountId, TrimReport report)
         {
             var bodies = new List<CachedBody>();
             foreach (var folder in MessageStore.GetFolders(accountId))
             {
+                if (folder.IsLocal)
+                {
+                    int protectedBodies = MessageStore.GetSummaries(accountId, folder.FullName)
+                        .Count(s => File.Exists(MessageStore.MessagePath(accountId, folder.FullName, s.Uid)));
+                    if (protectedBodies == 0) continue;
+
+                    // Stated in the receipt rather than silently skipped: an exemption nobody can
+                    // see is indistinguishable from a bug.
+                    report.ProtectedLocalBodies += protectedBodies;
+                    if (!report.ProtectedFolders.Contains(folder.FullName)) report.ProtectedFolders.Add(folder.FullName);
+                    continue;
+                }
+
                 foreach (var summary in MessageStore.GetSummaries(accountId, folder.FullName))
                 {
                     var file = new FileInfo(MessageStore.MessagePath(accountId, folder.FullName, summary.Uid));
