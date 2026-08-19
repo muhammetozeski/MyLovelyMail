@@ -212,29 +212,75 @@ namespace MyLovelyMail.MainProject.Storage
             incoming.Flags |= stored.Flags & (MailFlags.Important | MailFlags.Muted);
         }
 
-        /// <summary>Keeps the folder's unread badge honest after local flag changes (sync overwrites with server truth later).</summary>
+        /// <summary>
+        /// Recomputes the folder badge from the cached summaries — correct ONLY while the cache
+        /// holds the whole folder.
+        /// <para>
+        /// The badge is the server's unread number for the entire folder, but the cache may hold a
+        /// slice of it (313 of 9,624 after a first fill). Recomputing from that slice dropped the
+        /// Inbox badge from 8,607 to 149 the moment anything touched a flag, and the next sync put
+        /// it back — a badge that meant two different things depending on what ran last.
+        /// Truncated folders take a delta from <see cref="SetSeen"/> instead.
+        /// </para>
+        /// </summary>
         static void RefreshUnreadCount(string accountId, string folderFullName, FolderIndex index)
         {
             var info = GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
-            if (info == null) return;
+            if (info == null || index.Summaries.Count < info.TotalCount) return;
             int unread = index.Summaries.Values.Count(s => s.IsUnread);
             if (info.UnreadCount == unread) return;
             info.UnreadCount = unread;
             SaveFolder(info);
         }
 
+        /// <summary>
+        /// Flips the Seen flag on the given summaries and moves the folder badge by exactly the
+        /// number that changed. The store owns this because it owns the badge: callers that
+        /// mutated <c>Flags</c> themselves and then upserted left no way to tell what changed,
+        /// which is why the count had to be guessed from the cache. Returns how many changed.
+        /// </summary>
+        public static int SetSeen(string accountId, string folderFullName, IEnumerable<MailMessageSummary> summaries, bool seen)
+        {
+            List<MailMessageSummary> changed = [.. summaries.Where(s => s.IsUnread == seen)];
+            if (changed.Count == 0) return 0;
+
+            var index = GetIndex(accountId, folderFullName);
+            foreach (var summary in changed)
+            {
+                summary.Flags = seen ? summary.Flags | MailFlags.Seen : summary.Flags & ~MailFlags.Seen;
+                index.Summaries[summary.Uid] = summary;
+            }
+            SaveIndex(accountId, folderFullName, index);
+
+            if (GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName) is { } info)
+            {
+                info.UnreadCount = Math.Max(0, info.UnreadCount + (seen ? -changed.Count : changed.Count));
+                SaveFolder(info);
+            }
+            OnFolderChanged?.Invoke(accountId, folderFullName);
+            return changed.Count;
+        }
+
         /// <summary>Removes summaries and their cached .eml files, persists and notifies.</summary>
         public static void RemoveMessages(string accountId, string folderFullName, IEnumerable<uint> uids)
         {
             var index = GetIndex(accountId, folderFullName);
+            int removedUnread = 0;
             foreach (uint uid in uids)
             {
-                index.Summaries.TryRemove(uid, out _);
+                if (index.Summaries.TryRemove(uid, out var removed) && removed.IsUnread) removedUnread++;
                 string path = MessagePath(accountId, folderFullName, uid);
                 try { if (File.Exists(path)) File.Delete(path); }
                 catch (Exception ex) { Log($"Could not delete cached message '{path}': {ex.Message}", LogLevel.Warning); }
             }
             SaveIndex(accountId, folderFullName, index);
+            // Same reason as SetSeen: a truncated folder's badge cannot be recomputed from the
+            // slice in the cache, so it moves by exactly what left.
+            if (removedUnread > 0 && GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName) is { } info)
+            {
+                info.UnreadCount = Math.Max(0, info.UnreadCount - removedUnread);
+                SaveFolder(info);
+            }
             OnFolderChanged?.Invoke(accountId, folderFullName);
         }
 

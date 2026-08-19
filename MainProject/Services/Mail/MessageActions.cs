@@ -19,9 +19,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Forces the read state to <paramref name="read"/> (no-op when already there) — bulk-action friendly.</summary>
         public static void SetRead(MailAccountData account, string folderFullName, MailMessageSummary summary, bool read)
         {
-            if (summary.Flags.HasFlag(MailFlags.Seen) == read) return;
-            summary.Flags = read ? summary.Flags | MailFlags.Seen : summary.Flags & ~MailFlags.Seen;
-            MessageStore.UpsertSummaries(account.Id, folderFullName, [summary]);
+            if (MessageStore.SetSeen(account.Id, folderFullName, [summary], read) == 0) return;
             PushFlagInBackground(account, folderFullName, summary.Uid, MessageFlags.Seen, add: read);
         }
 
@@ -38,12 +36,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static int SetManyRead(MailAccountData account, string folderFullName, IEnumerable<MailMessageSummary> summaries)
         {
-            List<MailMessageSummary> changed = [.. summaries.Where(static s => !s.Flags.HasFlag(MailFlags.Seen))];
-            if (changed.Count == 0) return 0;
-
-            foreach (var summary in changed)
-                summary.Flags |= MailFlags.Seen;
-            MessageStore.UpsertSummaries(account.Id, folderFullName, changed);
+            List<MailMessageSummary> changed = [.. summaries.Where(static s => s.IsUnread)];
+            if (MessageStore.SetSeen(account.Id, folderFullName, changed, seen: true) == 0) return 0;
 
             RunServerActionInBackground(account, folderFullName, $"Batched read push failed in '{folderFullName}'", LogLevel.Warning,
                 async (_, folder, ct) =>
