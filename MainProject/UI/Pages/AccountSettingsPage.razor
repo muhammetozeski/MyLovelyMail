@@ -147,9 +147,10 @@
         AccountStore.Save(account);
     }
 
+    /// <summary>A value that does not parse changes nothing — no override, no save.</summary>
     void SetValue(ISetting setting, string text)
     {
-        ((ISettingSetup)setting).LoadFromStr(text);
+        if (!setting.TrySetFromText(text)) return;
         AccountSettingsOf.Save();
     }
 
