@@ -9,7 +9,7 @@
 <PageTitle>My Lovely Mail</PageTitle>
 
 <div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
-     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))">
+     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     @* ---- Left: accounts + folders ---- *@
     <aside class="mail-sidebar">
@@ -63,7 +63,7 @@
                     <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
                     @if (GlobalSettings.ShowUnreadBadge.Value && AccountUnreadCount(account.Id) is > 0 and var accountUnread)
                     {
-                        <span class="mail-account-unread" style="background:@account.ColorHex">@accountUnread</span>
+                        <span class="mail-account-unread" style="background:@account.ColorHex;color:@AppColors.InkOn(account.ColorHex).ToRgbaHex(true)">@accountUnread</span>
                     }
                 </button>
 
@@ -261,7 +261,7 @@
                                 }
                                 @foreach (var tag in message.Tags)
                                 {
-                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag)">@tag</span>
+                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
                                 }
                                 @if (message.HasAttachments)
                                 {
@@ -435,7 +435,7 @@
                 <div class="mail-attachments">
                     @foreach (var tag in open.Tags)
                     {
-                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag)"
+                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
                                 title="Search this tag" @onclick="() => SearchByTag(tag)">@tag</button>
                     }
                 </div>
@@ -447,7 +447,7 @@
                     @foreach (var tag in TagStore.AllTags)
                     {
                         <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
-                                style="background:@TagStore.ColorOf(tag)"
+                                style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
                                 @onclick="() => ToggleTagOnOpen(open, tag)">
                             @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
                         </button>

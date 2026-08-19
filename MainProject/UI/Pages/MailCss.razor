@@ -132,7 +132,7 @@
     }
 
     .mail-account-unread {
-        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        /* Ink comes from the inline style (AppColors.InkOn), which measures contrast against the actual chip color. */
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Heavy);
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
@@ -1005,7 +1005,7 @@
     .mail-tag-chip {
         display: inline-flex;
         align-items: center;
-        color: @AppColors.TextOnFilledSurface.ToRgbaHex(true);
+        /* Ink comes from the inline style (AppColors.InkOn), which measures contrast against the actual chip color. */
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Medium);
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
@@ -1083,7 +1083,7 @@
         padding: 0 @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
         background: var(--account-accent, @primary);
-        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        color: var(--account-ink, @AppColors.TextOnAccent.ToRgbaHex(true));
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Bold);
     }
