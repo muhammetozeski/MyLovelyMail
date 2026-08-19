@@ -303,6 +303,31 @@ namespace MyLovelyMail.MainProject.ZTests
                     return await ConnectTriageService.ProbeAsync(seed, protocol, host);
                 }
 
+                // Synthetic summaries straight into the grouper: a folder of identical subjects
+                // is the case that breaks it, and waiting for one to exist is not a test.
+                case ("POST", "/threads/probe"):
+                {
+                    int count = ReadTake(query, 400);
+                    int hoursApart = int.TryParse(query["hoursApart"], out int parsed) ? parsed : 24;
+                    string subject = query["subject"] ?? "Re: Backup report";
+                    var start = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    List<MailMessageSummary> probes = [.. Enumerable.Range(0, count).Select(i => new MailMessageSummary
+                    {
+                        Uid = (uint)(i + 1),
+                        MessageId = $"<probe-{i}@mylovelymail.invalid>",
+                        Subject = subject,
+                        DateUtc = start.AddHours(i * hoursApart)
+                    })];
+                    var threads = ThreadingService.BuildThreads(probes);
+                    return new
+                    {
+                        messages = count,
+                        threads = threads.Count,
+                        largest = threads.Max(t => t.Messages.Count),
+                        spans = threads.Take(5).Select(t => new { size = t.Messages.Count, days = (int)(t.Newest.DateUtc - t.Messages[0].DateUtc).TotalDays })
+                    };
+                }
+
                 case ("GET", "/person"):
                     return PersonProfileService.Build(RequireQueryValue(query, "accountId"), RequireQueryValue(query, "address"));
 
