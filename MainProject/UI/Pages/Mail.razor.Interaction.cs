@@ -86,8 +86,31 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.ClearSelection();
         }
 
-        void BulkSetRead(bool read) =>
-            ForEachSelected((account, folderName, summary) => MessageActions.SetRead(account, folderName, summary, read));
+        /// <summary>
+        /// Marking read goes through the batched path — one index rewrite and one IMAP connection
+        /// for the whole selection instead of one of each per row. Unmarking stays per-message:
+        /// it is a correction on a handful of rows, never a folder-sized action.
+        /// </summary>
+        void BulkSetRead(bool read)
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            if (!read)
+            {
+                ForEachSelected((a, folderName, summary) => MessageActions.SetRead(a, folderName, summary, read: false));
+                return;
+            }
+
+            foreach (var perFolder in SelectedSummaries.GroupBy(ResolveFolderOf).Where(static g => g.Key != null))
+                MessageActions.SetManyRead(account, perFolder.Key!, perFolder);
+            MailUiState.ClearSelection();
+        }
+
+        /// <summary>Clears a whole folder's unread count from the sidebar, without checking rows by hand.</summary>
+        void MarkFolderRead(MailFolderData folder)
+        {
+            if (AccountStore.GetById(folder.AccountId) is not { } account) return;
+            MessageActions.SetFolderRead(account, folder.FullName);
+        }
 
         void BulkToggleFlag() => ForEachSelected(MessageActions.ToggleFlagged);
 

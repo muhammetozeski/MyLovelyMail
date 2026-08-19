@@ -29,6 +29,35 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static void MarkRead(MailAccountData account, string folderFullName, MailMessageSummary summary) =>
             SetRead(account, folderFullName, summary, read: true);
 
+        /// <summary>
+        /// Marks a whole set read in one store write and one server push, and returns how many
+        /// changed. Calling <see cref="SetRead"/> in a loop costs an index rewrite AND its own IMAP
+        /// connection per message, so clearing a 400-unread folder meant 400 of each.
+        /// Already-read messages are skipped, so snoozed rows (SnoozeService marks them Seen)
+        /// cannot be woken by accident.
+        /// </summary>
+        public static int SetManyRead(MailAccountData account, string folderFullName, IEnumerable<MailMessageSummary> summaries)
+        {
+            List<MailMessageSummary> changed = [.. summaries.Where(static s => !s.Flags.HasFlag(MailFlags.Seen))];
+            if (changed.Count == 0) return 0;
+
+            foreach (var summary in changed)
+                summary.Flags |= MailFlags.Seen;
+            MessageStore.UpsertSummaries(account.Id, folderFullName, changed);
+
+            RunServerActionInBackground(account, folderFullName, $"Batched read push failed in '{folderFullName}'", LogLevel.Warning,
+                async (_, folder, ct) =>
+                {
+                    await folder.AddFlagsAsync([.. changed.Select(static s => new UniqueId(s.Uid))], MessageFlags.Seen, silent: true, ct);
+                    Log($"Marked {changed.Count} messages read in '{folderFullName}' with one push.");
+                });
+            return changed.Count;
+        }
+
+        /// <summary>Marks everything cached in the folder read.</summary>
+        public static int SetFolderRead(MailAccountData account, string folderFullName) =>
+            SetManyRead(account, folderFullName, MessageStore.GetSummaries(account.Id, folderFullName));
+
         public static void ToggleFlagged(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {
             bool nowFlagged = !summary.Flags.HasFlag(MailFlags.Flagged);
