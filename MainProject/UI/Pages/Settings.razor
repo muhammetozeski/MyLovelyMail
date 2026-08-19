@@ -286,6 +286,19 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🗄️ Everything else</div>
+        <p class="settings-empty-text">
+            Registered settings without a card of their own above. They are edited raw — the name is
+            the field name — but they are reachable, and a setting added later shows up here by
+            itself instead of shipping invisible.
+        </p>
+        @foreach (var setting in UncardedSettings)
+        {
+            <SettingEditorRow Setting="@setting" OnSaved="@SettingsManager.SaveSettings" />
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">👤 Accounts</div>
         @if (AccountStore.Accounts.Count == 0)
         {
@@ -340,6 +353,55 @@
         setting.Set(value);
         SettingsManager.SaveSettings();
     }
+
+    /// <summary>
+    /// Keys the "Everything else" card must NOT render, for one of three reasons: a hand-written
+    /// control above already owns them, they are window/search state no one edits by hand, or —
+    /// CredentialVaultMode — a plain dropdown would be actively harmful. Written with nameof so a
+    /// renamed field breaks the build instead of quietly orphaning an entry here and showing the
+    /// setting twice.
+    /// </summary>
+    static readonly HashSet<string> KeysWithTheirOwnControl =
+    [
+        // Appearance card
+        nameof(GlobalSettings.Theme),
+        nameof(GlobalSettings.FollowSystemTheme),
+        nameof(GlobalSettings.FollowSystemMotion),
+        nameof(GlobalSettings.ReduceMotion),
+        nameof(GlobalSettings.UiScalePercent),
+        nameof(GlobalSettings.ShowUnreadBadge),
+        nameof(GlobalSettings.MessageListDensity),
+        // Window & startup card
+        nameof(GlobalSettings.CloseToTray),
+        nameof(GlobalSettings.StartMinimized),
+        nameof(GlobalSettings.StartWithWindows),
+        // Notifications, sync, reading, composing, diagnostics cards
+        nameof(GlobalSettings.NotifyOnNewMail),
+        nameof(GlobalSettings.SyncIntervalMinutes),
+        nameof(GlobalSettings.BackgroundFolderRefreshCount),
+        nameof(GlobalSettings.UseImapIdle),
+        nameof(GlobalSettings.FoldQuotedText),
+        nameof(GlobalSettings.ReplyQuoteStyle),
+        nameof(GlobalSettings.Signature),
+        nameof(GlobalSettings.UndoSendSeconds),
+        nameof(GlobalSettings.EnableLogging),
+        // Its control is the reader toolbar's A- / A+ / reset, not a row here.
+        nameof(GlobalSettings.ReaderTextScalePercent),
+        // Remembered window bounds and saved searches: state, not preferences.
+        nameof(GlobalSettings.WindowX),
+        nameof(GlobalSettings.WindowY),
+        nameof(GlobalSettings.WindowWidth),
+        nameof(GlobalSettings.WindowHeight),
+        nameof(GlobalSettings.SavedSearches),
+        // The vault card switches this through CredentialVault, which re-encrypts every stored
+        // password on the way. A dropdown would flip the mode without that, losing all of them.
+        nameof(GlobalSettings.CredentialVaultMode),
+    ];
+
+    static IEnumerable<ISetting> UncardedSettings =>
+        SettingsManager.GetAllSettings()
+            .Where(static s => !KeysWithTheirOwnControl.Contains(s.Key))
+            .OrderBy(static s => s.KeyHumanReadable, StringComparer.CurrentCulture);
 
     static void SetSyncInterval(string text)
     {
