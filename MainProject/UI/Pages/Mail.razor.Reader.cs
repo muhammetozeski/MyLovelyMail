@@ -270,6 +270,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
             WithAccountAndFolder(message, (account, folderName) =>
                 MailUiState.OpenCompose(ComposeService.BuildForward(account, folderName, message)));
 
+        /// <summary>Passes the message on as a file, so its attachments and headers survive the trip.</summary>
+        void StartForwardAsAttachment(MailMessageSummary message) =>
+            WithAccountAndFolder(message, (account, folderName) =>
+                MailUiState.OpenCompose(ComposeService.BuildForwardAsAttachment(account, folderName, message)));
+
         void ToggleOpenFlagged(MailMessageSummary message) =>
             WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleFlagged(account, folderName, message));
 

@@ -203,6 +203,45 @@ namespace MyLovelyMail.MainProject.Services.Mail
         };
 
         /// <summary>
+        /// Forwards the message as a file rather than as re-typed text: the cached .eml rides along
+        /// as an attachment, so whatever the original carried — the PDF, the headers, the DKIM
+        /// signature and the Received chain <see cref="MessageAuthService"/> reads — arrives intact.
+        /// <para>
+        /// Falls back to <see cref="BuildForward"/> when the body was never fetched. Handing back a
+        /// draft that claims an attachment it does not have would be a worse failure than the one
+        /// this fixes, since the send path silently skips missing paths.
+        /// </para>
+        /// </summary>
+        public static ComposeDraft BuildForwardAsAttachment(MailAccountData account, string folderFullName, MailMessageSummary summary)
+        {
+            byte[]? mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid);
+            if (mimeBytes == null)
+            {
+                Log($"Forward-as-attachment fell back to a quoted forward: uid {summary.Uid} in '{folderFullName}' has no cached body.", LogLevel.Warning);
+                return BuildForward(account, folderFullName, summary);
+            }
+
+            var draft = new ComposeDraft
+            {
+                Account = account,
+                SourceFolder = folderFullName,
+                SourceUid = summary.Uid,
+                Subject = summary.Subject.StartsWith("Fwd:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Fwd: {summary.Subject}",
+                // Attribution only: the forwarded copy IS the attachment, so quoting it again would
+                // ship the same message twice.
+                Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary, QuoteStyle.None)
+            };
+
+            string folder = AttachmentStageFolder(draft);
+            Directory.CreateDirectory(folder);
+            string target = AttachmentService.UniquePath(folder,
+                AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".eml");
+            File.WriteAllBytes(target, mimeBytes);
+            draft.AttachmentPaths.Add(target);
+            return draft;
+        }
+
+        /// <summary>
         /// The attribution line plus as much of the original as the account's quote style asks
         /// for. Every reply used to carry the whole history forward, so a five-round thread
         /// shipped a body several times bigger than what was actually written — and the only way
