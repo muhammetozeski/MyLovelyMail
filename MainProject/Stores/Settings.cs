@@ -62,6 +62,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Keep an IMAP IDLE connection open so new mail arrives instantly.</summary>
         public static readonly Setting<bool> UseImapIdle = new(true);
 
+        /// <summary>How many of the stalest non-Inbox folders each sync pass also refreshes (0 = Inbox only).</summary>
+        public static readonly Setting<int> BackgroundFolderRefreshCount = new(2);
+
         /// <summary>Download attachments together with the message body instead of on first open.</summary>
         public static readonly Setting<bool> DownloadAttachmentsAutomatically = new(false);
 

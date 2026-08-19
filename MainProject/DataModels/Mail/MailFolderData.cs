@@ -43,6 +43,10 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// folder has never been filled.
         /// </summary>
         public uint OldestFetchedUid { get; set; }
+
+        /// <summary>When this folder's MESSAGES were last fetched — not its counts, which the folder-list pass refreshes every time.</summary>
+        public DateTime? LastSyncedUtc { get; set; }
+
         public int TotalCount { get; set; }
         public int UnreadCount { get; set; }
     }

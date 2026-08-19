@@ -19,6 +19,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.UseImapIdle"/>
         public readonly InheritedSetting<bool> UseImapIdle = new(Settings.UseImapIdle);
 
+        /// <inheritdoc cref="Settings.BackgroundFolderRefreshCount"/>
+        public readonly InheritedSetting<int> BackgroundFolderRefreshCount = new(Settings.BackgroundFolderRefreshCount);
+
         /// <inheritdoc cref="Settings.DownloadAttachmentsAutomatically"/>
         public readonly InheritedSetting<bool> DownloadAttachmentsAutomatically = new(Settings.DownloadAttachmentsAutomatically);
 

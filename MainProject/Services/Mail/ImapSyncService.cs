@@ -152,7 +152,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }, cancellationToken);
         }
 
-        /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
+        /// <summary>Refreshes the folder list, the Inbox, and a couple of the stalest other folders.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
             using var syncScope = SyncScheduler.EnterSyncScope();
@@ -162,9 +162,41 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 using var client = await MailConnections.OpenImapAsync(account, ct);
                 await SyncFolderListAsync(account, client, ct);
                 await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
+                await RefreshStalestFoldersAsync(account, client, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken);
             Log($"IMAP sync finished: {account.EmailAddress}");
+        }
+
+        /// <summary>
+        /// Fetches messages for the stalest few server folders, riding the connection this pass
+        /// already opened. Without it a folder is only ever filled by opening it, so all-folders
+        /// search — which reads the cache alone — cannot find anything that arrived in a folder
+        /// the user has not clicked, while the folder-list pass keeps its unread badge perfectly
+        /// current. A badge saying 4 unread over a message list from three weeks ago is the
+        /// worst form of that mismatch.
+        /// </summary>
+        static async Task RefreshStalestFoldersAsync(MailAccountData account, ImapClient client, CancellationToken cancellationToken)
+        {
+            int count = AccountStore.GetSettings(account.Id).BackgroundFolderRefreshCount.Value;
+            if (count <= 0) return;
+
+            var stalest = MessageStore.GetFolders(account.Id)
+                .Where(f => !f.IsLocal && !f.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase))
+                // A server count that disagrees with the cache is free evidence something changed,
+                // so those folders go first; the rest fall back to plain age.
+                .OrderByDescending(f => f.TotalCount != MessageStore.GetSummaries(account.Id, f.FullName).Count)
+                .ThenBy(f => f.LastSyncedUtc ?? DateTime.MinValue)
+                .Take(count)
+                .ToList();
+
+            foreach (var folder in stalest)
+            {
+                var serverFolder = await client.GetFolderAsync(folder.FullName, cancellationToken);
+                await SyncOpenedFolderAsync(account, client, serverFolder, cancellationToken, backgroundRefresh: true);
+            }
+            if (stalest.Count > 0)
+                Log($"Background refresh touched: {string.Join(", ", stalest.Select(static f => f.FullName))}");
         }
 
         /// <summary>Syncs one folder's messages; reached through <see cref="KickFolderSync"/> when the user opens a folder.</summary>
@@ -225,6 +257,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     // undone by the next folder-list refresh and start over from the floor.
                     LastSeenUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSeenUid ?? 0,
                     OldestFetchedUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.OldestFetchedUid ?? 0,
+                    LastSyncedUtc = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSyncedUtc,
                     TotalCount = folder.Count,
                     UnreadCount = folder.Unread
                 });
@@ -284,7 +317,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             _ => FolderRole.None
         };
 
-        static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken)
+        /// <param name="backgroundRefresh">
+        /// True for a folder the rotation picked rather than the user. Rules and notifications are
+        /// skipped: a toast for mail landing in Sent or Trash is noise, and RuleEngine.ProcessIncoming
+        /// is not folder-scoped, so a rotation pass would otherwise start executing move actions on
+        /// Junk and Trash arrivals in the background with nobody watching. Rotation is a pure refresh.
+        /// </param>
+        static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken, bool backgroundRefresh = false)
         {
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
@@ -340,7 +379,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
             RuleProcessResult? ruleResult = null;
-            if (lastSeenUid > 0 && summaries.Count > 0)
+            if (lastSeenUid > 0 && summaries.Count > 0 && !backgroundRefresh)
             {
                 // Before the rules: a reply to a muted conversation must never reach the
                 // notification check as a normal arrival.
@@ -361,11 +400,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
                 OldestFetchedUid = oldestFetchedUid,
+                LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = folder.Count,
                 UnreadCount = folder.Unread
             });
 
-            if (newCount > 0 && lastSeenUid > 0)
+            if (newCount > 0 && lastSeenUid > 0 && !backgroundRefresh)
             {
                 var arrived = summaries.Where(s => s.Uid > lastSeenUid).ToList();
                 NotificationService.NotifyNewMessages(account, folder.FullName, arrived);
