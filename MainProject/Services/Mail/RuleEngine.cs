@@ -45,8 +45,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     if (rule.AccountId.Length > 0 && rule.AccountId != account.Id) continue;
                     if (!Matches(rule, summary)) continue;
 
-                    ApplyActions(rule, summary, result);
-                    if (rule.StopProcessing) break;
+                    ApplyActions(account, folderFullName, rule, summary, result);
+                    if (rule.StopProcessing)
+                    {
+                        // Recorded too: "why did my second rule not run" is the same question.
+                        Audit(account, folderFullName, rule, summary, "StopProcessing", string.Empty);
+                        break;
+                    }
                 }
             }
             return result;
@@ -181,10 +186,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        static void ApplyActions(FilterRule rule, MailMessageSummary summary, RuleProcessResult result)
+        static void ApplyActions(MailAccountData account, string folderFullName, FilterRule rule, MailMessageSummary summary, RuleProcessResult result)
         {
             foreach (var action in rule.Actions)
             {
+                // Recorded BEFORE the switch runs: MoveToRemoteFolder only queues the move, and
+                // the sync service deletes the source row as soon as it succeeds - after that the
+                // uid this was found under no longer exists.
+                Audit(account, folderFullName, rule, summary, action.Type.ToString(), action.Argument);
                 switch (action.Type)
                 {
                     case FilterActionType.MarkRead:
@@ -222,6 +231,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
             }
         }
+
+        static void Audit(MailAccountData account, string folderFullName, FilterRule rule, MailMessageSummary summary, string action, string argument) =>
+            RuleAuditStore.Record(new RuleAuditEntry
+            {
+                WhenUtc = DateTime.UtcNow,
+                AccountId = account.Id,
+                FolderFullName = folderFullName,
+                Uid = summary.Uid,
+                MessageId = summary.MessageId,
+                RuleId = rule.Id,
+                RuleName = rule.Name,
+                Action = action,
+                Argument = argument
+            });
 
         /// <summary>False when a rule muted the message (its arrival should stay silent).</summary>
         public static bool ShouldNotify(MailMessageSummary summary) => !summary.Flags.HasFlag(MailFlags.Muted);
