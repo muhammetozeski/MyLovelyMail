@@ -169,8 +169,36 @@ namespace MyLovelyMail.MainProject.ZTests
                         vaultUnlocked = CredentialVault.IsUnlocked,
                         syncing = SyncScheduler.IsSyncing,
                         userDataRoot = AppPaths.Root,
+                        selectedAccountId = MailUiState.SelectedAccount?.Id,
+                        selectedFolder = MailUiState.SelectedFolder?.FullName,
+                        rememberedFolder = MailUiState.SelectedAccount is { } open ? FolderMemoryStore.FolderOf(open.Id) : null,
+                        rememberedAccountId = FolderMemoryStore.LastAccountId,
                         accounts = AccountStore.Accounts.Select(a => new { a.Id, a.EmailAddress, a.Protocol, a.IncomingHost, a.Enabled })
                     };
+
+                // Drives the same selection path the sidebar uses, so the folder memory can be
+                // exercised without touching the screen.
+                case ("POST", "/select-folder"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string wanted = RequireQueryValue(query, "folder");
+                    var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == wanted);
+                    if (folder != null) MailUiState.SelectFolder(folder);
+                    return new { selected = folder != null, folder = folder?.FullName, requested = wanted };
+                }
+
+                // Answers "where would this account open right now" without selecting anything, so
+                // the restore — including the phantom-folder fallback — is checkable while the app
+                // is in use. ?pretend= substitutes a remembered name the server does not have.
+                case ("GET", "/start-folder"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    var folders = MessageStore.GetFolders(accountId);
+                    string? remembered = FolderMemoryStore.FolderOf(accountId);
+                    string? pretend = query["pretend"];
+                    var resolved = FolderMemoryStore.ResolveStartFolder(pretend is { Length: > 0 } ? pretend : remembered, folders);
+                    return new { remembered, pretended = pretend, opensIn = resolved?.FullName };
+                }
 
                 case ("POST", "/accounts"):
                 {
