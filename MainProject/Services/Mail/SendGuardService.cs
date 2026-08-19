@@ -26,6 +26,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public const string DomainTypoCode = "domain-typo";
         public const string AttachmentCode = "attachment";
         public const string AttachmentSizeCode = "attachment-too-large";
+        public const string SendingIdentityCode = "sending-identity";
 
         /// <summary>
         /// Base64 grows a file by roughly a third, and the ceiling a server enforces is on the
@@ -68,6 +69,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (draft.AttachmentPaths.Count == 0
                 && AttachmentIntentService.FindTrigger(draft.Subject, draft.Body) is { } trigger)
                 warnings.Add(new SendWarning(AttachmentCode, $"\"{trigger}\" is in the text, but nothing is attached."));
+
+            // A reply that leaves from the wrong address is not a typo the recipient can ignore;
+            // it tells them which of your mailboxes to answer.
+            if (draft.Account is { } sender && draft.ArrivedAtAddress.Length > 0
+                && !SplitAddresses(draft.ArrivedAtAddress).Contains(sender.EmailAddress, StringComparer.OrdinalIgnoreCase))
+                warnings.Add(new SendWarning(SendingIdentityCode,
+                    $"This leaves from {sender.EmailAddress}, but the mail arrived at {draft.ArrivedAtAddress}."));
 
             if (FindOversizedAttachments(draft) is { } oversized)
                 warnings.Add(new SendWarning(AttachmentSizeCode, oversized));

@@ -137,6 +137,38 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static ComposeDraft BuildNew(MailAccountData account) =>
             new() { Account = account, Body = SignatureBlock(account) };
 
+        /// <summary>
+        /// Sends this draft from another account. Both callers that start a draft freeze the
+        /// account to whatever the rail had selected, and the pane rendered it as plain text — so
+        /// replying to work mail with a personal account open meant discarding the draft,
+        /// switching, and retyping it.
+        /// <para>
+        /// Two things a naive picker gets wrong, both invisible until they bite: the old account's
+        /// signature stays in the body, and the autosaved copy is stranded in the OLD account's
+        /// local Drafts forever. The stranded row is removed directly rather than through
+        /// DeleteDraft, which would also delete the attachment stage folder — that folder is keyed
+        /// by draft id and the draft still needs the files in it.
+        /// </para>
+        /// </summary>
+        public static void SwitchSendingAccount(ComposeDraft draft, MailAccountData next)
+        {
+            if (draft.Account is not { } previous || previous.Id == next.Id) return;
+
+            draft.Body = SignatureBlock(next) + StripSignature(draft.Body);
+            MessageStore.RemoveMessages(previous.Id, LocalDraftsFullName, [DraftUid(draft)]);
+            draft.Account = next;
+            SaveDraft(draft);
+            Log($"Draft {draft.DraftId} now sends from {next.EmailAddress} (was {previous.EmailAddress}).");
+        }
+
+        /// <summary>Drops the leading signature block, keeping everything the user typed under it.</summary>
+        static string StripSignature(string body)
+        {
+            if (!body.StartsWith(SignatureDelimiter, StringComparison.Ordinal)) return body;
+            int end = body.IndexOf('\n', SignatureDelimiter.Length);
+            return end < 0 ? string.Empty : body[(end + 1)..];
+        }
+
         public static ComposeDraft BuildReply(MailAccountData account, string folderFullName, MailMessageSummary summary, bool replyAll)
         {
             var draft = new ComposeDraft
@@ -145,6 +177,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 To = summary.FromAddress,
                 SourceFolder = folderFullName,
                 SourceUid = summary.Uid,
+                ArrivedAtAddress = summary.ToAddresses,
                 Subject = summary.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? summary.Subject : $"Re: {summary.Subject}",
                 // Signature sits ABOVE the quote, where the reply is typed.
                 Body = SignatureBlock(account) + QuoteBody(account, folderFullName, summary)

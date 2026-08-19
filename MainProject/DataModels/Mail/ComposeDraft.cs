@@ -16,6 +16,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public string SourceFolder { get; set; } = string.Empty;
         public uint SourceUid { get; set; }
 
+        /// <summary>Which of your addresses the message being replied to actually arrived at; empty for a new message.</summary>
+        public string ArrivedAtAddress { get; set; } = string.Empty;
+
         /// <summary>Full paths of the staged attachment copies under AppCache (see ComposeService.AttachFileAsync).</summary>
         public List<string> AttachmentPaths { get; set; } = [];
     }
