@@ -371,7 +371,26 @@
         outline-offset: -@(AppMeasures.Border.Medium)px;
     }
 
-    .mail-rows:focus {
+    /* The app-state ring (.mail-row--focused) tracks MailUiState.FocusedMessage, which stays lit
+       while the keyboard is somewhere else entirely. These rules follow real DOM focus, and only
+       for keyboard focus, so clicking does not light everything up. */
+    .mail-rows:focus-visible,
+    .mail-account:focus-visible,
+    .mail-folder:focus-visible,
+    .mail-folder-action:focus-visible,
+    .mail-search-toggle:focus-visible,
+    .mail-row:focus-visible,
+    .mail-move-option:focus-visible,
+    .mail-attachment-chip:focus-visible,
+    .mail-tag-chip:focus-visible,
+    .mail-backfill-button:focus-visible,
+    .mail-saved-run:focus-visible,
+    .mail-saved-remove:focus-visible {
+        outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
+        outline-offset: @(AppMeasures.Border.Thin)px;
+    }
+
+    .mail-rows:focus:not(:focus-visible) {
         outline: none;
     }
 
