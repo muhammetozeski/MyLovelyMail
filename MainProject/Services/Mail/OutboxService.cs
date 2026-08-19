@@ -151,21 +151,28 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 foreach (var queued in MessageStore.GetSummaries(account.Id, outboxFullName))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    // A held message waits for the user to say try again; retrying past the ceiling
+                    // is not persistence, it is spinning against an endpoint that will not answer.
+                    if (OutboxAttemptStore.IsHeld(account.Id, queued.Uid)) continue;
                     try
                     {
                         if (MessageStore.TryLoadMimeMessage(account.Id, outboxFullName, queued.Uid) is not { } message)
                         {
                             MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
+                            // An attempt entry must never outlive the message it describes.
+                            OutboxAttemptStore.Clear(account.Id, queued.Uid);
                             Log($"Outbox flush: dropped '{queued.Subject}' — its MIME file is gone.", LogLevel.Warning);
                             continue;
                         }
                         await SmtpSendService.SendAsync(account, message, cancellationToken);
                         MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
+                        OutboxAttemptStore.Clear(account.Id, queued.Uid);
                         await ComposeService.ArchiveToSentAsync(account, message, cancellationToken);
                         Log($"Outbox flush: sent '{queued.Subject}'.");
                     }
                     catch (Exception ex)
                     {
+                        OutboxAttemptStore.RecordFailure(account.Id, queued.Uid, ex.Message);
                         Log($"Outbox flush: '{queued.Subject}' still failing, stays queued: {ex.Message}", LogLevel.Warning);
                     }
                 }
