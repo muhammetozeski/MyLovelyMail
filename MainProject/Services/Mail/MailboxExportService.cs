@@ -69,6 +69,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// ">From ") gets one more ">", so no line inside a message can be mistaken for the
         /// separator that starts the next one. Without it, a message quoting "From " splits into
         /// two on import.
+        /// <para>
+        /// The matching un-escape is the READER's half of mboxrd — Thunderbird and the other
+        /// importers do it. A parser that only splits on the separator (MimeKit's Mbox format
+        /// among them) hands back the extra "&gt;" still attached; that is the parser being
+        /// half-done, not this file being wrong. Do not "fix" it by dropping the escape: the
+        /// alternative is messages silently splitting in two.
+        /// </para>
         /// </summary>
         static void WriteEscapedBody(Stream file, byte[] mime)
         {
