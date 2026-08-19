@@ -68,16 +68,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.SelectAccount(account);
             Folders = SortFolders(MessageStore.GetFolders(account.Id));
 
-            var inbox = Folders.FirstOrDefault(f => f.Role == FolderRole.Inbox) ?? Folders.FirstOrDefault();
-            if (inbox != null)
-                MailUiState.SelectFolder(inbox);
+            if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), Folders) is { } target)
+                MailUiState.SelectFolder(target);
         }
 
-        /// <summary>Selects the first account when none is selected yet; returns whether it did.</summary>
+        /// <summary>Selects an account when none is selected yet — the one last used, else the first.</summary>
         bool TrySelectFirstAccount()
         {
             if (MailUiState.SelectedAccount != null || AccountStore.Accounts.Count == 0) return false;
-            SelectAccount(AccountStore.Accounts[0]);
+            var lastUsed = FolderMemoryStore.LastAccountId is { } accountId ? AccountStore.GetById(accountId) : null;
+            SelectAccount(lastUsed ?? AccountStore.Accounts[0]);
             return true;
         }
 

@@ -73,6 +73,7 @@ namespace MyLovelyMail.MainProject.Stores
         {
             accounts.RemoveAll(a => a.Id == accountId);
             settingsById.TryRemove(accountId, out _);
+            FolderMemoryStore.Forget(accountId);
             try
             {
                 string dir = AccountFolder(accountId);

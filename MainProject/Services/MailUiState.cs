@@ -60,6 +60,11 @@ namespace MyLovelyMail.MainProject.Services
             SelectedUids.Clear();
             OnSelectionChanged?.Invoke();
 
+            // Every folder change in the app comes through here, so this is the one place that
+            // has to record where the user is; the sidebar, Ctrl+1..9 and the debug API all inherit it.
+            if (folder != null)
+                FolderMemoryStore.Remember(folder.AccountId, folder.FullName);
+
             // The scheduled pass only fills the Inbox, so any other server folder is fetched
             // the moment the user opens it (incremental — repeat visits only pull what's new).
             if (folder is { IsLocal: false }
