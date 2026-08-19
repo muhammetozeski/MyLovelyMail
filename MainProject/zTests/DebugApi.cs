@@ -292,6 +292,16 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                case ("GET", "/person"):
+                    return PersonProfileService.Build(RequireQueryValue(query, "accountId"), RequireQueryValue(query, "address"));
+
+                case ("POST", "/person/open"):
+                {
+                    string address = RequireQueryValue(query, "address");
+                    if (address == "close") MailUiState.ClosePerson(); else MailUiState.OpenPerson(address);
+                    return new { open = MailUiState.OpenPersonAddress };
+                }
+
                 case ("GET", "/folder-tree"):
                 {
                     List<MailFolderData> folders = query["probe"] is { Length: > 0 } probe
