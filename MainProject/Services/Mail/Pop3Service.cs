@@ -202,16 +202,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }, cancellationToken);
         }
 
-        /// <summary>Stable 32-bit FNV-1a hash mapping a POP3 string UID onto the numeric summary Uid.</summary>
-        internal static uint Fnv1aHash(string text)
-        {
-            uint hash = 2166136261;
-            foreach (char c in text)
-            {
-                hash ^= c;
-                hash *= 16777619;
-            }
-            return hash == 0 ? 1u : hash;
-        }
+        /// <summary>Maps a POP3 string UID onto the numeric summary Uid. Kept as a named step because
+        /// "the POP3 uid is a hash of the server's string uid" is the fact worth reading here.</summary>
+        internal static uint Fnv1aHash(string text) => StableHash.Fnv1a(text);
     }
 }
