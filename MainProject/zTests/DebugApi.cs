@@ -292,6 +292,17 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // Connect-only, never AUTH: this reports what a host answers on, not whether a
+                // password works.
+                case ("GET", "/connect-diagnose"):
+                {
+                    string host = RequireQueryValue(query, "host");
+                    var protocol = Enum.Parse<ConnectTriageService.MailProtocol>(query["protocol"] ?? "Imap", ignoreCase: true);
+                    string stage = query["stage"] ?? "incoming server";
+                    var seed = new ConnectDiagnosis(Enum.Parse<DiagnosisKind>(query["kind"] ?? "ConnectionRefused", ignoreCase: true), "Probe.", stage);
+                    return await ConnectTriageService.ProbeAsync(seed, protocol, host);
+                }
+
                 case ("GET", "/person"):
                     return PersonProfileService.Build(RequireQueryValue(query, "accountId"), RequireQueryValue(query, "address"));
 
