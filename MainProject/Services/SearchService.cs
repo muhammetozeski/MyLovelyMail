@@ -68,6 +68,26 @@ namespace MyLovelyMail.MainProject.Services
             return [.. hits.OrderByDescending(static h => h.Summary.DateUtc).Take(MaxHits)];
         }
 
+        /// <summary>
+        /// Operator prefixes whose VALUE the parser validates. When one of these lands in the
+        /// default arm its value was rejected and the token quietly became a literal text search —
+        /// that is what makes it dead. from:/to:/tag: accept any value and so can never be dead.
+        /// </summary>
+        static readonly string[] ValidatedPrefixes =
+            ["has", "is", "after", "before", "on", "newer_than", "older_than"];
+
+        /// <summary>
+        /// Tokens typed as operators that the parser refused, so a caller can say WHY a query
+        /// found nothing. Read from where the token actually landed rather than from a second copy
+        /// of the switch's value guards, which would drift away from the parser.
+        /// </summary>
+        public static List<string> DeadOperators(string query) =>
+            [.. ParseQuery(query).TextTokens.Where(static token =>
+            {
+                int colon = token.IndexOf(':');
+                return colon > 0 && ValidatedPrefixes.Contains(token[..colon].ToLowerInvariant());
+            })];
+
         static (List<string> TextTokens, List<Func<MailMessageSummary, bool>> Predicates) ParseQuery(string query)
         {
             List<string> textTokens = [];
