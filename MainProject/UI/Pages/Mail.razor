@@ -183,6 +183,14 @@
                 <div class="mail-empty">
                     <div class="mail-empty-icon">🕊️</div>
                     <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+                    @* A refused operator becomes a literal text search, so the query looks right
+                       and the screen says only that it failed. These say what would work. *@
+                    <div class="mail-rescue">
+                        @foreach (var rescue in SearchRescues)
+                        {
+                            <button class="mail-search-toggle" @onclick="() => ApplyRescue(rescue)">@rescue.Label</button>
+                        }
+                    </div>
                 </div>
             }
         }

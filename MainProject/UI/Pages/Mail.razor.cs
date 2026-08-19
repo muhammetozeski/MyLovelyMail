@@ -169,6 +169,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
             RefreshLists();
         }
 
+        /// <summary>
+        /// Ways to get results back, computed only on the empty-result screen — the scan runs the
+        /// real matcher several times over the folder, which is nothing next to a wall of "no
+        /// results" but is not something to do on every render of a list that has rows.
+        /// </summary>
+        List<SearchRescue> SearchRescues =>
+            MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder
+            && !string.IsNullOrWhiteSpace(SearchText)
+                ? SearchRescueService.Suggest(account.Id, folder.FullName, SearchText, SearchAllFolders)
+                : [];
+
+        void ApplyRescue(SearchRescue rescue)
+        {
+            SearchAllFolders = rescue.SearchAllFolders;
+            SearchText = rescue.Query;
+        }
+
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
         static int AccountUnreadCount(string accountId) =>
             MessageStore.GetFolders(accountId)
