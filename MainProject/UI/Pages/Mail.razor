@@ -342,6 +342,47 @@
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
+        @* The sheet lives INSIDE the reader pane rather than beside it: .mail-screen is a
+           three-column grid, and a fourth child pushed the message list into the reader's slot. *@
+        @if (MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
+        {
+            <div class="mail-person-sheet">
+                <div class="mail-person-head">
+                    <span class="mail-person-name">@(person.DisplayName.Length > 0 ? person.DisplayName : person.Address)</span>
+                    <button class="mail-person-close" title="Close" @onclick="MailUiState.ClosePerson">✕</button>
+                </div>
+                <div class="mail-person-address">@person.Address</div>
+                <div class="mail-person-stats">
+                    <span>@person.MessageCount messages</span>
+                    <span>@person.ReceivedCount received · @person.SentCount sent</span>
+                    <span>@person.UnreadCount unread</span>
+                    <span>@person.WithAttachments with attachments</span>
+                    @if (person.MessageCount > 0)
+                    {
+                        <span>@person.OldestUtc.ToLocalTime().ToString("dd MMM yyyy") — @person.NewestUtc.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    }
+                </div>
+                @foreach (var (folderName, count) in person.ByFolder.OrderByDescending(e => e.Value))
+                {
+                    <div class="mail-person-folder">@folderName — @count</div>
+                }
+                @if (person.Tags.Count > 0)
+                {
+                    <div class="mail-person-tags">
+                        @foreach (string tag in person.Tags)
+                        {
+                            <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
+                        }
+                    </div>
+                }
+                <div class="mail-person-actions">
+                    <button class="mail-search-toggle" @onclick='() => RunSavedSearch("from:" + person.Address)'>🔍 From them</button>
+                    <button class="mail-search-toggle" @onclick='() => RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
+                    <button class="mail-search-toggle" @onclick="() => StartComposeTo(person.Address)">✏️ Write</button>
+                </div>
+            </div>
+        }
+
         @if (OutboxService.LastFailure is { } failedSend)
         {
             <div class="mail-undo-bar mail-undo-bar--failed">
@@ -465,7 +506,9 @@
             <div class="mail-reader-header">
                 <BackButton OnClick="@MailUiState.CloseMessage" />
                 @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
-                <span class="mail-reader-avatar" style="background:@AvatarGradient(open)">@AvatarInitials(open)</span>
+                <button class="mail-reader-avatar" title="Everything known about this correspondent"
+                        style="background:@AvatarGradient(open)"
+                        @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@AvatarInitials(open)</button>
                 <div class="mail-reader-titles">
                     <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
                     <div class="mail-reader-meta">
@@ -475,7 +518,7 @@
                     @if (HistoryOfOpenSender(open) is { } history)
                     {
                         <button class="mail-reader-history" title="Show everything from this sender"
-                                @onclick='() => RunSavedSearch("from:" + open.FromAddress)'>
+                                @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
                             💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
                         </button>
                     }

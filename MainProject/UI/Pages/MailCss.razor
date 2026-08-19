@@ -1166,6 +1166,80 @@
         word-break: break-all;
     }
 
+    /* One panel for everything the cache knows about a correspondent. */
+    .mail-person-sheet {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .mail-person-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-person-name {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+    }
+
+    /* Its own class, not mail-folder-action: that one is invisible until its row is hovered. */
+    .mail-person-close {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: @textMuted;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+        .mail-person-close:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-person-address {
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Small)px;
+        word-break: break-all;
+    }
+
+    .mail-person-stats {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        padding: @(AppMeasures.Space.Px8)px 0;
+        color: @textPrimary;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-person-folder {
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-person-tags,
+    .mail-person-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-top: @(AppMeasures.Space.Px8)px;
+    }
+
     /* What a rule did to this message — the only trace a working rule leaves. */
     .mail-rule-trace {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;

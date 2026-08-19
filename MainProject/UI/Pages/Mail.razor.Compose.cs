@@ -58,6 +58,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             NoteComposeActivity();
         }
 
+        /// <summary>Starts a new draft addressed to this person and closes the sheet behind it.</summary>
+        void StartComposeTo(string address)
+        {
+            if (MailUiState.SelectedAccount is not { } account) return;
+            var draft = ComposeService.BuildNew(account);
+            draft.To = address;
+            MailUiState.ClosePerson();
+            MailUiState.OpenCompose(draft);
+        }
+
         void QueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
