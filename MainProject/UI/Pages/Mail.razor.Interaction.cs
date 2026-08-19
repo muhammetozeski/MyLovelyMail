@@ -25,6 +25,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("I", "Toggle important"),
             ("X", "Tick / untick the focused row"),
             ("Ctrl+A", "Tick every listed row"),
+            ("N", "Next in the open conversation"),
+            ("P", "Previous in the open conversation"),
             ("Delete", "Delete message"),
             ("Escape", "Close reader / dialog"),
             ("Ctrl+1..9", "Switch account"),
@@ -219,6 +221,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 // route at all — only Ctrl+A for the whole list.
                 case "x" or "X" when focused != null:
                     MailUiState.ToggleSelected(focused.Uid);
+                    break;
+                case "n" or "N" when MailUiState.OpenMessage != null:
+                    StepThread(1);
+                    break;
+                case "p" or "P" when MailUiState.OpenMessage != null:
+                    StepThread(-1);
                     break;
                 case "Delete" when focusedFolder != null:
                     MessageActions.Delete(account, focusedFolder, focused!);
