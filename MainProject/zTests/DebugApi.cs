@@ -606,8 +606,8 @@ namespace MyLovelyMail.MainProject.ZTests
                         Subject = query["subject"] ?? string.Empty,
                         Body = query["body"] ?? string.Empty
                     };
-                    if (query["attachment"] is { Length: > 0 } attachmentPath)
-                        draft.AttachmentPaths.Add(attachmentPath);
+                    // GetValues, not the indexer: a multi-file draft is what the size ceiling needs.
+                    draft.AttachmentPaths.AddRange(query.GetValues("attachment") ?? []);
                     return new { warnings = SendGuardService.Inspect(draft) };
                 }
 
