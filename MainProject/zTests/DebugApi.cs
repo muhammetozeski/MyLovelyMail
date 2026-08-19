@@ -227,6 +227,12 @@ namespace MyLovelyMail.MainProject.ZTests
                     return MailboxExportService.ExportFolder(RequireAccount(accountId), ReadFolder(query));
                 }
 
+                case ("GET", "/search-rescue"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    return new { suggestions = SearchRescueService.Suggest(accountId, ReadFolder(query), RequireQueryValue(query, "query"), query["all"] == "true"), dead = SearchService.DeadOperators(RequireQueryValue(query, "query")) };
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
