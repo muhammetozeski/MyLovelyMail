@@ -36,6 +36,13 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         public uint UidValidity { get; set; }
         public uint LastSeenUid { get; set; }
+
+        /// <summary>
+        /// Lowest uid the app has ever fetched here. Incremental sync only asks for uids ABOVE
+        /// <see cref="LastSeenUid"/>, so this is the floor the backfill digs below; 0 means the
+        /// folder has never been filled.
+        /// </summary>
+        public uint OldestFetchedUid { get; set; }
         public int TotalCount { get; set; }
         public int UnreadCount { get; set; }
     }

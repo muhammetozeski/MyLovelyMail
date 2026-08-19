@@ -1,5 +1,6 @@
 using MailKit;
 using MailKit.Net.Imap;
+using MailKit.Search;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
@@ -79,6 +80,78 @@ namespace MyLovelyMail.MainProject.Services.Mail
             KickFolderSync(account, folderFullName);
         }
 
+        /// <summary>
+        /// Fetches the next <paramref name="count"/> messages BELOW the folder's oldest fetched
+        /// uid — the only way to reach mail past the first fill, since incremental sync asks for
+        /// uids above LastSeenUid and a resync just re-fetches the same newest slice.
+        /// Never touches LastSeenUid, so the new-mail path and its notification stay untouched.
+        /// </summary>
+        public static void KickFolderBackfill(MailAccountData account, string folderFullName, int count)
+        {
+            string key = MessageStore.FolderKey(account.Id, folderFullName);
+            lock (onDemandInFlight)
+                if (!onDemandInFlight.Add(key)) return;
+
+            OnFolderSyncStateChanged?.Invoke();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    int landed = await BackfillFolderAsync(account, folderFullName, count);
+                    Log($"Backfill of '{folderFullName}': {landed} older summaries added for {account.EmailAddress}.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Backfill of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
+                }
+                finally
+                {
+                    lock (onDemandInFlight)
+                        onDemandInFlight.Remove(key);
+                    OnFolderSyncStateChanged?.Invoke();
+                }
+            });
+        }
+
+        /// <summary>The backfill itself; returns how many summaries landed. Awaited by the debug API.</summary>
+        public static async Task<int> BackfillFolderAsync(MailAccountData account, string folderFullName, int count,
+            CancellationToken cancellationToken = default)
+        {
+            var cached = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folderFullName);
+            // Nothing fetched yet means there is no floor to dig below; a normal sync goes first.
+            if (cached is not { OldestFetchedUid: > 1 }) return 0;
+
+            using var syncScope = SyncScheduler.EnterSyncScope();
+            return await ResiliencePolicy.RunNetwork(async ct =>
+            {
+                using var client = await MailConnections.OpenImapAsync(account, ct);
+                var folder = await client.GetFolderAsync(folderFullName, ct);
+                await folder.OpenAsync(FolderAccess.ReadOnly, ct);
+
+                var below = new UniqueIdRange(UniqueId.MinValue, new UniqueId(cached.OldestFetchedUid - 1));
+                var olderUids = await folder.SearchAsync(SearchQuery.Uids(below), ct);
+                // Newest of the older ones first: the user is walking backwards through the folder.
+                var wanted = olderUids.OrderByDescending(static u => u.Id).Take(count).ToList();
+                if (wanted.Count == 0)
+                {
+                    await client.DisconnectAsync(true, ct);
+                    return 0;
+                }
+
+                var fetched = await folder.FetchAsync(wanted, SummaryItems, ct);
+                List<MailMessageSummary> older = [.. fetched.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
+                if (older.Count > 0)
+                {
+                    MessageStore.UpsertSummaries(account.Id, folderFullName, older);
+                    cached.OldestFetchedUid = older.Min(static s => s.Uid);
+                    MessageStore.SaveFolder(cached);
+                }
+
+                await client.DisconnectAsync(true, ct);
+                return older.Count;
+            }, cancellationToken);
+        }
+
         /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
@@ -148,7 +221,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     // Refreshing counts must never erase sync progress: dropping LastSeenUid to 0
                     // here re-imported "the newest 300" as brand-new on EVERY pass, which both
                     // wasted traffic and kept the new-mail notification condition permanently false.
+                    // OldestFetchedUid has to survive the same way, or every backfill would be
+                    // undone by the next folder-list refresh and start over from the floor.
                     LastSeenUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSeenUid ?? 0,
+                    OldestFetchedUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.OldestFetchedUid ?? 0,
                     TotalCount = folder.Count,
                     UnreadCount = folder.Unread
                 });
@@ -224,6 +300,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             int newCount = 0;
             uint maxUid = lastSeenUid;
+            // Backfilled from the cache when the field is missing, so folders filled before this
+            // existed get a floor without a re-sync.
+            uint oldestFetchedUid = cached?.OldestFetchedUid ?? 0;
+            if (oldestFetchedUid == 0 && MessageStore.GetSummaries(account.Id, folder.FullName) is { Count: > 0 } cachedSummaries)
+                oldestFetchedUid = cachedSummaries.Min(static s => s.Uid);
             List<MailMessageSummary> summaries = [];
             if (lastSeenUid == 0)
             {
@@ -239,6 +320,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     MessageStore.UpsertSummaries(account.Id, folder.FullName, sliceSummaries);
                     summaries.AddRange(sliceSummaries);
                     maxUid = Math.Max(maxUid, sliceSummaries.Max(static s => s.Uid));
+                    uint sliceLowest = sliceSummaries.Min(static s => s.Uid);
+                    oldestFetchedUid = oldestFetchedUid == 0 ? sliceLowest : Math.Min(oldestFetchedUid, sliceLowest);
                 }
             }
             else
@@ -274,6 +357,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 Role = cached?.Role ?? (folder.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
+                OldestFetchedUid = oldestFetchedUid,
                 TotalCount = folder.Count,
                 UnreadCount = folder.Unread
             });
