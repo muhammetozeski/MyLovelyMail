@@ -19,23 +19,13 @@ namespace MyLovelyMail.MainProject.ZTests
     /// DEBUG-ONLY localhost REST API so the running app can be driven and inspected from outside
     /// (automated end-to-end tests against a local mail server). Never started in Release builds.
     /// Strictly a consumer of the existing services — it owns no mail logic of its own.
-    /// Base address: http://127.0.0.1:52539/ — endpoints:
-    ///   GET  /status                                  app + accounts overview
-    ///   POST /accounts   {email,password,hosts,...}   add account into vault+store, kicks a sync
-    ///   POST /sync                                    run a full sync pass now (awaited)
-    ///   GET  /folders?accountId=                      cached folders of the account
-    ///   GET  /messages?accountId=&amp;folder=&amp;take=      newest summaries of a folder
-    ///   GET  /message?accountId=&amp;folder=&amp;uid=        rendered body + attachments of one message
-    ///   POST /send       {accountId,to,cc,subject,body,attachmentPaths,queued}   send through SMTP (queued=true goes via OutboxService)
-    ///   POST /open       ?accountId=&amp;folder=&amp;uid=     select + open the message in the reader
-    ///   POST /compose    ?accountId=&amp;attachmentPath=   open the compose pane (optionally pre-attach a file)
-    ///   GET  /threads    ?accountId=&amp;folder=&amp;take=     conversations built by ThreadingService
-    ///   GET  /logs       ?filter=&amp;take=                in-memory log lines
-    ///   GET  /export     ?accountId=&amp;folder=&amp;uid=&amp;format=   save the message as .eml (format=html for .html), returns the path
-    ///   POST /move       ?accountId=&amp;folder=&amp;uid=&amp;target=   move the message to another folder
-    ///   POST /flush-outbox                             send everything waiting in the outbox now
-    ///   POST /undo                                     cancel the queued send and reopen the draft
-    ///   DELETE /accounts ?accountId=                   remove the account
+    /// Base address: <c>http://127.0.0.1:52539/</c>.
+    /// <para>
+    /// The routes are the <c>case ("VERB", "/path")</c> labels of <see cref="RouteAsync"/> and are
+    /// deliberately NOT listed here: the list that used to live in this comment named eighteen
+    /// while the switch had grown past forty, so it read as documentation and worked as
+    /// misinformation. Read the switch — every case carries the reason it exists.
+    /// </para>
     /// </summary>
     public static class DebugApi
     {
@@ -559,9 +549,6 @@ namespace MyLovelyMail.MainProject.ZTests
                         a.EmailAddress,
                         health = SyncHealthService.For(a.Id)
                     });
-
-                case ("GET", "/attachment-hint"):
-                    return new { trigger = AttachmentIntentService.FindTrigger(query["subject"] ?? string.Empty, query["body"] ?? string.Empty) };
 
                 // A raw header can be passed instead of a message, so the parser and the link gate
                 // can be exercised on the shapes real newsletters send without hunting for one.
