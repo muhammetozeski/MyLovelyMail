@@ -176,15 +176,31 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>Wraps the sanitized body in a minimal document whose colors come from <see cref="AppColors.MailCanvas"/>, the same source the iframe element uses.</summary>
-        static string WrapDocument(string body) =>
-            "<!DOCTYPE html><html><head><style>" +
-            $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
-            "margin:12px;line-height:1.55;font-size:14px;word-break:break-word;}" +
-            "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;}" +
-            $"a{{color:{AppColors.MailCanvas.Link};}}blockquote{{border-left:3px solid {AppColors.MailCanvas.QuoteBorder};margin-left:0;padding-left:12px;color:{AppColors.MailCanvas.QuoteText};}}" +
-            $"details.mlm-quote>summary{{cursor:pointer;list-style:none;display:inline-block;margin:8px 0;padding:2px 10px;border-radius:9999px;" +
-            $"background:{AppColors.MailCanvas.QuoteBorder};color:{AppColors.MailCanvas.QuoteText};font-size:12px;}}" +
-            "details.mlm-quote>summary::-webkit-details-marker{display:none;}" +
-            "</style></head><body>" + body + "</body></html>";
+        /// <summary>Design text size inside the reader, before <see cref="Settings.ReaderTextScalePercent"/>.</summary>
+        const int BaseFontPx = 14;
+
+        const int MinScalePercent = 70, MaxScalePercent = 200;
+
+        /// <summary>
+        /// The one piece of type the user could not change: UiScalePercent scales the whole shell
+        /// and the density setting only touches list rows, so making mail readable meant resizing
+        /// the entire app. Read inline like the other settings this method already consults, so
+        /// every caller — the reader and the debug API alike — gets the scaled document.
+        /// </summary>
+        static string WrapDocument(string body)
+        {
+            int scale = Math.Clamp(Settings.ReaderTextScalePercent.Value, MinScalePercent, MaxScalePercent);
+            int fontPx = BaseFontPx * scale / 100;
+            return "<!DOCTYPE html><html><head><style>" +
+                $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
+                $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
+                "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;}" +
+                $"a{{color:{AppColors.MailCanvas.Link};}}blockquote{{border-left:3px solid {AppColors.MailCanvas.QuoteBorder};margin-left:0;padding-left:12px;color:{AppColors.MailCanvas.QuoteText};}}" +
+                $"details.mlm-quote>summary{{cursor:pointer;list-style:none;display:inline-block;margin:8px 0;padding:2px 10px;border-radius:9999px;" +
+                // em, not px: the pill has to grow with the text it sits beside.
+                $"background:{AppColors.MailCanvas.QuoteBorder};color:{AppColors.MailCanvas.QuoteText};font-size:0.85em;}}" +
+                "details.mlm-quote>summary::-webkit-details-marker{display:none;}" +
+                "</style></head><body>" + body + "</body></html>";
+        }
     }
 }

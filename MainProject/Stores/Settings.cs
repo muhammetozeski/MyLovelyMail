@@ -90,6 +90,9 @@ namespace MyLovelyMail.MainProject.Stores
 
         // ---- Reading ----
 
+        /// <summary>Text size inside the reader as a percentage of the design size (clamped 70-200).</summary>
+        public static readonly Setting<int> ReaderTextScalePercent = new(100);
+
         /// <summary>Collapses the quoted history under a reply behind a "Show quoted text" fold.</summary>
         public static readonly Setting<bool> FoldQuotedText = new(true);
 
