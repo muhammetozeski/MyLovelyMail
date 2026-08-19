@@ -309,6 +309,13 @@ namespace MyLovelyMail.MainProject.ZTests
                         });
                 }
 
+                case ("POST", "/folder/read-all"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    return new { marked = MessageActions.SetFolderRead(RequireAccount(accountId), folder) };
+                }
+
                 // Awaited, unlike the UI's fire-and-forget kick, so a test can read the count back.
                 case ("POST", "/backfill"):
                 {
