@@ -202,6 +202,16 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { navigated = NavigationBridge.TryNavigate(route), route };
                 }
 
+                // Read-only by construction: Preview never runs the rule's actions, so this cannot
+                // tag, move or mark-read anything in the user's cache.
+                case ("GET", "/rule-preview"):
+                {
+                    string ruleId = RequireQueryValue(query, "ruleId");
+                    var rule = FilterRuleStore.Rules.FirstOrDefault(r => r.Id == ruleId)
+                        ?? throw new InvalidOperationException("Unknown rule.");
+                    return RuleEngine.Preview(rule);
+                }
+
                 case ("GET", "/motion"):
                     return new
                     {
