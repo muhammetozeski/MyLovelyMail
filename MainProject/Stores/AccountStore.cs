@@ -106,6 +106,7 @@ namespace MyLovelyMail.MainProject.Stores
             accounts.RemoveAll(a => a.Id == accountId);
             settingsById.TryRemove(accountId, out _);
             FolderMemoryStore.Forget(accountId);
+            Services.Mail.OutboxAttemptStore.ForgetAccount(accountId);
             try
             {
                 string dir = AccountFolder(accountId);

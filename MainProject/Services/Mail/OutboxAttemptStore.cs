@@ -96,6 +96,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (Attempts.RemoveAll(a => a.AccountId == accountId && a.Uid == uid) > 0) Persist();
         }
 
+        /// <summary>Drops everything belonging to an account, called when the account itself is removed.</summary>
+        public static void ForgetAccount(string accountId)
+        {
+            if (Attempts.RemoveAll(a => a.AccountId == accountId) > 0) Persist();
+        }
+
         /// <summary>Releases every hold so the next flush tries again; the counts stay, as history.</summary>
         public static int ReleaseHolds()
         {
