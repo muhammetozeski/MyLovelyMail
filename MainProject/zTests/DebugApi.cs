@@ -388,6 +388,41 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { GlobalSettings.ReduceMotion.Value, followSystem = GlobalSettings.FollowSystemMotion.Value, effective = MotionPreference.IsCalm, css = AppStyles.BuildCalmMotionLayer() };
                 }
 
+                // Builds a forward-as-attachment draft and reports what actually got staged: the
+                // path, its size next to the cached MIME's, and the content type MimeKit picks for
+                // it in the send path's BodyBuilder loop. The draft is discarded afterwards, so the
+                // probe leaves no row in local Drafts and no files in the stage folder.
+                case ("GET", "/forward-attach"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
+                    var summary = RequireSummary(accountId, folder, uid);
+
+                    var draft = ComposeService.BuildForwardAsAttachment(account, folder, summary);
+                    try
+                    {
+                        string? staged = draft.AttachmentPaths.FirstOrDefault();
+                        var builder = new BodyBuilder();
+                        if (staged != null) await builder.Attachments.AddAsync(staged);
+
+                        return new
+                        {
+                            draft.Subject,
+                            bodyIsAttributionOnly = !draft.Body.Contains("\n> "),
+                            staged,
+                            stagedBytes = staged is { } stagedPath ? new FileInfo(stagedPath).Length : 0,
+                            cachedBytes = MessageStore.TryLoadFullMessage(accountId, folder, uid)?.Length ?? 0,
+                            contentType = builder.Attachments.FirstOrDefault()?.ContentType.MimeType
+                        };
+                    }
+                    finally
+                    {
+                        ComposeService.DeleteDraft(draft);
+                    }
+                }
+
                 // Every registered setting with its value and whether it still follows the default.
                 // ?accountId= switches to that account's inherited set. This is what makes "does a
                 // control exist for every key" a checkable question instead of an eyeballed one.
