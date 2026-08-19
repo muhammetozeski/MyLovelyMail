@@ -12,6 +12,11 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   yalnızca UI'a çıkarken üretilir; veri taşımada asla string kullanılmaz. (Vaka: wizard'da
   POP3 seçilince kutular hâlâ "imap.example.com" ve IMAP portu gösteriyordu, çünkü metinler
   tek tek elle yazılmıştı.)
+- **Zemin rengi değişkense yazı rengi sabit yazılmaz, ölçülerek seçilir.** Pastel bir paletin
+  üzerine beyaz yazı "çalışıyor gibi" görünür ama ölçünce çökebilir. Karar kodda verilir:
+  `AppColors.InkOn(hex)` beyaz ile koyu erik arasında WCAG kontrast oranı büyük olanı döndürür.
+  (Vaka: hesap okunmamış rozeti ve etiket çipleri kimlik paletinin üzerine beyaz yazıyordu;
+  ölçüm 1,70–3,42:1 çıktı, yani AA sınırının epey altı. Koyu mürekkeple 5,45–10,95:1 oldu.)
 
 ## Loglama
 
