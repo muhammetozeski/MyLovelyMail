@@ -133,6 +133,14 @@
     {
         <GlassCard CustomClass="wizard-card">
             <p class="wizard-test @(TestSucceeded ? "wizard-test--ok" : "wizard-test--fail")">@TestMessage</p>
+            @* Offered only when a connect-only probe actually got an answer on another pair —
+               the port/security pairing is the one thing a provider preset cannot guess. *@
+            @if (Diagnosis is { SuggestedPort: not null } suggestion)
+            {
+                <SecondaryButton OnClick="@(() => ApplySuggestion(suggestion))">
+                    ↩️ Use port @suggestion.SuggestedPort with @suggestion.SuggestedSecurity
+                </SecondaryButton>
+            }
         </GlassCard>
     }
 
