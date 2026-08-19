@@ -29,6 +29,8 @@
         NavManager.LocationChanged += HandleLocationChanged;
         Events.MainEvents.OnDataChanged += HandleDataChanged;
         EvaluateBottomNavVisibility(NavManager.Uri);
+        // The layout outlives every page, so it is the right owner of the app-wide navigator.
+        Services.NavigationBridge.Navigator = route => InvokeAsync(() => NavManager.NavigateTo(route));
     }
 
     private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -55,5 +57,6 @@
     {
         NavManager.LocationChanged -= HandleLocationChanged;
         Events.MainEvents.OnDataChanged -= HandleDataChanged;
+        Services.NavigationBridge.Navigator = null;
     }
 }
