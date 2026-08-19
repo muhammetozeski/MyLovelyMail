@@ -264,6 +264,17 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { style = style.ToString(), lines = body.Split('\n').Length, characters = body.Length, body };
                 }
 
+                // ?probe= runs the builder over handmade paths, so the nesting rules are checkable
+                // without a server that happens to have nested folders.
+                case ("GET", "/folder-tree"):
+                {
+                    List<MailFolderData> folders = query["probe"] is { Length: > 0 } probe
+                        ? [.. probe.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .Select(name => new MailFolderData { FullName = name, DisplayName = name.Split('/').Last(), Delimiter = '/', IsLocal = name.StartsWith(MessageStore.LocalFolderPrefix) })]
+                        : MessageStore.GetFolders(RequireQueryValue(query, "accountId"));
+                    return FolderTreeService.Build(folders).Select(n => new { n.Folder.FullName, n.Folder.DisplayName, n.Depth });
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
@@ -372,7 +383,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         .Select(f => new
                         {
                             f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal,
-                            f.LastSeenUid, f.OldestFetchedUid, f.LastSyncedUtc,
+                            f.LastSeenUid, f.OldestFetchedUid, f.LastSyncedUtc, f.Delimiter,
                             CachedCount = MessageStore.GetSummaries(accountId, f.FullName).Count
                         });
                 }
