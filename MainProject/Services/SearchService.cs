@@ -102,6 +102,9 @@ namespace MyLovelyMail.MainProject.Services
                     case "is" when value.Equals("important", StringComparison.OrdinalIgnoreCase):
                         predicates.Add(static s => s.Flags.HasFlag(MailFlags.Important));
                         break;
+                    case "is" when value.Equals("muted", StringComparison.OrdinalIgnoreCase):
+                        predicates.Add(static s => s.Flags.HasFlag(MailFlags.Muted));
+                        break;
                     case "is" when value.Equals("snoozed", StringComparison.OrdinalIgnoreCase):
                         predicates.Add(static s => s.SnoozedUntilUtc != null);
                         break;

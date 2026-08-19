@@ -258,6 +258,10 @@
                                 <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
                             </span>
                             <span class="mail-row-subject">
+                                @if (message.Flags.HasFlag(MailFlags.Muted))
+                                {
+                                    <span class="mail-row-flag mail-row-flag--muted" title="Muted conversation — replies arrive quietly">🔕</span>
+                                }
                                 @if (message.Flags.HasFlag(MailFlags.Important))
                                 {
                                     <span class="mail-row-flag">❗</span>
