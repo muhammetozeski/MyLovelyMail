@@ -108,6 +108,7 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   yalnızca önbellekteki dilimle (513 mesaj) yazıyordu. Tek bir mail açmak rozeti 8.607'den
   149'a düşürüyor, sonraki senkron geri koyuyordu. Alanın sahibi tek bir katman olmalı; ötekiler
   ona delta bildirir. Yeniden-hesap ancak önbellek tüm klasörü tutuyorsa doğrudur.
+
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
