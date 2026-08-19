@@ -774,8 +774,25 @@ namespace MyLovelyMail.MainProject.ZTests
                         pending = OutboxService.Current is { } pending ? new { pending.Draft.Subject, pending.DueUtc } : null,
                         failure = OutboxService.LastFailure is { } failure
                             ? new { failure.Draft.Subject, failure.Reason, failure.FailedAtUtc }
-                            : null
+                            : null,
+                        heldCount = OutboxAttemptStore.HeldCount,
+                        // The queue itself, which nothing could see before: a stuck message was
+                        // indistinguishable from one queued a moment ago.
+                        queued = AccountStore.Accounts.SelectMany(a =>
+                            MessageStore.GetSummaries(a.Id, MessageStore.LocalFolderPrefix + ComposeService.LocalOutboxFolderName)
+                                .Select(q => new
+                                {
+                                    accountId = a.Id,
+                                    q.Uid,
+                                    q.Subject,
+                                    attempts = OutboxAttemptStore.For(a.Id, q.Uid)?.AttemptCount ?? 0,
+                                    lastError = OutboxAttemptStore.For(a.Id, q.Uid)?.LastError ?? string.Empty,
+                                    held = OutboxAttemptStore.IsHeld(a.Id, q.Uid)
+                                }))
                     };
+
+                case ("POST", "/outbox/hold/clear"):
+                    return new { released = OutboxAttemptStore.ReleaseHolds() };
 
                 case ("POST", "/outbox/retry"):
                     OutboxService.RetryFailed();
