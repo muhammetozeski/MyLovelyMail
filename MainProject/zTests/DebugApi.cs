@@ -221,6 +221,12 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { findings = MessageAuthService.Read(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid)) };
                 }
 
+                case ("GET", "/export/folder"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    return MailboxExportService.ExportFolder(RequireAccount(accountId), ReadFolder(query));
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
