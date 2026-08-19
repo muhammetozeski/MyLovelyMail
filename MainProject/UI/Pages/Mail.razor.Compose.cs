@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Components.Forms;
+using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
+using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Services.Mail;
 using Timer = System.Timers.Timer;
 
@@ -27,6 +31,24 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// The draft is saved first so a failed submit still leaves it in Drafts.</summary>
         /// <summary>What the pre-send checks found; empty means nothing is worth stopping for.</summary>
         IReadOnlyList<SendWarning> SendWarnings { get; set; } = [];
+
+        /// <summary>
+        /// Rebuilds the quote at another style from the message the draft is answering, keeping
+        /// whatever was typed ABOVE the attribution line. Rebuilding from the source is the only
+        /// safe direction: re-parsing the edited body would have to guess which of its lines the
+        /// user wrote.
+        /// </summary>
+        void RequoteDraft(ComposeDraft draft, QuoteStyle style)
+        {
+            if (draft.Account is not { } account || draft.SourceUid == 0) return;
+            if (MessageStore.GetSummary(account.Id, draft.SourceFolder, draft.SourceUid) is not { } source) return;
+
+            const string AttributionMarker = "\n\nOn ";
+            int cut = draft.Body.IndexOf(AttributionMarker, StringComparison.Ordinal);
+            string typed = cut >= 0 ? draft.Body[..cut] : draft.Body;
+            draft.Body = typed + ComposeService.QuoteBody(account, draft.SourceFolder, source, style);
+            NoteComposeActivity();
+        }
 
         void QueueActiveDraftSend()
         {

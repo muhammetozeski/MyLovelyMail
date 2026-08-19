@@ -365,6 +365,17 @@
                 {
                     <span class="mail-compose-saved">💾 @DraftSavedAt?.ToString("HH:mm:ss")</span>
                 }
+                @* Only on a draft that quotes something; the quote is rebuilt from the source
+                   message, never re-parsed out of the body the user has been editing. *@
+                @if (draft.SourceUid > 0)
+                {
+                    <span class="mail-quote-picker">
+                        @foreach (var style in Enum.GetValues<QuoteStyle>())
+                        {
+                            <button class="mail-folder-action mail-text-scale-step" @onclick="() => RequoteDraft(draft, style)">@style</button>
+                        }
+                    </span>
+                }
             </div>
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">

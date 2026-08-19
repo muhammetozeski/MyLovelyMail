@@ -163,6 +163,19 @@
         <div class="settings-section-title">✍️ Composing</div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Quote the original in replies</span>
+                <span class="settings-row-hint">Trimmed keeps the head and drops the history the message was already carrying</span>
+            </div>
+            <div class="settings-density">
+                @foreach (var style in Enum.GetValues<QuoteStyle>())
+                {
+                    <button class="settings-density-option @(GlobalSettings.ReplyQuoteStyle.Value == style ? "settings-density-option--on" : "")"
+                            @onclick="() => SetAndSave(GlobalSettings.ReplyQuoteStyle, style)">@style</button>
+                }
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Signature</span>
                 <span class="settings-row-hint">Added under new messages and above the quoted text in replies; empty = none</span>
             </div>
