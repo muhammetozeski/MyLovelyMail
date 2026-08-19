@@ -32,6 +32,9 @@ $tag = "v$major.$minor.$patch"
 Write-Host "$lastTag -> $tag" -ForegroundColor Cyan
 
 # ── Notes: the commit subjects since the last release ──
+# gh creates the tag on the remote, so the local repository has never heard of it and the range
+# below silently resolves to nothing. Fetch first or the notes come out empty.
+git fetch --tags --quiet 2>&1 | Out-Null
 $subjects = git log "$lastTag..HEAD" --no-merges --pretty=format:'- %s'
 if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
 $notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
