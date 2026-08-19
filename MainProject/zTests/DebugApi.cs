@@ -317,6 +317,37 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { account.EmailAddress, account.Enabled };
                 }
 
+                case ("POST", "/mute"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var account = RequireAccount(accountId);
+                    var summary = RequireSummary(accountId, folder, uid);
+                    int touched = query["mute"] == "false"
+                        ? MuteService.UnmuteThread(account, folder, summary)
+                        : MuteService.MuteThread(account, folder, summary);
+                    return new { touched, mutedThreadIds = MutedThreadStore.All.Count };
+                }
+
+                case ("GET", "/muted"):
+                    return new { messageIds = MutedThreadStore.All };
+
+                // Hands ApplyToIncoming a summary that only claims to be a reply, which is the one
+                // way to prove the future-arrival half without waiting on real mail. A resync
+                // proves nothing here: Muted survives that through CarryOverLocalState anyway.
+                case ("POST", "/mute/incoming-probe"):
+                {
+                    var probe = new MailMessageSummary
+                    {
+                        Uid = uint.MaxValue,
+                        MessageId = query["messageId"] ?? "<probe@mylovelymail.invalid>",
+                        InReplyTo = RequireQueryValue(query, "inReplyTo")
+                    };
+                    bool muted = MuteService.ApplyToIncoming(probe);
+                    return new { muted, flags = probe.Flags.ToString(), remembered = MutedThreadStore.All.Contains(probe.MessageId) };
+                }
+
                 case ("POST", "/read"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
