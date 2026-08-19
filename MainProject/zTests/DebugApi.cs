@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Web;
+using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
@@ -204,6 +205,22 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 // Read-only by construction: Preview never runs the rule's actions, so this cannot
                 // tag, move or mark-read anything in the user's cache.
+                // Raw MIME on the body: every finding is provable by piping a handcrafted header
+                // block, with no mail server and no waiting for a message that happens to be wrong.
+                case ("POST", "/auth"):
+                {
+                    var message = await MimeMessage.LoadAsync(request.InputStream);
+                    return new { findings = MessageAuthService.Inspect(message) };
+                }
+
+                case ("GET", "/auth"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    return new { findings = MessageAuthService.Read(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid)) };
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
