@@ -116,6 +116,15 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   mesaj gibi görünüyordu. Diğer bütün çakışmalar yeniden senkronla düzeliyor; sunucu kopyası
   olmayan yolda düzelmiyor. Bir kimliği başka bir isim alanına taşırken "orada bu numara boş mu"
   diye sor.
+- **Geri çekilme (backoff) hızı sınırlar, toplamı değil.** IDLE döngüsü her kopuşta 2, 4, 8, 16, 32
+  saniyeyle yeniden bağlanıyordu — reddedilmiş bir şifre için bu, uygulama açık kaldığı sürece aynı
+  başarısız girişi tekrarlamak demek. Ölçüm: sahte sunucuya 35 saniyede 10 giriş denemesi ve
+  artıyor. Yeniden denemenin düzeltebileceği hata (soket, TLS, zaman aşımı) ile düzeltemeyeceği
+  hata (şifre reddi) ayrılmalı; ikincisinde döngü durmalı.
+- **Merkezî bir politika düzeltilince iş bitmiş sayılmaz; aynı işi kendi başına yapan döngüler
+  aranmalı.** Polly'nin yeniden deneme yordamını düzeltmek senkron pasını tek denemeye indirdi ama
+  denemelerin çoğu IDLE servisinin kendi yeniden bağlanma döngüsünden geliyordu. Ölçmeden
+  "düzeldi" denseydi asıl kaynak elde kalacaktı.
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
