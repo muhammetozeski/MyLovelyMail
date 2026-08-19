@@ -196,6 +196,14 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/trim"):
                     return new { lastReport = OfflineCacheTrimmer.LastReport };
 
+                // Answers "is this element really in the page" for anything a screenshot cannot
+                // show: below the fold, inside a virtualized list, or a style that only emits CSS.
+                case ("GET", "/dom"):
+                {
+                    string? html = await RenderedPageProbe.ReadHtmlAsync(query["selector"] ?? string.Empty);
+                    return new { available = html != null, length = html?.Length ?? 0, html };
+                }
+
                 // Opens a page without touching the screen, so any page can be snapshot-audited.
                 case ("POST", "/navigate"):
                 {
@@ -293,7 +301,21 @@ namespace MyLovelyMail.MainProject.ZTests
                 {
                     string accountId = RequireQueryValue(query, "accountId");
                     return MessageStore.GetFolders(accountId)
-                        .Select(f => new { f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal });
+                        .Select(f => new
+                        {
+                            f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal,
+                            f.LastSeenUid, f.OldestFetchedUid,
+                            CachedCount = MessageStore.GetSummaries(accountId, f.FullName).Count
+                        });
+                }
+
+                // Awaited, unlike the UI's fire-and-forget kick, so a test can read the count back.
+                case ("POST", "/backfill"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    int landed = await ImapSyncService.BackfillFolderAsync(RequireAccount(accountId), folder, ReadTake(query, 300));
+                    return new { landed };
                 }
 
                 case ("GET", "/messages"):
