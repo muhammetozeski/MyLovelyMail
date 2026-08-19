@@ -223,7 +223,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("⭐ Starred", "is:starred"),
             ("❗ Important", "is:important"),
             ("📎 Attachments", "has:attachment"),
-            ("💤 Snoozed", "is:snoozed")
+            ("💤 Snoozed", "is:snoozed"),
+            ("🕒 Last 7 days", "newer_than:7d")
         ];
 
         bool HasSearchToken(string token) =>
