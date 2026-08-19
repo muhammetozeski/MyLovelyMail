@@ -10,6 +10,7 @@ using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.Constants;
+using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.ZTests
@@ -194,6 +195,39 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 case ("GET", "/trim"):
                     return new { lastReport = OfflineCacheTrimmer.LastReport };
+
+                // Opens a page without touching the screen, so any page can be snapshot-audited.
+                case ("POST", "/navigate"):
+                {
+                    string route = RequireQueryValue(query, "route");
+                    return new { navigated = NavigationBridge.TryNavigate(route), route };
+                }
+
+                case ("GET", "/motion"):
+                    return new
+                    {
+                        reduceMotion = GlobalSettings.ReduceMotion.Value,
+                        followSystem = GlobalSettings.FollowSystemMotion.Value,
+                        systemReduced = MotionPreference.SystemPrefersReduced,
+                        effective = MotionPreference.IsCalm,
+                        css = AppStyles.BuildCalmMotionLayer()
+                    };
+
+                // ?reduce= sets the app switch and stops following the system, since the switch
+                // means nothing while the OS is the source of the answer; ?follow= sets that
+                // choice on its own.
+                case ("POST", "/motion"):
+                {
+                    if (query["follow"] is { Length: > 0 } follow)
+                        GlobalSettings.FollowSystemMotion.Value = follow == "true";
+                    if (query["reduce"] is { Length: > 0 } reduce)
+                    {
+                        GlobalSettings.FollowSystemMotion.Value = false;
+                        GlobalSettings.ReduceMotion.Value = reduce == "true";
+                    }
+                    SettingsManager.SaveSettings();
+                    return new { GlobalSettings.ReduceMotion.Value, followSystem = GlobalSettings.FollowSystemMotion.Value, effective = MotionPreference.IsCalm, css = AppStyles.BuildCalmMotionLayer() };
+                }
 
                 // Rehearses the size stage against a real cache by lending one account a budget for
                 // the duration of a dry run, then putting its setting back exactly as it was.
