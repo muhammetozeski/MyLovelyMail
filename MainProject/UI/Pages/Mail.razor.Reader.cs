@@ -29,15 +29,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
         void OpenUnsubscribePage(string url)
         {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-                SaveStatus = "🌐 Unsubscribe page opened in your browser";
-            }
-            catch (Exception ex)
-            {
-                SaveStatus = $"❌ {ex.Message}";
-            }
+            SaveStatus = ExternalLinkService.TryOpen(url, out string failureReason)
+                ? "🌐 Unsubscribe page opened in your browser"
+                : $"❌ {failureReason}";
         }
 
         /// <summary>Prepares the unsubscribe mail as a normal draft — the user still presses Send.</summary>
