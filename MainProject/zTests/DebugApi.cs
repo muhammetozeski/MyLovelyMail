@@ -246,6 +246,14 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 // The quote is a pure function of the source message plus the style, so each
                 // mode is checkable without opening a compose pane.
+                case ("POST", "/compose/from"):
+                {
+                    var next = RequireAccount(RequireQueryValue(query, "accountId"));
+                    if (MailUiState.ActiveCompose is not { } draft) throw new InvalidOperationException("No draft is open.");
+                    ComposeService.SwitchSendingAccount(draft, next);
+                    return new { from = draft.Account?.EmailAddress, bodyPrefix = draft.Body[..Math.Min(60, draft.Body.Length)], attachments = draft.AttachmentPaths.Count(File.Exists) };
+                }
+
                 case ("GET", "/reply-preview"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
@@ -663,7 +671,8 @@ namespace MyLovelyMail.MainProject.ZTests
                         To = query["to"] ?? string.Empty,
                         Cc = query["cc"] ?? string.Empty,
                         Subject = query["subject"] ?? string.Empty,
-                        Body = query["body"] ?? string.Empty
+                        Body = query["body"] ?? string.Empty,
+                        ArrivedAtAddress = query["arrivedAt"] ?? string.Empty
                     };
                     // GetValues, not the indexer: a multi-file draft is what the size ceiling needs.
                     draft.AttachmentPaths.AddRange(query.GetValues("attachment") ?? []);
