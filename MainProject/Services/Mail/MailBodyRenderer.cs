@@ -68,6 +68,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             catch (Exception ex)
             {
                 Log($"Body render failed for uid {summary.Uid}: {ex.Message}", LogLevel.Warning);
+
+                // A body that will not parse is a corpse of an interrupted write, and returning a
+                // preview stub hid it forever: the row opened instantly and showed 160 characters
+                // of a real message, while HasFullMessage kept reporting the file as cached.
+                // Dropping it puts the caller on the download path it already has for a missing
+                // body. Local folders are exempt — there is no server copy to fetch it back from.
+                if (!folderFullName.StartsWith(MessageStore.LocalFolderPrefix))
+                {
+                    MessageStore.DeleteCachedBody(account.Id, folderFullName, summary.Uid);
+                    Log($"Dropped the unreadable cached body of uid {summary.Uid}; it will be downloaded again.");
+                    return null;
+                }
                 return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>"), false);
             }
         }
