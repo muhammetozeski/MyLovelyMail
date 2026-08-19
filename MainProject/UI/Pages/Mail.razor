@@ -520,6 +520,11 @@
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
+                <span class="mail-text-scale">
+                    <button class="mail-folder-action mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => StepReaderTextScale(-1)">A-</button>
+                    <button class="mail-folder-action mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
+                    <button class="mail-folder-action mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => StepReaderTextScale(1)">A+</button>
+                </span>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => OpenMessageSource(open))">🔍 Source</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ExportOpen(open, asHtml: false))">💾 .eml</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ExportOpen(open, asHtml: true))">🌐 .html</SecondaryButton>

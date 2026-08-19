@@ -129,6 +129,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return true;
         }
 
+        /// <summary>How far one press of A- / A+ moves the reader text size.</summary>
+        const int ReaderScaleStep = 10;
+
+        /// <summary>
+        /// Steps the reader text size, or resets it when <paramref name="delta"/> is 0. Re-renders
+        /// through the same path AllowImagesOnce uses, because the size lives in the generated
+        /// document rather than in the page's own CSS.
+        /// </summary>
+        void StepReaderTextScale(int delta)
+        {
+            var setting = GlobalSettings.ReaderTextScalePercent;
+            setting.Value = delta == 0 ? 100 : Math.Clamp(setting.Value + delta * ReaderScaleStep, 70, 200);
+            SettingsManager.SaveSettings();
+            loadedBodyUid = 0;
+            _ = LoadOpenBodyIfNeededAsync();
+        }
+
         /// <summary>Re-renders the open message with remote images allowed for THIS message only.</summary>
         void AllowImagesOnce()
         {

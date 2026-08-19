@@ -1116,6 +1116,20 @@
         gap: @(AppMeasures.Space.Px6)px;
     }
 
+    /* Reader text-size stepper, in the action strip. */
+    .mail-text-scale {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px2)px;
+    }
+
+        .mail-text-scale .mail-text-scale-step {
+            opacity: 1;
+            border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+            color: @textSecondary;
+            font-size: @(AppMeasures.Font.XSmall)px;
+        }
+
     /* Chips under an empty result: what would find something. */
     .mail-rescue {
         display: flex;

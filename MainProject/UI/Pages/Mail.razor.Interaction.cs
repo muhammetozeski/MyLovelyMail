@@ -26,6 +26,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("M", "Mute / unmute the conversation"),
             ("X", "Tick / untick the focused row"),
             ("Ctrl+A", "Tick every listed row"),
+            ("Ctrl+- / Ctrl+= / Ctrl+0", "Reader text smaller / larger / reset"),
             ("N", "Next in the open conversation"),
             ("P", "Previous in the open conversation"),
             ("Delete", "Delete message"),
@@ -264,6 +265,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     if (ShowShortcutHelp) ShowShortcutHelp = false;
                     else if (MailUiState.SelectedUids.Count > 0) MailUiState.ClearSelection();
                     else MailUiState.CloseMessage();
+                    break;
+                // Ctrl with the zoom keys, the shape every reader uses.
+                case "+" or "=" when e.CtrlKey:
+                    StepReaderTextScale(1);
+                    break;
+                case "-" or "_" when e.CtrlKey:
+                    StepReaderTextScale(-1);
+                    break;
+                case "0" when e.CtrlKey:
+                    StepReaderTextScale(0);
                     break;
                 case "a" or "A" when e.CtrlKey:
                     MailUiState.SelectMany(Rows.Select(static r => r.Message.Uid));
