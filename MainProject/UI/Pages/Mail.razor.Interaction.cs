@@ -23,6 +23,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("U", "Toggle read / unread"),
             ("S", "Toggle star (flag)"),
             ("I", "Toggle important"),
+            ("X", "Tick / untick the focused row"),
+            ("Ctrl+A", "Tick every listed row"),
             ("Delete", "Delete message"),
             ("Escape", "Close reader / dialog"),
             ("Ctrl+1..9", "Switch account"),
@@ -212,6 +214,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     break;
                 case "i" or "I" when focusedFolder != null:
                     MessageActions.ToggleImportant(account, focusedFolder, focused!);
+                    break;
+                // The row checkbox is a span with @onclick, so ticking one row had no keyboard
+                // route at all — only Ctrl+A for the whole list.
+                case "x" or "X" when focused != null:
+                    MailUiState.ToggleSelected(focused.Uid);
                     break;
                 case "Delete" when focusedFolder != null:
                     MessageActions.Delete(account, focusedFolder, focused!);
