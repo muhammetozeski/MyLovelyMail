@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
@@ -50,6 +51,79 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
             return result;
         }
+
+        /// <summary>How one condition of a previewed rule fares against the mail already on disk.</summary>
+        public sealed record ConditionHits(int Index, string Description, int Hits, bool OperatorIgnored);
+
+        /// <summary>What a rule would do if it were armed, measured against the cache.</summary>
+        public sealed record RulePreview(int Scanned, int Matched, List<ConditionHits> PerCondition, List<string> SampleSubjects);
+
+        /// <summary>Newest messages scanned per preview, so a large cache cannot stall the caller.</summary>
+        const int PreviewScanCap = 5000;
+
+        /// <summary>Subjects shown as proof of what matched.</summary>
+        const int PreviewSampleSize = 10;
+
+        /// <summary>
+        /// Answers "what would this rule have done" against the summaries already on disk, WITHOUT
+        /// applying anything. The editor could only Save, so a rule that matches nothing and one
+        /// that matches everything looked identical until real mail arrived — by which time a
+        /// move-to-folder action has already run on the server, which this app cannot undo.
+        /// <para>
+        /// Strictly read-only: <see cref="MessageStore.GetSummaries"/> hands back the STORED
+        /// instances, so calling ApplyActions here would really tag, flag and mark-read the user's
+        /// cache. Actions are only ever described, never run.
+        /// </para>
+        /// </summary>
+        public static RulePreview Preview(FilterRule rule)
+        {
+            List<ConditionHits> perCondition = [.. rule.Conditions.Select((condition, index) =>
+                new ConditionHits(index + 1, Describe(condition), 0, IgnoresOperator(condition)))];
+            int scanned = 0, matched = 0;
+            List<string> sample = [];
+
+            foreach (var account in AccountStore.Accounts)
+            {
+                // Same account gate as ProcessIncoming: an empty AccountId means every account.
+                if (rule.AccountId.Length > 0 && rule.AccountId != account.Id) continue;
+
+                foreach (var folder in MessageStore.GetFolders(account.Id))
+                {
+                    foreach (var summary in MessageStore.GetSummaries(account.Id, folder.FullName))
+                    {
+                        if (scanned >= PreviewScanCap) goto done;
+                        scanned++;
+
+                        for (int i = 0; i < rule.Conditions.Count; i++)
+                        {
+                            if (MatchesCondition(rule.Conditions[i], summary))
+                                perCondition[i] = perCondition[i] with { Hits = perCondition[i].Hits + 1 };
+                        }
+
+                        if (!Matches(rule, summary)) continue;
+                        matched++;
+                        if (sample.Count < PreviewSampleSize) sample.Add(summary.Subject);
+                    }
+                }
+            }
+        done:
+            return new RulePreview(scanned, matched, perCondition, sample);
+        }
+
+        /// <summary>
+        /// True when the engine will not honour the chosen operator for this field. Three such
+        /// combinations exist and all of them fail silently today: HasAttachment never reads the
+        /// operator, SizeKb treats everything that is not LessThan as greater-than, and an
+        /// ordering operator on a text field falls through to "never matches".
+        /// </summary>
+        static bool IgnoresOperator(FilterCondition condition) => condition.Field switch
+        {
+            FilterField.HasAttachment => true,
+            FilterField.SizeKb => condition.Operator is not (FilterOperator.LessThan or FilterOperator.GreaterThan),
+            _ => condition.Operator is FilterOperator.GreaterThan or FilterOperator.LessThan
+        };
+
+        static string Describe(FilterCondition condition) => $"{condition.Field} {condition.Operator} \"{condition.Value}\"";
 
         /// <summary>True when the rule's conditions match under its AND/OR mode (a rule without conditions never matches).</summary>
         static bool Matches(FilterRule rule, MailMessageSummary summary)
