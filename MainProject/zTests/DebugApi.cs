@@ -309,6 +309,16 @@ namespace MyLovelyMail.MainProject.ZTests
                         });
                 }
 
+                case ("POST", "/read"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    bool read = query["read"] != "false";
+                    MessageActions.SetRead(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid), read);
+                    return new { uid, read };
+                }
+
                 case ("POST", "/folder/read-all"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
