@@ -200,7 +200,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     return [];
 
                 bool serverSource = account.Protocol == IncomingProtocol.Imap && !current.IsLocal;
-                return [.. Folders.Where(f => f.FullName != current.FullName && (serverSource || f.IsLocal))];
+                return [.. Folders.Select(static n => n.Folder).Where(f => f.FullName != current.FullName && (serverSource || f.IsLocal))];
             }
         }
 

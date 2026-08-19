@@ -75,10 +75,12 @@
 
                 @if (MailUiState.SelectedAccount?.Id == account.Id)
                 {
-                    @foreach (var folder in Folders)
+                    @foreach (var node in Folders)
                     {
-                        @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper. *@
-                        <div class="mail-folder-row">
+                        var folder = node.Folder;
+                        @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
+                           Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
+                        <div class="mail-folder-row" style="--folder-depth:@node.Depth">
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
                                     title="@FolderFreshness(folder)"
                                     @onclick="() => MailUiState.SelectFolder(folder)">

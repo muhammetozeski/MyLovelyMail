@@ -160,6 +160,8 @@
         .mail-folder-row > .mail-folder {
             flex: 1;
             min-width: 0;
+            /* One step of indent per level of the server's own folder path. */
+            padding-left: calc(@(AppMeasures.Space.Px24)px + var(--folder-depth, 0) * @(AppMeasures.Space.Px12)px);
         }
 
     .mail-folder-action {

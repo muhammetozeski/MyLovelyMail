@@ -27,7 +27,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
         }
 
-        List<MailFolderData> Folders { get; set; } = [];
+        /// <summary>The folder rows in display order, each carrying its depth in the server's tree.</summary>
+        List<FolderNode> Folders { get; set; } = [];
 
         /// <summary>The open folder's summaries after the search box filter, newest first.</summary>
         List<MailMessageSummary> FilteredSummaries { get; set; } = [];
@@ -68,7 +69,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.SelectAccount(account);
             Folders = SortFolders(MessageStore.GetFolders(account.Id));
 
-            if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), Folders) is { } target)
+            if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), [.. Folders.Select(static n => n.Folder)]) is { } target)
                 MailUiState.SelectFolder(target);
         }
 
@@ -308,9 +309,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             RefreshLists();
         }
 
-        /// <summary>Well-known folders first (Inbox on top), then the rest alphabetically.</summary>
-        static List<MailFolderData> SortFolders(List<MailFolderData> folders) =>
-            [.. folders.OrderBy(f => RoleRank(f.Role)).ThenBy(f => f.DisplayName, StringComparer.OrdinalIgnoreCase)];
+        /// <summary>Display order and nesting depth; the ordering rules live in FolderTreeService now.</summary>
+        static List<FolderNode> SortFolders(List<MailFolderData> folders) => FolderTreeService.Build(folders);
 
         static int RoleRank(FolderRole role) => role switch
         {
