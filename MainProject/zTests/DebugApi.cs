@@ -425,6 +425,17 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { muted, flags = probe.Flags.ToString(), remembered = MutedThreadStore.All.Contains(probe.MessageId) };
                 }
 
+                // Goes through MessageActions.Delete, so it honours DeleteAction the same way the
+                // list does: a server folder moves to Trash, a local folder is removed outright.
+                case ("DELETE", "/message"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    MessageActions.Delete(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid));
+                    return new { deleted = uid, folder };
+                }
+
                 case ("POST", "/read"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");
