@@ -112,6 +112,24 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.ClearSelection();
         }
 
+        /// <summary>How a queued message is doing, or null when this is not an Outbox row.</summary>
+        string? OutboxStatusOf(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedFolder is not { Role: FolderRole.Outbox } outbox) return null;
+            var attempt = OutboxAttemptStore.For(outbox.AccountId, message.Uid);
+            if (attempt is null || attempt.AttemptCount == 0) return "⏳ Queued";
+            return attempt.HeldUtc != null
+                ? $"⛔ Stopped after {attempt.AttemptCount} tries — {attempt.LastError}"
+                : $"⏳ Queued, {attempt.AttemptCount} tries — {attempt.LastError}";
+        }
+
+        /// <summary>Releases every hold and flushes now; the bar that offers this only appears when something is held.</summary>
+        void RetryHeldOutbox()
+        {
+            OutboxAttemptStore.ReleaseHolds();
+            _ = OutboxService.FlushAsync();
+        }
+
         /// <summary>Result of the last folder-level action, shown under the folder list.</summary>
         string? FolderActionStatus { get; set; }
 

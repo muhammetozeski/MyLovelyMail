@@ -293,6 +293,12 @@
                                 @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
                             </span>
                             <span class="mail-row-preview">
+                                @* The Outbox row carried no state at all, so a message queued a
+                                   moment ago looked like one failing for three days. *@
+                                @if (OutboxStatusOf(message) is { } outboxStatus)
+                                {
+                                    <span class="mail-row-outbox">@outboxStatus</span>
+                                }
                                 @if (HitFolderDisplay(message) is { } hitFolder)
                                 {
                                     <span class="mail-row-folder">📁 @hitFolder</span>
@@ -380,6 +386,16 @@
                     <button class="mail-search-toggle" @onclick='() => RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
                     <button class="mail-search-toggle" @onclick="() => StartComposeTo(person.Address)">✏️ Write</button>
                 </div>
+            </div>
+        }
+
+        @* One bar for the whole held queue, not one per message: Outbox is a folder the user
+           has no reason to open, so the count has to come to them. *@
+        @if (OutboxAttemptStore.HeldCount is > 0 and var heldCount)
+        {
+            <div class="mail-undo-bar mail-undo-bar--failed">
+                <span class="mail-undo-text">⛔ @heldCount message(s) stopped after repeated send failures</span>
+                <button class="mail-undo-button" @onclick="RetryHeldOutbox">Try now</button>
             </div>
         }
 

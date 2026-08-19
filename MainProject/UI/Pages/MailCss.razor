@@ -1166,6 +1166,12 @@
         word-break: break-all;
     }
 
+    /* How a queued message is doing, on its own row. */
+    .mail-row-outbox {
+        color: @AppColors.TextWarning.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
     /* One panel for everything the cache knows about a correspondent. */
     .mail-person-sheet {
         display: flex;
