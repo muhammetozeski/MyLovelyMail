@@ -75,8 +75,8 @@
                         <div class="mail-folder-row">
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
-                                <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
-                                <span class="mail-folder-name">@folder.DisplayName</span>
+                                <span class="mail-folder-icon">@FolderIcon(folder)</span>
+                                <span class="mail-folder-name">@FolderLabel(folder)</span>
                                 @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value)
                                 {
                                     <CoreChip Text="@folder.UnreadCount.ToString()"
@@ -201,7 +201,7 @@
                                         @foreach (var targetFolder in targetGroup)
                                         {
                                             <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
-                                                @FolderIcon(targetFolder.Role) @targetFolder.DisplayName
+                                                @FolderIcon(targetFolder) @FolderLabel(targetFolder)
                                             </button>
                                         }
                                     }

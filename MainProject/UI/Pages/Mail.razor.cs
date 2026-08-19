@@ -287,6 +287,25 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ => 9
         };
 
+        /// <summary>Glyph for a folder that exists only on this machine.</summary>
+        const string LocalFolderIcon = "💾";
+
+        /// <summary>Appended to a local folder's name, because a server folder can carry the same one.</summary>
+        const string LocalFolderSuffix = "(this PC)";
+
+        /// <summary>
+        /// The folder's icon. Local folders get their own glyph rather than their role's: rules and
+        /// the draft autosave create "Local/Drafts" beside the server's "Drafts", and two rows
+        /// showing 📝 Drafts are indistinguishable — including in the move menu, where picking the
+        /// wrong one files the message somewhere the user did not mean.
+        /// </summary>
+        static string FolderIcon(MailFolderData folder) =>
+            folder.IsLocal ? LocalFolderIcon : FolderIcon(folder.Role);
+
+        /// <summary>What the folder is called on screen; local folders say where they live.</summary>
+        static string FolderLabel(MailFolderData folder) =>
+            folder.IsLocal ? $"{folder.DisplayName} {LocalFolderSuffix}" : folder.DisplayName;
+
         static string FolderIcon(FolderRole role) => role switch
         {
             FolderRole.Inbox => "📥",
