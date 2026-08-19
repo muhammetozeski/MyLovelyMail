@@ -75,6 +75,35 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static void ToggleMuted(MailAccountData account, string folderFullName, MailMessageSummary summary) =>
             MuteService.ToggleThread(account, folderFullName, summary);
 
+        /// <summary>
+        /// Adds or removes a tag across a whole selection with ONE index write instead of one per
+        /// message. Tagging was the only local triage action with no bulk path, so filing forty
+        /// receipts meant opening forty messages and using the reader picker forty times.
+        /// Tags never leave the machine, so there is no server push here.
+        /// </summary>
+        public static int SetTagOnMany(MailAccountData account, string folderFullName,
+            IEnumerable<MailMessageSummary> summaries, string tagName, bool add)
+        {
+            if (tagName.Length == 0) return 0;
+
+            List<MailMessageSummary> changed = [];
+            foreach (var summary in summaries)
+            {
+                string? existing = summary.Tags.FirstOrDefault(t => t.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+                if (add == (existing != null)) continue;
+
+                if (add) summary.Tags.Add(tagName); else summary.Tags.Remove(existing!);
+                changed.Add(summary);
+            }
+            if (changed.Count == 0) return 0;
+
+            // These are the STORED instances, so the store's reference check skips the local-state
+            // carry-over — which is what lets removing the last tag stick instead of being put back.
+            MessageStore.UpsertSummaries(account.Id, folderFullName, changed);
+            Log($"{(add ? "Tagged" : "Untagged")} {changed.Count} message(s) '{tagName}' in '{folderFullName}'.");
+            return changed.Count;
+        }
+
         /// <summary>Important is the app's own marker — it lives only in the local store.</summary>
         public static void ToggleImportant(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {
