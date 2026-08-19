@@ -14,9 +14,13 @@ $MauiCsproj = Join-Path $SlnDir "$ProjectName\$ProjectName.csproj"
 $Tfm = 'net10.0-windows10.0.19041.0'
 $PublishDir = Join-Path $SlnDir 'publish'
 
-# ── Next version from the newest release tag ──
-$lastTag = (gh release list --limit 1 --json tagName --jq '.[0].tagName')
-if (-not $lastTag) { $lastTag = 'v0.0.0' }
+# ── Next version from the HIGHEST existing release tag ──
+# Not "the newest": GitHub reports a release's createdAt from its tag, which can predate an
+# earlier release, so listing by date once handed back v1.2.0 while v1.3.0 already existed.
+$tags = @(gh release list --limit 100 --json tagName --jq '.[].tagName')
+$lastTag = if ($tags) {
+    ($tags | Sort-Object { [version]($_.TrimStart('v')) } | Select-Object -Last 1)
+} else { 'v0.0.0' }
 $parts = $lastTag.TrimStart('v').Split('.')
 [int]$major = $parts[0]; [int]$minor = $parts[1]; [int]$patch = $parts[2]
 switch ($Bump) {
@@ -58,7 +62,11 @@ foreach ($stage in $stages) {
 }
 
 # ── Publish the release ──
-gh release create $tag $assets --title $tag --notes-file $notesFile
+# --target is mandatory: without it gh tags the repository's DEFAULT branch, which on this
+# project trails the working branch by a hundred commits - the assets would be built from code
+# the tag does not point at.
+$head = git rev-parse HEAD
+gh release create $tag $assets --title $tag --notes-file $notesFile --target $head
 if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 Write-Host "Released $tag" -ForegroundColor Green
