@@ -249,6 +249,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     FullName = folder.FullName,
                     DisplayName = folder.Name,
                     Role = ResolveRole(client, folder),
+                    Delimiter = folder.DirectorySeparator,
                     UidValidity = folder.UidValidity,
                     // Refreshing counts must never erase sync progress: dropping LastSeenUid to 0
                     // here re-imported "the newest 300" as brand-new on EVERY pass, which both
@@ -397,6 +398,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 FullName = folder.FullName,
                 DisplayName = folder.Name,
                 Role = cached?.Role ?? (folder.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
+                Delimiter = folder.DirectorySeparator,
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
                 OldestFetchedUid = oldestFetchedUid,

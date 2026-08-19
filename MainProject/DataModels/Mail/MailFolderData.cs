@@ -34,6 +34,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>True for folders that exist only on this machine (never synced to the server).</summary>
         public bool IsLocal { get; set; }
 
+        /// <summary>The server's path separator for this folder ('/' or '.'), so a nested path can be split. 0 = not recorded yet.</summary>
+        public char Delimiter { get; set; }
+
         public uint UidValidity { get; set; }
         public uint LastSeenUid { get; set; }
 
