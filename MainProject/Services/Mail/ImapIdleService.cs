@@ -120,6 +120,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 {
                     return;
                 }
+                // A refused password will be refused again, so reconnecting only replays the same
+                // failed login for as long as the app runs — the backoff caps the RATE, never the
+                // total, which is how an account gets rate-limited by its own provider. The
+                // scheduled pass still reports the account as failing; only the loop gives up.
+                catch (Exception ex) when (ex is MailKit.Security.AuthenticationException or MailKit.ServiceNotAuthenticatedException)
+                {
+                    SyncHealthService.MarkFailure(account.Id, ex.Message);
+                    Log($"IMAP IDLE for '{account.EmailAddress}' stopped: {ex.Message}. Reconnecting cannot fix a rejected password.", LogLevel.Error);
+                    return;
+                }
                 catch (Exception ex)
                 {
                     SyncHealthService.MarkFailure(account.Id, ex.Message);
