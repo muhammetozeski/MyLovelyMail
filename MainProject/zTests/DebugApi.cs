@@ -10,6 +10,7 @@ using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.Constants;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.ZTests
 {
@@ -376,6 +377,21 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/snoozed"):
                     return SnoozeService.Snoozed(RequireQueryValue(query, "accountId"))
                         .Select(entry => new { folder = entry.FolderFullName, entry.Summary.Uid, entry.Summary.Subject, entry.Summary.SnoozedUntilUtc });
+
+                case ("GET", "/identity"):
+                {
+                    var colors = AppColors.IdentityPalette.Concat(AccountStore.Accounts.Select(a => a.ColorHex)).Distinct();
+                    return colors.Select(hex =>
+                    {
+                        var ink = AppColors.InkOn(hex);
+                        return new
+                        {
+                            background = hex,
+                            ink = ink.ToRgbaHex(true),
+                            ratio = Math.Round(AppColors.ContrastRatio(Color.FromArgb(hex), ink), 2)
+                        };
+                    });
+                }
 
                 case ("GET", "/health"):
                     return AccountStore.Accounts.Select(a => new
