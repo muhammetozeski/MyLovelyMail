@@ -233,6 +233,17 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { suggestions = SearchRescueService.Suggest(accountId, ReadFolder(query), RequireQueryValue(query, "query"), query["all"] == "true"), dead = SearchService.DeadOperators(RequireQueryValue(query, "query")) };
                 }
 
+                // One rotation step on its own, so a test can watch which folder it picks.
+                case ("POST", "/sync/folders"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    var before = MessageStore.GetFolders(account.Id).ToDictionary(f => f.FullName, f => f.LastSyncedUtc);
+                    await ImapSyncService.SyncAccountAsync(account);
+                    return new { refreshed = MessageStore.GetFolders(account.Id)
+                        .Where(f => !f.IsLocal && f.LastSyncedUtc != null && before.GetValueOrDefault(f.FullName) != f.LastSyncedUtc)
+                        .Select(f => new { f.FullName, f.LastSyncedUtc, CachedCount = MessageStore.GetSummaries(account.Id, f.FullName).Count }) };
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
@@ -341,7 +352,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         .Select(f => new
                         {
                             f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal,
-                            f.LastSeenUid, f.OldestFetchedUid,
+                            f.LastSeenUid, f.OldestFetchedUid, f.LastSyncedUtc,
                             CachedCount = MessageStore.GetSummaries(accountId, f.FullName).Count
                         });
                 }
