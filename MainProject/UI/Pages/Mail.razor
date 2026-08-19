@@ -71,7 +71,7 @@
                 {
                     @foreach (var folder in Folders)
                     {
-                        @* The row is itself a button, so the resync control has to be a SIBLING inside this wrapper. *@
+                        @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper. *@
                         <div class="mail-folder-row">
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
@@ -86,9 +86,14 @@
                                               PaddingX="8" PaddingY="2" />
                                 }
                             </button>
+                            @if (folder.UnreadCount > 0)
+                            {
+                                <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
+                                        @onclick="() => MarkFolderRead(folder)">📖</button>
+                            }
                             @if (!folder.IsLocal)
                             {
-                                <button class="mail-folder-resync" title="Redownload this folder (newest 300 messages)"
+                                <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
                                         @onclick="() => ResyncFolder(folder)">🔄</button>
                             }
                         </div>
