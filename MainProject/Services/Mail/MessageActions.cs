@@ -71,6 +71,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             MessageStore.UpsertSummaries(account.Id, folderFullName, [summary]);
         }
 
+        /// <summary>Mutes or unmutes the whole conversation — app-local, never pushed to a server.</summary>
+        public static void ToggleMuted(MailAccountData account, string folderFullName, MailMessageSummary summary) =>
+            MuteService.ToggleThread(account, folderFullName, summary);
+
         /// <summary>Important is the app's own marker — it lives only in the local store.</summary>
         public static void ToggleImportant(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {

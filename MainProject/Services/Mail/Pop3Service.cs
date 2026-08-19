@@ -61,6 +61,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             RuleProcessResult? ruleResult = null;
             if (!isFirstSync && allNew.Count > 0)
             {
+                MuteService.ApplyToIncoming(allNew);
                 ruleResult = RuleEngine.ProcessIncoming(account, InboxFullName, allNew);
                 // Rules mutate flags/tags in place, so re-persist everything they saw.
                 MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);

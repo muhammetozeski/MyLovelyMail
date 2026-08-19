@@ -342,6 +342,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
             RuleProcessResult? ruleResult = null;
             if (lastSeenUid > 0 && summaries.Count > 0)
             {
+                // Before the rules: a reply to a muted conversation must never reach the
+                // notification check as a normal arrival.
+                MuteService.ApplyToIncoming(summaries);
                 ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, summaries);
                 MessageStore.UpsertSummaries(account.Id, folder.FullName, summaries);
             }
