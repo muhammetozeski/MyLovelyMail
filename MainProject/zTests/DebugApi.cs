@@ -368,12 +368,25 @@ namespace MyLovelyMail.MainProject.ZTests
                     var account = RequireAccount(accountId);
                     var summary = RequireSummary(accountId, folder, uid);
 
-                    if (!MessageStore.HasFullMessage(accountId, folder, uid))
+                    async Task DownloadBodyAsync()
                     {
                         if (account.Protocol == IncomingProtocol.Imap)
                             await ImapSyncService.DownloadMessageAsync(account, folder, uid);
                         else
                             await Pop3Service.DownloadMessageAsync(account, uid);
+                    }
+
+                    if (!MessageStore.HasFullMessage(accountId, folder, uid))
+                        await DownloadBodyAsync();
+
+                    // A render that comes back null means the cached body was unreadable and has
+                    // just been dropped — the reader downloads again at that point, so this does
+                    // too, or the corrupt case would need two calls to answer.
+                    var rendered = MailBodyRenderer.Render(account, folder, summary);
+                    if (rendered == null)
+                    {
+                        await DownloadBodyAsync();
+                        rendered = MailBodyRenderer.Render(account, folder, summary);
                     }
 
                     return new
@@ -382,7 +395,7 @@ namespace MyLovelyMail.MainProject.ZTests
                         summary.Subject,
                         summary.FromAddress,
                         summary.ToAddresses,
-                        bodyHtml = MailBodyRenderer.Render(account, folder, summary)?.Html,
+                        bodyHtml = rendered?.Html,
                         attachments = AttachmentService.List(account, folder, summary)
                     };
                 }
