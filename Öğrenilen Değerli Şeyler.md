@@ -41,6 +41,15 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   Geliştirme makinesinde fark edilmez, çünkü orada runtime hep vardır.
 - **Autostart/registry gibi makine-genel kayıtlara dev build asla yazmamalı.** Debug sandbox
   bir kez kullanıcının gerçek autostart kaydını kendi bin\ yoluyla ezdi.
+- **`gh release create` `--target` verilmezse VARSAYILAN dalı etiketler.** Geliştirme başka
+  bir dalda ilerliyorsa tag, asset'lerin derlendiği koddan yüzlerce commit geride bir yeri
+  gösterir. Ayrıca `gh release list` sıralaması güvenilmez: `createdAt` tag'den geldiği için
+  daha yeni bir release daha eski görünebilir — sürüm seçerken tarihe değil, semantik sürüm
+  sırasına bak. (Vaka: v1.3.0 master'ın ucuna bağlandı ve bir sonraki çağrı "en son sürüm"
+  olarak v1.2.0'ı gördü.)
+- **Her döngü turu dağıtımla biter.** Kod commit'lenmiş olması yetmiyor; `Export.ps1` ile
+  kurulu kopya, `Release.ps1` ile GitHub release güncellenmezse programı deneyen kişi
+  düzeltilmiş hataları yeniden bildiriyor.
 
 ## Hata ayıklama disiplini
 
