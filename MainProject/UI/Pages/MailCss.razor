@@ -1116,6 +1116,23 @@
         gap: @(AppMeasures.Space.Px6)px;
     }
 
+    /* Which mailbox this draft leaves from — the pane used to render it as plain text. */
+    .mail-from-chip {
+        border: @(AppMeasures.Border.Thin)px solid transparent;
+        cursor: pointer;
+        margin-left: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        opacity: @(AppMeasures.Opacity.Muted);
+    }
+
+    .mail-from-chip--on {
+        opacity: 1;
+        font-weight: @(AppMeasures.Weight.Bold);
+        border-color: @glassBorder;
+    }
+
     /* Reader text-size stepper, in the action strip. */
     .mail-text-scale {
         display: inline-flex;

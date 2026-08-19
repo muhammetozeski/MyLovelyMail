@@ -50,6 +50,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
             NoteComposeActivity();
         }
 
+        /// <summary>Sends this draft from another account; the service owns the signature swap and the stranded-copy cleanup.</summary>
+        void SwitchDraftAccount(ComposeDraft draft, MailAccountData sender)
+        {
+            ComposeService.SwitchSendingAccount(draft, sender);
+            SendWarnings = [];
+            NoteComposeActivity();
+        }
+
         void QueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;

@@ -380,7 +380,15 @@
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
                 <div class="mail-compose-fields" @oninput="NoteComposeActivity">
-                <div class="mail-compose-from">From: <b>@draft.Account?.EmailAddress</b></div>
+                <div class="mail-compose-from">
+                    From:
+                    @foreach (var sender in AccountStore.Accounts)
+                    {
+                        <button class="mail-from-chip @(draft.Account?.Id == sender.Id ? "mail-from-chip--on" : "")"
+                                style="background:@sender.ColorHex;color:@AppColors.InkOn(sender.ColorHex).ToRgbaHex(true)"
+                                @onclick="() => SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
+                    }
+                </div>
                 @* Native datalist: the browser owns the dropdown, so autosave and typing stay untouched. *@
                 <datalist id="@ContactListId">
                     @foreach (var contact in KnownContacts)
