@@ -244,6 +244,18 @@ namespace MyLovelyMail.MainProject.ZTests
                         .Select(f => new { f.FullName, f.LastSyncedUtc, CachedCount = MessageStore.GetSummaries(account.Id, f.FullName).Count }) };
                 }
 
+                // The quote is a pure function of the source message plus the style, so each
+                // mode is checkable without opening a compose pane.
+                case ("GET", "/reply-preview"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var style = Enum.Parse<QuoteStyle>(query["style"] ?? nameof(QuoteStyle.Full), ignoreCase: true);
+                    string body = ComposeService.QuoteBody(RequireAccount(accountId), folder, RequireSummary(accountId, folder, uid), style);
+                    return new { style = style.ToString(), lines = body.Split('\n').Length, characters = body.Length, body };
+                }
+
                 case ("GET", "/rule-preview"):
                 {
                     string ruleId = RequireQueryValue(query, "ruleId");
