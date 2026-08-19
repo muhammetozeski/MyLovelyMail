@@ -109,6 +109,13 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   149'a düşürüyor, sonraki senkron geri koyuyordu. Alanın sahibi tek bir katman olmalı; ötekiler
   ona delta bildirir. Yeniden-hesap ancak önbellek tüm klasörü tutuyorsa doğrudur.
 
+- **Bir anahtar ancak kendi alanı içinde benzersizdir; başka bir alana taşınırken yeniden
+  anahtarlanmalı.** IMAP uid'leri her klasörde 1'den başlıyor. INBOX uid 7 ile Sent uid 7'yi aynı
+  yerel klasöre taşımak hem .eml'i hem indeks satırını eziyordu — üstelik uygulama-yerel durum
+  taşıması, yok olan mesajın etiketlerini hayatta kalanın üzerine geçiriyordu, yani enkaz yok olan
+  mesaj gibi görünüyordu. Diğer bütün çakışmalar yeniden senkronla düzeliyor; sunucu kopyası
+  olmayan yolda düzelmiyor. Bir kimliği başka bir isim alanına taşırken "orada bu numara boş mu"
+  diye sor.
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
