@@ -241,6 +241,13 @@ namespace MyLovelyMail.MainProject.ZTests
                     return RuleEngine.Preview(rule);
                 }
 
+                case ("POST", "/reader-scale"):
+                {
+                    GlobalSettings.ReaderTextScalePercent.Value = int.Parse(RequireQueryValue(query, "percent"));
+                    SettingsManager.SaveSettings();
+                    return new { GlobalSettings.ReaderTextScalePercent.Value };
+                }
+
                 case ("GET", "/motion"):
                     return new
                     {
