@@ -187,6 +187,34 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { selected = folder != null, folder = folder?.FullName, requested = wanted };
                 }
 
+                // ?dry=true measures without deleting, which is the only safe way to check the
+                // budget stage against a real cache. GET returns the persisted receipt instead.
+                case ("POST", "/trim"):
+                    return OfflineCacheTrimmer.TrimAll(query["dry"] == "true");
+
+                case ("GET", "/trim"):
+                    return new { lastReport = OfflineCacheTrimmer.LastReport };
+
+                // Rehearses the size stage against a real cache by lending one account a budget for
+                // the duration of a dry run, then putting its setting back exactly as it was.
+                case ("POST", "/trim-rehearsal"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    int budgetMb = int.Parse(RequireQueryValue(query, "mb"));
+                    var budget = AccountStore.GetSettings(accountId).OfflineMaxCacheMb;
+                    bool wasOverridden = budget.IsOverridden;
+                    int previous = budget.Value;
+                    budget.Value = budgetMb;
+                    try
+                    {
+                        return OfflineCacheTrimmer.TrimAll(dryRun: true);
+                    }
+                    finally
+                    {
+                        if (wasOverridden) budget.Value = previous; else budget.ClearOverride();
+                    }
+                }
+
                 // Answers "where would this account open right now" without selecting anything, so
                 // the restore — including the phantom-folder fallback — is checkable while the app
                 // is in use. ?pretend= substitutes a remembered name the server does not have.
