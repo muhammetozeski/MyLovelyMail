@@ -142,6 +142,24 @@
         flex-shrink: 0;
     }
 
+    /* Rail order is also the Ctrl+1..9 order; these choose it. */
+    .settings-account-move {
+        flex-shrink: 0;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: transparent;
+        cursor: pointer;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .settings-account-move:hover {
+            color: @AppColors.Primary.ToRgbaHex(true);
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        }
+
     .settings-themes {
         display: flex;
         gap: @(AppMeasures.Space.Px12)px;

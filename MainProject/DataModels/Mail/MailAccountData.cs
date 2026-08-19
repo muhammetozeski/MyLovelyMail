@@ -71,5 +71,12 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public bool Enabled { get; set; } = true;
 
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Position in the account rail, and therefore which mailbox answers Ctrl+1..9. 0 means
+        /// "never ordered"; <see cref="AccountStore.Load"/> fills it from the signup order so
+        /// nothing moves the first time.
+        /// </summary>
+        public int SortOrder { get; set; }
     }
 }

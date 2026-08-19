@@ -281,6 +281,9 @@
                         </span>
                         <span class="settings-row-hint">@account.Protocol · @account.IncomingHost · @SyncHealthLine(account.Id)</span>
                     </div>
+                    @* The rail order is also the Ctrl+1..9 order, so this is where that mapping is chosen. *@
+                    <button class="settings-account-move" title="Move up" @onclick="() => AccountStore.Move(account.Id, -1)">▲</button>
+                    <button class="settings-account-move" title="Move down" @onclick="() => AccountStore.Move(account.Id, 1)">▼</button>
                     <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
                     <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
                 </div>
