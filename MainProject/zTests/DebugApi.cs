@@ -404,6 +404,14 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/attachment-hint"):
                     return new { trigger = AttachmentIntentService.FindTrigger(query["subject"] ?? string.Empty, query["body"] ?? string.Empty) };
 
+                // A raw header can be passed instead of a message, so the parser and the link gate
+                // can be exercised on the shapes real newsletters send without hunting for one.
+                case ("GET", "/unsubscribe") when query["header"] is { Length: > 0 } rawHeader:
+                {
+                    var parsed = UnsubscribeService.Parse(rawHeader);
+                    return new { found = parsed != null, parsed?.HttpUrl, parsed?.MailtoAddress, parsed?.MailtoSubject };
+                }
+
                 case ("GET", "/unsubscribe"):
                 {
                     string accountId = RequireQueryValue(query, "accountId");

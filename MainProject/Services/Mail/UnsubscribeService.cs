@@ -40,7 +40,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             foreach (string part in header.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string value = part.Trim().Trim('<', '>').Trim();
-                if (value.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                // The same gate the opener uses, so a chip can never offer a link that would be refused.
+                if (ExternalLinkService.IsOpenable(value) && !value.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
                 {
                     httpUrl ??= value;
                 }
