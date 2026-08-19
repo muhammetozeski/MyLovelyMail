@@ -105,9 +105,20 @@
         flex-shrink: 0;
     }
 
+    /* A paused account stays clickable — its cached mail is still readable — but stops looking
+       like one that is up to date. */
+    .mail-account--paused {
+        opacity: @(AppMeasures.Opacity.Muted);
+    }
+
+        .mail-account--paused .mail-account-dot {
+            filter: grayscale(1);
+        }
+
     /* Ctrl+N ordinal so the keyboard mapping is discoverable at a glance. */
     /* Only shown while an account is actually failing, so it means something when it appears. */
-    .mail-account-failing {
+    .mail-account-failing,
+    .mail-account-paused {
         flex-shrink: 0;
         font-size: @(AppMeasures.Font.Small)px;
     }

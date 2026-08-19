@@ -48,10 +48,16 @@
         {
             @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
-                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "")"
+                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
                         title="@SyncHealthTooltip(account)"
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                    @if (!account.Enabled)
+                    {
+                        @* Enabled has real consequences — sync, IDLE and the outbox all skip the
+                           account — but the rail drew it exactly like a live one. *@
+                        <span class="mail-account-paused" title="Paused — not syncing">⏸️</span>
+                    }
                     @if (SyncHealthService.For(account.Id).IsFailing)
                     {
                         <span class="mail-account-failing" title="@SyncHealthTooltip(account)">⚠️</span>
