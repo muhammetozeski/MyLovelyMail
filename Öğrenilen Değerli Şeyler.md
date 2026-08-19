@@ -125,6 +125,11 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   aranmalı.** Polly'nin yeniden deneme yordamını düzeltmek senkron pasını tek denemeye indirdi ama
   denemelerin çoğu IDLE servisinin kendi yeniden bağlanma döngüsünden geliyordu. Ölçmeden
   "düzeldi" denseydi asıl kaynak elde kalacaktı.
+- **"Bulunamadı" değeri geçerli bir değerse, o metot kullanılmaz.** List<int>.FindLast ELEMANI
+  döndürür; bulamayınca default(int) yani **0** verir — indeks listesinde 0 tamamen geçerli bir
+  indeks. Yazdığım pencere kontrolü bu yüzden hiç çalışmadı: eşleşme bulunmayan her mesaj sessizce
+  0 numaralı mesajla birleşti, yani düzeltmeye çalıştığım hatanın aynısı. FindLastIndex -1 döner,
+  ya da elle döngü yazılır. Ölçmeseydim "düzeldi" diye commit'lenmişti.
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
