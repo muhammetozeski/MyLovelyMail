@@ -266,6 +266,32 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 // ?probe= runs the builder over handmade paths, so the nesting rules are checkable
                 // without a server that happens to have nested folders.
+                case ("GET", "/rule-audit"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folder = ReadFolder(query);
+                    uint uid = RequireUid(query);
+                    var summary = MessageStore.GetSummary(accountId, folder, uid);
+                    return new { entries = RuleAuditStore.For(accountId, folder, uid, summary?.MessageId ?? string.Empty) };
+                }
+
+                // Feeds a synthetic arrival straight to the rule engine, so the trace is checkable
+                // without waiting for mail that happens to match a rule.
+                case ("POST", "/rule-audit/probe"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    var probe = new MailMessageSummary
+                    {
+                        Uid = uint.MaxValue,
+                        MessageId = query["messageId"] ?? "<rule-probe@mylovelymail.invalid>",
+                        FromAddress = query["from"] ?? "probe@example.invalid",
+                        Subject = query["subject"] ?? string.Empty,
+                        DateUtc = DateTime.UtcNow
+                    };
+                    RuleEngine.ProcessIncoming(account, ReadFolder(query), [probe]);
+                    return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
+                }
+
                 case ("GET", "/folder-tree"):
                 {
                     List<MailFolderData> folders = query["probe"] is { Length: > 0 } probe
