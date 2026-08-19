@@ -340,7 +340,10 @@ namespace MyLovelyMail.MainProject.Storage
         {
             string path = MessagePath(accountId, folderFullName, uid);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllBytes(path, mimeBytes);
+            // Plain File.WriteAllBytes truncates before it writes, and this runs on every body
+            // fetch — a 50-message slice is 50 chances for a tray Exit or a shutdown to leave a
+            // zero-byte .eml behind, which HasFullMessage then reports as a cached body forever.
+            AtomicFile.WriteAllBytes(path, mimeBytes);
         }
 
         /// <summary>The raw MIME of a message, or null when it is not cached yet (caller then fetches it).</summary>
