@@ -1,4 +1,4 @@
-using MyLovelyMail.MainProject.Constants;
+﻿using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
@@ -46,7 +46,22 @@ namespace MyLovelyMail
                 };
 
                 if (Settings.StartMinimized.Value || LaunchedMinimized)
+                {
                     platformWindow.AppWindow.Hide();
+
+                    // The handler exists before WinUI activates the window, so that first Hide()
+                    // is undone by the activation that follows and the app flashes up in the
+                    // foreground. Hide once more on the first activation, then step aside so the
+                    // user's own "show from tray" is never fought.
+                    void HideOnFirstActivation(object _, Microsoft.UI.Xaml.WindowActivatedEventArgs e)
+                    {
+                        if (e.WindowActivationState == Microsoft.UI.Xaml.WindowActivationState.Deactivated) return;
+                        platformWindow.Activated -= HideOnFirstActivation;
+                        platformWindow.AppWindow.Hide();
+                    }
+
+                    platformWindow.Activated += HideOnFirstActivation;
+                }
             };
 
             Settings.StartWithWindows.OnChanged += ApplyAutostart;
