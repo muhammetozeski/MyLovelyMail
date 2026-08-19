@@ -111,6 +111,30 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.ClearSelection();
         }
 
+        /// <summary>Result of the last folder-level action, shown under the folder list.</summary>
+        string? FolderActionStatus { get; set; }
+
+        /// <summary>
+        /// Writes the folder as one mbox file. The count of bodies that were never downloaded is
+        /// reported rather than swallowed — an export that claims to be complete and is not would
+        /// be found out only by whoever imports it.
+        /// </summary>
+        void ExportFolderMailbox(MailFolderData folder)
+        {
+            if (AccountStore.GetById(folder.AccountId) is not { } account) return;
+            try
+            {
+                var result = MailboxExportService.ExportFolder(account, folder.FullName);
+                FolderActionStatus = result.SkippedUncached > 0
+                    ? $"📦 {result.Written} of {result.Written + result.SkippedUncached} saved to {result.Path} — {result.SkippedUncached} bodies were never downloaded"
+                    : $"📦 {result.Written} saved to {result.Path}";
+            }
+            catch (Exception ex)
+            {
+                FolderActionStatus = $"❌ {ex.Message}";
+            }
+        }
+
         /// <summary>Clears a whole folder's unread count from the sidebar, without checking rows by hand.</summary>
         void MarkFolderRead(MailFolderData folder)
         {

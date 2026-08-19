@@ -97,6 +97,8 @@
                                 <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
                                         @onclick="() => MarkFolderRead(folder)">📖</button>
                             }
+                            <button class="mail-folder-action" title="Export this folder as one .mbox file"
+                                    @onclick="() => ExportFolderMailbox(folder)">📦</button>
                             @if (!folder.IsLocal)
                             {
                                 <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
@@ -106,6 +108,13 @@
                     }
                 }
             }
+        }
+
+        @* Folder-level results need their own line: the reader's status sits inside the
+           open-message block, and a folder export happens with nothing open. *@
+        @if (FolderActionStatus != null)
+        {
+            <div class="mail-sidebar-status">@FolderActionStatus</div>
         }
     </aside>
 
