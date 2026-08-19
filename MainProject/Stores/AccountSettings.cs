@@ -28,6 +28,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.OfflineMaxCacheMb"/>
         public readonly InheritedSetting<int> OfflineMaxCacheMb = new(Settings.OfflineMaxCacheMb);
 
+        /// <inheritdoc cref="Settings.MaxAttachmentTotalMb"/>
+        public readonly InheritedSetting<int> MaxAttachmentTotalMb = new(Settings.MaxAttachmentTotalMb);
+
         /// <inheritdoc cref="Settings.MarkAsReadDelaySeconds"/>
         public readonly InheritedSetting<int> MarkAsReadDelaySeconds = new(Settings.MarkAsReadDelaySeconds);
 

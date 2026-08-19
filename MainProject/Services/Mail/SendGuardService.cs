@@ -1,5 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -24,6 +25,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public const string DuplicateRecipientCode = "duplicate-recipient";
         public const string DomainTypoCode = "domain-typo";
         public const string AttachmentCode = "attachment";
+        public const string AttachmentSizeCode = "attachment-too-large";
+
+        /// <summary>
+        /// Base64 grows a file by roughly a third, and the ceiling a server enforces is on the
+        /// ENCODED size — measuring the raw bytes would pass a message the server then refuses.
+        /// </summary>
+        const double Base64Inflation = 1.37;
+
+        const long BytesPerMegabyte = 1024 * 1024;
 
         /// <summary>Above this many addressees the send is worth a second look; a reply-all reaches it without anyone deciding to.</summary>
         const int ManyRecipientsThreshold = 10;
@@ -59,7 +69,39 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 && AttachmentIntentService.FindTrigger(draft.Subject, draft.Body) is { } trigger)
                 warnings.Add(new SendWarning(AttachmentCode, $"\"{trigger}\" is in the text, but nothing is attached."));
 
+            if (FindOversizedAttachments(draft) is { } oversized)
+                warnings.Add(new SendWarning(AttachmentSizeCode, oversized));
+
             return warnings;
+        }
+
+        /// <summary>
+        /// The message the user should see when the attachments will not fit, or null when they
+        /// will. Nothing here asks the server: the ceiling is a number the user sets, which keeps
+        /// this a pure function of the draft like every other check.
+        /// <para>
+        /// Without it, ComposeService hands every staged file to the builder and lets the server
+        /// decide — and a server that drops the connection mid-DATA instead of answering 552 lands
+        /// the message in the outbox, where the periodic flush retries the same too-big mail
+        /// forever with nothing explaining why.
+        /// </para>
+        /// </summary>
+        static string? FindOversizedAttachments(ComposeDraft draft)
+        {
+            if (draft.AttachmentPaths.Count == 0) return null;
+
+            int ceilingMb = draft.Account is { } account
+                ? AccountStore.GetSettings(account.Id).MaxAttachmentTotalMb.Value
+                : Settings.MaxAttachmentTotalMb.Value;
+            if (ceilingMb <= 0) return null;
+
+            long rawBytes = draft.AttachmentPaths
+                .Where(File.Exists)
+                .Sum(path => new FileInfo(path).Length);
+            double encodedMb = rawBytes * Base64Inflation / BytesPerMegabyte;
+            return encodedMb > ceilingMb
+                ? $"{encodedMb:0.0} MB of attachments, over this account's {ceilingMb} MB limit."
+                : null;
         }
 
         /// <summary>Splits a header field into bare addresses; display names and empty entries are dropped.</summary>

@@ -71,6 +71,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Megabytes of cached message bodies an account may hold; oldest go first above it (0 = no limit).</summary>
         public static readonly Setting<int> OfflineMaxCacheMb = new(0);
 
+        /// <summary>Encoded megabytes of attachments a message may carry before the pre-send list warns (0 = never warn).</summary>
+        public static readonly Setting<int> MaxAttachmentTotalMb = new(20);
+
         // ---- Reading ----
 
         /// <summary>Seconds a message must stay open before it is marked read (0 = immediately).</summary>
