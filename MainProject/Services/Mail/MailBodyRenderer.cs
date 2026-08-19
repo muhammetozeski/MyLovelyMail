@@ -194,13 +194,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return "<!DOCTYPE html><html><head><style>" +
                 $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
                 $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
-                "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;}" +
+                // plaintext direction: an Arabic or Hebrew paragraph inside an otherwise
+                // left-to-right message decides its own direction from its first strong character,
+                // rather than inheriting the document's and reading backwards.
+                "img{max-width:100%;height:auto;}pre{white-space:pre-wrap;font-family:inherit;unicode-bidi:plaintext;}" +
+                "blockquote{unicode-bidi:plaintext;}" +
                 $"a{{color:{AppColors.MailCanvas.Link};}}blockquote{{border-left:3px solid {AppColors.MailCanvas.QuoteBorder};margin-left:0;padding-left:12px;color:{AppColors.MailCanvas.QuoteText};}}" +
                 $"details.mlm-quote>summary{{cursor:pointer;list-style:none;display:inline-block;margin:8px 0;padding:2px 10px;border-radius:9999px;" +
                 // em, not px: the pill has to grow with the text it sits beside.
                 $"background:{AppColors.MailCanvas.QuoteBorder};color:{AppColors.MailCanvas.QuoteText};font-size:0.85em;}}" +
                 "details.mlm-quote>summary::-webkit-details-marker{display:none;}" +
-                "</style></head><body>" + body + "</body></html>";
+                // dir=auto: the document takes its direction from its own first strong character
+                // instead of being forced left-to-right.
+                "</style></head><body dir=\"auto\">" + body + "</body></html>";
         }
     }
 }
