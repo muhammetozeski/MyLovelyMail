@@ -106,6 +106,12 @@
     }
 
     /* Ctrl+N ordinal so the keyboard mapping is discoverable at a glance. */
+    /* Only shown while an account is actually failing, so it means something when it appears. */
+    .mail-account-failing {
+        flex-shrink: 0;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
     .mail-account-ordinal {
         flex-shrink: 0;
         min-width: @(AppMeasures.Size.Px16)px;

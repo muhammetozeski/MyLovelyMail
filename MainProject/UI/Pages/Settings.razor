@@ -263,7 +263,7 @@
                             <span class="settings-account-dot" style="background:@account.ColorHex"></span>
                             @account.EmailAddress
                         </span>
-                        <span class="settings-row-hint">@account.Protocol · @account.IncomingHost</span>
+                        <span class="settings-row-hint">@account.Protocol · @account.IncomingHost · @SyncHealthLine(account.Id)</span>
                     </div>
                     <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
                     <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
@@ -304,6 +304,14 @@
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
+    }
+
+    /// <summary>Last sync outcome of the account, or the error that is keeping it from syncing.</summary>
+    static string SyncHealthLine(string accountId)
+    {
+        var health = SyncHealthService.For(accountId);
+        if (health.IsFailing) return $"⚠️ failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
+        return health.LastSuccessUtc is { } success ? $"synced {success.ToLocalTime():dd MMM HH:mm}" : "not synced yet";
     }
 
     /// <summary>Switching this on re-picks the palette immediately, so the effect is visible without restarting.</summary>

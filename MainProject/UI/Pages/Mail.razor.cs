@@ -93,6 +93,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleSyncStateChanged() => InvokeAsync(StateHasChanged);
 
+        /// <summary>Hover text of an account row: the keyboard shortcut plus how its syncing is going.</summary>
+        static string SyncHealthTooltip(MailAccountData account)
+        {
+            var health = SyncHealthService.For(account.Id);
+            if (health.IsFailing)
+                return $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
+            return health.LastSuccessUtc is { } success
+                ? $"Last synced {success.ToLocalTime():HH:mm}"
+                : "Not synced yet";
+        }
+
         void RefreshLists()
         {
             var account = MailUiState.SelectedAccount;

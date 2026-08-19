@@ -377,6 +377,14 @@ namespace MyLovelyMail.MainProject.ZTests
                     return SnoozeService.Snoozed(RequireQueryValue(query, "accountId"))
                         .Select(entry => new { folder = entry.FolderFullName, entry.Summary.Uid, entry.Summary.Subject, entry.Summary.SnoozedUntilUtc });
 
+                case ("GET", "/health"):
+                    return AccountStore.Accounts.Select(a => new
+                    {
+                        a.Id,
+                        a.EmailAddress,
+                        health = SyncHealthService.For(a.Id)
+                    });
+
                 case ("GET", "/attachment-hint"):
                     return new { trigger = AttachmentIntentService.FindTrigger(query["subject"] ?? string.Empty, query["body"] ?? string.Empty) };
 

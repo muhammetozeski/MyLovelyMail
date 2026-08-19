@@ -84,10 +84,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 {
                     try
                     {
+                        SyncHealthService.MarkAttempt(account.Id);
                         if (account.Protocol == IncomingProtocol.Imap)
                             await ImapSyncService.SyncAccountAsync(account, cancellationToken);
                         else
                             await Pop3Service.SyncAccountAsync(account, cancellationToken);
+                        SyncHealthService.MarkSuccess(account.Id);
                     }
                     catch (OperationCanceledException)
                     {
@@ -95,6 +97,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     }
                     catch (Exception ex)
                     {
+                        SyncHealthService.MarkFailure(account.Id, ex.Message);
                         Log($"Sync failed for '{account.EmailAddress}': {ex.Message}", LogLevel.Error);
                     }
                 }

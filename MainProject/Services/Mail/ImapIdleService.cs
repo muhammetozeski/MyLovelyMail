@@ -122,6 +122,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
                 catch (Exception ex)
                 {
+                    SyncHealthService.MarkFailure(account.Id, ex.Message);
                     Log($"IMAP IDLE for '{account.EmailAddress}' dropped: {ex.Message}. Reconnecting in {backoff.TotalSeconds:0}s.", LogLevel.Warning);
                     try { await Task.Delay(backoff, cancellationToken); }
                     catch (OperationCanceledException) { return; }
