@@ -889,7 +889,13 @@ namespace MyLovelyMail.MainProject.ZTests
                         await using var source = File.OpenRead(attachmentPath);
                         await ComposeService.AttachFileAsync(draft, source, Path.GetFileName(attachmentPath));
                     }
+                    // SelectAccount nulls the folder, and the page normally picks the next one
+                    // straight after. Doing the same here keeps the app in a state a user could
+                    // actually be in rather than one with no folder selected at all.
                     MailUiState.SelectAccount(account);
+                    var folders = MessageStore.GetFolders(account.Id);
+                    if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), folders) is { } start)
+                        MailUiState.SelectFolder(start);
                     MailUiState.OpenCompose(draft);
                     return new { ok = true, draft.DraftId, attachments = draft.AttachmentPaths.Count };
                 }
