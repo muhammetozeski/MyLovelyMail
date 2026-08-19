@@ -74,6 +74,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px1 = 1;
             public const int Px4 = 4;
             public const int Px5 = 5;
+            public const int Px8 = 8;
             public const int Px12 = 12;
             public const int Px14 = 14;
             public const int Px16 = 16;

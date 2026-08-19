@@ -458,6 +458,34 @@
                 </div>
             </div>
 
+            @* Conversation grouping maps a thread to its newest message alone, so the other
+               replies have no row at all while the count pill advertises that they exist. This is
+               the way to them, and it is shown in flat mode too — the thread is there either way. *@
+            @if (ThreadOfOpenMessage(open) is { } thread)
+            {
+                <div class="mail-reader-thread">
+                    <div class="mail-reader-thread-nav">
+                        <button class="mail-thread-step" disabled="@(OpenThreadPosition(open) <= 1)"
+                                title="Previous in conversation (P)" @onclick="() => StepThread(-1)">◀</button>
+                        <span class="mail-reader-thread-count">@OpenThreadPosition(open) of @thread.Count</span>
+                        <button class="mail-thread-step" disabled="@(OpenThreadPosition(open) >= thread.Count)"
+                                title="Next in conversation (N)" @onclick="() => StepThread(1)">▶</button>
+                    </div>
+                    @foreach (var step in thread)
+                    {
+                        <button class="mail-thread-line @(step.Uid == open.Uid ? "mail-thread-line--open" : "")"
+                                @onclick="() => OpenMessage(step)">
+                            <span class="mail-thread-line-date">@step.DateUtc.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                            <span class="mail-thread-line-sender">@(string.IsNullOrWhiteSpace(step.FromName) ? step.FromAddress : step.FromName)</span>
+                            @if (step.IsUnread)
+                            {
+                                <span class="mail-thread-line-unread"></span>
+                            }
+                        </button>
+                    }
+                </div>
+            }
+
             <div class="mail-reader-actions">
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>

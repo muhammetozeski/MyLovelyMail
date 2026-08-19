@@ -80,6 +80,52 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return senderHistory;
         }
 
+        List<MailMessageSummary>? openThread;
+        uint openThreadUid;
+
+        /// <summary>
+        /// The conversation the open message belongs to, oldest first, or null when it stands
+        /// alone. Cached by uid like <see cref="HistoryOfOpenSender"/>: threading walks the whole
+        /// folder, and the reader re-renders on any state change.
+        /// <para>
+        /// Built from the folder's FULL summaries rather than the filtered list — an active search
+        /// would otherwise cut the conversation down to the messages that happen to match it.
+        /// </para>
+        /// </summary>
+        List<MailMessageSummary>? ThreadOfOpenMessage(MailMessageSummary open)
+        {
+            if (openThreadUid == open.Uid) return openThread;
+            openThreadUid = open.Uid;
+            openThread = null;
+
+            if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(open) is not { } folderName)
+                return null;
+
+            var thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
+                .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
+
+            // A single message is not a conversation; the strip would be noise on most mail.
+            openThread = thread is { Messages.Count: > 1 } ? thread.Messages : null;
+            return openThread;
+        }
+
+        /// <summary>Position of the open message in its conversation, 1-based, for "3 of 7".</summary>
+        int OpenThreadPosition(MailMessageSummary open) =>
+            (ThreadOfOpenMessage(open)?.FindIndex(m => m.Uid == open.Uid) ?? -1) + 1;
+
+        /// <summary>
+        /// Opens the neighbouring message in the conversation. Returns false at either end, so the
+        /// arrows can be disabled rather than silently doing nothing.
+        /// </summary>
+        bool StepThread(int delta)
+        {
+            if (MailUiState.OpenMessage is not { } open || ThreadOfOpenMessage(open) is not { } thread) return false;
+            int target = thread.FindIndex(m => m.Uid == open.Uid) + delta;
+            if (target < 0 || target >= thread.Count) return false;
+            OpenMessage(thread[target]);
+            return true;
+        }
+
         /// <summary>Re-renders the open message with remote images allowed for THIS message only.</summary>
         void AllowImagesOnce()
         {

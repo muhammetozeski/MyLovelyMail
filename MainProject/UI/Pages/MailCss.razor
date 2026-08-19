@@ -1116,6 +1116,86 @@
         gap: @(AppMeasures.Space.Px6)px;
     }
 
+    /* Conversation strip: the only route to the replies a grouped row stands for. */
+    .mail-reader-thread {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        padding: @(AppMeasures.Space.Px8)px 0;
+        border-bottom: @(AppMeasures.Border.Thin)px solid @glassBorder;
+    }
+
+    .mail-reader-thread-nav {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding-bottom: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-reader-thread-count {
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-thread-step {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        cursor: pointer;
+        color: var(--account-accent, @primary);
+        padding: 0 @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+        .mail-thread-step:disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
+            cursor: not-allowed;
+        }
+
+    .mail-thread-line {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+        .mail-thread-line:hover {
+            background: @surfaceTint;
+        }
+
+    .mail-thread-line--open {
+        background: @surfaceTint;
+        color: @textPrimary;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    .mail-thread-line-date {
+        flex-shrink: 0;
+        color: @textMuted;
+    }
+
+    .mail-thread-line-sender {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-thread-line-unread {
+        flex-shrink: 0;
+        width: @(AppMeasures.Size.Px8)px;
+        height: @(AppMeasures.Size.Px8)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        background: var(--account-accent, @primary);
+    }
+
     /* Footer under the list when the server holds more than the cache does. */
     .mail-backfill {
         display: flex;
