@@ -535,6 +535,23 @@ namespace MyLovelyMail.MainProject.ZTests
 
                 // A raw header can be passed instead of a message, so the parser and the link gate
                 // can be exercised on the shapes real newsletters send without hunting for one.
+                // Builds a draft from the query and runs the pre-send checks on it, so every
+                // warning is reachable without a compose window.
+                case ("GET", "/send-check"):
+                {
+                    var draft = new ComposeDraft
+                    {
+                        Account = query["accountId"] is { Length: > 0 } guardAccountId ? RequireAccount(guardAccountId) : null,
+                        To = query["to"] ?? string.Empty,
+                        Cc = query["cc"] ?? string.Empty,
+                        Subject = query["subject"] ?? string.Empty,
+                        Body = query["body"] ?? string.Empty
+                    };
+                    if (query["attachment"] is { Length: > 0 } attachmentPath)
+                        draft.AttachmentPaths.Add(attachmentPath);
+                    return new { warnings = SendGuardService.Inspect(draft) };
+                }
+
                 case ("GET", "/unsubscribe") when query["header"] is { Length: > 0 } rawHeader:
                 {
                     var parsed = UnsubscribeService.Parse(rawHeader);
