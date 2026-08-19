@@ -1077,6 +1077,15 @@
         min-height: @(AppMeasures.Size.Px200)px;
     }
 
+    /* The undo bar carries one message; the send guard can carry several, so its rows stack
+       instead of being squeezed side by side into a single line. */
+    .mail-send-guard {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
     /* Footer under the list when the server holds more than the cache does. */
     .mail-backfill {
         display: flex;
