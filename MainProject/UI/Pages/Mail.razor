@@ -277,6 +277,27 @@
                         </span>
                     </button>
                 </Virtualize>
+
+                @* The store knows the folder is truncated (TotalCount is the server's own number),
+                   so say it instead of letting a search come back empty for mail that was never fetched. *@
+                @if (!SearchAllFolders && TruncatedFolder is { } truncated)
+                {
+                    <div class="mail-backfill">
+                        <span class="mail-backfill-text">
+                            Showing @CachedCount.ToString("N0") of @truncated.TotalCount.ToString("N0") here
+                        </span>
+                        @if (ImapSyncService.IsFolderSyncing(truncated.AccountId, truncated.FullName))
+                        {
+                            <CoreSpinner />
+                        }
+                        else
+                        {
+                            <button class="mail-backfill-button" @onclick="() => LoadOlder(truncated)">
+                                ⬇️ Load @BackfillBatchSize older
+                            </button>
+                        }
+                    </div>
+                }
             </div>
         }
     </section>

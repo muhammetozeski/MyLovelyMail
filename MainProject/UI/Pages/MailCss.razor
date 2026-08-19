@@ -1077,6 +1077,36 @@
         min-height: @(AppMeasures.Size.Px200)px;
     }
 
+    /* Footer under the list when the server holds more than the cache does. */
+    .mail-backfill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-backfill-text {
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .mail-backfill-button {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        cursor: pointer;
+        color: var(--account-accent, @primary);
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-backfill-button:hover {
+            background: @surfaceTint;
+        }
+
     /* Conversation count pill: how many messages the collapsed row stands for. */
     .mail-row-thread-count {
         flex-shrink: 0;

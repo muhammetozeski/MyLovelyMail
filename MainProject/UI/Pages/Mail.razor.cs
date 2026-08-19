@@ -190,6 +190,24 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
+        /// <summary>How many older messages one press of the footer button asks for.</summary>
+        internal const int BackfillBatchSize = 300;
+
+        /// <summary>Messages cached for the open folder — the honest half of "showing X of Y".</summary>
+        int CachedCount => MailUiState.SelectedFolder is { } folder
+            ? MessageStore.GetSummaries(folder.AccountId, folder.FullName).Count
+            : 0;
+
+        /// <summary>The open folder when the server holds more than the cache does, else null.</summary>
+        MailFolderData? TruncatedFolder =>
+            MailUiState.SelectedFolder is { IsLocal: false } folder && CachedCount < folder.TotalCount ? folder : null;
+
+        void LoadOlder(MailFolderData folder)
+        {
+            if (AccountStore.GetById(folder.AccountId) is not { } account) return;
+            ImapSyncService.KickFolderBackfill(account, folder.FullName, BackfillBatchSize);
+        }
+
         /// <summary>Drops the folder's cache and refills it — the way back from a truncated folder that incremental sync can never heal.</summary>
         void ResyncFolder(MailFolderData folder)
         {
