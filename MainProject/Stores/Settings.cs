@@ -62,6 +62,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>How many days of mail to keep offline in UserCache (0 = everything).</summary>
         public static readonly Setting<int> OfflineKeepDays = new(0);
 
+        /// <summary>Megabytes of cached message bodies an account may hold; oldest go first above it (0 = no limit).</summary>
+        public static readonly Setting<int> OfflineMaxCacheMb = new(0);
+
         // ---- Reading ----
 
         /// <summary>Seconds a message must stay open before it is marked read (0 = immediately).</summary>

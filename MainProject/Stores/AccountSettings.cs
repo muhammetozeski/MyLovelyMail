@@ -25,6 +25,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.OfflineKeepDays"/>
         public readonly InheritedSetting<int> OfflineKeepDays = new(Settings.OfflineKeepDays);
 
+        /// <inheritdoc cref="Settings.OfflineMaxCacheMb"/>
+        public readonly InheritedSetting<int> OfflineMaxCacheMb = new(Settings.OfflineMaxCacheMb);
+
         /// <inheritdoc cref="Settings.MarkAsReadDelaySeconds"/>
         public readonly InheritedSetting<int> MarkAsReadDelaySeconds = new(Settings.MarkAsReadDelaySeconds);
 
