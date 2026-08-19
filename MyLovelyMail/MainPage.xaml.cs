@@ -13,7 +13,40 @@ namespace MyLovelyMail
 #if WINDOWS
             BuildTrayIcon();
 #endif
+#if DEBUG
+            MainProject.Services.RenderedPageProbe.HtmlProvider = ReadRenderedHtmlAsync;
+#endif
         }
+
+#if DEBUG
+        /// <summary>
+        /// Debug-only: hands the debug API the HTML the WebView is showing, so the UI can be
+        /// audited without clicking or scrolling on the user's screen.
+        /// </summary>
+        async Task<string> ReadRenderedHtmlAsync(string cssSelector)
+        {
+#if WINDOWS
+            string target = string.IsNullOrWhiteSpace(cssSelector)
+                ? "document.body.outerHTML"
+                : $"Array.from(document.querySelectorAll({System.Text.Json.JsonSerializer.Serialize(cssSelector)})).map(e => e.outerHTML).join('\\n')";
+
+            // BlazorWebView itself has no script API; the WebView2 behind its handler does.
+            // ExecuteScriptAsync must run on the UI thread, and the debug API calls in from an
+            // HttpListener thread, hence the dispatch. It answers with a JSON-encoded string.
+            return await Dispatcher.DispatchAsync(async () =>
+            {
+                if (blazorWebView.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.WebView2 webView)
+                    return string.Empty;
+                await webView.EnsureCoreWebView2Async();
+                string encoded = await webView.ExecuteScriptAsync(target);
+                return System.Text.Json.JsonSerializer.Deserialize<string>(encoded) ?? string.Empty;
+            });
+#else
+            await Task.CompletedTask;
+            return string.Empty;
+#endif
+        }
+#endif
 
 #if WINDOWS
         TaskbarIcon? trayIcon;
