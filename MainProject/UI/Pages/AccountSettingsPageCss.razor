@@ -2,37 +2,8 @@
 @inherits ThemedComponentBase
 
 <style>
-    .account-badge {
-        font-size: @(AppMeasures.Font.XSmall)px;
-        font-weight: @(AppMeasures.Weight.Medium);
-        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
-        border-radius: @(AppMeasures.Radius.Pill)px;
-        margin-left: @(AppMeasures.Space.Px6)px;
-    }
-
-    .account-badge--inherited {
-        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
-        color: @AppColors.TextMuted.ToRgbaHex(true);
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
-    }
-
-    .account-badge--overridden {
-        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
-        color: @AppColors.TextOnAccent.ToRgbaHex(true);
-    }
-
-    .account-setting-controls {
-        display: flex;
-        align-items: center;
-        gap: @(AppMeasures.Space.Px6)px;
-        flex-shrink: 0;
-    }
-
-    .account-setting-input {
-        width: @(AppMeasures.Size.Px180)px;
-        flex: 0 0 auto;
-    }
-
+    @* The badge, control-strip and input rules moved to SettingEditorRowCss, which ships with the
+       component that uses them instead of living on one page that happened to be its only host. *@
     .settings-number--wide {
         width: @(AppMeasures.Size.Px220)px;
     }

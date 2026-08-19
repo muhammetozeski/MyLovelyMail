@@ -7,7 +7,7 @@
             @Setting.KeyHumanReadable
             @if (BadgeText is { Length: > 0 } badge)
             {
-                <span class="account-badge @(Setting.IsDefault ? "account-badge--inherited" : "account-badge--overridden")">@badge</span>
+                <span class="setting-editor-badge @(Setting.IsDefault ? "setting-editor-badge--inherited" : "setting-editor-badge--overridden")">@badge</span>
             }
         </span>
         @if (Hint is { Length: > 0 } hint)
@@ -15,14 +15,14 @@
             <span class="settings-row-hint">@hint</span>
         }
     </div>
-    <div class="account-setting-controls">
+    <div class="setting-editor-controls">
         @if (Setting.Value is bool boolValue)
         {
             <CoreToggle Checked="@boolValue" CheckedChanged="@(v => Commit(v.ToString()))" />
         }
         else if (Setting.Value is Enum enumValue)
         {
-            <select class="filters-select" value="@enumValue.ToString()"
+            <select class="setting-editor-select" value="@enumValue.ToString()"
                     @onchange="@(e => Commit(e.Value?.ToString() ?? string.Empty))">
                 @foreach (var option in Enum.GetValues(enumValue.GetType()))
                 {
@@ -32,17 +32,19 @@
         }
         else
         {
-            <input class="filters-input account-setting-input"
+            <input class="setting-editor-input"
                    type="@(Setting.Value is int ? "number" : "text")"
                    value="@Setting.Value"
                    @onchange="@(e => Commit(e.Value?.ToString() ?? string.Empty))" />
         }
         @if (!Setting.IsDefault)
         {
-            <button class="filters-remove" title="@ResetTitle" @onclick="Reset">↩︎</button>
+            <button class="setting-editor-reset" title="@ResetTitle" @onclick="Reset">↩︎</button>
         }
     </div>
 </div>
+
+<SettingEditorRowCss />
 
 @code {
     [Parameter, EditorRequired] public ISetting Setting { get; set; } = default!;

@@ -1,0 +1,66 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+
+@* Ships with SettingEditorRow so any page can render the row. The row used to borrow
+   .filters-* from FilterRulesCss and .account-* from AccountSettingsPageCss, which held together
+   only on the account page: those two stylesheets are not on the Settings page, so the same
+   markup arrived there as unstyled native inputs. *@
+<style>
+    .setting-editor-controls {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-shrink: 0;
+    }
+
+    .setting-editor-select,
+    .setting-editor-input {
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Normal)px;
+        outline: none;
+    }
+
+    .setting-editor-input {
+        width: @(AppMeasures.Size.Px180)px;
+        flex: 0 0 auto;
+    }
+
+    .setting-editor-reset {
+        border: none;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .setting-editor-reset:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+            color: @AppColors.TextPrimary.ToRgbaHex(true);
+        }
+
+    .setting-editor-badge {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        margin-left: @(AppMeasures.Space.Px6)px;
+    }
+
+    .setting-editor-badge--inherited {
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+    }
+
+    .setting-editor-badge--overridden {
+        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+    }
+</style>
