@@ -50,18 +50,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OpenCompose(draft);
         }
 
-        /// <summary>What the app already knows about the open message's sender.</summary>
-        sealed record SenderHistory(int MessageCount, int UnreadCount, DateTime OldestUtc);
-
-        SenderHistory? senderHistory;
+        PersonProfile? senderHistory;
         uint senderHistoryUid;
 
         /// <summary>
-        /// Counts everything from this sender across the account. The scan walks every cached
-        /// summary, so it runs ONCE per opened message (keyed by uid) — never per render, which
-        /// the reader does on any state change.
+        /// Everything the cache knows about this sender. The scan walks every cached summary, so
+        /// it runs ONCE per opened message (keyed by uid) — never per render, which the reader
+        /// does on any state change. The pill and the person sheet read the same profile, so
+        /// opening the sheet costs no second scan.
         /// </summary>
-        SenderHistory? HistoryOfOpenSender(MailMessageSummary open)
+        PersonProfile? HistoryOfOpenSender(MailMessageSummary open)
         {
             if (senderHistoryUid == open.Uid) return senderHistory;
             senderHistoryUid = open.Uid;
@@ -69,20 +67,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (MailUiState.SelectedAccount is not { } account || open.FromAddress.Length == 0) return null;
 
-            int count = 0, unread = 0;
-            DateTime oldest = DateTime.MaxValue;
-            foreach (var folder in MessageStore.GetFolders(account.Id))
-            {
-                foreach (var summary in MessageStore.GetSummaries(account.Id, folder.FullName))
-                {
-                    if (!summary.FromAddress.Equals(open.FromAddress, StringComparison.OrdinalIgnoreCase)) continue;
-                    count++;
-                    if (summary.IsUnread) unread++;
-                    if (summary.DateUtc < oldest) oldest = summary.DateUtc;
-                }
-            }
-
-            senderHistory = count > 1 ? new SenderHistory(count, unread, oldest) : null;
+            var profile = PersonProfileService.Build(account.Id, open.FromAddress);
+            senderHistory = profile.MessageCount > 1 ? profile : null;
             return senderHistory;
         }
 

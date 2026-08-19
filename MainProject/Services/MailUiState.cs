@@ -29,6 +29,21 @@ namespace MyLovelyMail.MainProject.Services
             OnSelectionChanged?.Invoke();
         }
 
+        /// <summary>The correspondent whose sheet is open; null = closed.</summary>
+        public static string? OpenPersonAddress { get; private set; }
+
+        public static void OpenPerson(string address)
+        {
+            OpenPersonAddress = address;
+            OnSelectionChanged?.Invoke();
+        }
+
+        public static void ClosePerson()
+        {
+            OpenPersonAddress = null;
+            OnSelectionChanged?.Invoke();
+        }
+
         public static void CloseCompose()
         {
             ActiveCompose = null;
