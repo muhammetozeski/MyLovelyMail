@@ -45,6 +45,12 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Message list density: "Cozy", "Comfortable" or "Compact".</summary>
         public static readonly Setting<string> MessageListDensity = new("Comfortable");
 
+        /// <summary>Stop looping animations (aurora drift, sync heart, pulses) and shorten transitions.</summary>
+        public static readonly Setting<bool> ReduceMotion = new(false);
+
+        /// <summary>Take the calm-motion answer from the Windows animation setting instead of the fixed value above.</summary>
+        public static readonly Setting<bool> FollowSystemMotion = new(true);
+
         /// <summary>Show the unread-count badge on folders and the tray icon.</summary>
         public static readonly Setting<bool> ShowUnreadBadge = new(true);
 

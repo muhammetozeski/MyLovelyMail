@@ -132,5 +132,27 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static string BuildAuroraStopsLayer() =>
             "background:" + string.Join(", ", AppColors.AuroraStops.Select(s =>
                 $"radial-gradient(ellipse {s.Size} at {s.Position}, {s.Color.WithAlpha(0.55f).ToRgbaHex(true)} 0%, transparent 70%)")) + ";";
+
+        /// <summary>
+        /// The declarations that stop motion, without the selector. One string used twice: under
+        /// the app's own switch and under the always-emitted <c>prefers-reduced-motion</c> query,
+        /// so the OS preference keeps working when the app switch is off.
+        /// <para>
+        /// <c>animation-iteration-count: 1</c> is the load-bearing line — shortening the duration
+        /// alone would only make a looping animation flicker faster.
+        /// </para>
+        /// </summary>
+        public const string CalmMotionDeclarations =
+            "animation-duration:1ms !important;animation-iteration-count:1 !important;"
+            + "transition-duration:1ms !important;scroll-behavior:auto !important;";
+
+        /// <summary>
+        /// The calm-motion rule for the app's own switch, or an empty string when motion is normal.
+        /// Applies to every element and pseudo-element, so it reaches animations no one remembered:
+        /// the sync heart, the sweep line, the drifting hearts and the pulses all loop
+        /// unconditionally in their own components.
+        /// </summary>
+        public static string BuildCalmMotionLayer() =>
+            MotionPreference.IsCalm ? $"*, *::before, *::after {{ {CalmMotionDeclarations} }}" : string.Empty;
     }
 }

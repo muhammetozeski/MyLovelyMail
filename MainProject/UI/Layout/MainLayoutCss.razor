@@ -5,6 +5,7 @@
 @{
     string auroraBase = $"background:linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
     string auroraStops = AppStyles.BuildAuroraStopsLayer();
+    string calmMotion = AppStyles.BuildCalmMotionLayer();
     string textColor = AppColors.TextPrimary.ToRgbaHex(true);
     string warningBg = AppColors.Warning.ToRgbaHex(true);
     string warningFg = AppColors.BackgroundDeep.ToRgbaHex(true);
@@ -55,6 +56,16 @@
     @@media (prefers-reduced-motion: no-preference) {
         body::before {
             animation: aurora-drift @(AppMeasures.Duration.Glacial)s ease-in-out infinite alternate;
+        }
+    }
+
+    @* The app's own calm switch, and the OS preference honoured whether or not that switch is on.
+       The component styles never use !important, so these win no matter which <style> renders first. *@
+    @((MarkupString)calmMotion)
+
+    @@media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            @((MarkupString)AppStyles.CalmMotionDeclarations)
         }
     }
 

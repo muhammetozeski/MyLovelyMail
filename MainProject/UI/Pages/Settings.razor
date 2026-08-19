@@ -38,6 +38,22 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Follow the Windows animation setting</span>
+                <span class="settings-row-hint">Takes the answer below from Windows instead of the switch</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FollowSystemMotion.Value" CheckedChanged="@SetFollowSystemMotion" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Calm motion</span>
+                <span class="settings-row-hint">Stops the looping animations — the aurora, the sync heart and the pulses</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.ReduceMotion.Value"
+                        Disabled="@GlobalSettings.FollowSystemMotion.Value"
+                        CheckedChanged="@SetReduceMotion" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Interface scale (%)</span>
                 <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
             </div>
@@ -320,6 +336,11 @@
         SetAndSave(GlobalSettings.FollowSystemTheme, follow);
         ThemeManager.ApplyFromSettings();
     }
+
+    /// <summary>While this is on the manual switch is disabled, so only one of the two can be the answer.</summary>
+    static void SetFollowSystemMotion(bool follow) => SetAndSave(GlobalSettings.FollowSystemMotion, follow);
+
+    static void SetReduceMotion(bool reduce) => SetAndSave(GlobalSettings.ReduceMotion, reduce);
 
     /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
     static void SetUiScale(string text)
