@@ -94,6 +94,15 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
 - **Razor, çift tırnaklı attribute içinde iç içe `$"..."` ayrıştıramaz.** Attribute'u tek tırnakla
   yaz (`@onclick='() => F("x" + y)'`) ya da ifadeyi code-behind'a taşı.
 
+- **Ekran görüntüsüyle animasyon ölçülmez.** PrintWindow kareleri arasında geçen süre
+  belirsiz, gradyan zemin de kanal başına 1-2 adım dithering üretiyor; eşik düşük olunca
+  gürültü hareket sanılıyor, yüksek olunca gerçek animasyon kayboluyor. Aynı ölçüm arka arkaya
+  %40 ve %3 verdi. Animasyonun durduğunu göstermek gerekiyorsa üretilen CSS'i ve kararı
+  doğrula, pikselle uğraşma; kare kare ölçüm bu araçlarla yapılamıyor — bunu söyle ve geç.
+- **Kayıt defteri değerinin TÜRÜNÜ varsayma.** `AppsUseLightTheme` REG_DWORD ama
+  `WindowMetrics\MinAnimate` REG_SZ ("1"/"0"). Çalışan bir prob'u kopyalayıp tip desenini
+  aynen bırakmak sessizce her kullanıcı için yanlış cevap üretirdi; değeri önce oku, sonra yaz.
+
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
