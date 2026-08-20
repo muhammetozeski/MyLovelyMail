@@ -18,6 +18,6 @@ namespace MyLovelyMail.MainProject.Constants
         /// the last person to edit it: it does not come from the csproj, the assembly or the
         /// release tag, and nothing fails when they disagree. Bump it with the release.
         /// </summary>
-        public const string AppVersion = "v1.34.0";
+        public const string AppVersion = "v1.35.0";
     }
 }
