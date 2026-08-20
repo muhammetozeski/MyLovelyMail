@@ -132,24 +132,37 @@
             {
                 <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
             }
-            <div class="mail-search-tools">
-                @foreach (var (label, token) in QuickFilters)
-                {
-                    <button class="mail-search-toggle @(HasSearchToken(token) ? "mail-search-toggle--on" : "")"
-                            @onclick="() => ToggleSearchToken(token)">@label</button>
-                }
-                @if (MailUiState.SelectedAccount != null)
-                {
-                    <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
-                            title="Group replies into conversations"
-                            @onclick="ToggleConversationMode">💬 Conversations</button>
-                }
-                @if (!string.IsNullOrWhiteSpace(SearchText))
-                {
-                    <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
-                    <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
-                }
+            @* Seven pills wrapped onto three rows and pushed the message list off the screen,
+               so the row folds away. Folded it still carries the count of live filters - a
+               filter you cannot see is worse than one you can. *@
+            <div class="mail-search-fold-row">
+                <button class="mail-search-toggle @(!ShowSearchTools && ActiveFilterCount > 0 ? "mail-search-toggle--on" : "")"
+                        title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
+                        @onclick="() => ShowSearchTools = !ShowSearchTools">
+                    🎛️ Filters@(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "") @(ShowSearchTools ? "▴" : "▾")
+                </button>
             </div>
+            @if (ShowSearchTools)
+            {
+                <div class="mail-search-tools">
+                    @foreach (var (label, token) in QuickFilters)
+                    {
+                        <button class="mail-search-toggle @(HasSearchToken(token) ? "mail-search-toggle--on" : "")"
+                                @onclick="() => ToggleSearchToken(token)">@label</button>
+                    }
+                    @if (MailUiState.SelectedAccount != null)
+                    {
+                        <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
+                                title="Group replies into conversations"
+                                @onclick="ToggleConversationMode">💬 Conversations</button>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(SearchText))
+                    {
+                        <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
+                        <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                    }
+                </div>
+            }
         </div>
 
         @if (MailUiState.SelectedFolder == null)

@@ -250,11 +250,30 @@
         100% { left: @(AppMeasures.Percent.Full)%; }
     }
 
+    /* The fold handle is a pill like the filters it hides, and sits on its own line so it keeps
+       pill width instead of stretching across the column the way a flex child would. */
+    .mail-search-fold-row {
+        display: flex;
+    }
+
     .mail-search-tools {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
         /* Without wrapping, the filter pills run past the list column and slide under the reader. */
+        animation: filters-unfold @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    @@keyframes filters-unfold {
+        from {
+            opacity: 0;
+            transform: translateY(-@(AppMeasures.Space.Px4)px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .mail-search-toggle {

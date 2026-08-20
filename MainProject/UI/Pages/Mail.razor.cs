@@ -266,6 +266,18 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("🔕 Muted", "is:muted")
         ];
 
+        /// <summary>
+        /// Whether the quick-filter pill row is unfolded. Deliberately not persisted: every start
+        /// gives the list its full height back, and one click brings the pills straight back.
+        /// </summary>
+        bool ShowSearchTools { get; set; }
+
+        /// <summary>How many filters are actually narrowing the list right now - what the folded handle reports.</summary>
+        int ActiveFilterCount =>
+            QuickFilters.Count(filter => HasSearchToken(filter.Token))
+            + (ConversationMode ? 1 : 0)
+            + (SearchAllFolders && !string.IsNullOrWhiteSpace(SearchText) ? 1 : 0);
+
         bool HasSearchToken(string token) =>
             SearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Any(part => part.Equals(token, StringComparison.OrdinalIgnoreCase));
