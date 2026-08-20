@@ -11,8 +11,8 @@ namespace MyLovelyMail.MainProject.Storage
     /// </summary>
     public enum AppExitReason
     {
-        /// <summary>Written while the app is up; never a final verdict.</summary>
-        StillRunning,
+        /// <summary>Written while the app is up. Not an ending - the run has not ended yet.</summary>
+        Running,
 
         /// <summary>"❌ Exit" in the tray icon's menu.</summary>
         TrayExit,
@@ -49,6 +49,13 @@ namespace MyLovelyMail.MainProject.Storage
     /// The deploy script needs this. It used to delete the live install and find out it could not
     /// finish only when it reached the locked executable, having already deleted everything that
     /// sorted before it.
+    /// </para>
+    /// <para>
+    /// Every line states something that is true when it is read. "Unexpected" is about how the run
+    /// ENDED, so while the app is up it says "-" rather than pre-judging an ending that has not
+    /// happened: false once a deliberate stop is recorded, true for a crash, and "-" left standing
+    /// beside an empty Stopped line for a run that was killed. That last case is the one nobody
+    /// could write from inside, and the next run names it on the PreviousRun line.
     /// </para>
     /// </summary>
     public static class RunLock
@@ -87,7 +94,7 @@ namespace MyLovelyMail.MainProject.Storage
                     held = new FileStream(FilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
                     startedAt = Stamp();
                     noted = AppExitReason.ProcessExit;
-                    Write(AppExitReason.StillRunning, stoppedAt: null, toDisk: true);
+                    Write(AppExitReason.Running, stoppedAt: null, toDisk: true);
                     heartbeat = new Timer(static _ => Beat(), null, HeartbeatInterval, HeartbeatInterval);
                 }
                 catch (Exception ex)
@@ -150,7 +157,7 @@ namespace MyLovelyMail.MainProject.Storage
                     // same file cache, so the tick is visible immediately either way, and the one
                     // case a flush would cover - the power going out - is already an unexpected
                     // end by definition.
-                    Write(AppExitReason.StillRunning, stoppedAt: null, toDisk: false);
+                    Write(AppExitReason.Running, stoppedAt: null, toDisk: false);
                 }
                 catch (Exception ex)
                 {
@@ -170,7 +177,7 @@ namespace MyLovelyMail.MainProject.Storage
                 .AppendLine(Row("Stopped", stoppedAt ?? Unknown))
                 .AppendLine(Row("Reason", reason.ToString()))
                 .AppendLine(Row("ReasonText", DescriptionOf(reason)))
-                .AppendLine(Row("Unexpected", stoppedAt == null ? "true" : "false"))
+                .AppendLine(Row("Unexpected", stoppedAt == null ? Unknown : IsUnexpected(reason) ? "true" : "false"))
                 .AppendLine(Row("Alive", Stamp()))
                 .AppendLine(Row("Pid", Environment.ProcessId.ToString(CultureInfo.InvariantCulture)))
                 .AppendLine(Row("Version", AppConstants.AppVersion))
@@ -183,6 +190,14 @@ namespace MyLovelyMail.MainProject.Storage
             held.SetLength(bytes.Length);
             held.Flush(toDisk);
         }
+
+        /// <summary>
+        /// Did this ending happen against the user's wishes? Every reason the app can write is a
+        /// deliberate stop except a crash. The other unwanted endings - a kill, a power cut, a
+        /// debugger stop - write nothing at all, so they are recognised by the missing Stopped
+        /// line instead, and named as such in the next run's PreviousRun.
+        /// </summary>
+        static bool IsUnexpected(AppExitReason reason) => reason == AppExitReason.UnhandledException;
 
         static string Row(string key, string value) => key.PadRight(KeyColumnWidth) + value;
 
@@ -201,7 +216,7 @@ namespace MyLovelyMail.MainProject.Storage
                 string[] lines = File.ReadAllLines(FilePath);
                 string stopped = ValueOf(lines, "Stopped");
                 if (stopped.Length == 0 || stopped == Unknown)
-                    return $"Unexpected, last alive {Fallback(ValueOf(lines, "Alive"))}";
+                    return $"Unexpected - killed, crashed or lost power, last alive {Fallback(ValueOf(lines, "Alive"))}";
 
                 return $"{Fallback(ValueOf(lines, "Reason"))} at {stopped}";
             }
@@ -228,7 +243,7 @@ namespace MyLovelyMail.MainProject.Storage
 
         static string DescriptionOf(AppExitReason reason) => reason switch
         {
-            AppExitReason.StillRunning => "Still running",
+            AppExitReason.Running => "Still running; if no copy is up, this run was killed",
             AppExitReason.TrayExit => "Quit from the tray icon menu",
             AppExitReason.WindowClosed => "Window closed with close-to-tray off",
             AppExitReason.SystemShutdown => "Windows shut down or restarted",
