@@ -40,7 +40,14 @@ namespace MyLovelyMail
 
                 platformWindow.AppWindow.Closing += (_, e) =>
                 {
-                    if (!Settings.CloseToTray.Value) return;
+                    if (!Settings.CloseToTray.Value)
+                    {
+                        // A real quit, not a hide. NoteExitReason keeps the first cause seen, so
+                        // the tray's own quit - which switches this setting off on its way out -
+                        // is still recorded as a tray quit rather than as this window closing.
+                        RunLock.NoteExitReason(AppExitReason.WindowClosed);
+                        return;
+                    }
                     e.Cancel = true;
                     platformWindow.AppWindow.Hide();
                 };
@@ -87,6 +94,7 @@ namespace MyLovelyMail
 
         public static void ExitApplication()
         {
+            RunLock.NoteExitReason(AppExitReason.TrayExit);
 #if WINDOWS
             // Quit() respects nothing about our close-to-tray interception — the Closing handler
             // cancels it. Drop the interception by clearing the setting flag in memory only.

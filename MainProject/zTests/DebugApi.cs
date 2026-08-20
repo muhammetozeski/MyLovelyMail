@@ -1,4 +1,4 @@
-using System.Collections.Specialized;
+﻿using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -195,6 +195,34 @@ namespace MyLovelyMail.MainProject.ZTests
                     string? html = await RenderedPageProbe.ReadHtmlAsync(query["selector"] ?? string.Empty);
                     return new { available = html != null, length = html?.Length ?? 0, html };
                 }
+
+                // Ends the run the way a real quit does - reason noted, then a normal exit that
+                // lets ProcessExit write the run lock's closing lines. Reading those lines back
+                // otherwise means clicking the tray menu on the user's screen.
+                case ("POST", "/exit"):
+                {
+                    var reason = Enum.TryParse(query["reason"], ignoreCase: true, out AppExitReason parsed)
+                        ? parsed
+                        : AppExitReason.ProcessExit;
+                    RunLock.NoteExitReason(reason);
+                    // Delayed so this answer is on the wire before the process goes.
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(250);
+                        Environment.Exit(0);
+                    });
+                    return new { exiting = true, reason = reason.ToString() };
+                }
+
+                // Answers "is the installed copy running" the way the deploy script does: by
+                // trying to take the very lock the app holds while it is up.
+                case ("GET", "/run-lock"):
+                    return new
+                    {
+                        path = RunLock.FilePath,
+                        exists = File.Exists(RunLock.FilePath),
+                        text = File.Exists(RunLock.FilePath) ? File.ReadAllText(RunLock.FilePath) : null
+                    };
 
                 // Opens a page without touching the screen, so any page can be snapshot-audited.
                 case ("POST", "/navigate"):
