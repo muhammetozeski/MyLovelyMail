@@ -1,4 +1,4 @@
-# Publishes the Windows app into the STABLE deploy root so user data survives updates.
+﻿# Publishes the Windows app into the STABLE deploy root so user data survives updates.
 # Layout produced (and kept stable across versions):
 #   <DeployRoot>\MyLovelyMail.exe    launcher (applies pending updates, migrates data, starts the app)
 #   <DeployRoot>\AppData\            the running application (replaced in place when not locked)
@@ -16,6 +16,27 @@ $MauiCsproj = Join-Path $SlnDir "MyLovelyMail\MyLovelyMail.csproj"
 $Tfm = "net10.0-windows10.0.19041.0"
 
 New-Item -ItemType Directory -Force $DeployRoot | Out-Null
+
+# Is the installed copy running? The app holds AppCache\run-lock.txt open for writing for as long
+# as it is up and shares reads only, so a refused write IS the answer. Windows drops the handle
+# when the process dies - a killed app leaves no stale lock - so this cannot answer "yes" for a
+# copy that is already gone. When the file is missing (fresh install, cleared cache) the process
+# list still gets a say, because guessing "not running" is the guess that deletes a live install.
+function Test-DeployedAppRunning {
+    param([string]$Root)
+
+    $lockFile = Join-Path $Root "AppCache\run-lock.txt"
+    if (Test-Path $lockFile) {
+        try {
+            $probe = [IO.File]::Open($lockFile, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            $probe.Close()
+        } catch {
+            return $true
+        }
+    }
+    return [bool](Get-Process -Name 'MyLovelyMail' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) })
+}
 
 # ── Pick the next archive version number ──
 $versionsDir = Join-Path $DeployRoot "Versions"
@@ -39,15 +60,29 @@ if (-not (Test-Path "$staging\MyLovelyMail.exe")) { throw "Published exe not fou
 Copy-Item $staging (Join-Path $versionsDir "$versionTag\AppData") -Recurse
 Write-Host "Archived as Versions\$versionTag" -ForegroundColor DarkGray
 
-# ── Try to apply the update NOW (works when the app is closed; otherwise the launcher applies it) ──
+# ── Apply the update NOW when the app is closed; otherwise leave it staged for the launcher ──
+# This used to delete AppData first and discover the app was running only when it reached the
+# locked executable - by then it had already deleted everything sorting before it (73 localization
+# folders, one time). So: ask first, and swap by RENAME, which either takes the whole folder or
+# takes nothing.
 $liveAppData = Join-Path $DeployRoot "AppData"
-try {
-    if (Test-Path $liveAppData) { Remove-Item -Recurse -Force $liveAppData }
-    Move-Item $staging $liveAppData
-    Remove-Item -Recurse -Force (Join-Path $DeployRoot "PendingUpdate") -ErrorAction SilentlyContinue
-    Write-Host "Live AppData updated in place." -ForegroundColor Green
-} catch {
-    Write-Host "App seems to be running - update staged in PendingUpdate; the launcher applies it on next start." -ForegroundColor Yellow
+$retired = Join-Path $DeployRoot "AppData.retired"
+
+if (Test-DeployedAppRunning $DeployRoot) {
+    Write-Host "MyLovelyMail is running - nothing touched; the update stays staged in PendingUpdate and the launcher applies it on next start." -ForegroundColor Yellow
+} else {
+    Remove-Item -Recurse -Force $retired -ErrorAction SilentlyContinue
+    try {
+        if (Test-Path $liveAppData) { Rename-Item $liveAppData "AppData.retired" -ErrorAction Stop }
+        Move-Item $staging $liveAppData
+        Remove-Item -Recurse -Force (Join-Path $DeployRoot "PendingUpdate") -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force $retired -ErrorAction SilentlyContinue
+        Write-Host "Live AppData updated in place." -ForegroundColor Green
+    } catch {
+        # A half-applied update is worse than an old one: put the previous install back.
+        if ((Test-Path $retired) -and -not (Test-Path $liveAppData)) { Rename-Item $retired "AppData" }
+        Write-Host "Could not swap AppData ($($_.Exception.Message)) - the update stays staged in PendingUpdate." -ForegroundColor Yellow
+    }
 }
 
 # ── Build the launcher (applies pending updates, migrates old vNNN user data once, starts the app) ──
@@ -92,18 +127,29 @@ string appDirectory = Path.Combine(root, "AppData");
 string pendingAppData = Path.Combine(root, "PendingUpdate", "AppData");
 string targetExe = Path.Combine(appDirectory, "MyLovelyMail.exe");
 
-// Apply a staged update. Move fails while the old build is still running - then just start it;
-// the update is applied on the next launch instead.
-if (Directory.Exists(pendingAppData))
+// Apply a staged update, but never while a copy is up: the app holds AppCache\run-lock.txt open
+// for writing for as long as it runs, and swapping the folder under a live process breaks
+// everything it has not loaded yet. The swap is a rename, so a refusal leaves the install whole
+// instead of half-deleted.
+if (Directory.Exists(pendingAppData) && !IsAppRunning(root))
 {
+    string retired = Path.Combine(root, "AppData.retired");
     try
     {
+        if (Directory.Exists(retired))
+            Directory.Delete(retired, recursive: true);
         if (Directory.Exists(appDirectory))
-            Directory.Delete(appDirectory, recursive: true);
+            Directory.Move(appDirectory, retired);
         Directory.Move(pendingAppData, appDirectory);
         Directory.Delete(Path.Combine(root, "PendingUpdate"), recursive: true);
+        Directory.Delete(retired, recursive: true);
     }
-    catch { /* locked by a running instance - keep the current build */ }
+    catch
+    {
+        // Roll back to whatever was installed; a half-applied update is worse than an old one.
+        if (Directory.Exists(retired) && !Directory.Exists(appDirectory))
+            Directory.Move(retired, appDirectory);
+    }
 }
 
 // One-time migration from the old per-version layout: adopt the newest vNNN\UserData sibling.
@@ -136,6 +182,24 @@ foreach (string argument in args)
 
 Process.Start(startInfo);
 return 0;
+
+// Mirrors Export.ps1: a refused write on the run lock means a copy is up. The handle dies with
+// the process, so a killed app cannot leave a lock that blocks every future update.
+static bool IsAppRunning(string root)
+{
+    string lockFile = Path.Combine(root, "AppCache", "run-lock.txt");
+    if (!File.Exists(lockFile))
+        return false;
+    try
+    {
+        using var probe = File.Open(lockFile, FileMode.Open, FileAccess.Write, FileShare.None);
+        return false;
+    }
+    catch (IOException)
+    {
+        return true;
+    }
+}
 
 static void CopyDirectory(string source, string destination)
 {
