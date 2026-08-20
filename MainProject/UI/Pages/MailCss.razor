@@ -17,6 +17,10 @@
     string primary = AppColors.Primary.ToRgbaHex(true);
     string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
     string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+
+    // The window height minus the bottom-nav clearance and the screen's own padding: what a
+    // pinned column may occupy. Written once so the sidebar, the list and the reader floor agree.
+    string paneHeight = $"calc({AppMeasures.Viewport.Full}vh - {AppMeasures.Space.Px90 + AppMeasures.Space.Medium * 2}px)";
 }
 
 <style>
@@ -26,8 +30,12 @@
         gap: @(AppMeasures.Space.Medium)px;
         padding: @(AppMeasures.Space.Medium)px;
         box-sizing: border-box;
-        height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
-        min-height: 0;
+        /* min-height, NOT height: a message whose headers, rule traces and body add up to more
+           than the window makes the PAGE grow and scroll. Clipped to the window there was no
+           room left even to scroll - the body ended up a few pixels tall under the metadata. */
+        min-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+        /* Each column owns its height; stretched, the two left ones would follow the reader down. */
+        align-items: start;
     }
 
     /* ---- Sidebar ---- */
@@ -38,6 +46,11 @@
         gap: @(AppMeasures.Space.Px4)px;
         overflow-y: auto;
         min-height: 0;
+        /* Window-tall and pinned: the reader column can now run to several screens, and folders
+           you cannot reach without scrolling back up are worse than no folder rail at all. */
+        position: sticky;
+        top: @(AppMeasures.Space.Medium)px;
+        height: @paneHeight;
     }
 
     .mail-logo {
@@ -349,6 +362,10 @@
         flex-direction: column;
         gap: @(AppMeasures.Space.Px8)px;
         min-height: 0;
+        /* Pinned beside the growing reader, exactly like the sidebar. */
+        position: sticky;
+        top: @(AppMeasures.Space.Medium)px;
+        height: @paneHeight;
     }
 
     .mail-rows {
@@ -724,8 +741,9 @@
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Medium)px;
-        min-height: 0;
-        overflow-y: auto;
+        /* No inner scrollport. The column is as tall as the message needs and the page carries
+           it; a short message still fills the window because of the floor. */
+        min-height: @paneHeight;
     }
 
     .mail-reader-header {
@@ -788,14 +806,20 @@
         color: @textMuted;
     }
 
+    /* Grows to fill the window when the message is short, never shrinks below it when it is not. */
     .mail-reader-body {
-        flex: 1;
+        flex: 1 0 auto;
     }
 
     .mail-reader-frame {
         width: @(AppMeasures.Percent.Full)%;
-        flex: 1;
+        flex: 1 0 auto;
+        /* mail-reader.js replaces this with the message's own rendered height, so the mail opens
+           whole rather than scrolling inside a window-sized box. The bounds below hold either
+           way, and this stays the height wherever that script has not run. */
+        height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Size.Px320)px);
         min-height: @(AppMeasures.Size.Px300)px;
+        max-height: @(AppMeasures.Size.ReaderBodyMax)px;
         border: none;
         border-radius: @(AppMeasures.Radius.Medium)px;
         background: @AppColors.MailCanvas.Background;
@@ -1552,8 +1576,19 @@
     /* ---- Responsive: drop to two panes, then one ---- */
 
     @@media (max-width: @(AppMeasures.Breakpoint.TwoPane)px) {
+        /* Below this width the reader is a full-window overlay with its own scrollport, so the
+           screen has nothing left to grow for: it goes back to fitting the window exactly, and
+           the two panes back to sharing that height instead of being pinned inside it. */
         .mail-screen {
             grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
+            height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+            align-items: stretch;
+        }
+
+        .mail-sidebar,
+        .mail-list {
+            position: static;
+            height: auto;
         }
 
         .mail-reader {
@@ -1566,6 +1601,10 @@
             inset: 0;
             z-index: @(AppMeasures.ZLayer.Overlay);
             padding: @(AppMeasures.Space.Medium)px;
+            /* Pinned to the window here, so this one DOES need its own scrollport - the page
+               behind it cannot carry an overlay that is taller than the screen. */
+            overflow-y: auto;
+            min-height: 0;
             @((MarkupString)AppStyles.BuildAuroraBackground())
         }
     }

@@ -103,7 +103,10 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden;
+        /* No overflow here. A non-visible overflow on ONE axis turns the other into a scrollport
+           too, and this box never scrolls - it just grows - so every position:sticky inside it
+           was anchored to a scrollport that never moves. The viewport still clips sideways: the
+           body's overflow-x above propagates to it. */
     }
 
     .content {

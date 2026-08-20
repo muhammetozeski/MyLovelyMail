@@ -107,6 +107,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px400 = 400;
             public const int Px420 = 420;
 
+            /// <summary> How far the reader body may grow before it starts scrolling inside itself: the message opens whole, the page grows with it, and only a truly endless newsletter hits the ceiling. </summary>
+            public const int ReaderBodyMax = 1500;
+
             /// <summary> Height of the floating bottom navigation bar. Single source: the nav sets its height from this and the scroll bottom-inset reads it, so they can never drift apart. </summary>
             public const int BottomNavHeight = 70;
         }
