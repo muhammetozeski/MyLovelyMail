@@ -69,6 +69,11 @@
             <div class="filters-section-title">Actions</div>
             @foreach (var action in rule.Actions)
             {
+                @* A move target used to be free text. The user typed a folder name that was close
+                   but not the server's path, and the rule then failed on every single sync while
+                   still looking perfectly configured. The list is the account's real folders. *@
+                var choices = FolderChoicesFor(rule, action.Type);
+                bool missingTarget = choices.Count > 0 && action.Argument.Length > 0 && !choices.Contains(action.Argument);
                 <div class="filters-rowline">
                     <select class="filters-select" @bind="action.Type">
                         @foreach (var type in Enum.GetValues<FilterActionType>())
@@ -76,7 +81,30 @@
                             <option value="@type">@type</option>
                         }
                     </select>
-                    <input class="filters-input" placeholder="@ArgumentPlaceholder(action.Type)" @bind="action.Argument" />
+                    @if (IsMove(action.Type))
+                    {
+                        <select class="filters-select" @bind="action.Argument">
+                            <option value="">@ArgumentPlaceholder(action.Type)</option>
+                            @foreach (string choice in choices)
+                            {
+                                <option value="@choice">@choice</option>
+                            }
+                            @if (missingTarget)
+                            {
+                                <option value="@action.Argument">@action.Argument</option>
+                            }
+                        </select>
+                        @if (missingTarget)
+                        {
+                            <span class="filters-preview-warning" title="Every message this rule matches fails to move until the target exists">
+                                ⚠️ no folder named “@action.Argument”
+                            </span>
+                        }
+                    }
+                    else
+                    {
+                        <input class="filters-input" placeholder="@ArgumentPlaceholder(action.Type)" @bind="action.Argument" />
+                    }
                     <button class="filters-remove" @onclick="() => rule.Actions.Remove(action)">✕</button>
                 </div>
             }
@@ -186,12 +214,44 @@
 
     static string ArgumentPlaceholder(FilterActionType type) => type switch
     {
-        FilterActionType.MoveToRemoteFolder => "Server folder (e.g. Archive)",
-        FilterActionType.MoveToLocalFolder => "Local folder name",
+        FilterActionType.MoveToRemoteFolder => "— pick a server folder —",
+        FilterActionType.MoveToLocalFolder => "— pick a folder on this PC —",
         FilterActionType.SetNotificationSound => "Sound name or 'none'",
         FilterActionType.AddTag => "Tag name",
         _ => "(no argument needed)"
     };
+
+    static bool IsMove(FilterActionType type) =>
+        type is FilterActionType.MoveToRemoteFolder or FilterActionType.MoveToLocalFolder;
+
+    /// <summary>
+    /// The folders this action may name. For a rule bound to one account: that account's folders.
+    /// For a rule that applies to every account: only the paths ALL of them have, because a path
+    /// that exists on one server and not another is a move that fails silently everywhere else.
+    /// </summary>
+    static List<string> FolderChoicesFor(FilterRule rule, FilterActionType type)
+    {
+        if (!IsMove(type)) return [];
+
+        var accounts = rule.AccountId.Length > 0
+            ? AccountStore.Accounts.Where(a => a.Id == rule.AccountId).ToList()
+            : [.. AccountStore.Accounts];
+        if (accounts.Count == 0) return [];
+
+        bool wantsLocal = type == FilterActionType.MoveToLocalFolder;
+        List<HashSet<string>> perAccount = [.. accounts.Select(account =>
+            MessageStore.GetFolders(account.Id)
+                .Where(f => IsLocalFolder(f) == wantsLocal && f.Selectable)
+                .Select(f => wantsLocal ? f.FullName[MessageStore.LocalFolderPrefix.Length..] : f.FullName)
+                .ToHashSet(StringComparer.Ordinal))];
+
+        var shared = perAccount[0];
+        foreach (var other in perAccount.Skip(1)) shared.IntersectWith(other);
+        return [.. shared.OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    static bool IsLocalFolder(MailFolderData folder) =>
+        folder.IsLocal || folder.FullName.StartsWith(MessageStore.LocalFolderPrefix, StringComparison.Ordinal);
 
     static string Summarize(FilterRule rule) =>
         $"{rule.Conditions.Count} condition(s) → {string.Join(", ", rule.Actions.Select(a => a.Type))}" +
