@@ -593,11 +593,41 @@
                         <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
                     }
                     @* A rule that works leaves no other trace: mail simply arrives already-read,
-                       tagged, or missing from the folder it was addressed to. *@
-                    @foreach (var trace in ruleTrace)
+                       tagged, or missing from the folder it was addressed to. Folded to one line
+                       because the strip is a footnote — a rule that fired sixteen times is sixteen
+                       on a counter, not sixteen chips pushing the message off the screen. *@
+                    @if (ruleTraceLines.Count > 0)
                     {
-                        <button class="mail-rule-trace" title="Open the filter rules"
-                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>🧭 @trace.Action by “@trace.RuleName”</button>
+                        <div class="mail-rule-strip">
+                            <button class="mail-rule-trace mail-rule-summary" title="What the filter rules did to this message"
+                                    @onclick="() => ruleTraceExpanded = !ruleTraceExpanded">
+                                <span>🧭</span>
+                                <span class="mail-rule-lead">@RuleTraceLabel(ruleTraceLines[0])</span>
+                                @if (ruleTraceLines.Count > 1)
+                                {
+                                    <span class="mail-rule-count">+@(ruleTraceLines.Count - 1)</span>
+                                }
+                                <span class="mail-rule-name">@ruleTraceLines[0].RuleName</span>
+                                <span class="mail-rule-caret">@(ruleTraceExpanded ? "▴" : "▾")</span>
+                            </button>
+                            @if (ruleTraceExpanded)
+                            {
+                                <div class="mail-rule-rows">
+                                    @foreach (var line in ruleTraceLines)
+                                    {
+                                        <button class="mail-rule-trace mail-rule-row" title="Open the filter rules"
+                                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>
+                                            <span class="mail-rule-lead">@RuleTraceLabel(line)</span>
+                                            <span class="mail-rule-name">@line.RuleName</span>
+                                            @if (line.Count > 1)
+                                            {
+                                                <span class="mail-rule-count">×@line.Count</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
                     }
                     @if (unsubscribeTargets is { } unsubscribe)
                     {
