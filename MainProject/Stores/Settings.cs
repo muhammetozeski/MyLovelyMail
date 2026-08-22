@@ -1,3 +1,5 @@
+using MyLovelyMail.MainProject.DataModels.Mail;
+
 namespace MyLovelyMail.MainProject.Stores
 {
     /// <summary>How deleting a message behaves.</summary>
@@ -78,6 +80,23 @@ namespace MyLovelyMail.MainProject.Stores
         /// the local copy where it is, so this machine's filing can differ from the server's.
         /// </summary>
         public static readonly Setting<bool> MirrorRuleMovesLocally = new(true);
+
+        // ---- Which way each kind of folder syncs (see FolderSyncPolicy) ----
+
+        /// <summary>Inbox: new mail comes down, deletions and flags go up.</summary>
+        public static readonly Setting<FolderSyncDirection> InboxSync = new(FolderSyncDirection.TwoWay);
+
+        /// <summary>Drafts: written here, kept here. The server's drafts folder is listed but not fetched.</summary>
+        public static readonly Setting<FolderSyncDirection> DraftsSync = new(FolderSyncDirection.LocalOnly);
+
+        /// <summary>Sent: both ways — mail sent from another device belongs in this list too.</summary>
+        public static readonly Setting<FolderSyncDirection> SentSync = new(FolderSyncDirection.TwoWay);
+
+        /// <summary>Trash: both ways.</summary>
+        public static readonly Setting<FolderSyncDirection> TrashSync = new(FolderSyncDirection.TwoWay);
+
+        /// <summary>Every other folder — junk, archive, and the ones the user made.</summary>
+        public static readonly Setting<FolderSyncDirection> OtherFolderSync = new(FolderSyncDirection.TwoWay);
 
         /// <summary>Download attachments together with the message body instead of on first open.</summary>
         public static readonly Setting<bool> DownloadAttachmentsAutomatically = new(false);

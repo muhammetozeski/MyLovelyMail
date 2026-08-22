@@ -1,3 +1,4 @@
+using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Stores
@@ -24,6 +25,21 @@ namespace MyLovelyMail.MainProject.Stores
 
         /// <inheritdoc cref="Settings.MirrorRuleMovesLocally"/>
         public readonly InheritedSetting<bool> MirrorRuleMovesLocally = new(Settings.MirrorRuleMovesLocally);
+
+        /// <inheritdoc cref="Settings.InboxSync"/>
+        public readonly InheritedSetting<FolderSyncDirection> InboxSync = new(Settings.InboxSync);
+
+        /// <inheritdoc cref="Settings.DraftsSync"/>
+        public readonly InheritedSetting<FolderSyncDirection> DraftsSync = new(Settings.DraftsSync);
+
+        /// <inheritdoc cref="Settings.SentSync"/>
+        public readonly InheritedSetting<FolderSyncDirection> SentSync = new(Settings.SentSync);
+
+        /// <inheritdoc cref="Settings.TrashSync"/>
+        public readonly InheritedSetting<FolderSyncDirection> TrashSync = new(Settings.TrashSync);
+
+        /// <inheritdoc cref="Settings.OtherFolderSync"/>
+        public readonly InheritedSetting<FolderSyncDirection> OtherFolderSync = new(Settings.OtherFolderSync);
 
         /// <inheritdoc cref="Settings.DownloadAttachmentsAutomatically"/>
         public readonly InheritedSetting<bool> DownloadAttachmentsAutomatically = new(Settings.DownloadAttachmentsAutomatically);

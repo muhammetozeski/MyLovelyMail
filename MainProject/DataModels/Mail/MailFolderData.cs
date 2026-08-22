@@ -16,6 +16,25 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     }
 
     /// <summary>
+    /// Which side of a folder is allowed to change the other. Read through
+    /// <c>Services.Mail.FolderSyncPolicy</c>, which resolves it per role and per account.
+    /// </summary>
+    public enum FolderSyncDirection
+    {
+        /// <summary>Read the server; never write anything back to it.</summary>
+        ServerToLocal,
+
+        /// <summary>Push what happens here; never read the server's copy of this folder.</summary>
+        LocalToServer,
+
+        /// <summary>Both directions.</summary>
+        TwoWay,
+
+        /// <summary>Neither: the folder lives on this machine only.</summary>
+        LocalOnly
+    }
+
+    /// <summary>
     /// One mail folder of an account — either a server folder mirrored locally or a local-only
     /// folder created by the user/filters. Server identity is <see cref="FullName"/> (the IMAP
     /// path); sync state (<see cref="UidValidity"/>, <see cref="LastSeenUid"/>) lets incremental

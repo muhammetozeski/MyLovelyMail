@@ -454,6 +454,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </param>
         static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken, bool backgroundRefresh = false)
         {
+            // A folder the policy does not pull is never opened at all — that is what makes
+            // "drafts live on this machine" a rule rather than an accident of which code path ran.
+            if (!FolderSyncPolicy.PullsFromServer(account.Id, folder.FullName))
+            {
+                Log($"'{folder.FullName}' is not fetched from the server ({FolderSyncPolicy.For(account.Id, folder.FullName)}).");
+                return;
+            }
+
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
             var cached = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folder.FullName);

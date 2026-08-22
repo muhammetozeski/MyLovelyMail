@@ -202,6 +202,31 @@ namespace MyLovelyMail.MainProject.Storage
         public static MailMessageSummary? GetSummary(string accountId, string folderFullName, uint uid) =>
             GetIndex(accountId, folderFullName).Summaries.TryGetValue(uid, out var summary) ? summary : null;
 
+        /// <summary>
+        /// Messages whose local flag change is still on its way to the server, as
+        /// <see cref="FolderKey"/> + uid. Kept in RAM only: it describes an in-flight push, and a
+        /// push does not survive the process that started it.
+        /// </summary>
+        static readonly ConcurrentDictionary<string, byte> pendingFlagPushes = [];
+
+        static string PendingKey(string accountId, string folderFullName, uint uid) =>
+            FolderKey(accountId, folderFullName) + (char)31 + uid;
+
+        /// <summary>Remembers that these messages carry a local flag change the server has not been told about yet.</summary>
+        public static void MarkFlagPushPending(string accountId, string folderFullName, IEnumerable<uint> uids)
+        {
+            foreach (uint uid in uids) pendingFlagPushes[PendingKey(accountId, folderFullName, uid)] = 0;
+        }
+
+        /// <summary>The push landed (or gave up): the server's answer is authoritative again.</summary>
+        public static void ClearFlagPushPending(string accountId, string folderFullName, IEnumerable<uint> uids)
+        {
+            foreach (uint uid in uids) pendingFlagPushes.TryRemove(PendingKey(accountId, folderFullName, uid), out _);
+        }
+
+        /// <summary>Flags the SERVER owns. Everything else in <see cref="MailFlags"/> exists only here.</summary>
+        const MailFlags ServerOwnedFlags = MailFlags.Seen | MailFlags.Answered | MailFlags.Flagged | MailFlags.Deleted;
+
         /// <summary>Adds or replaces summaries, persists the index and notifies listeners.</summary>
         public static void UpsertSummaries(string accountId, string folderFullName, IEnumerable<MailMessageSummary> summaries)
         {
@@ -209,7 +234,14 @@ namespace MyLovelyMail.MainProject.Storage
             foreach (var summary in summaries)
             {
                 if (index.Summaries.TryGetValue(summary.Uid, out var stored) && !ReferenceEquals(stored, summary))
+                {
                     CarryOverLocalState(stored, summary);
+                    // A read/star the user just made, whose push has not landed: the server is
+                    // reporting the state from BEFORE the change, so letting its answer win would
+                    // flip the message back in front of the user who just changed it.
+                    if (pendingFlagPushes.ContainsKey(PendingKey(accountId, folderFullName, summary.Uid)))
+                        summary.Flags = summary.Flags & ~ServerOwnedFlags | stored.Flags & ServerOwnedFlags;
+                }
                 index.Summaries[summary.Uid] = summary;
             }
             SaveIndex(accountId, folderFullName, index);

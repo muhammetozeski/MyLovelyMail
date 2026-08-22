@@ -39,12 +39,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
             List<MailMessageSummary> changed = [.. summaries.Where(static s => s.IsUnread)];
             if (MessageStore.SetSeen(account.Id, folderFullName, changed, seen: true) == 0) return 0;
 
+            uint[] uids = [.. changed.Select(static s => s.Uid)];
+            MessageStore.MarkFlagPushPending(account.Id, folderFullName, uids);
             RunServerActionInBackground(account, folderFullName, $"Batched read push failed in '{folderFullName}'", LogLevel.Warning,
                 async (_, folder, ct) =>
                 {
-                    await folder.AddFlagsAsync([.. changed.Select(static s => new UniqueId(s.Uid))], MessageFlags.Seen, silent: true, ct);
+                    await folder.AddFlagsAsync([.. uids.Select(static uid => new UniqueId(uid))], MessageFlags.Seen, silent: true, ct);
                     Log($"Marked {changed.Count} messages read in '{folderFullName}' with one push.");
-                });
+                },
+                () => MessageStore.ClearFlagPushPending(account.Id, folderFullName, uids));
             return changed.Count;
         }
 
@@ -170,7 +173,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 });
         }
 
-        static void PushFlagInBackground(MailAccountData account, string folderFullName, uint uid, MessageFlags flag, bool add) =>
+        static void PushFlagInBackground(MailAccountData account, string folderFullName, uint uid, MessageFlags flag, bool add)
+        {
+            // Held from the click until the server has been told: a sync landing in between reports
+            // the state from before the change, and without this it would win.
+            MessageStore.MarkFlagPushPending(account.Id, folderFullName, [uid]);
             RunServerActionInBackground(account, folderFullName, $"Flag push failed for uid {uid}", LogLevel.Warning,
                 async (_, folder, ct) =>
                 {
@@ -178,23 +185,38 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         await folder.AddFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
                     else
                         await folder.RemoveFlagsAsync(new UniqueId(uid), flag, silent: true, ct);
-                });
+                },
+                () => MessageStore.ClearFlagPushPending(account.Id, folderFullName, [uid]));
+        }
 
         /// <summary>
         /// The shared fire-and-forget server push: skips POP3 and local folders, opens the folder
         /// ReadWrite under the resilience pipeline, runs the action, logs failures with the given
         /// context. Both Delete and flag pushes go through here so the guard logic exists once.
         /// </summary>
+        /// <param name="whenSettled">Runs after the push finished, succeeded or not, and after the
+        /// policy gate refused it — anything held for the duration of the push is released here.</param>
         static void RunServerActionInBackground(MailAccountData account, string folderFullName, string failContext,
-            LogLevel failLevel, Func<ImapClient, IMailFolder, CancellationToken, Task> action)
+            LogLevel failLevel, Func<ImapClient, IMailFolder, CancellationToken, Task> action, Action? whenSettled = null)
         {
             if (account.Protocol != IncomingProtocol.Imap || folderFullName.StartsWith(MessageStore.LocalFolderPrefix))
+            {
+                whenSettled?.Invoke();
                 return;
+            }
 
             _ = Task.Run(async () =>
             {
                 try
                 {
+                    // The one gate every local-to-server write passes through. Read inside the task
+                    // because it walks the folder list, and this is called straight off a click.
+                    if (!FolderSyncPolicy.PushesToServer(account.Id, folderFullName))
+                    {
+                        Log($"'{folderFullName}' does not push to the server ({FolderSyncPolicy.For(account.Id, folderFullName)}); the change stays local.");
+                        return;
+                    }
+
                     await ResiliencePolicy.RunNetwork(async ct =>
                     {
                         using var client = await MailConnections.OpenImapAsync(account, ct);
@@ -207,6 +229,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 catch (Exception ex)
                 {
                     Log($"{failContext}: {ex.Message}", failLevel);
+                }
+                finally
+                {
+                    whenSettled?.Invoke();
                 }
             });
         }
