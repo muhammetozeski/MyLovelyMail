@@ -53,6 +53,9 @@
         height: @(AppMeasures.Size.Px180)px;
         border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
         border-radius: @(AppMeasures.Radius.Medium)px;
+        /* Without this the padding and border ride on top of the 280px basis, the pair no longer
+           fits the card, and the two panes stack instead of sitting side by side. */
+        box-sizing: border-box;
     }
 
     /* Monospace, tabs that indent rather than move focus away: this box holds code. */
