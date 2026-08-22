@@ -33,6 +33,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
         [GeneratedRegex(@"\n{3,}")]
         private static partial Regex ExtraBlankLines();
 
+        [GeneratedRegex(@"<script[\s\S]*?</script\s*>|<script[^>]*/>", RegexOptions.IgnoreCase)]
+        private static partial Regex ScriptBlocks();
+
+        [GeneratedRegex(@"\son\w+\s*=\s*(""[^""]*""|'[^']*'|[^\s>]+)", RegexOptions.IgnoreCase)]
+        private static partial Regex EventAttributes();
+
+        [GeneratedRegex(@"(href|src|action)\s*=\s*([""']?)\s*javascript:[^""'>\s]*\2", RegexOptions.IgnoreCase)]
+        private static partial Regex JavascriptUrls();
+
         /// <summary>True when the stored value is HTML rather than a line of plain text.</summary>
         public static bool IsHtml(string signature) => signature.Contains('<');
 
@@ -62,6 +71,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return ExtraBlankLines().Replace(text, "\n\n").Trim();
         }
 
+        /// <summary>
+        /// The signature as it leaves in a message. The preview runs whatever the user wrote,
+        /// including script — that is their own page in their own app. What goes out is a
+        /// different question: no mail program runs script in a delivered message, so a script tag
+        /// can only ever cost the message a spam score. The markup and the CSS go as written.
+        /// </summary>
+        public static string ToOutgoingHtml(string signature)
+        {
+            string html = ToHtml(signature);
+            if (html.Length == 0) return html;
+            html = ScriptBlocks().Replace(html, string.Empty);
+            html = EventAttributes().Replace(html, string.Empty);
+            return JavascriptUrls().Replace(html, "$1=$2about:blank$2");
+        }
+
         /// <summary>The block the compose pane puts in the body: delimiter plus the readable signature.</summary>
         public static string PlainBlock(string signature) =>
             signature.Length == 0 ? string.Empty : Delimiter + ToPlainText(signature);
@@ -83,7 +107,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             string before = text[..at];
             string after = text[(at + block.Length)..];
             string html = TextToHtml(before)
-                + $"<div style=\"margin-top:1em\">{ToHtml(signature)}</div>"
+                + $"<div style=\"margin-top:1em\">{ToOutgoingHtml(signature)}</div>"
                 + TextToHtml(after);
             return (text, html);
         }
