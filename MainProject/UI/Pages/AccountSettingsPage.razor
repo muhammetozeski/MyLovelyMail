@@ -55,13 +55,24 @@
             </div>
         </GlassCard>
 
+        @* Inherits exactly like every other account setting, but it gets its own card: a
+           signature is written, and a one-line override row cannot hold an editor and a preview. *@
+        <GlassCard CustomClass="settings-section">
+            <SignatureEditor Value="@AccountSettingsOf.Signature.Value"
+                             BadgeText="@(AccountSettingsOf.Signature.IsOverridden ? "overridden" : "inherited")"
+                             Inherited="@(!AccountSettingsOf.Signature.IsOverridden)"
+                             Hint="Follows the global signature until you write one here"
+                             ValueChanged="@SaveAccountSignature"
+                             OnReset="@ResetAccountSignature" />
+        </GlassCard>
+
         <GlassCard CustomClass="settings-section">
             <div class="settings-section-title">🧬 Account overrides</div>
             <p class="settings-empty-text">
                 Each setting follows the global value until you change it here. "Inherited" rows update
                 live when the global setting changes; overridden rows keep their own value.
             </p>
-            @foreach (var setting in AccountSettingsOf.GetAllSettings())
+            @foreach (var setting in AccountSettingsOf.GetAllSettings().Where(SettingHasItsOwnCard))
             {
                 <SettingEditorRow Setting="@setting"
                                   BadgeText="@(setting.IsDefault ? "inherited" : "overridden")"
@@ -85,6 +96,22 @@
 
     MailAccountData? Account => AccountStore.GetById(AccountId);
     AccountSettings AccountSettingsOf => AccountStore.GetSettings(AccountId);
+
+    /// <summary>Written with nameof so renaming the field breaks the build instead of showing the signature twice.</summary>
+    static bool SettingHasItsOwnCard(ISetting setting) =>
+        setting.Key != nameof(AccountSettings.Signature);
+
+    void SaveAccountSignature(string value)
+    {
+        AccountSettingsOf.Signature.Value = value;
+        AccountSettingsOf.Save();
+    }
+
+    void ResetAccountSignature()
+    {
+        AccountSettingsOf.Signature.ClearOverride();
+        AccountSettingsOf.Save();
+    }
 
     public static string RouteFor(string accountId) => $"/Settings/Account/{accountId}";
 

@@ -124,15 +124,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
             try { File.Delete(path); } catch { /* stage cleanup is best-effort */ }
         }
 
-        /// <summary>RFC 3676 signature delimiter; mail clients fold everything under it.</summary>
-        const string SignatureDelimiter = "\n\n-- \n";
+        /// <summary>The signature as stored for this account — HTML when the user wrote HTML.</summary>
+        static string SignatureOf(MailAccountData account) => AccountStore.GetSettings(account.Id).Signature.Value;
 
-        /// <summary>The account's signature block, or empty when no signature is configured.</summary>
-        static string SignatureBlock(MailAccountData account)
-        {
-            string signature = AccountStore.GetSettings(account.Id).Signature.Value;
-            return signature.Length == 0 ? string.Empty : SignatureDelimiter + signature;
-        }
+        /// <summary>
+        /// The readable signature block the compose box shows. The box is a textarea, so what goes
+        /// into the body is the signature's text; the HTML itself is attached at send time, in this
+        /// same position (see <see cref="SignatureService.Compose"/>).
+        /// </summary>
+        static string SignatureBlock(MailAccountData account) => SignatureService.PlainBlock(SignatureOf(account));
 
         public static ComposeDraft BuildNew(MailAccountData account) =>
             new() { Account = account, Body = SignatureBlock(account) };
@@ -154,19 +154,23 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             if (draft.Account is not { } previous || previous.Id == next.Id) return;
 
-            draft.Body = SignatureBlock(next) + StripSignature(draft.Body);
+            draft.Body = SignatureBlock(next) + StripSignature(draft, previous);
             MessageStore.RemoveMessages(previous.Id, LocalDraftsFullName, [DraftUid(draft)]);
             draft.Account = next;
             SaveDraft(draft);
             Log($"Draft {draft.DraftId} now sends from {next.EmailAddress} (was {previous.EmailAddress}).");
         }
 
-        /// <summary>Drops the leading signature block, keeping everything the user typed under it.</summary>
-        static string StripSignature(string body)
+        /// <summary>
+        /// Drops the leading signature block, keeping everything the user typed under it. Removes
+        /// the WHOLE block: reading to the first newline lost only the first line of a signature
+        /// with more than one, and left the rest sitting above the new account's.
+        /// </summary>
+        static string StripSignature(ComposeDraft draft, MailAccountData previous)
         {
-            if (!body.StartsWith(SignatureDelimiter, StringComparison.Ordinal)) return body;
-            int end = body.IndexOf('\n', SignatureDelimiter.Length);
-            return end < 0 ? string.Empty : body[(end + 1)..];
+            string block = SignatureBlock(previous);
+            if (block.Length == 0 || !draft.Body.StartsWith(block, StringComparison.Ordinal)) return draft.Body;
+            return draft.Body[block.Length..];
         }
 
         public static ComposeDraft BuildReply(MailAccountData account, string folderFullName, MailMessageSummary summary, bool replyAll)
@@ -319,7 +323,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 message.Cc.AddRange(InternetAddressList.Parse(draft.Cc));
             message.Subject = draft.Subject;
 
-            var builder = new BodyBuilder { TextBody = draft.Body };
+            // An html part is added only when the signature actually contributes one. A message
+            // with no signature — or one the user deleted out of this draft — stays plain text,
+            // exactly as it was before signatures could be HTML.
+            var (bodyText, bodyHtml) = SignatureService.Compose(draft.Body, SignatureOf(account));
+            var builder = new BodyBuilder { TextBody = bodyText };
+            if (bodyHtml != null) builder.HtmlBody = bodyHtml;
             foreach (string path in draft.AttachmentPaths.Where(File.Exists))
                 await builder.Attachments.AddAsync(path, cancellationToken);
             message.Body = builder.ToMessageBody();

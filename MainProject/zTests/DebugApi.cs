@@ -320,6 +320,58 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // The signature in all three of its shapes at once: what is stored, what goes out
+                // as html, and what goes out as text. Without an accountId these read and write
+                // the global value; with one they read and write that account's override.
+                case ("GET", "/signature"):
+                {
+                    string accountId = query["accountId"] ?? string.Empty;
+                    string stored = accountId.Length > 0
+                        ? AccountStore.GetSettings(accountId).Signature.Value
+                        : GlobalSettings.Signature.Value;
+                    return new
+                    {
+                        accountId,
+                        stored,
+                        isHtml = SignatureService.IsHtml(stored),
+                        overridden = accountId.Length > 0 && AccountStore.GetSettings(accountId).Signature.IsOverridden,
+                        html = SignatureService.ToHtml(stored),
+                        plainText = SignatureService.ToPlainText(stored),
+                        plainBlock = SignatureService.PlainBlock(stored)
+                    };
+                }
+
+                case ("POST", "/signature"):
+                {
+                    using var reader = new StreamReader(request.InputStream);
+                    string value = await reader.ReadToEndAsync();
+                    string accountId = query["accountId"] ?? string.Empty;
+                    if (accountId.Length > 0)
+                    {
+                        var settings = AccountStore.GetSettings(accountId);
+                        if (query["reset"] == "true") settings.Signature.ClearOverride();
+                        else settings.Signature.Value = value;
+                        settings.Save();
+                    }
+                    else
+                    {
+                        GlobalSettings.Signature.Set(value);
+                        SettingsManager.SaveSettings();
+                    }
+                    return new { saved = true, accountId, length = value.Length };
+                }
+
+                // Exactly what the send path will put in the two parts of the message, without
+                // sending anything.
+                case ("GET", "/compose/preview"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    string signature = AccountStore.GetSettings(account.Id).Signature.Value;
+                    string body = query["body"] ?? SignatureService.PlainBlock(signature);
+                    var (text, html) = SignatureService.Compose(body, signature);
+                    return new { text, html, multipart = html != null };
+                }
+
                 // The server's list, not the cache's. "Which folders is the app missing" cannot be
                 // answered from one side alone, and it turned out the app was missing several.
                 case ("GET", "/folders/server"):
