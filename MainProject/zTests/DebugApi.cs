@@ -320,6 +320,39 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // Evaluates one expression in the page. Scrolling something into view before a
+                // snapshot, reading a computed style, checking whether a script ran — all of it is
+                // one call instead of a new endpoint each time.
+                case ("POST", "/dom/script"):
+                {
+                    using var scriptReader = new StreamReader(request.InputStream);
+                    string? value = await RenderedPageProbe.RunScriptAsync(await scriptReader.ReadToEndAsync());
+                    return new { value };
+                }
+
+                // Clicks an element IN THE DOM. No cursor moves and no window takes focus, so a
+                // control that only exists once it is opened — an expander, a menu — can be
+                // audited on a machine somebody is working on.
+                case ("POST", "/dom/click"):
+                {
+                    string selector = JsonSerializer.Serialize(RequireQueryValue(query, "selector"));
+                    string? result = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';e.click();return 'clicked';}})()");
+                    return new { result };
+                }
+
+                // Dispatches a real mouse event on an element — the only way to exercise the
+                // side-button script itself rather than the C# it ends up calling.
+                case ("POST", "/dom/mouse"):
+                {
+                    string selector = JsonSerializer.Serialize(RequireQueryValue(query, "selector"));
+                    int button = int.TryParse(query["button"], out int parsedButton) ? parsedButton : 3;
+                    string? result = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';"
+                        + $"e.dispatchEvent(new MouseEvent('auxclick',{{button:{button},bubbles:true,cancelable:true}}));return 'dispatched';}})()");
+                    return new { result, button };
+                }
+
                 // Fires a side-button action without a mouse, so the behavior is testable without
                 // touching the cursor on a machine the user is sitting at.
                 case ("POST", "/mouse"):
@@ -390,10 +423,20 @@ namespace MyLovelyMail.MainProject.ZTests
                 // is the shape of the bug this endpoint exists to make impossible to miss.
                 case ("GET", "/folders/roles"):
                 {
-                    var folders = MessageStore.GetFolders(RequireQueryValue(query, "accountId"));
+                    string rolesAccountId = RequireQueryValue(query, "accountId");
+                    var folders = MessageStore.GetFolders(rolesAccountId);
                     return new
                     {
-                        folders = folders.Select(static f => new { f.FullName, f.DisplayName, Role = f.Role.ToString(), f.Selectable, f.IsLocal, f.TotalCount }),
+                        folders = folders.Select(f => new
+                        {
+                            f.FullName,
+                            f.DisplayName,
+                            Role = f.Role.ToString(),
+                            Direction = FolderSyncPolicy.For(rolesAccountId, f.FullName).ToString(),
+                            f.Selectable,
+                            f.IsLocal,
+                            f.TotalCount
+                        }),
                         duplicateRoles = folders
                             .Where(static f => f.Role != FolderRole.None)
                             .GroupBy(static f => f.Role)
@@ -950,8 +993,9 @@ namespace MyLovelyMail.MainProject.ZTests
                     string folder = ReadFolder(query);
                     string searchQuery = query["query"] ?? string.Empty;
                     // Always through the matcher, exactly like the list page: an empty query is not
-                    // "no filtering" — it is still what hides snoozed mail.
-                    var matcher = SearchService.BuildMatcher(searchQuery);
+                    // "no filtering" — it is still what hides snoozed mail. The account goes with
+                    // it, because "to:" means mail THIS account sent.
+                    var matcher = SearchService.BuildMatcher(searchQuery, accountId);
                     return MessageStore.GetSummaries(accountId, folder)
                         .Where(matcher)
                         .Take(ReadTake(query, 20))
