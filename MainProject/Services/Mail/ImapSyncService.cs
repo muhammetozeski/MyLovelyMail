@@ -338,7 +338,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 lastSeenUid = 0;
             }
 
-            int newCount = 0;
             uint maxUid = lastSeenUid;
             // Backfilled from the cache when the field is missing, so folders filled before this
             // existed get a floor without a re-sync.
@@ -373,20 +372,31 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     if (!item.UniqueId.IsValid) continue;
                     summaries.Add(ToSummary(item));
                     maxUid = Math.Max(maxUid, item.UniqueId.Id);
-                    if (item.UniqueId.Id > lastSeenUid) newCount++;
                 }
             }
-            Log($"IMAP folder '{folder.FullName}': fetched {summaries.Count} summaries ({newCount} new), server count {folder.Count}");
+
+            // "Fetched" is not "arrived". An IMAP range of <lastSeenUid+1>:* ALWAYS returns the
+            // last message in the mailbox, even when its uid is below the range (RFC 3501), so a
+            // folder with nothing new still hands back one summary. Gating the rule pass on
+            // summaries.Count meant the newest message was re-processed on every single sync: the
+            // audit collected sixteen copies of the same four actions, mark-read/mute/sound were
+            // re-applied forever, and a move whose target folder does not exist was retried 48
+            // times in one session. Everything that must happen once per arrival hangs off THIS
+            // list; nothing hangs off `summaries`.
+            List<MailMessageSummary> arrived = lastSeenUid == 0
+                ? []
+                : [.. summaries.Where(s => s.Uid > lastSeenUid)];
+            Log($"IMAP folder '{folder.FullName}': fetched {summaries.Count} summaries ({arrived.Count} new), server count {folder.Count}");
 
             // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
             RuleProcessResult? ruleResult = null;
-            if (lastSeenUid > 0 && summaries.Count > 0 && !backgroundRefresh)
+            if (arrived.Count > 0 && !backgroundRefresh)
             {
                 // Before the rules: a reply to a muted conversation must never reach the
                 // notification check as a normal arrival.
-                MuteService.ApplyToIncoming(summaries);
-                ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, summaries);
-                MessageStore.UpsertSummaries(account.Id, folder.FullName, summaries);
+                MuteService.ApplyToIncoming(arrived);
+                ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, arrived);
+                MessageStore.UpsertSummaries(account.Id, folder.FullName, arrived);
             }
 
             if (ruleResult != null)
@@ -407,9 +417,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 UnreadCount = folder.Unread
             });
 
-            if (newCount > 0 && lastSeenUid > 0 && !backgroundRefresh)
+            if (arrived.Count > 0 && !backgroundRefresh)
             {
-                var arrived = summaries.Where(s => s.Uid > lastSeenUid).ToList();
                 NotificationService.NotifyNewMessages(account, folder.FullName, arrived);
                 await PrefetchAttachmentBodiesAsync(account, folder.FullName, arrived, cancellationToken);
             }
