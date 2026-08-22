@@ -349,6 +349,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return found;
         }
 
+        /// <summary>
+        /// Accounts whose server refused to create a folder, as accountId + role. A server that
+        /// answers "Folders are not supported" will answer that every time, and a failing operation
+        /// repeated once per sync forever is exactly the pattern the rule-move retry storm was.
+        /// Kept for the life of the process, so restarting the app tries again.
+        /// </summary>
+        static readonly HashSet<string> refusedFolderCreations = [];
+
         /// <summary>Creates the standard folders the account has no holder for, and appends them to the list.</summary>
         static async Task CreateMissingRequiredFoldersAsync(MailAccountData account, ImapClient client,
             List<IMailFolder> folders, CancellationToken cancellationToken)
@@ -364,6 +372,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             foreach (var (role, name) in RequiredFolders)
             {
                 if (held.Contains(role)) continue;
+                string refusalKey = $"{account.Id}/{role}";
+                lock (refusedFolderCreations)
+                    if (refusedFolderCreations.Contains(refusalKey)) continue;
+
                 try
                 {
                     var created = await parent.CreateAsync(name, isMessageFolder: true, cancellationToken);
@@ -372,7 +384,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
                 catch (Exception ex)
                 {
-                    Log($"Could not create a {role} folder on {account.EmailAddress}: {ex.Message}", LogLevel.Warning);
+                    lock (refusedFolderCreations) refusedFolderCreations.Add(refusalKey);
+                    Log($"Could not create a {role} folder on {account.EmailAddress}: {ex.Message} — not asked again this run.", LogLevel.Warning);
                 }
             }
         }
