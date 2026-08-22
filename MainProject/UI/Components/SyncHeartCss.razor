@@ -1,4 +1,4 @@
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
 
 <style>
     .sync-heart {
@@ -20,7 +20,7 @@
         height: @(AppMeasures.Size.Px14)px;
         background: @AppColors.Primary.ToRgbaHex(true);
         transform: rotate(45deg);
-        filter: drop-shadow(0 0 4px @AppColors.Primary.WithAlpha(0.45f).ToRgbaHex(true));
+        filter: drop-shadow(0 0 @(AppMeasures.Space.Px4)px @AppColors.Primary.WithAlpha(0.45f).ToRgbaHex(true));
         transition: filter @(AppMeasures.Duration.Normal)s ease;
     }
 
@@ -44,11 +44,11 @@
 
     .sync-heart--beating .sync-heart-shape {
         animation: sync-heartbeat @(AppMeasures.Duration.Long)s ease-in-out infinite;
-        filter: drop-shadow(0 0 8px @AppColors.Primary.WithAlpha(0.8f).ToRgbaHex(true));
+        filter: drop-shadow(0 0 @(AppMeasures.Space.Px8)px @AppColors.Primary.WithAlpha(0.8f).ToRgbaHex(true));
     }
 
     .sync-heart:hover .sync-heart-shape {
-        filter: drop-shadow(0 0 8px @AppColors.Primary.WithAlpha(0.7f).ToRgbaHex(true));
+        filter: drop-shadow(0 0 @(AppMeasures.Space.Px8)px @AppColors.Primary.WithAlpha(0.7f).ToRgbaHex(true));
     }
 
     @@keyframes sync-heartbeat {

@@ -1,8 +1,13 @@
+using System.Globalization;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace MyLovelyMail.MainProject.Stores
 {
-    /// <summary>Read-only view of a setting (value as object, plus its keys).</summary>
+    /// <summary>
+    /// The type-agnostic view a settings editor works against: the value as an object, the keys,
+    /// and the two writes an editor needs.
+    /// </summary>
     public interface ISetting
     {
         string Key { get; }
@@ -11,6 +16,15 @@ namespace MyLovelyMail.MainProject.Stores
         object DefaultValue { get; }
         bool IsDefault { get; }
         void ResetToDefault();
+
+        /// <summary>
+        /// Parses <paramref name="text"/> and assigns it ONLY when the parse succeeds, returning
+        /// whether it did. This is the editor's write path, deliberately separate from
+        /// <see cref="ISettingSetup.LoadFromStr"/>: the file loader must always end up with a
+        /// usable value, so it falls back to the default, while an editor must leave a setting
+        /// alone when the typed text is not a value at all.
+        /// </summary>
+        bool TrySetFromText(string text);
     }
 
     /// <summary>Setup contract used exclusively by the settings stores (key assignment + persistence).</summary>
@@ -20,6 +34,35 @@ namespace MyLovelyMail.MainProject.Stores
         void InitializeKey(string key);
         void LoadFromStr(string value);
         string Serialize();
+    }
+
+    static class SettingRegistration
+    {
+        /// <summary>
+        /// The one reflection pass both settings stores run at construction: every public
+        /// Setting/InheritedSetting field gets its field name as key and lands in the two lookup
+        /// dictionaries the store uses for file I/O (<paramref name="setups"/>) and for the
+        /// settings UI (<paramref name="settings"/>).
+        /// </summary>
+        /// <param name="ownerType">Type whose fields are scanned (typeof(Settings), or the AccountSettings instance's type).</param>
+        /// <param name="instance">Owning object for instance fields; null scans static fields.</param>
+        /// <param name="setups">Filled with every discovered setting, keyed by field name.</param>
+        /// <param name="settings">Filled with the subset that also implements <see cref="ISetting"/>.</param>
+        internal static void RegisterFields(Type ownerType, object? instance,
+            Dictionary<string, ISettingSetup> setups, Dictionary<string, ISetting> settings)
+        {
+            var bindingFlags = BindingFlags.Public | (instance == null ? BindingFlags.Static : BindingFlags.Instance);
+            foreach (var field in ownerType.GetFields(bindingFlags))
+            {
+                if (field.GetValue(instance) is ISettingSetup setupSetting)
+                {
+                    setupSetting.InitializeKey(field.Name);
+                    setups.Add(field.Name, setupSetting);
+                    if (setupSetting is ISetting setting)
+                        settings[field.Name] = setting;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -73,6 +116,14 @@ namespace MyLovelyMail.MainProject.Stores
 
         void ISettingSetup.LoadFromStr(string value) => Value = ParseOrDefault(value, DefaultValue, Key);
 
+        /// <summary>Goes through <see cref="Set"/>, so an editor's write raises <see cref="OnChanged"/>.</summary>
+        public bool TrySetFromText(string text)
+        {
+            if (!TryParse(text, out T parsed)) return false;
+            Set(parsed);
+            return true;
+        }
+
         string ISettingSetup.Serialize() => SerializeValue(Value);
 
         public static implicit operator T(Setting<T> setting) => setting.Value;
@@ -80,23 +131,32 @@ namespace MyLovelyMail.MainProject.Stores
         internal static string SerializeValue(T? value) => value switch
         {
             bool b => b.ToString(),
-            IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
             _ => value?.ToString() ?? string.Empty
         };
 
-        internal static T ParseOrDefault(string text, T fallback, string keyForLog)
+        /// <summary>The one parse both paths share; false means the text is not a T at all.</summary>
+        internal static bool TryParse(string text, out T value)
         {
             try
             {
-                if (typeof(T).IsEnum)
-                    return (T)Enum.Parse(typeof(T), text, ignoreCase: true);
-                return (T)Convert.ChangeType(text, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+                value = typeof(T).IsEnum
+                    ? (T)Enum.Parse(typeof(T), text, ignoreCase: true)
+                    : (T)Convert.ChangeType(text, typeof(T), CultureInfo.InvariantCulture);
+                return true;
             }
             catch
             {
-                Log($"Config: invalid {typeof(T).Name} for '{keyForLog}': '{text}'. Using default.", LogLevel.Warning);
-                return fallback;
+                value = default!;
+                return false;
             }
+        }
+
+        internal static T ParseOrDefault(string text, T fallback, string keyForLog)
+        {
+            if (TryParse(text, out T parsed)) return parsed;
+            Log($"Config: invalid {typeof(T).Name} for '{keyForLog}': '{text}'. Using default.", LogLevel.Warning);
+            return fallback;
         }
 
         internal static string SplitCamelCase(string value) =>
@@ -165,6 +225,19 @@ namespace MyLovelyMail.MainProject.Stores
 
         void ISettingSetup.LoadFromStr(string value) =>
             Value = Setting<T>.ParseOrDefault(value, Parent.DefaultValue, Key);
+
+        /// <summary>
+        /// Assigns only on a successful parse. Going through LoadFromStr instead was destructive
+        /// here in a way it is not on a plain Setting: the fallback runs through the Value setter,
+        /// which sets IsOverridden, so one unparseable keystroke ended inheritance and pinned the
+        /// account to the shipped default -- silently, and looking exactly like a deliberate choice.
+        /// </summary>
+        public bool TrySetFromText(string text)
+        {
+            if (!Setting<T>.TryParse(text, out T parsed)) return false;
+            Value = parsed;
+            return true;
+        }
 
         string ISettingSetup.Serialize() => Setting<T>.SerializeValue(Value);
 

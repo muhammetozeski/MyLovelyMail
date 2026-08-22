@@ -1,3 +1,5 @@
+using MyLovelyMail.MainProject.Constants;
+
 namespace MyLovelyMail.MainProject.Storage
 {
     /// <summary>
@@ -10,7 +12,7 @@ namespace MyLovelyMail.MainProject.Storage
     /// </summary>
     public static class AppPaths
     {
-        public const string RootFolderName = "MyLovelyMail";
+        public const string RootFolderName = AppConstants.AppName;
         public const string AppFolderName = "AppData";
         public const string UserDataFolderName = "UserData";
         public const string UserCacheFolderName = "UserCache";

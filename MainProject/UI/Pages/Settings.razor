@@ -15,14 +15,58 @@
                 <button class="settings-theme @(ThemeManager.Current == theme ? "settings-theme--active" : "")"
                         style="@ThemePreviewStyle(theme)"
                         @onclick="() => ApplyTheme(theme)">
-                    <span class="settings-theme-name" style="color:@theme.TextPrimary.ToRgbaHex(true)">@theme.Name</span>
-                    <span class="settings-theme-dots">
-                        <span class="settings-theme-dot" style="background:@theme.Primary.ToRgbaHex(true)"></span>
-                        <span class="settings-theme-dot" style="background:@theme.Secondary.ToRgbaHex(true)"></span>
-                        <span class="settings-theme-dot" style="background:@theme.Accent.ToRgbaHex(true)"></span>
+                    <span class="settings-theme-mini">
+                        <span class="settings-theme-mini-sidebar" style="background:@theme.Primary.WithAlpha(0.8f).ToRgbaHex(true)"></span>
+                        <span class="settings-theme-mini-list">
+                            <span class="settings-theme-mini-row" style="background:@theme.SurfaceStrong.ToRgbaHex(true)">
+                                <span class="settings-theme-mini-unread" style="background:@theme.Accent.ToRgbaHex(true)"></span>
+                            </span>
+                            <span class="settings-theme-mini-row" style="background:@theme.SurfaceNormal.ToRgbaHex(true)"></span>
+                            <span class="settings-theme-mini-row" style="background:@theme.Secondary.WithAlpha(0.35f).ToRgbaHex(true)"></span>
+                        </span>
                     </span>
+                    <span class="settings-theme-name" style="color:@theme.TextPrimary.ToRgbaHex(true)">@theme.Name</span>
                 </button>
             }
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Follow the Windows theme</span>
+                <span class="settings-row-hint">Picks the light or dark palette automatically instead of the one chosen above</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FollowSystemTheme.Value" CheckedChanged="@SetFollowSystemTheme" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Follow the Windows animation setting</span>
+                <span class="settings-row-hint">Takes the answer below from Windows instead of the switch</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FollowSystemMotion.Value" CheckedChanged="@SetFollowSystemMotion" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Calm motion</span>
+                <span class="settings-row-hint">Stops the looping animations — the aurora, the sync heart and the pulses</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.ReduceMotion.Value"
+                        Disabled="@GlobalSettings.FollowSystemMotion.Value"
+                        CheckedChanged="@SetReduceMotion" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Interface scale (%)</span>
+                <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.UiScalePercent.Value.ToString()" ValueChanged="@SetUiScale" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Unread count badges</span>
+                <span class="settings-row-hint">Shows the number of unread messages on accounts and folders</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.ShowUnreadBadge.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.ShowUnreadBadge, v))" />
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
@@ -88,10 +132,64 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Other folders refreshed per sync</span>
+                <span class="settings-row-hint">Keeps folders you rarely open findable by search; 0 syncs the inbox only</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.BackgroundFolderRefreshCount.Value.ToString()" ValueChanged="@SetBackgroundFolderRefresh" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Instant push (IMAP IDLE)</span>
                 <span class="settings-row-hint">Keep a live connection so mail arrives immediately</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.UseImapIdle.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.UseImapIdle, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">📖 Reading</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Fold quoted history</span>
+                <span class="settings-row-hint">Collapses the older thread under a "Show quoted text" line in the reader</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.FoldQuotedText.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.FoldQuotedText, v))" />
+        </div>
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">✍️ Composing</div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Quote the original in replies</span>
+                <span class="settings-row-hint">Trimmed keeps the head and drops the history the message was already carrying</span>
+            </div>
+            <div class="settings-density">
+                @foreach (var style in Enum.GetValues<QuoteStyle>())
+                {
+                    <button class="settings-density-option @(GlobalSettings.ReplyQuoteStyle.Value == style ? "settings-density-option--on" : "")"
+                            @onclick="() => SetAndSave(GlobalSettings.ReplyQuoteStyle, style)">@style</button>
+                }
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Signature</span>
+                <span class="settings-row-hint">Added under new messages and above the quoted text in replies; empty = none</span>
+            </div>
+        </div>
+        <textarea class="settings-signature" placeholder="Your name&#10;you@example.com"
+                  @bind="SignatureText" @bind:event="oninput" @onblur="SaveSignature"></textarea>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Undo send window (seconds)</span>
+                <span class="settings-row-hint">A sent message waits this long behind an Undo bar; 0 sends immediately</span>
+            </div>
+            <div class="settings-number">
+                <CoreInput Type="number" Value="@GlobalSettings.UndoSendSeconds.Value.ToString()" ValueChanged="@SetUndoSendSeconds" />
+            </div>
         </div>
     </GlassCard>
 
@@ -188,6 +286,19 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🗄️ Everything else</div>
+        <p class="settings-empty-text">
+            Registered settings without a card of their own above. They are edited raw — the name is
+            the field name — but they are reachable, and a setting added later shows up here by
+            itself instead of shipping invisible.
+        </p>
+        @foreach (var setting in UncardedSettings)
+        {
+            <SettingEditorRow Setting="@setting" OnSaved="@SettingsManager.SaveSettings" />
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">👤 Accounts</div>
         @if (AccountStore.Accounts.Count == 0)
         {
@@ -203,8 +314,11 @@
                             <span class="settings-account-dot" style="background:@account.ColorHex"></span>
                             @account.EmailAddress
                         </span>
-                        <span class="settings-row-hint">@account.Protocol · @account.IncomingHost</span>
+                        <span class="settings-row-hint">@account.Protocol · @account.IncomingHost · @SyncHealthLine(account.Id)</span>
                     </div>
+                    @* The rail order is also the Ctrl+1..9 order, so this is where that mapping is chosen. *@
+                    <button class="settings-account-move" title="Move up" @onclick="() => AccountStore.Move(account.Id, -1)">▲</button>
+                    <button class="settings-account-move" title="Move down" @onclick="() => AccountStore.Move(account.Id, 1)">▼</button>
                     <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
                     <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
                 </div>
@@ -214,6 +328,8 @@
             <PrimaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountWizard.RoutePath))">➕ Add account</PrimaryButton>
         </div>
     </GlassCard>
+
+    <p class="settings-version">@AppConstants.AppNameHumanReadable @AppConstants.AppVersion</p>
 </div>
 
 <SettingsCss />
@@ -240,11 +356,108 @@
         SettingsManager.SaveSettings();
     }
 
+    /// <summary>
+    /// Keys the "Everything else" card must NOT render, for one of three reasons: a hand-written
+    /// control above already owns them, they are window/search state no one edits by hand, or —
+    /// CredentialVaultMode — a plain dropdown would be actively harmful. Written with nameof so a
+    /// renamed field breaks the build instead of quietly orphaning an entry here and showing the
+    /// setting twice.
+    /// </summary>
+    static readonly HashSet<string> KeysWithTheirOwnControl =
+    [
+        // Appearance card
+        nameof(GlobalSettings.Theme),
+        nameof(GlobalSettings.FollowSystemTheme),
+        nameof(GlobalSettings.FollowSystemMotion),
+        nameof(GlobalSettings.ReduceMotion),
+        nameof(GlobalSettings.UiScalePercent),
+        nameof(GlobalSettings.ShowUnreadBadge),
+        nameof(GlobalSettings.MessageListDensity),
+        // Window & startup card
+        nameof(GlobalSettings.CloseToTray),
+        nameof(GlobalSettings.StartMinimized),
+        nameof(GlobalSettings.StartWithWindows),
+        // Notifications, sync, reading, composing, diagnostics cards
+        nameof(GlobalSettings.NotifyOnNewMail),
+        nameof(GlobalSettings.SyncIntervalMinutes),
+        nameof(GlobalSettings.BackgroundFolderRefreshCount),
+        nameof(GlobalSettings.UseImapIdle),
+        nameof(GlobalSettings.FoldQuotedText),
+        nameof(GlobalSettings.ReplyQuoteStyle),
+        nameof(GlobalSettings.Signature),
+        nameof(GlobalSettings.UndoSendSeconds),
+        nameof(GlobalSettings.EnableLogging),
+        // Its control is the reader toolbar's A- / A+ / reset, not a row here.
+        nameof(GlobalSettings.ReaderTextScalePercent),
+        // Remembered window bounds and saved searches: state, not preferences.
+        nameof(GlobalSettings.WindowX),
+        nameof(GlobalSettings.WindowY),
+        nameof(GlobalSettings.WindowWidth),
+        nameof(GlobalSettings.WindowHeight),
+        nameof(GlobalSettings.SavedSearches),
+        // The vault card switches this through CredentialVault, which re-encrypts every stored
+        // password on the way. A dropdown would flip the mode without that, losing all of them.
+        nameof(GlobalSettings.CredentialVaultMode),
+    ];
+
+    static IEnumerable<ISetting> UncardedSettings =>
+        SettingsManager.GetAllSettings()
+            .Where(static s => !KeysWithTheirOwnControl.Contains(s.Key))
+            .OrderBy(static s => s.KeyHumanReadable, StringComparer.CurrentCulture);
+
     static void SetSyncInterval(string text)
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
     }
+
+    /// <summary>Last sync outcome of the account, or the error that is keeping it from syncing.</summary>
+    static string SyncHealthLine(string accountId)
+    {
+        var health = SyncHealthService.For(accountId);
+        if (health.IsFailing) return $"⚠️ failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
+        return health.LastSuccessUtc is { } success ? $"synced {success.ToLocalTime():dd MMM HH:mm}" : "not synced yet";
+    }
+
+    /// <summary>Switching this on re-picks the palette immediately, so the effect is visible without restarting.</summary>
+    static void SetFollowSystemTheme(bool follow)
+    {
+        SetAndSave(GlobalSettings.FollowSystemTheme, follow);
+        ThemeManager.ApplyFromSettings();
+    }
+
+    /// <summary>While this is on the manual switch is disabled, so only one of the two can be the answer.</summary>
+    static void SetFollowSystemMotion(bool follow) => SetAndSave(GlobalSettings.FollowSystemMotion, follow);
+
+    static void SetReduceMotion(bool reduce) => SetAndSave(GlobalSettings.ReduceMotion, reduce);
+
+    /// <summary>Clamped: a negative count is meaningless and a big one turns every sync into a full-mailbox pass.</summary>
+    static void SetBackgroundFolderRefresh(string text)
+    {
+        const int MaxFolders = 10;
+        if (int.TryParse(text, out int parsed))
+            SetAndSave(GlobalSettings.BackgroundFolderRefreshCount, Math.Clamp(parsed, 0, MaxFolders));
+    }
+
+    /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
+    static void SetUiScale(string text)
+    {
+        const int MinScalePercent = 50;
+        const int MaxScalePercent = 200;
+        if (int.TryParse(text, out int percent))
+            SetAndSave(GlobalSettings.UiScalePercent, Math.Clamp(percent, MinScalePercent, MaxScalePercent));
+    }
+
+    static void SetUndoSendSeconds(string text)
+    {
+        if (int.TryParse(text, out int seconds) && seconds >= 0)
+            SetAndSave(GlobalSettings.UndoSendSeconds, seconds);
+    }
+
+    /// <summary>Edited live in the textarea, written to disk on blur so typing does not hit the file per keystroke.</summary>
+    string SignatureText { get; set; } = GlobalSettings.Signature.Value;
+
+    void SaveSignature() => SetAndSave(GlobalSettings.Signature, SignatureText);
 
     static readonly string[] DensityOptions = ["Cozy", "Comfortable", "Compact"];
 

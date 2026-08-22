@@ -1,4 +1,6 @@
-﻿namespace MyLovelyMail
+using MyLovelyMail.MainProject.Constants;
+
+namespace MyLovelyMail
 {
     public partial class App : Application
     {
@@ -9,7 +11,7 @@
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            var window = new Window(new MainPage()) { Title = "My Lovely Mail" };
+            var window = new Window(new MainPage()) { Title = AppConstants.AppNameHumanReadable };
             TrayService.AttachWindow(window);
             return window;
         }

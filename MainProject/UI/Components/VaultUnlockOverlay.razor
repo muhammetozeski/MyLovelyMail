@@ -6,7 +6,7 @@
 
 @if (CredentialVault.NeedsMasterPassword && !CredentialVault.IsUnlocked)
 {
-    <div class="vault-overlay">
+    <div class="vault-overlay" @onkeydown="HandleKeyDown">
         <GlassCard Level="AcrylicLevel.Strong" CustomClass="@_cardClass">
             <div class="vault-icon">🔐</div>
             @if (CredentialVault.VaultFileExists)
@@ -48,6 +48,14 @@
     int _attempts;
 
     protected override void OnInitialized() => CredentialVault.OnVaultStateChanged += HandleVaultChanged;
+
+    /// <summary>Enter submits whichever form is showing (unlock or first-time setup).</summary>
+    async Task HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" || _password.Length == 0) return;
+        if (CredentialVault.VaultFileExists) await TryUnlock();
+        else SetInitialPassword();
+    }
 
     void HandleVaultChanged() => InvokeAsync(StateHasChanged);
 

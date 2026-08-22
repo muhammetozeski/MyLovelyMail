@@ -1,8 +1,10 @@
 using MailKit;
 using MailKit.Net.Imap;
+using MailKit.Search;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -16,28 +18,191 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Newest messages fetched for a folder that has never been synced (older mail loads when scrolled later).</summary>
         const int InitialFetchCount = 300;
 
+        /// <summary>First-fill fetches land in slices this big, each painted into the UI on arrival.</summary>
+        const int FirstFillSliceSize = 50;
+
         const MessageSummaryItems SummaryItems =
             MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.Flags |
-            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText;
+            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText |
+            MessageSummaryItems.References;
 
-        /// <summary>Raised after a sync stored NEW messages: (accountId, folderFullName, newMessageCount).</summary>
-        public static event Action<string, string, int>? OnNewMail;
+        /// <summary>Raised when an on-demand folder sync starts or finishes (drives the folder loading state).</summary>
+        public static event Action? OnFolderSyncStateChanged;
 
-        /// <summary>Refreshes the folder list and the Inbox contents of the account.</summary>
+        /// <summary>Folders currently being synced on demand, keyed by <see cref="MessageStore.FolderKey"/>.</summary>
+        static readonly HashSet<string> onDemandInFlight = [];
+
+        public static bool IsFolderSyncing(string accountId, string folderFullName)
+        {
+            lock (onDemandInFlight)
+                return onDemandInFlight.Contains(MessageStore.FolderKey(accountId, folderFullName));
+        }
+
+        /// <summary>
+        /// Fire-and-forget sync of one folder, used when the user opens it. The scheduled pass only
+        /// fills the Inbox, so without this every other server folder would stay empty forever.
+        /// Repeat calls while a sync is already running are ignored.
+        /// </summary>
+        public static void KickFolderSync(MailAccountData account, string folderFullName)
+        {
+            string key = MessageStore.FolderKey(account.Id, folderFullName);
+            lock (onDemandInFlight)
+                if (!onDemandInFlight.Add(key)) return;
+
+            OnFolderSyncStateChanged?.Invoke();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SyncFolderAsync(account, folderFullName);
+                }
+                catch (Exception ex)
+                {
+                    Log($"On-demand sync of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
+                }
+                finally
+                {
+                    lock (onDemandInFlight)
+                        onDemandInFlight.Remove(key);
+                    OnFolderSyncStateChanged?.Invoke();
+                }
+            });
+        }
+
+        /// <summary>
+        /// Throws the folder's cache away and refills it. Incremental sync only ever asks for uids
+        /// ABOVE LastSeenUid, so a folder whose cache was truncated can never heal itself — this is
+        /// the way back. The refill lands in the usual slices, so the list repaints while it runs.
+        /// </summary>
+        public static void KickFolderResync(MailAccountData account, string folderFullName)
+        {
+            MessageStore.ClearFolderCache(account.Id, folderFullName);
+            KickFolderSync(account, folderFullName);
+        }
+
+        /// <summary>
+        /// Fetches the next <paramref name="count"/> messages BELOW the folder's oldest fetched
+        /// uid — the only way to reach mail past the first fill, since incremental sync asks for
+        /// uids above LastSeenUid and a resync just re-fetches the same newest slice.
+        /// Never touches LastSeenUid, so the new-mail path and its notification stay untouched.
+        /// </summary>
+        public static void KickFolderBackfill(MailAccountData account, string folderFullName, int count)
+        {
+            string key = MessageStore.FolderKey(account.Id, folderFullName);
+            lock (onDemandInFlight)
+                if (!onDemandInFlight.Add(key)) return;
+
+            OnFolderSyncStateChanged?.Invoke();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    int landed = await BackfillFolderAsync(account, folderFullName, count);
+                    Log($"Backfill of '{folderFullName}': {landed} older summaries added for {account.EmailAddress}.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Backfill of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
+                }
+                finally
+                {
+                    lock (onDemandInFlight)
+                        onDemandInFlight.Remove(key);
+                    OnFolderSyncStateChanged?.Invoke();
+                }
+            });
+        }
+
+        /// <summary>The backfill itself; returns how many summaries landed. Awaited by the debug API.</summary>
+        public static async Task<int> BackfillFolderAsync(MailAccountData account, string folderFullName, int count,
+            CancellationToken cancellationToken = default)
+        {
+            var cached = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folderFullName);
+            // Nothing fetched yet means there is no floor to dig below; a normal sync goes first.
+            if (cached is not { OldestFetchedUid: > 1 }) return 0;
+
+            using var syncScope = SyncScheduler.EnterSyncScope();
+            return await ResiliencePolicy.RunNetwork(async ct =>
+            {
+                using var client = await MailConnections.OpenImapAsync(account, ct);
+                var folder = await client.GetFolderAsync(folderFullName, ct);
+                await folder.OpenAsync(FolderAccess.ReadOnly, ct);
+
+                var below = new UniqueIdRange(UniqueId.MinValue, new UniqueId(cached.OldestFetchedUid - 1));
+                var olderUids = await folder.SearchAsync(SearchQuery.Uids(below), ct);
+                // Newest of the older ones first: the user is walking backwards through the folder.
+                var wanted = olderUids.OrderByDescending(static u => u.Id).Take(count).ToList();
+                if (wanted.Count == 0)
+                {
+                    await client.DisconnectAsync(true, ct);
+                    return 0;
+                }
+
+                var fetched = await folder.FetchAsync(wanted, SummaryItems, ct);
+                List<MailMessageSummary> older = [.. fetched.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
+                if (older.Count > 0)
+                {
+                    MessageStore.UpsertSummaries(account.Id, folderFullName, older);
+                    cached.OldestFetchedUid = older.Min(static s => s.Uid);
+                    MessageStore.SaveFolder(cached);
+                }
+
+                await client.DisconnectAsync(true, ct);
+                return older.Count;
+            }, cancellationToken);
+        }
+
+        /// <summary>Refreshes the folder list, the Inbox, and a couple of the stalest other folders.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
+            using var syncScope = SyncScheduler.EnterSyncScope();
+            Log($"IMAP sync started: {account.EmailAddress}");
             await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
                 await SyncFolderListAsync(account, client, ct);
                 await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
+                await RefreshStalestFoldersAsync(account, client, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken);
+            Log($"IMAP sync finished: {account.EmailAddress}");
         }
 
-        /// <summary>Syncs one folder's messages (used when the user opens a folder).</summary>
-        public static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Fetches messages for the stalest few server folders, riding the connection this pass
+        /// already opened. Without it a folder is only ever filled by opening it, so all-folders
+        /// search — which reads the cache alone — cannot find anything that arrived in a folder
+        /// the user has not clicked, while the folder-list pass keeps its unread badge perfectly
+        /// current. A badge saying 4 unread over a message list from three weeks ago is the
+        /// worst form of that mismatch.
+        /// </summary>
+        static async Task RefreshStalestFoldersAsync(MailAccountData account, ImapClient client, CancellationToken cancellationToken)
         {
+            int count = AccountStore.GetSettings(account.Id).BackgroundFolderRefreshCount.Value;
+            if (count <= 0) return;
+
+            var stalest = MessageStore.GetFolders(account.Id)
+                .Where(f => !f.IsLocal && !f.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase))
+                // A server count that disagrees with the cache is free evidence something changed,
+                // so those folders go first; the rest fall back to plain age.
+                .OrderByDescending(f => f.TotalCount != MessageStore.GetSummaries(account.Id, f.FullName).Count)
+                .ThenBy(f => f.LastSyncedUtc ?? DateTime.MinValue)
+                .Take(count)
+                .ToList();
+
+            foreach (var folder in stalest)
+            {
+                var serverFolder = await client.GetFolderAsync(folder.FullName, cancellationToken);
+                await SyncOpenedFolderAsync(account, client, serverFolder, cancellationToken, backgroundRefresh: true);
+            }
+            if (stalest.Count > 0)
+                Log($"Background refresh touched: {string.Join(", ", stalest.Select(static f => f.FullName))}");
+        }
+
+        /// <summary>Syncs one folder's messages; reached through <see cref="KickFolderSync"/> when the user opens a folder.</summary>
+        static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
+        {
+            using var syncScope = SyncScheduler.EnterSyncScope();
             await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
@@ -69,14 +234,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static async Task SyncFolderListAsync(MailAccountData account, ImapClient client, CancellationToken cancellationToken)
         {
             var serverFolders = await client.GetFoldersAsync(client.PersonalNamespaces[0], false, cancellationToken);
+            var cachedFolders = MessageStore.GetFolders(account.Id);
 
             foreach (var folder in serverFolders)
             {
                 if (folder.Attributes.HasFlag(FolderAttributes.NonExistent) || folder.Attributes.HasFlag(FolderAttributes.NoSelect))
                     continue;
 
-                var status = StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity;
-                await folder.StatusAsync(status, cancellationToken);
+                await folder.StatusAsync(StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity, cancellationToken);
 
                 MessageStore.SaveFolder(new MailFolderData
                 {
@@ -84,10 +249,44 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     FullName = folder.FullName,
                     DisplayName = folder.Name,
                     Role = ResolveRole(client, folder),
+                    Delimiter = folder.DirectorySeparator,
                     UidValidity = folder.UidValidity,
+                    // Refreshing counts must never erase sync progress: dropping LastSeenUid to 0
+                    // here re-imported "the newest 300" as brand-new on EVERY pass, which both
+                    // wasted traffic and kept the new-mail notification condition permanently false.
+                    // OldestFetchedUid has to survive the same way, or every backfill would be
+                    // undone by the next folder-list refresh and start over from the floor.
+                    LastSeenUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSeenUid ?? 0,
+                    OldestFetchedUid = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.OldestFetchedUid ?? 0,
+                    LastSyncedUtc = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName)?.LastSyncedUtc,
                     TotalCount = folder.Count,
                     UnreadCount = folder.Unread
                 });
+            }
+        }
+
+        /// <summary>
+        /// Downloads the bodies of newly arrived messages that carry attachments, so opening them
+        /// offline works. Only runs when the account asks for it; a failed prefetch is harmless —
+        /// the reader downloads on demand exactly as before.
+        /// </summary>
+        static async Task PrefetchAttachmentBodiesAsync(MailAccountData account, string folderFullName,
+            List<MailMessageSummary> arrived, CancellationToken cancellationToken)
+        {
+            if (!AccountStore.GetSettings(account.Id).DownloadAttachmentsAutomatically.Value) return;
+
+            foreach (var summary in arrived.Where(static s => s.HasAttachments))
+            {
+                if (MessageStore.HasFullMessage(account.Id, folderFullName, summary.Uid)) continue;
+                try
+                {
+                    await DownloadMessageAsync(account, folderFullName, summary.Uid, cancellationToken);
+                    Log($"Prefetched attachment body for uid {summary.Uid} in '{folderFullName}'.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Attachment prefetch failed for uid {summary.Uid}: {ex.Message}", LogLevel.Warning);
+                }
             }
         }
 
@@ -119,7 +318,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             _ => FolderRole.None
         };
 
-        static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken)
+        /// <param name="backgroundRefresh">
+        /// True for a folder the rotation picked rather than the user. Rules and notifications are
+        /// skipped: a toast for mail landing in Sent or Trash is noise, and RuleEngine.ProcessIncoming
+        /// is not folder-scoped, so a rotation pass would otherwise start executing move actions on
+        /// Junk and Trash arrivals in the background with nobody watching. Rotation is a pure refresh.
+        /// </param>
+        static async Task SyncOpenedFolderAsync(MailAccountData account, ImapClient client, IMailFolder folder, CancellationToken cancellationToken, bool backgroundRefresh = false)
         {
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
@@ -133,38 +338,56 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 lastSeenUid = 0;
             }
 
-            IList<IMessageSummary> fetched;
+            int newCount = 0;
+            uint maxUid = lastSeenUid;
+            // Backfilled from the cache when the field is missing, so folders filled before this
+            // existed get a floor without a re-sync.
+            uint oldestFetchedUid = cached?.OldestFetchedUid ?? 0;
+            if (oldestFetchedUid == 0 && MessageStore.GetSummaries(account.Id, folder.FullName) is { Count: > 0 } cachedSummaries)
+                oldestFetchedUid = cachedSummaries.Min(static s => s.Uid);
+            List<MailMessageSummary> summaries = [];
             if (lastSeenUid == 0)
             {
+                // First fill: newest slice first, each slice stored (and painted) as it lands
+                // instead of after the whole fetch finishes.
                 int startIndex = Math.Max(0, folder.Count - InitialFetchCount);
-                fetched = folder.Count == 0
-                    ? []
-                    : await folder.FetchAsync(startIndex, -1, SummaryItems, cancellationToken);
+                for (int sliceEnd = folder.Count - 1; sliceEnd >= startIndex; sliceEnd -= FirstFillSliceSize)
+                {
+                    int sliceStart = Math.Max(startIndex, sliceEnd - FirstFillSliceSize + 1);
+                    var slice = await folder.FetchAsync(sliceStart, sliceEnd, SummaryItems, cancellationToken);
+                    List<MailMessageSummary> sliceSummaries = [.. slice.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
+                    if (sliceSummaries.Count == 0) continue;
+                    MessageStore.UpsertSummaries(account.Id, folder.FullName, sliceSummaries);
+                    summaries.AddRange(sliceSummaries);
+                    maxUid = Math.Max(maxUid, sliceSummaries.Max(static s => s.Uid));
+                    uint sliceLowest = sliceSummaries.Min(static s => s.Uid);
+                    oldestFetchedUid = oldestFetchedUid == 0 ? sliceLowest : Math.Min(oldestFetchedUid, sliceLowest);
+                }
             }
             else
             {
                 var range = new UniqueIdRange(new UniqueId(lastSeenUid + 1), UniqueId.MaxValue);
-                fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);
+                var fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);
+                foreach (var item in fetched)
+                {
+                    if (!item.UniqueId.IsValid) continue;
+                    summaries.Add(ToSummary(item));
+                    maxUid = Math.Max(maxUid, item.UniqueId.Id);
+                    if (item.UniqueId.Id > lastSeenUid) newCount++;
+                }
             }
-
-            int newCount = 0;
-            uint maxUid = lastSeenUid;
-            List<MailMessageSummary> summaries = [];
-            foreach (var item in fetched)
-            {
-                if (!item.UniqueId.IsValid) continue;
-                summaries.Add(ToSummary(item));
-                maxUid = Math.Max(maxUid, item.UniqueId.Id);
-                if (item.UniqueId.Id > lastSeenUid) newCount++;
-            }
+            Log($"IMAP folder '{folder.FullName}': fetched {summaries.Count} summaries ({newCount} new), server count {folder.Count}");
 
             // Incoming rules run on genuinely NEW mail only (never on the first bulk import).
             RuleProcessResult? ruleResult = null;
-            if (lastSeenUid > 0 && summaries.Count > 0)
+            if (lastSeenUid > 0 && summaries.Count > 0 && !backgroundRefresh)
+            {
+                // Before the rules: a reply to a muted conversation must never reach the
+                // notification check as a normal arrival.
+                MuteService.ApplyToIncoming(summaries);
                 ruleResult = RuleEngine.ProcessIncoming(account, folder.FullName, summaries);
-
-            if (summaries.Count > 0)
                 MessageStore.UpsertSummaries(account.Id, folder.FullName, summaries);
+            }
 
             if (ruleResult != null)
                 await ExecuteRuleMovesAsync(account, client, folder, ruleResult, cancellationToken);
@@ -174,18 +397,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 AccountId = account.Id,
                 FullName = folder.FullName,
                 DisplayName = folder.Name,
-                Role = cached?.Role ?? (folder.FullName.Equals("INBOX", StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
+                Role = cached?.Role ?? (folder.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
+                Delimiter = folder.DirectorySeparator,
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
+                OldestFetchedUid = oldestFetchedUid,
+                LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = folder.Count,
                 UnreadCount = folder.Unread
             });
 
-            if (newCount > 0 && lastSeenUid > 0)
+            if (newCount > 0 && lastSeenUid > 0 && !backgroundRefresh)
             {
-                OnNewMail?.Invoke(account.Id, folder.FullName, newCount);
-                NotificationService.NotifyNewMessages(account, folder.FullName,
-                    [.. summaries.Where(s => s.Uid > lastSeenUid)]);
+                var arrived = summaries.Where(s => s.Uid > lastSeenUid).ToList();
+                NotificationService.NotifyNewMessages(account, folder.FullName, arrived);
+                await PrefetchAttachmentBodiesAsync(account, folder.FullName, arrived, cancellationToken);
             }
         }
 
@@ -220,6 +446,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 Uid = item.UniqueId.Id,
                 MessageId = item.Envelope?.MessageId ?? string.Empty,
+                InReplyTo = item.Envelope?.InReplyTo ?? string.Empty,
+                ReferenceIds = item.References == null ? [] : [.. item.References],
                 Subject = item.Envelope?.Subject ?? string.Empty,
                 FromName = from?.Name ?? string.Empty,
                 FromAddress = from?.Address ?? string.Empty,

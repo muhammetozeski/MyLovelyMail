@@ -34,8 +34,22 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>True for folders that exist only on this machine (never synced to the server).</summary>
         public bool IsLocal { get; set; }
 
+        /// <summary>The server's path separator for this folder ('/' or '.'), so a nested path can be split. 0 = not recorded yet.</summary>
+        public char Delimiter { get; set; }
+
         public uint UidValidity { get; set; }
         public uint LastSeenUid { get; set; }
+
+        /// <summary>
+        /// Lowest uid the app has ever fetched here. Incremental sync only asks for uids ABOVE
+        /// <see cref="LastSeenUid"/>, so this is the floor the backfill digs below; 0 means the
+        /// folder has never been filled.
+        /// </summary>
+        public uint OldestFetchedUid { get; set; }
+
+        /// <summary>When this folder's MESSAGES were last fetched — not its counts, which the folder-list pass refreshes every time.</summary>
+        public DateTime? LastSyncedUtc { get; set; }
+
         public int TotalCount { get; set; }
         public int UnreadCount { get; set; }
     }

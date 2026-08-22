@@ -30,11 +30,26 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
                 string.Equals(Normalize(t.Name), Normalize(name), StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>Applies the palette chosen in <see cref="Stores.Settings.Theme"/>; unknown names keep the current one.</summary>
+        /// <summary>
+        /// Applies the palette the settings ask for: the Windows app theme picks a matching
+        /// light/dark palette when FollowSystemTheme is on, otherwise the named Theme is used.
+        /// Unknown names keep the current palette.
+        /// </summary>
         public static void ApplyFromSettings()
         {
+            if (Stores.Settings.FollowSystemTheme.Value)
+            {
+                Apply(AppThemes.All.FirstOrDefault(t => t.IsDark == SystemPrefersDark) ?? Current);
+                return;
+            }
+
             var theme = ByName(Stores.Settings.Theme);
             if (theme != null) Apply(theme);
         }
+
+        /// <summary>Set by the head project (Windows: Application.RequestedTheme); false on platforms that cannot report it.</summary>
+        public static Func<bool>? SystemDarkProbe;
+
+        static bool SystemPrefersDark => SystemDarkProbe?.Invoke() ?? Current.IsDark;
     }
 }

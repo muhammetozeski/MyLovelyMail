@@ -1,5 +1,5 @@
 @namespace MyLovelyMail.MainProject.UI.Pages
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
 
 <style>
     .wizard-screen {
@@ -72,6 +72,13 @@
         font-size: @(AppMeasures.Font.Small)px;
         color: @AppColors.TextSecondary.ToRgbaHex(true);
         line-height: @(AppMeasures.LineHeight.Relaxed);
+    }
+
+    .wizard-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px12)px;
     }
 
     .wizard-field {

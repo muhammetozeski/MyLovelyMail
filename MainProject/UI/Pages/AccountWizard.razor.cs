@@ -2,6 +2,8 @@ using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.UI.Pages
 {
@@ -9,8 +11,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
     {
         public const string RoutePath = "/Settings/AddAccount";
 
-        /// <summary>Pastel palette offered in the wizard; the default rotates so each account differs.</summary>
-        internal static readonly string[] AccountColors = ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+        /// <summary>Swatches offered in the wizard; the preselected one rotates so each new account differs.</summary>
+        internal static string[] AccountColors => AppColors.IdentityPalette;
 
         string SelectedColorHex { get; set; } = AccountColors[AccountStore.Accounts.Count % AccountColors.Length];
 
@@ -25,6 +27,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
         IncomingProtocol Protocol { get; set; } = IncomingProtocol.Imap;
         string IncomingHost { get; set; } = string.Empty;
         string IncomingPortText { get; set; } = "993";
+        string Pop3FetchLimitText { get; set; } = GlobalSettings.Pop3FetchLimit.Value.ToString();
+
+        /// <summary>UI face of "limit = 0": on disables the number field and downloads everything.</summary>
+        bool Pop3FetchEverything { get; set; }
         ConnectionSecurity IncomingSecurity { get; set; } = ConnectionSecurity.SslOnConnect;
         string SmtpHost { get; set; } = string.Empty;
         string SmtpPortText { get; set; } = "465";
@@ -102,9 +108,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             StateHasChanged();
 
             var account = BuildAccount();
+            Diagnosis = null;
             try
             {
-                await Services.ResiliencePolicy.RunNetwork(async ct =>
+                // Two separate scopes so a failure is attributable: one shared try around both
+                // servers printed the same sentence whichever one refused.
+                await TestStageAsync(IncomingStage, async ct =>
                 {
                     if (account.Protocol == IncomingProtocol.Imap)
                     {
@@ -116,22 +125,77 @@ namespace MyLovelyMail.MainProject.UI.Pages
                         using var pop3 = await MailConnections.OpenPop3Async(account, ct, Password);
                         await pop3.DisconnectAsync(true, ct);
                     }
+                });
+                await TestStageAsync(SendingStage, async ct =>
+                {
                     using var smtp = await MailConnections.OpenSmtpAsync(account, ct, Password);
                     await smtp.DisconnectAsync(true, ct);
                 });
                 TestSucceeded = true;
                 TestMessage = "✅ Connected! Both receiving and sending servers accepted the credentials.";
             }
-            catch (Exception ex)
+            catch (StageFailure failure)
             {
                 TestSucceeded = false;
-                TestMessage = $"❌ {ex.Message}";
+                var protocol = failure.Stage == SendingStage
+                    ? ConnectTriageService.MailProtocol.Smtp
+                    : account.Protocol == IncomingProtocol.Imap
+                        ? ConnectTriageService.MailProtocol.Imap
+                        : ConnectTriageService.MailProtocol.Pop3;
+                string host = failure.Stage == SendingStage ? account.SmtpHost : account.IncomingHost;
+
+                var diagnosis = ConnectTriageService.Classify(failure.InnerException!, failure.Stage);
+                Diagnosis = await ConnectTriageService.ProbeAsync(diagnosis, protocol, host);
+                TestMessage = $"❌ {Diagnosis.Sentence}";
             }
             finally
             {
                 Busy = false;
                 BusyAction = string.Empty;
             }
+        }
+
+        const string IncomingStage = "incoming server";
+        const string SendingStage = "sending server";
+
+        /// <summary>What the last failed test found; drives the suggestion chip.</summary>
+        ConnectDiagnosis? Diagnosis { get; set; }
+
+        /// <summary>Carries WHICH server failed out of the shared retry pipeline, which otherwise loses it.</summary>
+        sealed class StageFailure(string stage, Exception inner) : Exception(inner.Message, inner)
+        {
+            public string Stage { get; } = stage;
+        }
+
+        static async Task TestStageAsync(string stage, Func<CancellationToken, Task> attempt)
+        {
+            try
+            {
+                await Services.ResiliencePolicy.RunNetwork(attempt);
+            }
+            catch (Exception ex)
+            {
+                throw new StageFailure(stage, ex);
+            }
+        }
+
+        /// <summary>Writes the port/security pair the probe found into the live wizard fields.</summary>
+        void ApplySuggestion(ConnectDiagnosis diagnosis)
+        {
+            if (diagnosis.SuggestedPort is not { } port || diagnosis.SuggestedSecurity is not { } security) return;
+
+            if (diagnosis.Stage == SendingStage)
+            {
+                SmtpPortText = port.ToString();
+                SmtpSecurity = security;
+            }
+            else
+            {
+                IncomingPortText = port.ToString();
+                IncomingSecurity = security;
+            }
+            Diagnosis = null;
+            TestMessage = $"↩️ Applied port {port} with {security}. Test again.";
         }
 
         async Task SaveAsync()
@@ -150,6 +214,18 @@ namespace MyLovelyMail.MainProject.UI.Pages
             var account = BuildAccount();
             CredentialVault.SetPassword(account.Id, Password);
             AccountStore.Save(account);
+
+            if (Protocol == IncomingProtocol.Pop3)
+            {
+                int fetchLimit = Pop3FetchEverything ? 0
+                    : int.TryParse(Pop3FetchLimitText, out int parsed) && parsed > 0 ? parsed : GlobalSettings.Pop3FetchLimit.Value;
+                var accountSettings = AccountStore.GetSettings(account.Id);
+                if (accountSettings.Pop3FetchLimit.Value != fetchLimit)
+                {
+                    accountSettings.Pop3FetchLimit.Value = fetchLimit;
+                    accountSettings.Save();
+                }
+            }
 
             // First sync runs in the background; the mail screen fills in as results land.
             _ = SyncScheduler.SyncNowAsync();

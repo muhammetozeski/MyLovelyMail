@@ -1,4 +1,4 @@
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
 <style>
     .core-input-group {
         display: flex;
@@ -22,4 +22,16 @@
         color: inherit;
         outline: none;
     }
+
+        /* outline:none above kills the browser ring; keyboard focus gets one back on the wrapper,
+           so the field that is listening is visible without a box drawn inside a box. */
+        .core-input-element:focus-visible {
+            outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
+            outline-offset: @(AppMeasures.Space.Px4)px;
+        }
+
+        .core-input-element:disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
+            cursor: not-allowed;
+        }
 </style>

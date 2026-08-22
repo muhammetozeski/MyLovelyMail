@@ -123,34 +123,36 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             return $"background:{radials}, linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
         }
 
-        //TODO: improve this comment. do we use these css variables or they are only for bootstrap and other css stuff?
-        //yani demek istediğim: bu değişkenler MainProject içinde herhangi bir yerde kullanılıyor mu? bunun cevabını summary'ye ekle kesin ve net bir şekilde emin olarak. sonra da bu todo'yu sil.
         /// <summary>
-        /// Emits a <c>:root { --color-*: ...; --blur-*: ...; }</c> block. Single emitter for global CSS
-        /// variables so legacy <c>var(--color-*)</c> consumers and Bootstrap styles read from one place.
+        /// The aurora stops alone (no base gradient) as a background value — painted onto an
+        /// oversized fixed layer that the drift animation moves, while the body keeps the static
+        /// base gradient underneath. Split from <see cref="BuildAuroraBackground"/> so the moving
+        /// part never repaints the whole page background.
         /// </summary>
-        public static string BuildCssVariables()
-        {
-            // TODO: bu fonksiyonu ve içindekileri silmek bir sorun çıkartmayacaksa silelim gitsin. biz direkt c#'taki renkleri kullanıyoruz zaten. "kara düzen" bir kod görmek istemiyorum projede
-            return ":root{" +
-                   $"--color-primary:{AppColors.Primary.ToRgbaHex(true)};" +
-                   $"--color-primary-light:{AppColors.PrimaryLight.ToRgbaHex(true)};" +
-                   $"--color-primary-dark:{AppColors.PrimaryDark.ToRgbaHex(true)};" +
-                   $"--color-secondary:{AppColors.Secondary.ToRgbaHex(true)};" +
-                   $"--color-accent:{AppColors.Accent.ToRgbaHex(true)};" +
-                   $"--color-background:{AppColors.BackgroundDeep.ToRgbaHex(true)};" +
-                   $"--color-surface:{AppColors.SurfaceNormal.ToRgbaHex(true)};" +
-                   $"--color-text-primary:{AppColors.TextPrimary.ToRgbaHex(true)};" +
-                   $"--color-text-secondary:{AppColors.TextSecondary.ToRgbaHex(true)};" +
-                   $"--color-text-muted:{AppColors.TextMuted.ToRgbaHex(true)};" +
-                   $"--color-success:{AppColors.Success.ToRgbaHex(true)};" +
-                   $"--color-error:{AppColors.Error.ToRgbaHex(true)};" +
-                   $"--color-warning:{AppColors.Warning.ToRgbaHex(true)};" +
-                   $"--blur-subtle:{AppMeasures.Blur.Subtle}px;" +
-                   $"--blur-normal:{AppMeasures.Blur.Normal}px;" +
-                   $"--blur-strong:{AppMeasures.Blur.Strong}px;" +
-                   $"--blur-heavy:{AppMeasures.Blur.Heavy}px;" +
-                   "}";
-        }
+        public static string BuildAuroraStopsLayer() =>
+            "background:" + string.Join(", ", AppColors.AuroraStops.Select(s =>
+                $"radial-gradient(ellipse {s.Size} at {s.Position}, {s.Color.WithAlpha(0.55f).ToRgbaHex(true)} 0%, transparent 70%)")) + ";";
+
+        /// <summary>
+        /// The declarations that stop motion, without the selector. One string used twice: under
+        /// the app's own switch and under the always-emitted <c>prefers-reduced-motion</c> query,
+        /// so the OS preference keeps working when the app switch is off.
+        /// <para>
+        /// <c>animation-iteration-count: 1</c> is the load-bearing line — shortening the duration
+        /// alone would only make a looping animation flicker faster.
+        /// </para>
+        /// </summary>
+        public const string CalmMotionDeclarations =
+            "animation-duration:1ms !important;animation-iteration-count:1 !important;"
+            + "transition-duration:1ms !important;scroll-behavior:auto !important;";
+
+        /// <summary>
+        /// The calm-motion rule for the app's own switch, or an empty string when motion is normal.
+        /// Applies to every element and pseudo-element, so it reaches animations no one remembered:
+        /// the sync heart, the sweep line, the drifting hearts and the pulses all loop
+        /// unconditionally in their own components.
+        /// </summary>
+        public static string BuildCalmMotionLayer() =>
+            MotionPreference.IsCalm ? $"*, *::before, *::after {{ {CalmMotionDeclarations} }}" : string.Empty;
     }
 }

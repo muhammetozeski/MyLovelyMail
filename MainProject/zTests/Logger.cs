@@ -1,7 +1,11 @@
 global using static Logger;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
+using MyLovelyMail.MainProject.Storage;
 
 #pragma warning disable CA1050 // Ad alanlarında türleri bildirin
 public static class Logger
@@ -16,7 +20,7 @@ public static class Logger
         set => Interlocked.Exchange(ref _activateLogging, value ? 1 : 0);
     }
 
-    const bool WriteToDisk = false; // Bunu false yaparak diske yazmayı devre dışı bırakabilirsin, bu sayede sadece konsola loglama yapar
+    const bool WriteToDisk = true; // Bunu false yaparak diske yazmayı devre dışı bırakabilirsin, bu sayede sadece konsola loglama yapar
 
     static ConsoleColor LogColor = ConsoleColor.Gray;
 
@@ -29,7 +33,8 @@ public static class Logger
 
     public static readonly string startTime = DateTime.UtcNow.AddHours(3).ToString("yyyy.MM.dd HH.mm.ss.ff");
 
-    public const string LogsFolder = "Logs";
+    /// <summary>Logs live in AppCache: diagnostic data, safe to delete, never part of the user's own data.</summary>
+    public static readonly string LogsFolder = Path.Combine(AppPaths.AppCache, "Logs");
     public const string LogFileNamePrefix = "Log";
     public readonly static string LogFileName = LogsFolder + "\\" + LogFileNamePrefix + " " + startTime + ".txt";
 
@@ -43,7 +48,7 @@ public static class Logger
     /// <summary> Assembles every buffered log line (from <see cref="AllLogs"/>) into one string. Used by the DevTools "copy logs" button so logs can be pulled off a device that has no debugger attached. </summary>
     public static string GetAllLogsText()
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         foreach (var line in AllLogs) sb.Append(line);
         return sb.ToString();
     }
@@ -79,7 +84,10 @@ public static class Logger
             {
                 foreach (var (Message, SyncEvent) in _logQueue.GetConsumingEnumerable())
                 {
-                    File.AppendAllText(LogFileName, Message + "\n");
+                    // Every persisted entry is scrambled (logs may carry subjects/addresses);
+                    // one Base64 line in the file = one entry, decoded via LogCrypto.Decrypt.
+                    try { File.AppendAllText(LogFileName, LogCrypto.Encrypt(Message) + "\n"); }
+                    catch { /* Logging must never take the app down with it. */ }
                     SyncEvent?.Set();
                 }
             })
@@ -100,7 +108,7 @@ public static class Logger
 
     /// <summary>
     /// Logs a message or object to the console and disk asynchronously. 
-    /// Handles <see cref="System.Collections.IEnumerable"/> by expanding their contents and captures caller metadata automatically.
+    /// Handles <see cref="IEnumerable"/> by expanding their contents and captures caller metadata automatically.
     /// </summary>
     /// <param name="MessageObject">The object or message to be logged.</param>
     /// <param name="consoleColor">The color of the text when printing to the <see cref="Console"/>.</param>
@@ -162,7 +170,7 @@ public static class Logger
         try
         {
 
-            if (MessageObject is System.Collections.IEnumerable numerable)
+            if (MessageObject is IEnumerable numerable)
             {
                 foreach (var item in numerable)
                 {
@@ -264,8 +272,8 @@ public static class Logger
             name = name.Contains(prefix) ? name.Remove(name.IndexOf(prefix), prefix.Length) : name;
             name = name.Trim();
             if (DateTime.TryParseExact(name, "yyyy.MM.dd HH.mm.ss.ff",
-                                       System.Globalization.CultureInfo.InvariantCulture,
-                                       System.Globalization.DateTimeStyles.None, out DateTime fileDate))
+                                       CultureInfo.InvariantCulture,
+                                       DateTimeStyles.None, out DateTime fileDate))
             {
                 datedFiles.Add((file.Path, fileDate));
             }

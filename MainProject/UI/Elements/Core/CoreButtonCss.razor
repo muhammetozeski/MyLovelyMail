@@ -1,4 +1,4 @@
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
 <style>
     .core-btn {
         border: none;
@@ -28,5 +28,11 @@
             opacity: @(AppMeasures.Opacity.Dim);
             cursor: not-allowed;
             box-shadow: none !important;
+        }
+
+        /* Keyboard focus only — a clicked button should not keep a ring. */
+        .core-btn:focus-visible {
+            outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
+            outline-offset: @(AppMeasures.Border.Thin)px;
         }
 </style>

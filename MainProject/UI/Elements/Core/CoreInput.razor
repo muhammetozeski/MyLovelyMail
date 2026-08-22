@@ -3,7 +3,7 @@
     {
         <span class="core-input-icon">@Icon</span>
     }
-    <input type="@Type" placeholder="@Placeholder" @bind="CurrentValue" @bind:event="oninput" required="@IsRequired" class="core-input-element" />
+    <input type="@Type" placeholder="@Placeholder" @bind="CurrentValue" @bind:event="oninput" required="@IsRequired" disabled="@Disabled" list="@ListId" class="core-input-element" />
     @ChildContent
 </div>
 
@@ -14,6 +14,10 @@
     [Parameter] public string Placeholder { get; set; } = string.Empty;
     [Parameter] public string Icon { get; set; } = string.Empty;
     [Parameter] public bool IsRequired { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary> Id of a &lt;datalist&gt; rendered by the caller; the browser then offers its options natively (no custom dropdown, no key handling). </summary>
+    [Parameter] public string? ListId { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     
     [Parameter] public string Value { get; set; } = string.Empty;

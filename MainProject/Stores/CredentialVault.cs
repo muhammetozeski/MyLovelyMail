@@ -75,7 +75,7 @@ namespace MyLovelyMail.MainProject.Stores
                         Log("DPAPI vault found on a non-Windows platform; it cannot be opened here.", LogLevel.Error);
                         return;
                     }
-                    byte[] plain = System.Security.Cryptography.ProtectedData.Unprotect(
+                    byte[] plain = ProtectedData.Unprotect(
                         Convert.FromBase64String(file.Payload), null, DataProtectionScope.CurrentUser);
                     secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? [];
                     IsUnlocked = true;
@@ -146,6 +146,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static void SetPassword(string accountId, string password)
         {
             secrets[accountId] = password;
+            Log($"Vault: password stored for account {accountId}.");
             Save();
         }
 
@@ -178,7 +179,7 @@ namespace MyLovelyMail.MainProject.Stores
                     Log("DPAPI vault mode is Windows-only; switch to the master password mode.", LogLevel.Error);
                     return;
                 }
-                payload = Convert.ToBase64String(System.Security.Cryptography.ProtectedData.Protect(
+                payload = Convert.ToBase64String(ProtectedData.Protect(
                     plain, null, DataProtectionScope.CurrentUser));
             }
             else

@@ -1,3 +1,4 @@
+using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using MailKit.Net.Smtp;
@@ -14,7 +15,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class MailConnections
     {
-        public static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
+        static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
         {
             ConnectionSecurity.SslOnConnect => SecureSocketOptions.SslOnConnect,
             ConnectionSecurity.StartTls => SecureSocketOptions.StartTls,
@@ -33,46 +34,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return password;
         }
 
-        public static async Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
+        /// <summary>
+        /// Connects and authenticates one MailKit client (the shared body of the three Open*Async
+        /// methods). On any failure the half-open client is disposed before the exception continues,
+        /// so no caller ever receives or leaks a broken connection.
+        /// </summary>
+        static async Task<TClient> OpenAsync<TClient>(TClient client, string protocolName, string host, int port,
+            ConnectionSecurity security, string username, MailAccountData account, string? passwordOverride,
+            CancellationToken cancellationToken) where TClient : MailService
         {
-            var client = new ImapClient();
             try
             {
-                await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
-                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
-                return client;
-            }
-            catch
-            {
-                client.Dispose();
-                throw;
-            }
-        }
-
-        public static async Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
-        {
-            var client = new Pop3Client();
-            try
-            {
-                await client.ConnectAsync(account.IncomingHost, account.IncomingPort, ToSocketOptions(account.IncomingSecurity), cancellationToken);
-                await client.AuthenticateAsync(account.IncomingUsername, RequirePassword(account, passwordOverride), cancellationToken);
-                return client;
-            }
-            catch
-            {
-                client.Dispose();
-                throw;
-            }
-        }
-
-        public static async Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null)
-        {
-            var client = new SmtpClient();
-            try
-            {
-                string username = string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername;
-                await client.ConnectAsync(account.SmtpHost, account.SmtpPort, ToSocketOptions(account.SmtpSecurity), cancellationToken);
+                await client.ConnectAsync(host, port, ToSocketOptions(security), cancellationToken);
                 await client.AuthenticateAsync(username, RequirePassword(account, passwordOverride), cancellationToken);
+                Log($"{protocolName} connected: {host}:{port}");
                 return client;
             }
             catch
@@ -81,5 +56,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 throw;
             }
         }
+
+        public static Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
+            OpenAsync(new ImapClient(), "IMAP", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+                account.IncomingUsername, account, passwordOverride, cancellationToken);
+
+        public static Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
+            OpenAsync(new Pop3Client(), "POP3", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+                account.IncomingUsername, account, passwordOverride, cancellationToken);
+
+        public static Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
+            OpenAsync(new SmtpClient(), "SMTP", account.SmtpHost, account.SmtpPort, account.SmtpSecurity,
+                string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername,
+                account, passwordOverride, cancellationToken);
     }
 }

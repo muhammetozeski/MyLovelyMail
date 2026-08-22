@@ -8,6 +8,63 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
     /// </summary>
     public static class AppColors
     {
+        /// <summary>
+        /// Identity colors that must stay stable across themes: account dots and tag chips both
+        /// pick from this one list round-robin, so an account and a tag never end up with two
+        /// different "pinks" and a palette edit reaches both features at once.
+        /// </summary>
+        public static readonly string[] IdentityPalette =
+            ["#EC6FA9", "#7C7BFF", "#FFB86B", "#34B27B", "#4FB6E8", "#F4714A", "#B79CEF", "#E9B949"];
+
+        /// <summary>Near-black plum used as ink on light identity colors; dark enough to clear 4.5:1 on every palette entry.</summary>
+        public static readonly Color IdentityInkDark = Color.FromArgb("#1A0F18");
+
+        /// <summary>
+        /// Readable text color for anything painted on an identity color (account badges, tag
+        /// chips, thread pills): white or the dark plum, whichever contrasts more. The palette is
+        /// pastel, so in practice the dark ink wins everywhere — which is the point, since white
+        /// text on these colors sits between 1.7:1 and 3.4:1 and fails WCAG AA outright.
+        /// </summary>
+        public static Color InkOn(string backgroundHex)
+        {
+            var background = Color.FromArgb(backgroundHex);
+            return ContrastRatio(background, Colors.White) >= ContrastRatio(background, IdentityInkDark)
+                ? Colors.White
+                : IdentityInkDark;
+        }
+
+        /// <summary>WCAG 2.1 contrast ratio (1:1 identical, 21:1 black on white).</summary>
+        public static double ContrastRatio(Color first, Color second)
+        {
+            double a = RelativeLuminance(first), b = RelativeLuminance(second);
+            return (Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05);
+        }
+
+        static double RelativeLuminance(Color color)
+        {
+            static double Channel(float raw)
+            {
+                double value = raw;
+                return value <= 0.03928 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+            return 0.2126 * Channel(color.Red) + 0.7152 * Channel(color.Green) + 0.0722 * Channel(color.Blue);
+        }
+
+        /// <summary>
+        /// The reader frame paints mail on a LIGHT canvas in every theme, because mail HTML is
+        /// authored for white backgrounds and turns unreadable on a dark one. Both the iframe
+        /// element (MailCss) and the document inside it (MailBodyRenderer) read these, so the two
+        /// halves of the same surface can never drift apart.
+        /// </summary>
+        public static class MailCanvas
+        {
+            public const string Background = "#ffffff";
+            public const string Text = "#33333a";
+            public const string Link = "#d14d8b";
+            public const string QuoteBorder = "#f0c0d4";
+            public const string QuoteText = "#7d5a6e";
+        }
+
         /// <inheritdoc cref="AppTheme.Primary"/>
         public static Color Primary => ThemeManager.Current.Primary;
 

@@ -1,17 +1,17 @@
 @namespace MyLovelyMail.MainProject.UI.Layout
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 
 @{
-    string cssVars = AppStyles.BuildCssVariables();
-    string aurora = AppStyles.BuildAuroraBackground();
+    string auroraBase = $"background:linear-gradient(180deg, {AppColors.BackgroundBase.ToRgbaHex(true)} 0%, {AppColors.BackgroundDeep.ToRgbaHex(true)} 100%);";
+    string auroraStops = AppStyles.BuildAuroraStopsLayer();
+    string calmMotion = AppStyles.BuildCalmMotionLayer();
     string textColor = AppColors.TextPrimary.ToRgbaHex(true);
     string warningBg = AppColors.Warning.ToRgbaHex(true);
     string warningFg = AppColors.BackgroundDeep.ToRgbaHex(true);
 }
 
 <style>
-    @((MarkupString)cssVars)
-
     /* Emoji font (Resources/Fonts copied to wwwroot/fonts). unicode-range pins it to emoji codepoints ONLY, so it can sit
        FIRST in font-family and win every emoji glyph (overriding the OS emoji font) while every text glyph still falls
        through to the system stack — Noto Color Emoji has no Latin glyphs, so text is never affected. */
@@ -27,12 +27,63 @@
         padding: 0;
         min-height: @(AppMeasures.Viewport.Full)vh;
         overflow-x: hidden;
+        /* One knob scales the whole app: zoom (not font-size) because every measure is in px. */
+        zoom: @(GlobalSettings.UiScalePercent.Value)%;
         font-family: "Noto Color Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         color: @textColor;
-        @((MarkupString)aurora)
+        @((MarkupString)auroraBase)
         background-attachment: fixed;
         background-repeat: no-repeat;
         background-size: cover;
+    }
+
+    /* The aurora blooms live on an oversized fixed layer BEHIND all content so the drift
+       animation only moves a GPU-composited transform — the page itself never repaints. */
+    body::before {
+        content: "";
+        position: fixed;
+        top: -15vh;
+        left: -15vw;
+        width: 130vw;
+        height: 130vh;
+        z-index: -1;
+        pointer-events: none;
+        @((MarkupString)auroraStops)
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    @@media (prefers-reduced-motion: no-preference) {
+        body::before {
+            animation: aurora-drift @(AppMeasures.Duration.Glacial)s ease-in-out infinite alternate;
+        }
+    }
+
+    @* The app's own calm switch, and the OS preference honoured whether or not that switch is on.
+       The component styles never use !important, so these win no matter which <style> renders first. *@
+    @((MarkupString)calmMotion)
+
+    @@media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            @((MarkupString)AppStyles.CalmMotionDeclarations)
+        }
+    }
+
+    @@keyframes aurora-drift {
+        0% {
+            transform: translate(0, 0) scale(1);
+            filter: hue-rotate(0deg);
+        }
+
+        50% {
+            transform: translate(-3%, -2%) scale(1.06);
+            filter: hue-rotate(8deg);
+        }
+
+        100% {
+            transform: translate(2%, 1%) scale(1.03);
+            filter: hue-rotate(-6deg);
+        }
     }
 
     .app-page {
@@ -52,7 +103,10 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        overflow-x: hidden;
+        /* No overflow here. A non-visible overflow on ONE axis turns the other into a scrollport
+           too, and this box never scrolls - it just grows - so every position:sticky inside it
+           was anchored to a scrollport that never moves. The viewport still clips sideways: the
+           body's overflow-x above propagates to it. */
     }
 
     .content {

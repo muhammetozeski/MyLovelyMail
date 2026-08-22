@@ -16,18 +16,19 @@ namespace MyLovelyMail.MainProject.Stores
         AllowAlways
     }
 
+    /// <summary>How much of the original a reply carries forward.</summary>
+    public enum QuoteStyle
+    {
+        Full,
+        Trimmed,
+        None
+    }
+
     /// <summary>How the credential vault encrypts stored passwords.</summary>
     public enum VaultMode
     {
         Dpapi,
         MasterPassword
-    }
-
-    /// <summary>Body format new messages start in.</summary>
-    public enum ComposeFormat
-    {
-        Html,
-        PlainText
     }
 
     /// <summary>
@@ -52,6 +53,12 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Message list density: "Cozy", "Comfortable" or "Compact".</summary>
         public static readonly Setting<string> MessageListDensity = new("Comfortable");
 
+        /// <summary>Stop looping animations (aurora drift, sync heart, pulses) and shorten transitions.</summary>
+        public static readonly Setting<bool> ReduceMotion = new(false);
+
+        /// <summary>Take the calm-motion answer from the Windows animation setting instead of the fixed value above.</summary>
+        public static readonly Setting<bool> FollowSystemMotion = new(true);
+
         /// <summary>Show the unread-count badge on folders and the tray icon.</summary>
         public static readonly Setting<bool> ShowUnreadBadge = new(true);
 
@@ -63,11 +70,20 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Keep an IMAP IDLE connection open so new mail arrives instantly.</summary>
         public static readonly Setting<bool> UseImapIdle = new(true);
 
+        /// <summary>How many of the stalest non-Inbox folders each sync pass also refreshes (0 = Inbox only).</summary>
+        public static readonly Setting<int> BackgroundFolderRefreshCount = new(2);
+
         /// <summary>Download attachments together with the message body instead of on first open.</summary>
         public static readonly Setting<bool> DownloadAttachmentsAutomatically = new(false);
 
         /// <summary>How many days of mail to keep offline in UserCache (0 = everything).</summary>
         public static readonly Setting<int> OfflineKeepDays = new(0);
+
+        /// <summary>Megabytes of cached message bodies an account may hold; oldest go first above it (0 = no limit).</summary>
+        public static readonly Setting<int> OfflineMaxCacheMb = new(0);
+
+        /// <summary>Encoded megabytes of attachments a message may carry before the pre-send list warns (0 = never warn).</summary>
+        public static readonly Setting<int> MaxAttachmentTotalMb = new(20);
 
         // ---- Reading ----
 
@@ -83,16 +99,30 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>What happens when the user deletes a message.</summary>
         public static readonly Setting<DeleteBehavior> DeleteAction = new(DeleteBehavior.MoveToTrash);
 
+        // ---- Reading ----
+
+        /// <summary>Text size inside the reader as a percentage of the design size (clamped 70-200).</summary>
+        public static readonly Setting<int> ReaderTextScalePercent = new(100);
+
+        /// <summary>Collapses the quoted history under a reply behind a "Show quoted text" fold.</summary>
+        public static readonly Setting<bool> FoldQuotedText = new(true);
+
         // ---- Composing ----
 
-        /// <summary>Body format new messages start in.</summary>
-        public static readonly Setting<ComposeFormat> DefaultComposeFormat = new(ComposeFormat.Html);
+        /// <summary>Plain-text signature appended under new, reply and forward drafts, empty = none (the compose body is plain text, so it is not HTML).</summary>
+        public static readonly Setting<string> Signature = new("");
 
-        /// <summary>HTML signature appended to outgoing mail (empty = none).</summary>
-        public static readonly Setting<string> SignatureHtml = new("");
+        /// <summary>How much of the original a reply or forward quotes back.</summary>
+        public static readonly Setting<QuoteStyle> ReplyQuoteStyle = new(QuoteStyle.Full);
+
+        /// <summary>Lines of the original kept in Trimmed mode before the rest is summarised away.</summary>
+        public static readonly Setting<int> QuoteTrimLines = new(30);
 
         /// <summary>Seconds the outbox holds a sent message for "undo send" (0 = send immediately).</summary>
         public static readonly Setting<int> UndoSendSeconds = new(5);
+
+        /// <summary>How many newest messages a POP3 sync may fetch; 0 fetches the entire mailbox.</summary>
+        public static readonly Setting<int> Pop3FetchLimit = new(300);
 
         // ---- Notifications ----
 
@@ -122,6 +152,13 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Saved search queries, separated by the unit-separator control char (it cannot occur in typed text).</summary>
         public static readonly Setting<string> SavedSearches = new("");
 
+        // ---- Window bounds (0 width/height = first run, keep platform defaults) ----
+
+        public static readonly Setting<int> WindowX = new(0);
+        public static readonly Setting<int> WindowY = new(0);
+        public static readonly Setting<int> WindowWidth = new(0);
+        public static readonly Setting<int> WindowHeight = new(0);
+
         // ---- Security ----
 
         /// <summary>How the credential vault encrypts account passwords on disk.</summary>
@@ -129,7 +166,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         // ---- Diagnostics ----
 
-        /// <summary>Master logging on/off.</summary>
-        public static readonly Setting<bool> EnableLogging = new(false);
+        /// <summary>Master logging on/off. On by default: entries buffer in RAM for the log viewer and persist scrambled to AppCache/Logs.</summary>
+        public static readonly Setting<bool> EnableLogging = new(true);
     }
 }

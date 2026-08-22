@@ -74,6 +74,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px1 = 1;
             public const int Px4 = 4;
             public const int Px5 = 5;
+            public const int Px8 = 8;
             public const int Px12 = 12;
             public const int Px14 = 14;
             public const int Px16 = 16;
@@ -105,6 +106,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px360 = 360;
             public const int Px400 = 400;
             public const int Px420 = 420;
+
+            /// <summary> How far the reader body may grow before it starts scrolling inside itself: the message opens whole, the page grows with it, and only a truly endless newsletter hits the ceiling. </summary>
+            public const int ReaderBodyMax = 1500;
 
             /// <summary> Height of the floating bottom navigation bar. Single source: the nav sets its height from this and the scroll bottom-inset reads it, so they can never drift apart. </summary>
             public const int BottomNavHeight = 70;
@@ -231,6 +235,11 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const string Longer = "1.5";
             public const string VerySlow = "2";
             public const string Slowest = "3";
+            /// <summary> Decorative particles crossing the screen (Inbox Zero hearts). </summary>
+            public const string Drift = "7";
+
+            /// <summary> Ambient background motion (aurora drift) — long enough to be felt, not watched. </summary>
+            public const string Glacial = "22";
         }
 
         /// <summary> The single throbber design every spinning loader reuses, so the whole app spins identically. </summary>

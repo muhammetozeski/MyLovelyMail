@@ -11,5 +11,15 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public string Cc { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
         public string Body { get; set; } = string.Empty;
+
+        /// <summary>What this draft is quoting, so the quote can be REBUILT at another style rather than re-parsed out of the edited body.</summary>
+        public string SourceFolder { get; set; } = string.Empty;
+        public uint SourceUid { get; set; }
+
+        /// <summary>Which of your addresses the message being replied to actually arrived at; empty for a new message.</summary>
+        public string ArrivedAtAddress { get; set; } = string.Empty;
+
+        /// <summary>Full paths of the staged attachment copies under AppCache (see ComposeService.AttachFileAsync).</summary>
+        public List<string> AttachmentPaths { get; set; } = [];
     }
 }

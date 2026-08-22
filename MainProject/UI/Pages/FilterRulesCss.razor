@@ -1,5 +1,5 @@
 @namespace MyLovelyMail.MainProject.UI.Pages
-@inherits MyLovelyMail.MainProject.UI.Layout.Architecture.ThemedComponentBase
+@inherits ThemedComponentBase
 
 <style>
     .filters-screen {
@@ -152,5 +152,44 @@
         align-items: center;
         gap: @(AppMeasures.Space.Px6)px;
         flex-shrink: 0;
+    }
+    /* "Try it" result: what the rule would have done to the mail already on disk. */
+    .filters-preview {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px12)px;
+        margin-top: @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .filters-preview-headline {
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        padding-bottom: @(AppMeasures.Space.Px4)px;
+    }
+
+    .filters-preview-condition {
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+    }
+
+    /* A condition nothing matches is the usual reason a rule "does not work". */
+    .filters-preview-condition--dead {
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    .filters-preview-warning {
+        color: @AppColors.TextWarning.ToRgbaHex(true);
+        padding-left: @(AppMeasures.Space.Px6)px;
+    }
+
+    .filters-preview-sample {
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 </style>

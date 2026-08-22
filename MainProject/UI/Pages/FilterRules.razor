@@ -82,8 +82,34 @@
             }
             <button class="filters-add" @onclick="() => rule.Actions.Add(new FilterAction())">➕ Add action</button>
 
+            @* A rule that matches nothing and one that matches everything look identical until
+               real mail arrives — and by then a move action has already run on the server. *@
+            @if (Preview is { } preview)
+            {
+                <div class="filters-preview">
+                    <div class="filters-preview-headline">
+                        Matches @preview.Matched.ToString("N0") of @preview.Scanned.ToString("N0") cached messages
+                    </div>
+                    @foreach (var condition in preview.PerCondition)
+                    {
+                        <div class="filters-preview-condition @(condition.Hits == 0 ? "filters-preview-condition--dead" : "")">
+                            @condition.Index. @condition.Description — @condition.Hits.ToString("N0") hits
+                            @if (condition.OperatorIgnored)
+                            {
+                                <span class="filters-preview-warning">the engine ignores this operator for this field</span>
+                            }
+                        </div>
+                    }
+                    @foreach (string subject in preview.SampleSubjects)
+                    {
+                        <div class="filters-preview-sample">· @(string.IsNullOrWhiteSpace(subject) ? "(no subject)" : subject)</div>
+                    }
+                </div>
+            }
+
             <div class="filters-actions">
-                <SecondaryButton OnClick="@(() => EditingRule = null)">Cancel</SecondaryButton>
+                <SecondaryButton OnClick="@(() => ClearEditor())">Cancel</SecondaryButton>
+                <SecondaryButton OnClick="@(() => Preview = RuleEngine.Preview(rule))" Disabled="@(rule.Conditions.Count == 0)">🔎 Try it</SecondaryButton>
                 <PrimaryButton OnClick="@SaveRule" Disabled="@(rule.Name.Trim().Length == 0 || rule.Conditions.Count == 0 || rule.Actions.Count == 0)">💾 Save rule</PrimaryButton>
             </div>
         </GlassCard>
@@ -124,8 +150,15 @@
     FilterRule? EditingRule { get; set; }
     bool IsNewRule { get; set; }
 
+    /// <summary>Result of the last "Try it"; cleared whenever a different rule is opened.</summary>
+    RuleEngine.RulePreview? Preview { get; set; }
+
+    /// <summary>Closes the editor and drops the preview with it, so it cannot outlive the rule it described.</summary>
+    void ClearEditor() => (EditingRule, Preview) = (null, null);
+
     void StartNewRule()
     {
+        Preview = null;
         EditingRule = new FilterRule { Conditions = [new FilterCondition()], Actions = [new FilterAction()] };
         IsNewRule = true;
     }
@@ -135,13 +168,14 @@
         // Edit a clone so Cancel never leaves half-typed changes in the store.
         EditingRule = System.Text.Json.JsonSerializer.Deserialize<FilterRule>(System.Text.Json.JsonSerializer.Serialize(rule));
         IsNewRule = false;
+        Preview = null;
     }
 
     void SaveRule()
     {
         if (EditingRule == null) return;
         FilterRuleStore.Save(EditingRule);
-        EditingRule = null;
+        ClearEditor();
     }
 
     static void SetEnabled(FilterRule rule, bool enabled)

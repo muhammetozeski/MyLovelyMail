@@ -1,5 +1,10 @@
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+#if WINDOWS
+using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
+#endif
 
 namespace MyLovelyMail
 {
@@ -15,10 +20,11 @@ namespace MyLovelyMail
 #if WINDOWS
             try
             {
-                var manager = Microsoft.Windows.AppNotifications.AppNotificationManager.Default;
+                var manager = AppNotificationManager.Default;
                 manager.NotificationInvoked += HandleNotificationInvoked;
                 manager.Register();
                 NotificationService.Presenter = ShowToast;
+                Logger.Log("Toast pipeline registered.");
             }
             catch (Exception ex)
             {
@@ -30,20 +36,25 @@ namespace MyLovelyMail
 #if WINDOWS
         static void ShowToast(MailToast toast)
         {
-            var builder = new Microsoft.Windows.AppNotifications.Builder.AppNotificationBuilder()
+            var builder = new AppNotificationBuilder()
                 .AddText(toast.Title)
                 .AddText(toast.Body)
                 .AddArgument("accountId", toast.AccountId)
                 .AddArgument("folder", toast.FolderFullName)
                 .AddArgument("uid", toast.Uid.ToString());
 
-            if (toast.Mute)
-                builder.MuteAudio();
+            // The toast's own audio is always muted; our SoundBridge plays the (possibly
+            // rule-customized) sound instead, so per-rule sounds actually differ.
+            builder.MuteAudio();
 
-            Microsoft.Windows.AppNotifications.AppNotificationManager.Default.Show(builder.BuildNotification());
+            AppNotificationManager.Default.Show(builder.BuildNotification());
+            Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
+
+            if (!toast.Mute)
+                SoundService.Play(toast.SoundName);
         }
 
-        static void HandleNotificationInvoked(object sender, Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs args)
+        static void HandleNotificationInvoked(object sender, AppNotificationActivatedEventArgs args)
         {
             TrayService.ShowMainWindow();
 
@@ -56,12 +67,12 @@ namespace MyLovelyMail
             var account = AccountStore.GetById(accountId);
             if (account == null) return;
 
-            var summary = MainProject.Storage.MessageStore.GetSummary(accountId, folderFullName, uid);
-            var folder = MainProject.Storage.MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
+            var summary = MessageStore.GetSummary(accountId, folderFullName, uid);
+            var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
 
-            MainProject.Services.MailUiState.SelectAccount(account);
-            if (folder != null) MainProject.Services.MailUiState.SelectFolder(folder);
-            if (summary != null) MainProject.Services.MailUiState.OpenMessageInReader(summary);
+            MailUiState.SelectAccount(account);
+            if (folder != null) MailUiState.SelectFolder(folder);
+            if (summary != null) MailUiState.OpenMessageInReader(summary);
         }
 #endif
     }

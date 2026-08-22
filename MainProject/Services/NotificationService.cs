@@ -1,6 +1,7 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.Constants;
 
 namespace MyLovelyMail.MainProject.Services
 {
@@ -11,6 +12,9 @@ namespace MyLovelyMail.MainProject.Services
         public required string Body { get; init; }
         /// <summary>True silences the toast sound (per-message "none" sound or a muting rule).</summary>
         public bool Mute { get; init; }
+
+        /// <summary>Sound name to play with the toast (rule-chosen or the account default); ignored when muted.</summary>
+        public string SoundName { get; init; } = "default";
         public string AccountId { get; init; } = string.Empty;
         public string FolderFullName { get; init; } = string.Empty;
         /// <summary>The single new message's uid; 0 for a batch toast.</summary>
@@ -33,35 +37,31 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>Called by the sync services after the rule pass with genuinely NEW messages only.</summary>
         public static void NotifyNewMessages(MailAccountData account, string folderFullName, List<MailMessageSummary> newMessages)
         {
-            if (Presenter == null) return;
-            if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) return;
-            if (IsInQuietHours(DateTime.Now.Hour)) return;
+            if (Presenter == null) { Log("Notification skipped: no platform presenter registered."); return; }
+            if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) { Log($"Notification skipped: NotifyOnNewMail off for {account.EmailAddress}."); return; }
+            if (IsInQuietHours(DateTime.Now.Hour)) { Log("Notification skipped: quiet hours."); return; }
 
             var audible = newMessages.Where(RuleEngine.ShouldNotify).ToList();
-            if (audible.Count == 0) return;
+            if (audible.Count == 0) { Log("Notification skipped: all new messages muted by rules."); return; }
 
             string soundName = RuleEngine.GetNotificationSound(audible[0])
                 ?? AccountStore.GetSettings(account.Id).NotificationSound.Value;
             bool mute = soundName.Equals(SilentSoundName, StringComparison.OrdinalIgnoreCase);
 
-            var toast = audible.Count == 1
-                ? new MailToast
-                {
-                    Title = string.IsNullOrWhiteSpace(audible[0].FromName) ? audible[0].FromAddress : audible[0].FromName,
-                    Body = string.IsNullOrWhiteSpace(audible[0].Subject) ? "(no subject)" : audible[0].Subject,
-                    Mute = mute,
-                    AccountId = account.Id,
-                    FolderFullName = folderFullName,
-                    Uid = audible[0].Uid
-                }
-                : new MailToast
-                {
-                    Title = "My Lovely Mail",
-                    Body = $"💌 {audible.Count} new messages for {account.EmailAddress}",
-                    Mute = mute,
-                    AccountId = account.Id,
-                    FolderFullName = folderFullName
-                };
+            // single != null: sender/subject toast opening that message; null: batch count toast (Uid 0).
+            var single = audible.Count == 1 ? audible[0] : null;
+            var toast = new MailToast
+            {
+                Title = single == null ? AppConstants.AppNameHumanReadable
+                    : string.IsNullOrWhiteSpace(single.FromName) ? single.FromAddress : single.FromName,
+                Body = single == null ? $"💌 {audible.Count} new messages for {account.EmailAddress}"
+                    : string.IsNullOrWhiteSpace(single.Subject) ? "(no subject)" : single.Subject,
+                Mute = mute,
+                SoundName = soundName,
+                AccountId = account.Id,
+                FolderFullName = folderFullName,
+                Uid = single?.Uid ?? 0
+            };
 
             try
             {

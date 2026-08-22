@@ -3,10 +3,16 @@
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
 @implements IDisposable
 @inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Forms
+@using System.IO
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>My Lovely Mail</PageTitle>
 
-<div class="mail-screen @(MailUiState.OpenMessage != null ? "mail-screen--reading" : "")"
-     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))">
+@* The narrow-window rule asked only about OpenMessage, so under the two-pane breakpoint the
+   sidebar Compose button rendered its card inside a display:none column and the autosave timer
+   wrote a draft nobody could see. It asks about the pane itself now. *@
+<div class="mail-screen @(MailUiState.ThirdPane != null ? "mail-screen--pane-open" : "")"
+     style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     @* ---- Left: accounts + folders ---- *@
     <aside class="mail-sidebar">
@@ -43,38 +49,78 @@
         }
         else
         {
-            @foreach (var account in AccountStore.Accounts)
+            @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
-                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "")"
+                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
+                        title="@SyncHealthTooltip(account)"
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
-                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
-                    @if (AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    @if (!account.Enabled)
                     {
-                        <span class="mail-account-unread" style="background:@account.ColorHex">@accountUnread</span>
+                        @* Enabled has real consequences — sync, IDLE and the outbox all skip the
+                           account — but the rail drew it exactly like a live one. *@
+                        <span class="mail-account-paused" title="Paused — not syncing">⏸️</span>
+                    }
+                    @if (SyncHealthService.For(account.Id).IsFailing)
+                    {
+                        <span class="mail-account-failing" title="@SyncHealthTooltip(account)">⚠️</span>
+                    }
+                    @if (accountIndex < 9)
+                    {
+                        <span class="mail-account-ordinal">@(accountIndex + 1)</span>
+                    }
+                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
+                    @if (GlobalSettings.ShowUnreadBadge.Value && AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    {
+                        <span class="mail-account-unread" style="background:@account.ColorHex;color:@AppColors.InkOn(account.ColorHex).ToRgbaHex(true)">@accountUnread</span>
                     }
                 </button>
 
                 @if (MailUiState.SelectedAccount?.Id == account.Id)
                 {
-                    @foreach (var folder in Folders)
+                    @foreach (var node in Folders)
                     {
-                        <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
-                                @onclick="() => MailUiState.SelectFolder(folder)">
-                            <span class="mail-folder-icon">@FolderIcon(folder.Role)</span>
-                            <span class="mail-folder-name">@folder.DisplayName</span>
+                        var folder = node.Folder;
+                        @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
+                           Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
+                        <div class="mail-folder-row" style="--folder-depth:@node.Depth">
+                            <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                    title="@FolderFreshness(folder)"
+                                    @onclick="() => MailUiState.SelectFolder(folder)">
+                                <span class="mail-folder-icon">@FolderIcon(folder)</span>
+                                <span class="mail-folder-name">@FolderLabel(folder)</span>
+                                @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value)
+                                {
+                                    <CoreChip Text="@folder.UnreadCount.ToString()"
+                                              Background="@AppColors.Primary"
+                                              TextColor="@AppColors.TextOnAccent"
+                                              FontSize="@AppMeasures.Font.XSmall"
+                                              PaddingX="8" PaddingY="2" />
+                                }
+                            </button>
                             @if (folder.UnreadCount > 0)
                             {
-                                <CoreChip Text="@folder.UnreadCount.ToString()"
-                                          Background="@AppColors.Primary"
-                                          TextColor="@AppColors.TextOnAccent"
-                                          FontSize="@AppMeasures.Font.XSmall"
-                                          PaddingX="8" PaddingY="2" />
+                                <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
+                                        @onclick="() => MarkFolderRead(folder)">📖</button>
                             }
-                        </button>
+                            <button class="mail-folder-action" title="Export this folder as one .mbox file"
+                                    @onclick="() => ExportFolderMailbox(folder)">📦</button>
+                            @if (!folder.IsLocal)
+                            {
+                                <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
+                                        @onclick="() => ResyncFolder(folder)">🔄</button>
+                            }
+                        </div>
                     }
                 }
             }
+        }
+
+        @* Folder-level results need their own line: the reader's status sits inside the
+           open-message block, and a folder export happens with nothing open. *@
+        @if (FolderActionStatus != null)
+        {
+            <div class="mail-sidebar-status">@FolderActionStatus</div>
         }
     </aside>
 
@@ -82,11 +128,39 @@
     <section class="mail-list">
         <div class="mail-search">
             <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
-            @if (!string.IsNullOrWhiteSpace(SearchText))
+            @if (SyncScheduler.IsSyncing)
+            {
+                <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
+            }
+            @* Seven pills wrapped onto three rows and pushed the message list off the screen,
+               so the row folds away. Folded it still carries the count of live filters - a
+               filter you cannot see is worse than one you can. *@
+            <div class="mail-search-fold-row">
+                <button class="mail-search-toggle @(!ShowSearchTools && ActiveFilterCount > 0 ? "mail-search-toggle--on" : "")"
+                        title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
+                        @onclick="() => ShowSearchTools = !ShowSearchTools">
+                    🎛️ Filters@(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "") @(ShowSearchTools ? "▴" : "▾")
+                </button>
+            </div>
+            @if (ShowSearchTools)
             {
                 <div class="mail-search-tools">
-                    <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
-                    <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                    @foreach (var (label, token) in QuickFilters)
+                    {
+                        <button class="mail-search-toggle @(HasSearchToken(token) ? "mail-search-toggle--on" : "")"
+                                @onclick="() => ToggleSearchToken(token)">@label</button>
+                    }
+                    @if (MailUiState.SelectedAccount != null)
+                    {
+                        <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
+                                title="Group replies into conversations"
+                                @onclick="ToggleConversationMode">💬 Conversations</button>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(SearchText))
+                    {
+                        <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
+                        <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                    }
                 </div>
             }
         </div>
@@ -100,10 +174,44 @@
         }
         else if (FilteredSummaries.Count == 0)
         {
-            <div class="mail-empty">
-                <div class="mail-empty-icon">🕊️</div>
-                <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
-            </div>
+            @if (string.IsNullOrWhiteSpace(SearchText)
+                 && MailUiState.SelectedFolder is { } waitedFolder
+                 && ImapSyncService.IsFolderSyncing(waitedFolder.AccountId, waitedFolder.FullName))
+            {
+                <div class="mail-empty">
+                    <CoreSpinner />
+                    <div class="mail-empty-text">Fetching this folder from the server…</div>
+                </div>
+            }
+            else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { Role: FolderRole.Inbox })
+            {
+                <div class="mail-empty mail-inbox-zero">
+                    <div class="mail-inbox-zero-hearts">
+                        @for (int heartIndex = 0; heartIndex < InboxZeroHeartCount; heartIndex++)
+                        {
+                            <span class="mail-inbox-zero-heart" style="@InboxZeroHeartStyle(heartIndex)">💗</span>
+                        }
+                    </div>
+                    @* Emoji stays OUTSIDE the gradient span: background-clip:text turns color emoji into flat blocks. *@
+                    <div class="mail-inbox-zero-headline"><span class="mail-inbox-zero-title">Inbox Zero</span> 💖</div>
+                    <div class="mail-empty-text">Nothing left to read — enjoy the quiet.</div>
+                </div>
+            }
+            else
+            {
+                <div class="mail-empty">
+                    <div class="mail-empty-icon">🕊️</div>
+                    <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+                    @* A refused operator becomes a literal text search, so the query looks right
+                       and the screen says only that it failed. These say what would work. *@
+                    <div class="mail-rescue">
+                        @foreach (var rescue in SearchRescues)
+                        {
+                            <button class="mail-search-toggle" @onclick="() => ApplyRescue(rescue)">@rescue.Label</button>
+                        }
+                    </div>
+                </div>
+            }
         }
         else
         {
@@ -116,25 +224,98 @@
                     <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
                     <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
                     <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
-                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(FilteredSummaries.Select(s => s.Uid))">☑️ All</button>
+                    @{
+                        var moveTargets = MoveTargets;
+                    }
+                    @if (moveTargets.Count > 0)
+                    {
+                        <span class="mail-bulk-move">
+                            <button class="mail-search-toggle" @onclick="() => ShowMovePicker = !ShowMovePicker">📂 Move</button>
+                            @if (ShowMovePicker)
+                            {
+                                <div class="mail-move-popover">
+                                    @foreach (var targetGroup in moveTargets.GroupBy(f => f.IsLocal).OrderBy(g => g.Key))
+                                    {
+                                        @if (targetGroup.Key && moveTargets.Any(f => !f.IsLocal))
+                                        {
+                                            <div class="mail-move-divider">📁 On this machine</div>
+                                        }
+                                        @foreach (var targetFolder in targetGroup)
+                                        {
+                                            <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
+                                                @FolderIcon(targetFolder) @FolderLabel(targetFolder)
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </span>
+                    }
+                    <span class="mail-bulk-move">
+                        <button class="mail-search-toggle" @onclick="() => ShowSnoozePicker = !ShowSnoozePicker">💤 Snooze</button>
+                        @if (ShowSnoozePicker)
+                        {
+                            <div class="mail-move-popover">
+                                @foreach (var (label, dueUtc) in SnoozeService.Presets)
+                                {
+                                    <button class="mail-move-option" @onclick="() => BulkSnooze(dueUtc)">@label</button>
+                                }
+                            </div>
+                        }
+                    </span>
+                    @* Tagging was the one local triage action with no bulk path: forty receipts
+                       meant opening forty messages and using the reader picker forty times. *@
+                    <span class="mail-bulk-move">
+                        <button class="mail-search-toggle" @onclick="() => ShowBulkTagPicker = !ShowBulkTagPicker">🏷️ Tag</button>
+                        @if (ShowBulkTagPicker)
+                        {
+                            <div class="mail-move-popover">
+                                @foreach (string tag in TagStore.AllTags)
+                                {
+                                    <button class="mail-move-option" @onclick="() => BulkTag(tag, add: true)">🏷️ @tag</button>
+                                }
+                                <div class="mail-bulk-tag-new">
+                                    <CoreInput Placeholder="New tag…" @bind-Value="BulkTagName" />
+                                    <button class="mail-move-option" @onclick="() => BulkTag(BulkTagName, add: true)">Add</button>
+                                </div>
+                            </div>
+                        }
+                    </span>
+                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(Rows.Select(r => r.Message.Uid))">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
             }
-            <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown" @onkeydown:preventDefault="true">
-                <Virtualize Items="FilteredSummaries" Context="message" ItemSize="76">
-                    <button class="mail-row @(message.IsUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "")"
+            @* No :preventDefault here: Blazor evaluates it once per render, not per event, so it
+               cancelled EVERY keydown that reached the list — Tab included — and a keyboard user
+               who landed on a row could not get back out to the sidebar, search box or reader. *@
+            <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown">
+                <Virtualize Items="Rows" Context="row" ItemSize="76">
+                    @{
+                        var message = row.Message;
+                        bool rowUnread = row.UnreadCount > 0;
+                    }
+                    <button class="mail-row @(rowUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
                             @onclick="e => HandleRowClick(e, message)">
                         <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
                               @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">
                             @(MailUiState.SelectedUids.Contains(message.Uid) ? "☑" : "☐")
                         </span>
+                        <span class="mail-row-avatar @(rowUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
                         <span class="mail-row-dot"></span>
                         <span class="mail-row-main">
                             <span class="mail-row-top">
-                                <span class="mail-row-from">@(string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName)</span>
+                                <span class="mail-row-from">@row.SenderText</span>
+                                @if (row.ConversationCount > 1)
+                                {
+                                    <span class="mail-row-thread-count" title="@row.ConversationCount messages in this conversation">@row.ConversationCount</span>
+                                }
                                 <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
                             </span>
                             <span class="mail-row-subject">
+                                @if (message.Flags.HasFlag(MailFlags.Muted))
+                                {
+                                    <span class="mail-row-flag mail-row-flag--muted" title="Muted conversation — replies arrive quietly">🔕</span>
+                                }
                                 @if (message.Flags.HasFlag(MailFlags.Important))
                                 {
                                     <span class="mail-row-flag">❗</span>
@@ -146,30 +327,143 @@
                                 @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
                             </span>
                             <span class="mail-row-preview">
+                                @* The Outbox row carried no state at all, so a message queued a
+                                   moment ago looked like one failing for three days. *@
+                                @if (OutboxStatusOf(message) is { } outboxStatus)
+                                {
+                                    <span class="mail-row-outbox">@outboxStatus</span>
+                                }
                                 @if (HitFolderDisplay(message) is { } hitFolder)
                                 {
                                     <span class="mail-row-folder">📁 @hitFolder</span>
                                 }
                                 @foreach (var tag in message.Tags)
                                 {
-                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag)">@tag</span>
+                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
                                 }
                                 @if (message.HasAttachments)
                                 {
                                     <span class="mail-row-attach">📎</span>
+                                }
+                                @if (message.SnoozedUntilUtc is { } snoozedUntil)
+                                {
+                                    <button class="mail-row-snoozed" title="Bring it back now"
+                                            @onclick="() => WakeMessage(message)" @onclick:stopPropagation="true">@SnoozeLabel(snoozedUntil)</button>
                                 }
                                 @message.PreviewText
                             </span>
                         </span>
                     </button>
                 </Virtualize>
+
+                @* The store knows the folder is truncated (TotalCount is the server's own number),
+                   so say it instead of letting a search come back empty for mail that was never fetched. *@
+                @if (!SearchAllFolders && TruncatedFolder is { } truncated)
+                {
+                    <div class="mail-backfill">
+                        <span class="mail-backfill-text">
+                            Showing @CachedCount.ToString("N0") of @truncated.TotalCount.ToString("N0") here
+                        </span>
+                        @if (ImapSyncService.IsFolderSyncing(truncated.AccountId, truncated.FullName))
+                        {
+                            <CoreSpinner />
+                        }
+                        else
+                        {
+                            <button class="mail-backfill-button" @onclick="() => LoadOlder(truncated)">
+                                ⬇️ Load @BackfillBatchSize older
+                            </button>
+                        }
+                    </div>
+                }
             </div>
         }
     </section>
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
-        @if (MailUiState.ActiveCompose is { } draft)
+        @* Exactly one occupant at a time, with a strip listing the ones that exist. The sheet used
+           to render above the reader body in the same scrolling column, pushing the message below
+           the fold; switching here only moves ThirdPane, so the draft and the open message keep
+           their state. *@
+        @if (PaneTabs.Count > 1)
+        {
+            <div class="mail-pane-tabs">
+                @foreach (var (occupant, label) in PaneTabs)
+                {
+                    <button class="mail-pane-tab @(MailUiState.ThirdPane == occupant ? "mail-pane-tab--on" : "")"
+                            @onclick="() => MailUiState.ShowPane(occupant)">@label</button>
+                }
+            </div>
+        }
+        @* The sheet lives INSIDE the reader pane rather than beside it: .mail-screen is a
+           three-column grid, and a fourth child pushed the message list into the reader's slot. *@
+        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person && MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
+        {
+            <div class="mail-person-sheet">
+                <div class="mail-person-head">
+                    <span class="mail-person-name">@(person.DisplayName.Length > 0 ? person.DisplayName : person.Address)</span>
+                    <button class="mail-person-close" title="Close" @onclick="MailUiState.ClosePerson">✕</button>
+                </div>
+                <div class="mail-person-address">@person.Address</div>
+                <div class="mail-person-stats">
+                    <span>@person.MessageCount messages</span>
+                    <span>@person.ReceivedCount received · @person.SentCount sent</span>
+                    <span>@person.UnreadCount unread</span>
+                    <span>@person.WithAttachments with attachments</span>
+                    @if (person.MessageCount > 0)
+                    {
+                        <span>@person.OldestUtc.ToLocalTime().ToString("dd MMM yyyy") — @person.NewestUtc.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    }
+                </div>
+                @foreach (var (folderName, count) in person.ByFolder.OrderByDescending(e => e.Value))
+                {
+                    <div class="mail-person-folder">@folderName — @count</div>
+                }
+                @if (person.Tags.Count > 0)
+                {
+                    <div class="mail-person-tags">
+                        @foreach (string tag in person.Tags)
+                        {
+                            <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
+                        }
+                    </div>
+                }
+                <div class="mail-person-actions">
+                    <button class="mail-search-toggle" @onclick='() => RunSavedSearch("from:" + person.Address)'>🔍 From them</button>
+                    <button class="mail-search-toggle" @onclick='() => RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
+                    <button class="mail-search-toggle" @onclick="() => StartComposeTo(person.Address)">✏️ Write</button>
+                </div>
+            </div>
+        }
+
+        @* One bar for the whole held queue, not one per message: Outbox is a folder the user
+           has no reason to open, so the count has to come to them. *@
+        @if (OutboxAttemptStore.HeldCount is > 0 and var heldCount)
+        {
+            <div class="mail-undo-bar mail-undo-bar--failed">
+                <span class="mail-undo-text">⛔ @heldCount message(s) stopped after repeated send failures</span>
+                <button class="mail-undo-button" @onclick="RetryHeldOutbox">Try now</button>
+            </div>
+        }
+
+        @if (OutboxService.LastFailure is { } failedSend)
+        {
+            <div class="mail-undo-bar mail-undo-bar--failed">
+                <span class="mail-undo-text">❌ Send failed: "@(string.IsNullOrWhiteSpace(failedSend.Draft.Subject) ? "(no subject)" : failedSend.Draft.Subject)" — @failedSend.Reason</span>
+                <button class="mail-undo-button" @onclick="OutboxService.RetryFailed">🔁 Retry</button>
+                <button class="mail-undo-button" @onclick="EditFailedSend">✏️ Edit</button>
+                <button class="mail-undo-button" @onclick="OutboxService.DismissFailed">✕ Dismiss</button>
+            </div>
+        }
+        @if (OutboxService.Current is { } pendingSend)
+        {
+            <div class="mail-undo-bar">
+                <span class="mail-undo-text">✉️ Sending "@(string.IsNullOrWhiteSpace(pendingSend.Draft.Subject) ? "(no subject)" : pendingSend.Draft.Subject)" in @(UndoSecondsLeft(pendingSend))s…</span>
+                <button class="mail-undo-button" @onclick="UndoPendingSend">↩️ Undo</button>
+            </div>
+        }
+        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Compose && MailUiState.ActiveCompose is { } draft)
         {
             <div class="mail-reader-header">
                 <BackButton OnClick="@SaveAndCloseCompose" />
@@ -178,31 +472,87 @@
                 {
                     <span class="mail-compose-saved">💾 @DraftSavedAt?.ToString("HH:mm:ss")</span>
                 }
+                @* Only on a draft that quotes something; the quote is rebuilt from the source
+                   message, never re-parsed out of the body the user has been editing. *@
+                @if (draft.SourceUid > 0)
+                {
+                    <span class="mail-quote-picker">
+                        @foreach (var style in Enum.GetValues<QuoteStyle>())
+                        {
+                            <button class="mail-folder-action mail-text-scale-step" @onclick="() => RequoteDraft(draft, style)">@style</button>
+                        }
+                    </span>
+                }
             </div>
 
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
                 <div class="mail-compose-fields" @oninput="NoteComposeActivity">
-                <div class="mail-compose-from">From: <b>@draft.Account?.EmailAddress</b></div>
-                <CoreInput Placeholder="To (comma separated)" Icon="👤" @bind-Value="draft.To" />
-                <CoreInput Placeholder="Cc" Icon="👥" @bind-Value="draft.Cc" />
+                <div class="mail-compose-from">
+                    From:
+                    @foreach (var sender in AccountStore.Accounts)
+                    {
+                        <button class="mail-from-chip @(draft.Account?.Id == sender.Id ? "mail-from-chip--on" : "")"
+                                style="background:@sender.ColorHex;color:@AppColors.InkOn(sender.ColorHex).ToRgbaHex(true)"
+                                @onclick="() => SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
+                    }
+                </div>
+                @* Native datalist: the browser owns the dropdown, so autosave and typing stay untouched. *@
+                <datalist id="@ContactListId">
+                    @foreach (var contact in KnownContacts)
+                    {
+                        <option value="@contact.Suggestion"></option>
+                    }
+                </datalist>
+                <CoreInput Placeholder="To (comma separated)" Icon="👤" ListId="@ContactListId" @bind-Value="draft.To" />
+                <CoreInput Placeholder="Cc" Icon="👥" ListId="@ContactListId" @bind-Value="draft.Cc" />
                 <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
                 <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
                 </div>
+
+                <label class="mail-compose-dropzone">
+                    <InputFile OnChange="OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                    📎 Attach files — click or drop them here
+                </label>
+                @if (draft.AttachmentPaths.Count > 0)
+                {
+                    <div class="mail-compose-attachments">
+                        @foreach (var attachmentPath in draft.AttachmentPaths)
+                        {
+                            <span class="mail-compose-attachment-chip">
+                                📎 @Path.GetFileName(attachmentPath)
+                                <button class="mail-compose-attachment-remove" title="Remove"
+                                        @onclick="() => RemoveComposeAttachment(attachmentPath)">✕</button>
+                            </span>
+                        }
+                    </div>
+                }
 
                 @if (SendError != null)
                 {
                     <p class="mail-compose-error">❌ @SendError</p>
                 }
 
-                <div class="mail-compose-actions">
-                    <SecondaryButton OnClick="@DiscardCompose" Disabled="@Sending">🗑️ Discard</SecondaryButton>
-                    <PrimaryButton OnClick="@SendActiveDraftAsync" Disabled="@(Sending || string.IsNullOrWhiteSpace(draft.To))">
-                        @if (Sending)
+                @if (SendWarnings.Count > 0)
+                {
+                    <div class="mail-undo-bar mail-undo-bar--warning mail-send-guard">
+                        @foreach (var warning in SendWarnings)
                         {
-                            <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
+                            <span class="mail-undo-text">⚠️ @warning.Text</span>
+                            @if (warning.Code == SendGuardService.AttachmentCode)
+                            {
+                                <label class="mail-undo-button">
+                                    <InputFile OnChange="OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                                    Attach a file
+                                </label>
+                            }
                         }
-                        📨 Send
-                    </PrimaryButton>
+                        <button class="mail-undo-button" @onclick="ForceQueueActiveDraftSend">Send anyway</button>
+                    </div>
+                }
+
+                <div class="mail-compose-actions">
+                    <SecondaryButton OnClick="@DiscardCompose">🗑️ Discard</SecondaryButton>
+                    <PrimaryButton OnClick="@QueueActiveDraftSend" Disabled="@(string.IsNullOrWhiteSpace(draft.To))">📨 Send</PrimaryButton>
                 </div>
             </GlassCard>
         }
@@ -215,14 +565,55 @@
         }
         else
         {
+            @* @key remounts this subtree per message, so the open animation replays on every switch. *@
+            <div class="mail-reader-content" @key="open.Uid">
             <div class="mail-reader-header">
                 <BackButton OnClick="@MailUiState.CloseMessage" />
+                @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
+                <button class="mail-reader-avatar" title="Everything known about this correspondent"
+                        style="background:@AvatarGradient(open)"
+                        @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@AvatarInitials(open)</button>
                 <div class="mail-reader-titles">
                     <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
                     <div class="mail-reader-meta">
                         <span class="mail-reader-from">@open.FromName &lt;@open.FromAddress&gt;</span>
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                     </div>
+                    @if (HistoryOfOpenSender(open) is { } history)
+                    {
+                        <button class="mail-reader-history" title="Show everything from this sender"
+                                @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
+                            💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
+                        </button>
+                    }
+                    @* Only ever what is WRONG. A dkim=pass line can be prepended by anyone, so a
+                       reassuring green badge would launder a forged header. *@
+                    @foreach (var finding in authFindings)
+                    {
+                        <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
+                    }
+                    @* A rule that works leaves no other trace: mail simply arrives already-read,
+                       tagged, or missing from the folder it was addressed to. *@
+                    @foreach (var trace in ruleTrace)
+                    {
+                        <button class="mail-rule-trace" title="Open the filter rules"
+                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>🧭 @trace.Action by “@trace.RuleName”</button>
+                    }
+                    @if (unsubscribeTargets is { } unsubscribe)
+                    {
+                        <div class="mail-unsubscribe">
+                            @if (unsubscribe.HttpUrl is { } unsubscribeUrl)
+                            {
+                                <button class="mail-unsubscribe-chip" title="@unsubscribeUrl"
+                                        @onclick="() => OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on the web</button>
+                            }
+                            @if (unsubscribe.MailtoAddress != null)
+                            {
+                                <button class="mail-unsubscribe-chip" title="Prepares the mail; you still press Send"
+                                        @onclick="() => ComposeUnsubscribeMail(unsubscribe)">✉️ Unsubscribe by mail</button>
+                            }
+                        </div>
+                    }
                     @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
                         <div class="mail-reader-to">to @open.ToAddresses</div>
@@ -230,13 +621,50 @@
                 </div>
             </div>
 
+            @* Conversation grouping maps a thread to its newest message alone, so the other
+               replies have no row at all while the count pill advertises that they exist. This is
+               the way to them, and it is shown in flat mode too — the thread is there either way. *@
+            @if (ThreadOfOpenMessage(open) is { } thread)
+            {
+                <div class="mail-reader-thread">
+                    <div class="mail-reader-thread-nav">
+                        <button class="mail-thread-step" disabled="@(OpenThreadPosition(open) <= 1)"
+                                title="Previous in conversation (P)" @onclick="() => StepThread(-1)">◀</button>
+                        <span class="mail-reader-thread-count">@OpenThreadPosition(open) of @thread.Count</span>
+                        <button class="mail-thread-step" disabled="@(OpenThreadPosition(open) >= thread.Count)"
+                                title="Next in conversation (N)" @onclick="() => StepThread(1)">▶</button>
+                    </div>
+                    @foreach (var step in thread)
+                    {
+                        <button class="mail-thread-line @(step.Uid == open.Uid ? "mail-thread-line--open" : "")"
+                                @onclick="() => OpenMessage(step)">
+                            <span class="mail-thread-line-date">@step.DateUtc.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                            <span class="mail-thread-line-sender">@(string.IsNullOrWhiteSpace(step.FromName) ? step.FromAddress : step.FromName)</span>
+                            @if (step.IsUnread)
+                            {
+                                <span class="mail-thread-line-unread"></span>
+                            }
+                        </button>
+                    }
+                </div>
+            }
+
             <div class="mail-reader-actions">
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartForward(open))">➡️ Forward</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => StartForwardAsAttachment(open))">📎 Forward as attachment</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ShowTagPicker = !ShowTagPicker)">🏷️ Tags</SecondaryButton>
+                <span class="mail-text-scale">
+                    <button class="mail-folder-action mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => StepReaderTextScale(-1)">A-</button>
+                    <button class="mail-folder-action mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
+                    <button class="mail-folder-action mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => StepReaderTextScale(1)">A+</button>
+                </span>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => OpenMessageSource(open))">🔍 Source</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ExportOpen(open, asHtml: false))">💾 .eml</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => ExportOpen(open, asHtml: true))">🌐 .html</SecondaryButton>
                 <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => DeleteOpen(open))">🗑️ Delete</DangerButton>
             </div>
 
@@ -245,7 +673,7 @@
                 <div class="mail-attachments">
                     @foreach (var tag in open.Tags)
                     {
-                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag)"
+                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
                                 title="Search this tag" @onclick="() => SearchByTag(tag)">@tag</button>
                     }
                 </div>
@@ -257,7 +685,7 @@
                     @foreach (var tag in TagStore.AllTags)
                     {
                         <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
-                                style="background:@TagStore.ColorOf(tag)"
+                                style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
                                 @onclick="() => ToggleTagOnOpen(open, tag)">
                             @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
                         </button>
@@ -327,9 +755,39 @@
                     }
                 }
             </GlassCard>
+            </div>
         }
     </section>
 </div>
+
+<CoreModal IsVisible="ShowMessageSource" OnBackdropClick="@(() => ShowMessageSource = false)">
+    <div class="mail-source">
+        <div class="mail-source-tabs">
+            <button class="mail-search-toggle @(ShowRawSource ? "" : "mail-search-toggle--on")" @onclick="() => ShowRawSource = false">📋 Headers</button>
+            <button class="mail-search-toggle @(ShowRawSource ? "mail-search-toggle--on" : "")" @onclick="() => ShowRawSource = true">📄 Raw MIME</button>
+            <button class="mail-search-toggle" @onclick="CopySourceAsync">⧉ Copy</button>
+            <button class="mail-search-toggle" @onclick="() => ShowMessageSource = false">✕ Close</button>
+        </div>
+        @if (ShowRawSource)
+        {
+            <pre class="mail-source-raw">@(SourceRaw.Length > 0 ? SourceRaw : "The message body is not cached yet — open it once while online.")</pre>
+        }
+        else if (SourceHeaders.Count == 0)
+        {
+            <p class="mail-empty-text">The message body is not cached yet — open it once while online.</p>
+        }
+        else
+        {
+            <div class="mail-source-headers">
+                @foreach (var (name, value) in SourceHeaders)
+                {
+                    <div class="mail-source-header-name">@name</div>
+                    <div class="mail-source-header-value">@value</div>
+                }
+            </div>
+        }
+    </div>
+</CoreModal>
 
 <CoreModal IsVisible="ShowShortcutHelp" OnBackdropClick="@(() => ShowShortcutHelp = false)">
     <div class="mail-shortcuts">

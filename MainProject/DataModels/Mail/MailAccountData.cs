@@ -1,3 +1,5 @@
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
+
 namespace MyLovelyMail.MainProject.DataModels.Mail
 {
     /// <summary>Protocol used to receive mail for an account.</summary>
@@ -5,6 +7,18 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     {
         Imap,
         Pop3
+    }
+
+    /// <summary>The single home of protocol display strings, so UI text always follows the selected enum value.</summary>
+    public static class IncomingProtocolNames
+    {
+        /// <summary>Human-facing name: "IMAP" / "POP3" (the enum members render as "Imap"/"Pop3").</summary>
+        public static string DisplayName(this IncomingProtocol protocol) =>
+            protocol == IncomingProtocol.Imap ? "IMAP" : "POP3";
+
+        /// <summary>Conventional incoming-host prefix: "imap" / "pop".</summary>
+        public static string HostPrefix(this IncomingProtocol protocol) =>
+            protocol == IncomingProtocol.Imap ? "imap" : "pop";
     }
 
     /// <summary>Socket security for a mail server connection.</summary>
@@ -51,11 +65,18 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public MailAuthMethod AuthMethod { get; set; } = MailAuthMethod.Password;
 
         /// <summary>Accent color of this account in the UI (folder dot, avatar ring).</summary>
-        public string ColorHex { get; set; } = "#EC6FA9";
+        public string ColorHex { get; set; } = AppColors.IdentityPalette[0];
 
         /// <summary>Disabled accounts stay configured but are skipped by sync.</summary>
         public bool Enabled { get; set; } = true;
 
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Position in the account rail, and therefore which mailbox answers Ctrl+1..9. 0 means
+        /// "never ordered"; <see cref="AccountStore.Load"/> fills it from the signup order so
+        /// nothing moves the first time.
+        /// </summary>
+        public int SortOrder { get; set; }
     }
 }

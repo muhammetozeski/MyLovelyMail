@@ -1,4 +1,3 @@
-using System.Reflection;
 using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Stores
@@ -20,11 +19,20 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.UseImapIdle"/>
         public readonly InheritedSetting<bool> UseImapIdle = new(Settings.UseImapIdle);
 
+        /// <inheritdoc cref="Settings.BackgroundFolderRefreshCount"/>
+        public readonly InheritedSetting<int> BackgroundFolderRefreshCount = new(Settings.BackgroundFolderRefreshCount);
+
         /// <inheritdoc cref="Settings.DownloadAttachmentsAutomatically"/>
         public readonly InheritedSetting<bool> DownloadAttachmentsAutomatically = new(Settings.DownloadAttachmentsAutomatically);
 
         /// <inheritdoc cref="Settings.OfflineKeepDays"/>
         public readonly InheritedSetting<int> OfflineKeepDays = new(Settings.OfflineKeepDays);
+
+        /// <inheritdoc cref="Settings.OfflineMaxCacheMb"/>
+        public readonly InheritedSetting<int> OfflineMaxCacheMb = new(Settings.OfflineMaxCacheMb);
+
+        /// <inheritdoc cref="Settings.MaxAttachmentTotalMb"/>
+        public readonly InheritedSetting<int> MaxAttachmentTotalMb = new(Settings.MaxAttachmentTotalMb);
 
         /// <inheritdoc cref="Settings.MarkAsReadDelaySeconds"/>
         public readonly InheritedSetting<int> MarkAsReadDelaySeconds = new(Settings.MarkAsReadDelaySeconds);
@@ -38,14 +46,20 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.DeleteAction"/>
         public readonly InheritedSetting<DeleteBehavior> DeleteAction = new(Settings.DeleteAction);
 
-        /// <inheritdoc cref="Settings.DefaultComposeFormat"/>
-        public readonly InheritedSetting<ComposeFormat> DefaultComposeFormat = new(Settings.DefaultComposeFormat);
-
-        /// <inheritdoc cref="Settings.SignatureHtml"/>
-        public readonly InheritedSetting<string> SignatureHtml = new(Settings.SignatureHtml);
+        /// <inheritdoc cref="Settings.Signature"/>
+        public readonly InheritedSetting<string> Signature = new(Settings.Signature);
 
         /// <inheritdoc cref="Settings.UndoSendSeconds"/>
         public readonly InheritedSetting<int> UndoSendSeconds = new(Settings.UndoSendSeconds);
+
+        /// <inheritdoc cref="Settings.ReplyQuoteStyle"/>
+        public readonly InheritedSetting<QuoteStyle> ReplyQuoteStyle = new(Settings.ReplyQuoteStyle);
+
+        /// <inheritdoc cref="Settings.QuoteTrimLines"/>
+        public readonly InheritedSetting<int> QuoteTrimLines = new(Settings.QuoteTrimLines);
+
+        /// <inheritdoc cref="Settings.Pop3FetchLimit"/>
+        public readonly InheritedSetting<int> Pop3FetchLimit = new(Settings.Pop3FetchLimit);
 
         /// <inheritdoc cref="Settings.NotifyOnNewMail"/>
         public readonly InheritedSetting<bool> NotifyOnNewMail = new(Settings.NotifyOnNewMail);
@@ -64,16 +78,7 @@ namespace MyLovelyMail.MainProject.Stores
         public AccountSettings(string accountId)
         {
             AccountId = accountId;
-            foreach (var field in GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (field.GetValue(this) is ISettingSetup setupSetting)
-                {
-                    setupSetting.InitializeKey(field.Name);
-                    iSettingSetups.Add(field.Name, setupSetting);
-                    if (setupSetting is ISetting setting)
-                        iSettings[field.Name] = setting;
-                }
-            }
+            SettingRegistration.RegisterFields(GetType(), this, iSettingSetups, iSettings);
         }
 
         public ISetting[] GetAllSettings() => [.. iSettings.Values];

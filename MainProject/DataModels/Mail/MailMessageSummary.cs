@@ -28,6 +28,12 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>RFC Message-Id header, used for threading and duplicate detection.</summary>
         public string MessageId { get; set; } = string.Empty;
 
+        /// <summary>Message-Id this one replies to (empty when not a reply). Normalized, no angle brackets.</summary>
+        public string InReplyTo { get; set; } = string.Empty;
+
+        /// <summary>The References header chain (oldest first), normalized ids. Empty when absent.</summary>
+        public List<string> ReferenceIds { get; set; } = [];
+
         public string Subject { get; set; } = string.Empty;
         public string FromName { get; set; } = string.Empty;
         public string FromAddress { get; set; } = string.Empty;
@@ -45,6 +51,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         /// <summary>User-assigned tag names (colored labels). Empty when untagged.</summary>
         public List<string> Tags { get; set; } = [];
+
+        /// <summary>Hidden from the lists until this moment, then it comes back unread. Null = not snoozed.</summary>
+        public DateTime? SnoozedUntilUtc { get; set; }
 
         public bool IsUnread => !Flags.HasFlag(MailFlags.Seen);
     }

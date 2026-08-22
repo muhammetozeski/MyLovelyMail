@@ -50,6 +50,10 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         Flag
     }
 
+    /// <summary>
+    /// One field/operator/value test of a rule. <see cref="Value"/> is always text: for SizeKb it
+    /// holds the numeric threshold as a string, for HasAttachment "false" means "has none".
+    /// </summary>
     public class FilterCondition
     {
         public FilterField Field { get; set; } = FilterField.From;
@@ -57,6 +61,7 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public string Value { get; set; } = string.Empty;
     }
 
+    /// <summary>One action a matched rule executes; what <see cref="Argument"/> means per type is documented on <see cref="FilterActionType"/>.</summary>
     public class FilterAction
     {
         public FilterActionType Type { get; set; } = FilterActionType.MarkRead;
