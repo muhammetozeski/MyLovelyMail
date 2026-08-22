@@ -76,6 +76,6 @@ namespace MyLovelyMail.MainProject.Services
         static int Count(string accountId, string folderFullName, string query, bool searchAllFolders) =>
             searchAllFolders && query.Trim().Length > 0
                 ? SearchService.Search(accountId, query).Count
-                : MessageStore.GetSummaries(accountId, folderFullName).Count(SearchService.BuildMatcher(query));
+                : MessageStore.GetSummaries(accountId, folderFullName).Count(SearchService.BuildMatcher(query, accountId));
     }
 }

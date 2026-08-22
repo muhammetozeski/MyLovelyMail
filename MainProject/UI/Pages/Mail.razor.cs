@@ -130,7 +130,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             // The matcher runs even for an empty query: it is also what hides snoozed mail.
             FilteredSummaries = [.. MessageStore.GetSummaries(account.Id, folder.FullName)
-                .Where(SearchService.BuildMatcher(SearchText))];
+                .Where(SearchService.BuildMatcher(SearchText, account.Id))];
             BuildRows();
         }
 
