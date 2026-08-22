@@ -560,14 +560,32 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             if (ruleResult.RemoteMoves.Count == 0) return;
 
+            // Off means "the server files it, this machine keeps its own filing" — the local copy
+            // stays where it is instead of following the move.
+            bool mirrorLocally = AccountStore.GetSettings(account.Id).MirrorRuleMovesLocally.Value;
+
             await folder.OpenAsync(FolderAccess.ReadWrite, cancellationToken);
-            foreach (var moveGroup in ruleResult.RemoteMoves.GroupBy(m => m.TargetFolder))
+            foreach (var moveGroup in ruleResult.RemoteMoves.GroupBy(static m => m.TargetFolder))
             {
+                List<UniqueId> sourceUids = [.. moveGroup.Select(static m => new UniqueId(m.Uid))];
                 try
                 {
                     var targetFolder = await client.GetFolderAsync(moveGroup.Key, cancellationToken);
-                    await folder.MoveToAsync([.. moveGroup.Select(m => new UniqueId(m.Uid))], targetFolder, cancellationToken);
-                    MessageStore.RemoveMessages(account.Id, folder.FullName, moveGroup.Select(m => m.Uid));
+                    var moved = await folder.MoveToAsync(sourceUids, targetFolder, cancellationToken);
+                    if (!mirrorLocally) continue;
+
+                    foreach (var source in sourceUids)
+                    {
+                        // The message used to be deleted from the source and written nowhere, so
+                        // it vanished from the app until the destination folder's own sync ran —
+                        // and with the destination folder unlisted, that never happened at all.
+                        if (moved.TryGetValue(source, out var destination))
+                            MessageStore.MoveToServerFolder(account.Id, folder.FullName, source.Id, targetFolder.FullName, destination.Id);
+                        else
+                            // No UIDPLUS: the destination's uid is unknowable here, so the row is
+                            // dropped and the destination folder's next sync brings it back.
+                            MessageStore.RemoveMessages(account.Id, folder.FullName, [source.Id]);
+                    }
                 }
                 catch (Exception ex)
                 {

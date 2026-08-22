@@ -22,6 +22,9 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.BackgroundFolderRefreshCount"/>
         public readonly InheritedSetting<int> BackgroundFolderRefreshCount = new(Settings.BackgroundFolderRefreshCount);
 
+        /// <inheritdoc cref="Settings.MirrorRuleMovesLocally"/>
+        public readonly InheritedSetting<bool> MirrorRuleMovesLocally = new(Settings.MirrorRuleMovesLocally);
+
         /// <inheritdoc cref="Settings.DownloadAttachmentsAutomatically"/>
         public readonly InheritedSetting<bool> DownloadAttachmentsAutomatically = new(Settings.DownloadAttachmentsAutomatically);
 

@@ -389,6 +389,30 @@ namespace MyLovelyMail.MainProject.Storage
             RemoveMessages(accountId, fromFolderFullName, [uid]);
         }
 
+        /// <summary>
+        /// Mirrors a move the SERVER already performed: the summary, its cached .eml and every
+        /// app-local field (tags, important, snooze, mute) land in the destination folder under the
+        /// uid the server assigned there, and the source row goes away.
+        /// <para>
+        /// Only ever called with a destination uid the server reported (UIDPLUS). Inventing one
+        /// would repeat the collision local folders already taught: uids restart per folder, so a
+        /// guessed number can land on top of a message that is already there.
+        /// </para>
+        /// </summary>
+        public static void MoveToServerFolder(string accountId, string fromFolderFullName, uint uid, string toFolderFullName, uint newUid)
+        {
+            var summary = GetSummary(accountId, fromFolderFullName, uid);
+            if (summary == null) return;
+
+            byte[]? mimeBytes = TryLoadFullMessage(accountId, fromFolderFullName, uid);
+            summary.Uid = newUid;
+            if (mimeBytes != null)
+                SaveFullMessage(accountId, toFolderFullName, newUid, mimeBytes);
+
+            UpsertSummaries(accountId, toFolderFullName, [summary]);
+            RemoveMessages(accountId, fromFolderFullName, [uid]);
+        }
+
         #region Full message bodies (disk only)
 
         public static bool HasFullMessage(string accountId, string folderFullName, uint uid) =>

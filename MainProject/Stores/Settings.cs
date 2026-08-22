@@ -73,6 +73,12 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>How many of the stalest non-Inbox folders each sync pass also refreshes (0 = Inbox only).</summary>
         public static readonly Setting<int> BackgroundFolderRefreshCount = new(2);
 
+        /// <summary>
+        /// When a rule moves a message on the server, move the cached copy the same way. Off keeps
+        /// the local copy where it is, so this machine's filing can differ from the server's.
+        /// </summary>
+        public static readonly Setting<bool> MirrorRuleMovesLocally = new(true);
+
         /// <summary>Download attachments together with the message body instead of on first open.</summary>
         public static readonly Setting<bool> DownloadAttachmentsAutomatically = new(false);
 
