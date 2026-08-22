@@ -320,6 +320,15 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // Fires a side-button action without a mouse, so the behavior is testable without
+                // touching the cursor on a machine the user is sitting at.
+                case ("POST", "/mouse"):
+                {
+                    string action = query["action"] ?? MouseActionService.CopyAction;
+                    string status = await MouseActionService.RunAsync(action, query["value"] ?? string.Empty);
+                    return new { action, status };
+                }
+
                 // The signature in all three of its shapes at once: what is stored, what goes out
                 // as html, and what goes out as text. Without an accountId these read and write
                 // the global value; with one they read and write that account's override.

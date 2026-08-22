@@ -51,8 +51,11 @@
         {
             @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
+                @* Side button 4 copies this account's address: the row shows a display name or a
+                   truncated address, so the payload is named rather than read off the screen. *@
                 <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
                         title="@SyncHealthTooltip(account)"
+                        data-mouse4="copy" data-mouse4-value="@account.EmailAddress"
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
                     @if (!account.Enabled)
