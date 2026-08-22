@@ -33,6 +33,18 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   varsayımı Yandex'te tersti (1 = en yeni). Sıra artık iki uçtaki Date başlığından ölçülüyor.
 - **"Son N" penceresi yeni-mail tespiti için kullanılamaz.** Yeni mail listenin herhangi bir
   ucuna düşebilir; tespit her zaman TÜM kimlik listesine karşı yapılır, limit sonra uygulanır.
+- **IMAP'te `<n>:*` aralığı hiçbir zaman boş dönmez.** RFC 3501, n kutudaki en yüksek uid'den
+  büyük olsa bile son mesajı döndürmeyi şart koşar. "Getirilen" ile "yeni" bu yüzden aynı şey
+  değildir ve fark tek bir yerde değil, kapının kendisinde durmalıdır. Kural motoru kapısı
+  `newCount` yerine `summaries.Count` baktığı için kutunun son maili her senkronda yeniden
+  kurallardan geçti: denetim kaydında aynı olayın 16 kopyası, 48 başarısız taşıma denemesi ve
+  okuyucuda 64 rozetlik bir duvar. (Ölçüm: kullanıcının log'u, 22.08.2026.)
+- **Klasör rolü tahmin edilmez, protokolden okunur.** RFC 6154 SPECIAL-USE yalnızca şu yedi rolü
+  tanımlar: All, Archive, Drafts, Flagged, Junk, Sent, Trash. Outbox bunlardan biri değildir —
+  gönderim kuyruğu istemcinin kendi kavramıdır. İsim tablosu ancak bayrak vermeyen sunucular için
+  yedektir ve tek dilli olamaz (Gönderilmiş Postalar, Papierkorb, Corbeille, Отправленные).
+  Bir de kimse "bu rolü ikinci kez alan var mı" diye sormuyorsa iki klasör aynı kimliğe sahip
+  olur ve "gönderilen mail nereye yazılır" sorusunun iki cevabı olur.
 
 ## Dağıtım
 
@@ -130,6 +142,20 @@ Yapılan hatalardan alınan dersler. Her madde gerçek bir vakadan çıktı.
   indeks. Yazdığım pencere kontrolü bu yüzden hiç çalışmadı: eşleşme bulunmayan her mesaj sessizce
   0 numaralı mesajla birleşti, yani düzeltmeye çalıştığım hatanın aynısı. FindLastIndex -1 döner,
   ya da elle döngü yazılır. Ölçmeseydim "düzeldi" diye commit'lenmişti.
+- **Her yeniden denemenin bir durma şartı olmalı.** Aynı desen bu projede iki kez çıktı: hedefi
+  olmayan bir klasöre taşıma her senkronda yeniden denendi (bir oturumda 48 kez), klasör
+  oluşturmayı "Folders are not supported" ile reddeden sunucuya da her senkronda yeniden soruldu.
+  Düzelemeyecek bir hata ile düzelebilecek bir hata ayrılmadıkça döngü uygulama açık kaldığı
+  sürece sürer. Reddi hatırla, o tur bir daha sorma.
+- **"Yaptım" demeden önce yaptığını oku.** Pano yazımı arka plan thread'inden sessizce
+  düşüyordu (Windows panosu apartman bağımlı; `MainThread.InvokeOnMainThreadAsync` ile geçince
+  çalıştı), ama arayüz yine de "📋 Copied ..." yazıyordu. Ölçüm basitti: panoya bilinen bir
+  değer koy, işlemi çalıştır, panoyu yeniden oku. Yazma sonucunu döndürmeyen bir yardımcı,
+  çağıranı yalan söylemeye mecbur bırakır.
+- **`flex-basis` + padding = taşma.** İki panel `flex: 1 1 280px` ile yan yana konulmuştu ama
+  `box-sizing` varsayılan olduğu için padding ve kenarlık 280'in üstüne bindi, çift 586 pikselik
+  kutuya sığmayıp alt alta düştü. Yan yana duracak kutulara `box-sizing: border-box`.
+
 ## Süreç
 
 - **Tek concern = tek commit.** Deneysel değişiklik ile sağlam düzeltme aynı commit'e girerse
