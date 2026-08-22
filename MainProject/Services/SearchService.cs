@@ -16,7 +16,8 @@ namespace MyLovelyMail.MainProject.Services
     /// <summary>
     /// Cross-folder search over the RAM summary index. Plain tokens must ALL match somewhere in
     /// subject/from/to/preview/tags; prefix operators narrow single fields:
-    /// <c>from:</c>, <c>to:</c>, <c>tag:</c>, <c>has:attachment</c>, <c>is:unread|starred|important|snoozed</c>,
+    /// <c>from:</c>, <c>to:</c> (mail the account itself SENT to that address), <c>tag:</c>,
+    /// <c>has:attachment</c>, <c>is:unread|starred|important|snoozed</c>,
     /// <c>after:</c>/<c>before:</c>/<c>on:</c> (yyyy-MM-dd) and <c>newer_than:</c>/<c>older_than:</c> (7d, 2w, 3m, 1y).
     /// </summary>
     public static class SearchService
@@ -29,9 +30,9 @@ namespace MyLovelyMail.MainProject.Services
         /// folder) run this, so the token language the help modal advertises works everywhere
         /// instead of only in all-folders mode.
         /// </summary>
-        public static Func<MailMessageSummary, bool> BuildMatcher(string query)
+        public static Func<MailMessageSummary, bool> BuildMatcher(string query, string? accountId = null)
         {
-            var (textTokens, predicates) = ParseQuery(query);
+            var (textTokens, predicates) = ParseQuery(query, OwnAddressesOf(accountId));
             // Snoozed mail is hidden EVERYWHERE unless the query asks for it. Living here means the
             // folder list, the all-folders search and the debug list can never disagree about it.
             bool showSnoozed = query.Contains(SnoozedToken, StringComparison.OrdinalIgnoreCase);
@@ -47,7 +48,7 @@ namespace MyLovelyMail.MainProject.Services
 
         public static List<SearchHit> Search(string accountId, string query)
         {
-            var matcher = BuildMatcher(query);
+            var matcher = BuildMatcher(query, accountId);
             List<SearchHit> hits = [];
 
             foreach (var folder in MessageStore.GetFolders(accountId))
@@ -88,8 +89,31 @@ namespace MyLovelyMail.MainProject.Services
                 return colon > 0 && ValidatedPrefixes.Contains(token[..colon].ToLowerInvariant());
             })];
 
-        static (List<string> TextTokens, List<Func<MailMessageSummary, bool>> Predicates) ParseQuery(string query)
+        /// <summary>
+        /// The addresses that count as "me" for this search: the account being looked at right
+        /// now. Falls back to the selected account, because that is what the user means by their
+        /// mailbox when they type a query into it.
+        /// </summary>
+        static HashSet<string> OwnAddressesOf(string? accountId)
         {
+            var account = accountId is { Length: > 0 }
+                ? Stores.AccountStore.GetById(accountId)
+                : MailUiState.SelectedAccount;
+
+            HashSet<string> addresses = new(StringComparer.OrdinalIgnoreCase);
+            if (account == null) return addresses;
+
+            if (account.EmailAddress.Length > 0) addresses.Add(account.EmailAddress);
+            // A mailbox is often logged into with the full address; when it is, it is another way
+            // of writing the same identity and mail from it is still mail from me.
+            if (account.IncomingUsername.Contains('@')) addresses.Add(account.IncomingUsername);
+            if (account.SmtpUsername.Contains('@')) addresses.Add(account.SmtpUsername);
+            return addresses;
+        }
+
+        static (List<string> TextTokens, List<Func<MailMessageSummary, bool>> Predicates) ParseQuery(string query, HashSet<string>? ownAddresses = null)
+        {
+            ownAddresses ??= [];
             List<string> textTokens = [];
             List<Func<MailMessageSummary, bool>> predicates = [];
 
@@ -104,8 +128,12 @@ namespace MyLovelyMail.MainProject.Services
                     case "from":
                         predicates.Add(s => $"{s.FromName} {s.FromAddress}".Contains(value, StringComparison.OrdinalIgnoreCase));
                         break;
+                    // "to:" means mail I SENT to that address. Matching the recipient alone put
+                    // every group message somebody else addressed to me and a colleague into the
+                    // results, which reads as "mail I wrote" and is not.
                     case "to":
-                        predicates.Add(s => s.ToAddresses.Contains(value, StringComparison.OrdinalIgnoreCase));
+                        predicates.Add(s => s.ToAddresses.Contains(value, StringComparison.OrdinalIgnoreCase)
+                            && (ownAddresses.Count == 0 || ownAddresses.Contains(s.FromAddress)));
                         break;
                     case "tag":
                         predicates.Add(s => s.Tags.Any(t => t.Contains(value, StringComparison.OrdinalIgnoreCase)));

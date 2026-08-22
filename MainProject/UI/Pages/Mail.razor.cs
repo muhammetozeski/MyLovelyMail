@@ -47,6 +47,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
             OutboxService.OnChanged += HandleOutboxChanged;
+            MouseActionService.OnStatus += HandleMouseStatus;
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -62,6 +63,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged -= HandleSyncStateChanged;
             OutboxService.OnChanged -= HandleOutboxChanged;
+            MouseActionService.OnStatus -= HandleMouseStatus;
+        }
+
+        /// <summary>A side-button action reports into the sidebar line — nothing the mouse does happens silently.</summary>
+        void HandleMouseStatus(string status)
+        {
+            FolderActionStatus = status;
+            InvokeAsync(StateHasChanged);
         }
 
         void SelectAccount(MailAccountData account)
@@ -130,7 +139,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             // The matcher runs even for an empty query: it is also what hides snoozed mail.
             FilteredSummaries = [.. MessageStore.GetSummaries(account.Id, folder.FullName)
-                .Where(SearchService.BuildMatcher(SearchText))];
+                .Where(SearchService.BuildMatcher(SearchText, account.Id))];
             BuildRows();
         }
 

@@ -34,7 +34,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("Escape", "Close reader / dialog"),
             ("Ctrl+1..9", "Switch account"),
             ("?", "Show this help"),
-            ("Search", "from: to: tag: has:attachment is:unread is:starred is:important is:snoozed"),
+            ("Search", "from: tag: has:attachment is:unread is:starred is:important is:snoozed"),
+            ("Search", "to:name@host — mail YOU sent to that address"),
             ("Search by date", "after:2026-08-01 before: on: newer_than:7d older_than:3m")
         ];
 

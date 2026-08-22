@@ -1337,6 +1337,60 @@
             color: @textPrimary;
         }
 
+    /* The whole strip is one column so the expanded rows sit under the summary rather than
+       wrapping into the header and pushing the subject around. */
+    .mail-rule-strip {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: @(AppMeasures.Space.Px4)px;
+        margin-top: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-rule-summary,
+    .mail-rule-row {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        margin-left: 0;
+        max-width: 100%;
+    }
+
+    .mail-rule-lead {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* The rule's own name is context, not the headline: dimmer than what it did. */
+    .mail-rule-name {
+        opacity: @AppMeasures.Opacity.Muted;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* "+3" collapsed, "×16" expanded — repetition is a number, never extra rows. */
+    .mail-rule-count {
+        padding: 0 @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @surfaceTint;
+        color: @textPrimary;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mail-rule-caret {
+        opacity: @AppMeasures.Opacity.Muted;
+    }
+
+    .mail-rule-rows {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-left: @(AppMeasures.Space.Px12)px;
+    }
+
     /* Sender-trust chip: shown only when something is wrong, so it never becomes wallpaper. */
     .mail-auth-chip {
         display: inline-flex;

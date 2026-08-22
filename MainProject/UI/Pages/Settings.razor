@@ -176,14 +176,6 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Signature</span>
-                <span class="settings-row-hint">Added under new messages and above the quoted text in replies; empty = none</span>
-            </div>
-        </div>
-        <textarea class="settings-signature" placeholder="Your name&#10;you@example.com"
-                  @bind="SignatureText" @bind:event="oninput" @onblur="SaveSignature"></textarea>
-        <div class="settings-row">
-            <div class="settings-row-text">
                 <span class="settings-row-label">Undo send window (seconds)</span>
                 <span class="settings-row-hint">A sent message waits this long behind an Undo bar; 0 sends immediately</span>
             </div>
@@ -191,6 +183,13 @@
                 <CoreInput Type="number" Value="@GlobalSettings.UndoSendSeconds.Value.ToString()" ValueChanged="@SetUndoSendSeconds" />
             </div>
         </div>
+    </GlassCard>
+
+    @* Its own card, not a row inside Composing: a signature is content the user writes, and it
+       needs an editor and a preview rather than a one-line field. *@
+    <GlassCard CustomClass="settings-section">
+        <SignatureEditor Value="@GlobalSettings.Signature.Value"
+                         ValueChanged="@(value => SetAndSave(GlobalSettings.Signature, value))" />
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
@@ -453,11 +452,6 @@
         if (int.TryParse(text, out int seconds) && seconds >= 0)
             SetAndSave(GlobalSettings.UndoSendSeconds, seconds);
     }
-
-    /// <summary>Edited live in the textarea, written to disk on blur so typing does not hit the file per keystroke.</summary>
-    string SignatureText { get; set; } = GlobalSettings.Signature.Value;
-
-    void SaveSignature() => SetAndSave(GlobalSettings.Signature, SignatureText);
 
     static readonly string[] DensityOptions = ["Cozy", "Comfortable", "Compact"];
 

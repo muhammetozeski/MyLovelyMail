@@ -1,0 +1,84 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+
+@* Ships with SignatureEditor so both hosts — the Settings page and an account's page — get the
+   same surface without either stylesheet having to know about it. *@
+<style>
+    .signature-editor {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .signature-editor-head {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .signature-editor-head-actions {
+        margin-left: auto;
+        display: flex;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .signature-editor-button {
+        background: transparent;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        cursor: pointer;
+    }
+
+        .signature-editor-button--on,
+        .signature-editor-button:hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+            color: @AppColors.TextPrimary.ToRgbaHex(true);
+        }
+
+    /* Code and preview side by side while there is room, stacked when there is not. */
+    .signature-editor-panes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .signature-editor-code,
+    .signature-editor-preview {
+        flex: 1 1 @(AppMeasures.Size.Px280)px;
+        min-width: @(AppMeasures.Size.Px280)px;
+        height: @(AppMeasures.Size.Px180)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        /* Without this the padding and border ride on top of the 280px basis, the pair no longer
+           fits the card, and the two panes stack instead of sitting side by side. */
+        box-sizing: border-box;
+    }
+
+    /* Monospace, tabs that indent rather than move focus away: this box holds code. */
+    .signature-editor-code {
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px10)px;
+        font-family: Consolas, 'Cascadia Mono', monospace;
+        font-size: @(AppMeasures.Font.Small)px;
+        line-height: 1.5;
+        tab-size: 2;
+        resize: vertical;
+        outline: none;
+        white-space: pre;
+        overflow: auto;
+    }
+
+    .signature-editor-preview {
+        background: @AppColors.MailCanvas.Background;
+    }
+
+    .signature-editor-foot {
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+</style>

@@ -56,3 +56,27 @@ Short "problem → solution" notes so the same wall is never hit twice.
 ## Never drive the UI with screen clicks — extend the DebugApi instead
 - Problem: verifying UI states (open compose, click a folder) by simulating mouse clicks moves the user's cursor and steals focus while they are using the machine.
 - Solution: the DEBUG REST API (127.0.0.1:52539) is the only sanctioned way to drive the running app. When a UI state has no endpoint, add one (like POST /compose) instead of reaching for SetCursorPos/mouse_event. Click-free PrintWindow snapshots remain fine; anything that touches cursor, keyboard or foreground focus is banned.
+
+- **`smtp4dev` started with `Start-Process` from a tool call dies with that call.** The SMTP
+  session opens, reports `MessageCount: 0`, and the next request finds nothing listening. Start it
+  as a background command that outlives the call instead.
+
+- **smtp4dev's mailbox has INBOX and Sent only, and `CREATE` is refused** ("Folders are not
+  supported"). Useful in itself: it is the cheapest way to test that a folder pass survives a
+  server saying no.
+
+- **An IMAP `<n>:*` fetch always returns the mailbox's last message**, even when nothing new
+  arrived (RFC 3501). Anything that must happen once per arrival has to hang off "uid greater than
+  the last seen one", never off "the fetch returned rows".
+
+- **A `<script>` inside an `srcdoc` preview that calls `document.write` after parsing wipes the
+  frame.** The preview looked broken; the signature was fine. Test preview frames with a script
+  that writes into an element, not with `document.write`.
+
+## Driving the page without touching the mouse
+- `POST /dom/click?selector=` clicks an element **in the DOM**, `POST /dom/mouse?selector=&button=`
+  dispatches a real `auxclick` (so the side-button script itself is exercised, not just the C# it
+  calls), and `POST /dom/script` evaluates one expression in the page — scrolling something into
+  view before a snapshot, reading a computed style, checking whether a script ran.
+- None of them move the cursor or take focus, so they are safe on a machine somebody is using.
+  `RenderedPageProbe.ScriptRunner` is the hook; the head registers it in DEBUG only.

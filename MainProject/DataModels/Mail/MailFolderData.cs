@@ -16,6 +16,25 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     }
 
     /// <summary>
+    /// Which side of a folder is allowed to change the other. Read through
+    /// <c>Services.Mail.FolderSyncPolicy</c>, which resolves it per role and per account.
+    /// </summary>
+    public enum FolderSyncDirection
+    {
+        /// <summary>Read the server; never write anything back to it.</summary>
+        ServerToLocal,
+
+        /// <summary>Push what happens here; never read the server's copy of this folder.</summary>
+        LocalToServer,
+
+        /// <summary>Both directions.</summary>
+        TwoWay,
+
+        /// <summary>Neither: the folder lives on this machine only.</summary>
+        LocalOnly
+    }
+
+    /// <summary>
     /// One mail folder of an account — either a server folder mirrored locally or a local-only
     /// folder created by the user/filters. Server identity is <see cref="FullName"/> (the IMAP
     /// path); sync state (<see cref="UidValidity"/>, <see cref="LastSeenUid"/>) lets incremental
@@ -33,6 +52,13 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         /// <summary>True for folders that exist only on this machine (never synced to the server).</summary>
         public bool IsLocal { get; set; }
+
+        /// <summary>
+        /// False for a server folder marked \NoSelect: it exists and holds children, but no
+        /// message can live in it. Such folders used to be dropped from the list entirely, which
+        /// orphaned everything nested under them.
+        /// </summary>
+        public bool Selectable { get; set; } = true;
 
         /// <summary>The server's path separator for this folder ('/' or '.'), so a nested path can be split. 0 = not recorded yet.</summary>
         public char Delimiter { get; set; }

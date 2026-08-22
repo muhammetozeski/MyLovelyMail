@@ -51,8 +51,11 @@
         {
             @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
+                @* Side button 4 copies this account's address: the row shows a display name or a
+                   truncated address, so the payload is named rather than read off the screen. *@
                 <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
                         title="@SyncHealthTooltip(account)"
+                        data-mouse4="copy" data-mouse4-value="@account.EmailAddress"
                         @onclick="() => SelectAccount(account)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
                     @if (!account.Enabled)
@@ -84,8 +87,11 @@
                         @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
                            Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
                         <div class="mail-folder-row" style="--folder-depth:@node.Depth">
+                            @* A \NoSelect folder is a branch, not a mailbox: it is shown so its
+                               children have a parent, and it cannot be opened. *@
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
-                                    title="@FolderFreshness(folder)"
+                                    disabled="@(!folder.Selectable)"
+                                    title="@(folder.Selectable ? FolderFreshness(folder) : "This folder only holds other folders")"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
                                 <span class="mail-folder-icon">@FolderIcon(folder)</span>
                                 <span class="mail-folder-name">@FolderLabel(folder)</span>
@@ -593,11 +599,41 @@
                         <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
                     }
                     @* A rule that works leaves no other trace: mail simply arrives already-read,
-                       tagged, or missing from the folder it was addressed to. *@
-                    @foreach (var trace in ruleTrace)
+                       tagged, or missing from the folder it was addressed to. Folded to one line
+                       because the strip is a footnote — a rule that fired sixteen times is sixteen
+                       on a counter, not sixteen chips pushing the message off the screen. *@
+                    @if (ruleTraceLines.Count > 0)
                     {
-                        <button class="mail-rule-trace" title="Open the filter rules"
-                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>🧭 @trace.Action by “@trace.RuleName”</button>
+                        <div class="mail-rule-strip">
+                            <button class="mail-rule-trace mail-rule-summary" title="What the filter rules did to this message"
+                                    @onclick="() => ruleTraceExpanded = !ruleTraceExpanded">
+                                <span>🧭</span>
+                                <span class="mail-rule-lead">@RuleTraceLabel(ruleTraceLines[0])</span>
+                                @if (ruleTraceLines.Count > 1)
+                                {
+                                    <span class="mail-rule-count">+@(ruleTraceLines.Count - 1)</span>
+                                }
+                                <span class="mail-rule-name">@ruleTraceLines[0].RuleName</span>
+                                <span class="mail-rule-caret">@(ruleTraceExpanded ? "▴" : "▾")</span>
+                            </button>
+                            @if (ruleTraceExpanded)
+                            {
+                                <div class="mail-rule-rows">
+                                    @foreach (var line in ruleTraceLines)
+                                    {
+                                        <button class="mail-rule-trace mail-rule-row" title="Open the filter rules"
+                                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>
+                                            <span class="mail-rule-lead">@RuleTraceLabel(line)</span>
+                                            <span class="mail-rule-name">@line.RuleName</span>
+                                            @if (line.Count > 1)
+                                            {
+                                                <span class="mail-rule-count">×@line.Count</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
                     }
                     @if (unsubscribeTargets is { } unsubscribe)
                     {

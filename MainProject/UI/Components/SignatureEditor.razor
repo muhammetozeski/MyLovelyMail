@@ -1,0 +1,88 @@
+@* The signature is written, not toggled: a code box plus a live preview, rendered the same way
+   on the global settings page and on an account's page. The account page passes the inheritance
+   chrome; the global page passes none. *@
+<div class="signature-editor">
+    <div class="signature-editor-head">
+        <span class="settings-row-label">
+            ✍️ Signature
+            @if (BadgeText is { Length: > 0 } badge)
+            {
+                <span class="setting-editor-badge @(Inherited ? "setting-editor-badge--inherited" : "setting-editor-badge--overridden")">@badge</span>
+            }
+        </span>
+        <span class="settings-row-hint">@Hint</span>
+        <div class="signature-editor-head-actions">
+            @if (OnReset.HasDelegate && !Inherited)
+            {
+                <button class="signature-editor-button" title="Follow the global signature again"
+                        @onclick="OnReset">↺ Reset</button>
+            }
+            <button class="signature-editor-button @(showPreview ? "signature-editor-button--on" : "")"
+                    @onclick="() => showPreview = !showPreview">👁️ Preview</button>
+        </div>
+    </div>
+
+    <div class="signature-editor-panes">
+        @* HTML, CSS and JavaScript all belong here — the preview runs them. *@
+        <textarea class="signature-editor-code" spellcheck="false"
+                  placeholder="@Placeholder"
+                  @bind="Text" @bind:event="oninput" @onblur="Commit"></textarea>
+        @if (showPreview)
+        {
+            @* allow-scripts WITHOUT allow-same-origin: the user's own script runs, in an opaque
+               origin that can reach neither the app nor anything it stores. *@
+            <iframe class="signature-editor-preview" sandbox="allow-scripts"
+                    srcdoc="@SignatureService.PreviewDocument(Text)"></iframe>
+        }
+    </div>
+
+    <SignatureEditorCss />
+
+    <div class="signature-editor-foot">
+        Sent as HTML. The preview above runs your script; the copy that leaves in a message does
+        not carry it, because no mail program would run it and its presence only costs the message
+        a spam score. Markup and styling go as written.
+    </div>
+</div>
+
+@code {
+    /// <summary>The stored signature: HTML when the user wrote HTML, plain text otherwise.</summary>
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+
+    /// <summary>Raised on blur, so the file is written once per edit rather than once per keystroke.</summary>
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Shown next to the title; empty on the global page, "Inherited"/"Overridden" on an account's.</summary>
+    [Parameter] public string BadgeText { get; set; } = string.Empty;
+
+    [Parameter] public bool Inherited { get; set; }
+
+    /// <summary>Present only where an override can be dropped back to the global value.</summary>
+    [Parameter] public EventCallback OnReset { get; set; }
+
+    [Parameter] public string Hint { get; set; } =
+        "Added under new messages and above the quoted text in replies; empty = none";
+
+    string Text { get; set; } = string.Empty;
+    bool showPreview = true;
+    string lastPushedValue = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        // Only adopt the incoming value when it changed underneath us — otherwise every re-render
+        // would throw away what is being typed.
+        if (Value != lastPushedValue)
+        {
+            Text = Value;
+            lastPushedValue = Value;
+        }
+    }
+
+    async Task Commit()
+    {
+        lastPushedValue = Text;
+        await ValueChanged.InvokeAsync(Text);
+    }
+
+    const string Placeholder = "<div style=\"color:#7a4a6a\">\n  <b>Your name</b><br>\n  <a href=\"mailto:you@example.com\">you@example.com</a>\n</div>";
+}

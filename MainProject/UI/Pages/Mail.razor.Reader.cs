@@ -32,6 +32,61 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// <summary>What the rules already did to the open message; same lifetime as the body.</summary>
         IReadOnlyList<RuleAuditEntry> ruleTrace = [];
 
+        /// <summary>One row of the rule strip: an action a rule took on this message, and how often.</summary>
+        public readonly record struct RuleTraceLine(string RuleName, string Action, string Argument, int Count);
+
+        /// <summary>The trace folded to one row per (rule, action), most important action first.</summary>
+        IReadOnlyList<RuleTraceLine> ruleTraceLines = [];
+
+        /// <summary>Collapsed by default and reset with the message: the strip is a footnote, not the header.</summary>
+        bool ruleTraceExpanded;
+
+        /// <summary>
+        /// Actions from the one that changed the most to the one that changed the least. A move put
+        /// the mail somewhere else; a notification sound only changed a chime nobody may have heard.
+        /// </summary>
+        static readonly string[] ActionImportance =
+        [
+            nameof(FilterActionType.MoveToRemoteFolder),
+            nameof(FilterActionType.MoveToLocalFolder),
+            nameof(FilterActionType.AddTag),
+            nameof(FilterActionType.MarkImportant),
+            nameof(FilterActionType.Flag),
+            nameof(FilterActionType.MarkRead),
+            nameof(FilterActionType.Mute),
+            nameof(FilterActionType.SetNotificationSound)
+        ];
+
+        static int ActionRank(string action)
+        {
+            int index = Array.IndexOf(ActionImportance, action);
+            // Anything unranked (today: the engine's "StopProcessing" note) sorts last rather than first.
+            return index < 0 ? ActionImportance.Length : index;
+        }
+
+        /// <summary>What one row says, in the same voice the rule editor uses for the action.</summary>
+        static string RuleTraceLabel(RuleTraceLine line) => line.Action switch
+        {
+            nameof(FilterActionType.MoveToRemoteFolder) => $"📁 Moved to {line.Argument}",
+            nameof(FilterActionType.MoveToLocalFolder) => $"💾 Moved to {line.Argument} on this PC",
+            nameof(FilterActionType.AddTag) => $"🏷️ Tagged {line.Argument}",
+            nameof(FilterActionType.MarkImportant) => "❗ Marked important",
+            nameof(FilterActionType.Flag) => "⭐ Starred",
+            nameof(FilterActionType.MarkRead) => "👁️ Marked read",
+            nameof(FilterActionType.Mute) => "🔕 Muted",
+            nameof(FilterActionType.SetNotificationSound) => $"🔔 Notification sound: {line.Argument}",
+            "StopProcessing" => "⛔ Stopped the later rules",
+            _ => line.Action
+        };
+
+        /// <summary>Folds the raw audit rows into the strip's rows. Repeats become a count, not a row.</summary>
+        static IReadOnlyList<RuleTraceLine> FoldTrace(IReadOnlyList<RuleAuditEntry> trace) =>
+            [.. trace
+                .GroupBy(static e => (e.RuleName, e.Action, e.Argument))
+                .Select(static g => new RuleTraceLine(g.Key.RuleName, g.Key.Action, g.Key.Argument, g.Sum(static e => e.Count)))
+                .OrderBy(static line => ActionRank(line.Action))
+                .ThenBy(static line => line.RuleName, StringComparer.OrdinalIgnoreCase)];
+
         /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
         void OpenUnsubscribePage(string url)
         {
@@ -67,7 +122,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (MailUiState.SelectedAccount is not { } account || open.FromAddress.Length == 0) return null;
 
-            var profile = PersonProfileService.Build(account.Id, open.FromAddress);
+            PersonProfile profile;
+            using (PerfTrace.Measure("reader.senderHistory"))
+                profile = PersonProfileService.Build(account.Id, open.FromAddress);
             senderHistory = profile.MessageCount > 1 ? profile : null;
             return senderHistory;
         }
@@ -93,8 +150,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(open) is not { } folderName)
                 return null;
 
-            var thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
-                .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
+            MailThread? thread;
+            using (PerfTrace.Measure("reader.thread"))
+                thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
+                    .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
 
             // A single message is not a conversation; the strip would be noise on most mail.
             openThread = thread is { Messages.Count: > 1 } ? thread.Messages : null;
@@ -168,7 +227,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             await InvokeAsync(StateHasChanged);
 
             bool allowRemote = open.Uid == remoteImagesAllowedUid;
-            var rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
+            RenderedBody? rendered;
+            using (PerfTrace.Measure("reader.render"))
+                rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
             if (rendered == null)
             {
                 try
@@ -190,11 +251,20 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OpenBodyHtml = rendered?.Html;
             OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
             OpenBodyLoading = false;
-            OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
-            unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
-            authFindings = MessageAuthService.Read(account, folderName, open);
-            ruleTrace = RuleAuditStore.For(account.Id, folderName, open.Uid, open.MessageId);
-            MarkOpenAsRead(account, folderName, open);
+            using (PerfTrace.Measure("reader.attachments"))
+                OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
+            using (PerfTrace.Measure("reader.unsubscribe"))
+                unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
+            using (PerfTrace.Measure("reader.auth"))
+                authFindings = MessageAuthService.Read(account, folderName, open);
+            using (PerfTrace.Measure("reader.ruleTrace"))
+            {
+                ruleTrace = RuleAuditStore.For(account.Id, folderName, open.Uid, open.MessageId);
+                ruleTraceLines = FoldTrace(ruleTrace);
+                ruleTraceExpanded = false;
+            }
+            using (PerfTrace.Measure("reader.markRead"))
+                MarkOpenAsRead(account, folderName, open);
             await InvokeAsync(StateHasChanged);
         }
 

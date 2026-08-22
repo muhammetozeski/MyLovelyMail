@@ -320,6 +320,158 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // Evaluates one expression in the page. Scrolling something into view before a
+                // snapshot, reading a computed style, checking whether a script ran — all of it is
+                // one call instead of a new endpoint each time.
+                case ("POST", "/dom/script"):
+                {
+                    using var scriptReader = new StreamReader(request.InputStream);
+                    string? value = await RenderedPageProbe.RunScriptAsync(await scriptReader.ReadToEndAsync());
+                    return new { value };
+                }
+
+                // Clicks an element IN THE DOM. No cursor moves and no window takes focus, so a
+                // control that only exists once it is opened — an expander, a menu — can be
+                // audited on a machine somebody is working on.
+                case ("POST", "/dom/click"):
+                {
+                    string selector = JsonSerializer.Serialize(RequireQueryValue(query, "selector"));
+                    string? result = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';e.click();return 'clicked';}})()");
+                    return new { result };
+                }
+
+                // Dispatches a real mouse event on an element — the only way to exercise the
+                // side-button script itself rather than the C# it ends up calling.
+                case ("POST", "/dom/mouse"):
+                {
+                    string selector = JsonSerializer.Serialize(RequireQueryValue(query, "selector"));
+                    int button = int.TryParse(query["button"], out int parsedButton) ? parsedButton : 3;
+                    string? result = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';"
+                        + $"e.dispatchEvent(new MouseEvent('auxclick',{{button:{button},bubbles:true,cancelable:true}}));return 'dispatched';}})()");
+                    return new { result, button };
+                }
+
+                // Fires a side-button action without a mouse, so the behavior is testable without
+                // touching the cursor on a machine the user is sitting at.
+                case ("POST", "/mouse"):
+                {
+                    string action = query["action"] ?? MouseActionService.CopyAction;
+                    string status = await MouseActionService.RunAsync(action, query["value"] ?? string.Empty);
+                    return new { action, status };
+                }
+
+                // The signature in all three of its shapes at once: what is stored, what goes out
+                // as html, and what goes out as text. Without an accountId these read and write
+                // the global value; with one they read and write that account's override.
+                case ("GET", "/signature"):
+                {
+                    string accountId = query["accountId"] ?? string.Empty;
+                    string stored = accountId.Length > 0
+                        ? AccountStore.GetSettings(accountId).Signature.Value
+                        : GlobalSettings.Signature.Value;
+                    return new
+                    {
+                        accountId,
+                        stored,
+                        isHtml = SignatureService.IsHtml(stored),
+                        overridden = accountId.Length > 0 && AccountStore.GetSettings(accountId).Signature.IsOverridden,
+                        html = SignatureService.ToHtml(stored),
+                        plainText = SignatureService.ToPlainText(stored),
+                        plainBlock = SignatureService.PlainBlock(stored)
+                    };
+                }
+
+                case ("POST", "/signature"):
+                {
+                    using var reader = new StreamReader(request.InputStream);
+                    string value = await reader.ReadToEndAsync();
+                    string accountId = query["accountId"] ?? string.Empty;
+                    if (accountId.Length > 0)
+                    {
+                        var settings = AccountStore.GetSettings(accountId);
+                        if (query["reset"] == "true") settings.Signature.ClearOverride();
+                        else settings.Signature.Value = value;
+                        settings.Save();
+                    }
+                    else
+                    {
+                        GlobalSettings.Signature.Set(value);
+                        SettingsManager.SaveSettings();
+                    }
+                    return new { saved = true, accountId, length = value.Length };
+                }
+
+                // Exactly what the send path will put in the two parts of the message, without
+                // sending anything.
+                case ("GET", "/compose/preview"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    string signature = AccountStore.GetSettings(account.Id).Signature.Value;
+                    string body = query["body"] ?? SignatureService.PlainBlock(signature);
+                    var (text, html) = SignatureService.Compose(body, signature);
+                    return new { text, html, multipart = html != null };
+                }
+
+                // The server's list, not the cache's. "Which folders is the app missing" cannot be
+                // answered from one side alone, and it turned out the app was missing several.
+                case ("GET", "/folders/server"):
+                    return new { folders = await ImapSyncService.ListServerFoldersAsync(RequireAccount(RequireQueryValue(query, "accountId"))) };
+
+                // Every folder with the role it ended up holding, plus any role held twice — which
+                // is the shape of the bug this endpoint exists to make impossible to miss.
+                case ("GET", "/folders/roles"):
+                {
+                    string rolesAccountId = RequireQueryValue(query, "accountId");
+                    var folders = MessageStore.GetFolders(rolesAccountId);
+                    return new
+                    {
+                        folders = folders.Select(f => new
+                        {
+                            f.FullName,
+                            f.DisplayName,
+                            Role = f.Role.ToString(),
+                            Direction = FolderSyncPolicy.For(rolesAccountId, f.FullName).ToString(),
+                            f.Selectable,
+                            f.IsLocal,
+                            f.TotalCount
+                        }),
+                        duplicateRoles = folders
+                            .Where(static f => f.Role != FolderRole.None)
+                            .GroupBy(static f => f.Role)
+                            .Where(static g => g.Count() > 1)
+                            .Select(static g => new { Role = g.Key.ToString(), Folders = g.Select(static f => f.FullName) })
+                    };
+                }
+
+                // The resolver over handmade folders: every language, every conflict and every
+                // tie-break is provable here with no mail server at all.
+                case ("POST", "/folders/roles/probe"):
+                {
+                    var candidates = await JsonSerializer.DeserializeAsync<List<FolderRoleCandidate>>(
+                        request.InputStream, JsonDefaults.SingleLine) ?? [];
+                    return new { decisions = FolderRoleResolver.Resolve(candidates).Select(static d => new { d.FullName, Role = d.Role.ToString(), Evidence = d.Evidence.ToString(), d.Why }) };
+                }
+
+                // What the steps of the open path actually cost. "Opening this message pins a core
+                // for five seconds" has as many plausible explanations as it has steps, and every
+                // one of them looks cheap in the source; this is the only way to name the real one.
+                case ("GET", "/timings"):
+                {
+                    var spans = PerfTrace.Recent;
+                    return new
+                    {
+                        spans,
+                        slowest = spans.OrderByDescending(static s => s.Milliseconds).Take(ReadTake(query, 10)),
+                        totalMs = spans.Sum(static s => s.Milliseconds)
+                    };
+                }
+
+                case ("POST", "/timings/clear"):
+                    PerfTrace.Clear();
+                    return new { cleared = true };
+
                 // Connect-only, never AUTH: this reports what a host answers on, not whether a
                 // password works.
                 case ("GET", "/connect-diagnose"):
@@ -841,8 +993,9 @@ namespace MyLovelyMail.MainProject.ZTests
                     string folder = ReadFolder(query);
                     string searchQuery = query["query"] ?? string.Empty;
                     // Always through the matcher, exactly like the list page: an empty query is not
-                    // "no filtering" — it is still what hides snoozed mail.
-                    var matcher = SearchService.BuildMatcher(searchQuery);
+                    // "no filtering" — it is still what hides snoozed mail. The account goes with
+                    // it, because "to:" means mail THIS account sent.
+                    var matcher = SearchService.BuildMatcher(searchQuery, accountId);
                     return MessageStore.GetSummaries(accountId, folder)
                         .Where(matcher)
                         .Take(ReadTake(query, 20))
