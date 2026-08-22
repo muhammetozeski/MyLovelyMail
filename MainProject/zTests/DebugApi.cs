@@ -320,6 +320,24 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // What the steps of the open path actually cost. "Opening this message pins a core
+                // for five seconds" has as many plausible explanations as it has steps, and every
+                // one of them looks cheap in the source; this is the only way to name the real one.
+                case ("GET", "/timings"):
+                {
+                    var spans = PerfTrace.Recent;
+                    return new
+                    {
+                        spans,
+                        slowest = spans.OrderByDescending(static s => s.Milliseconds).Take(ReadTake(query, 10)),
+                        totalMs = spans.Sum(static s => s.Milliseconds)
+                    };
+                }
+
+                case ("POST", "/timings/clear"):
+                    PerfTrace.Clear();
+                    return new { cleared = true };
+
                 // Connect-only, never AUTH: this reports what a host answers on, not whether a
                 // password works.
                 case ("GET", "/connect-diagnose"):

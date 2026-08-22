@@ -67,7 +67,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (MailUiState.SelectedAccount is not { } account || open.FromAddress.Length == 0) return null;
 
-            var profile = PersonProfileService.Build(account.Id, open.FromAddress);
+            PersonProfile profile;
+            using (PerfTrace.Measure("reader.senderHistory"))
+                profile = PersonProfileService.Build(account.Id, open.FromAddress);
             senderHistory = profile.MessageCount > 1 ? profile : null;
             return senderHistory;
         }
@@ -93,8 +95,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(open) is not { } folderName)
                 return null;
 
-            var thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
-                .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
+            MailThread? thread;
+            using (PerfTrace.Measure("reader.thread"))
+                thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
+                    .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
 
             // A single message is not a conversation; the strip would be noise on most mail.
             openThread = thread is { Messages.Count: > 1 } ? thread.Messages : null;
@@ -168,7 +172,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             await InvokeAsync(StateHasChanged);
 
             bool allowRemote = open.Uid == remoteImagesAllowedUid;
-            var rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
+            RenderedBody? rendered;
+            using (PerfTrace.Measure("reader.render"))
+                rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
             if (rendered == null)
             {
                 try
@@ -190,11 +196,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OpenBodyHtml = rendered?.Html;
             OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
             OpenBodyLoading = false;
-            OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
-            unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
-            authFindings = MessageAuthService.Read(account, folderName, open);
-            ruleTrace = RuleAuditStore.For(account.Id, folderName, open.Uid, open.MessageId);
-            MarkOpenAsRead(account, folderName, open);
+            using (PerfTrace.Measure("reader.attachments"))
+                OpenAttachments = open.HasAttachments ? AttachmentService.List(account, folderName, open) : [];
+            using (PerfTrace.Measure("reader.unsubscribe"))
+                unsubscribeTargets = UnsubscribeService.Read(account, folderName, open);
+            using (PerfTrace.Measure("reader.auth"))
+                authFindings = MessageAuthService.Read(account, folderName, open);
+            using (PerfTrace.Measure("reader.ruleTrace"))
+                ruleTrace = RuleAuditStore.For(account.Id, folderName, open.Uid, open.MessageId);
+            using (PerfTrace.Measure("reader.markRead"))
+                MarkOpenAsRead(account, folderName, open);
             await InvokeAsync(StateHasChanged);
         }
 
