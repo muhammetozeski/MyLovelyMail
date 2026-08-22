@@ -100,6 +100,26 @@ namespace MyLovelyMail.MainProject.Storage
         }
 
         /// <summary>
+        /// Forgets a folder completely: its cache, its info file and its directory. Only for a
+        /// folder the SERVER no longer has — a cached folder that outlives its server copy keeps
+        /// advertising a count nothing can refresh and stays a target in the move menu.
+        /// </summary>
+        public static void RemoveFolder(string accountId, string folderFullName)
+        {
+            Indexes.TryRemove(FolderKey(accountId, folderFullName), out _);
+            try
+            {
+                string dir = FolderCachePath(accountId, folderFullName);
+                if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not remove the cache of '{folderFullName}': {ex.Message}", LogLevel.Warning);
+            }
+            OnFolderChanged?.Invoke(accountId, folderFullName);
+        }
+
+        /// <summary>
         /// Throws the folder's cache away — RAM index, index.jsonl and the cached .eml files — and
         /// rewinds LastSeenUid so the next sync refills from scratch. UidValidity is KEPT: the
         /// sync's invalidation branch must stay quiet so the plain first-fill path runs.

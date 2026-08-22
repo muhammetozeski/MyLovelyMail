@@ -320,6 +320,36 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { flags = probe.Flags.ToString(), probe.Tags, entries = RuleAuditStore.For(account.Id, ReadFolder(query), probe.Uid, probe.MessageId) };
                 }
 
+                // The server's list, not the cache's. "Which folders is the app missing" cannot be
+                // answered from one side alone, and it turned out the app was missing several.
+                case ("GET", "/folders/server"):
+                    return new { folders = await ImapSyncService.ListServerFoldersAsync(RequireAccount(RequireQueryValue(query, "accountId"))) };
+
+                // Every folder with the role it ended up holding, plus any role held twice — which
+                // is the shape of the bug this endpoint exists to make impossible to miss.
+                case ("GET", "/folders/roles"):
+                {
+                    var folders = MessageStore.GetFolders(RequireQueryValue(query, "accountId"));
+                    return new
+                    {
+                        folders = folders.Select(static f => new { f.FullName, f.DisplayName, Role = f.Role.ToString(), f.Selectable, f.IsLocal, f.TotalCount }),
+                        duplicateRoles = folders
+                            .Where(static f => f.Role != FolderRole.None)
+                            .GroupBy(static f => f.Role)
+                            .Where(static g => g.Count() > 1)
+                            .Select(static g => new { Role = g.Key.ToString(), Folders = g.Select(static f => f.FullName) })
+                    };
+                }
+
+                // The resolver over handmade folders: every language, every conflict and every
+                // tie-break is provable here with no mail server at all.
+                case ("POST", "/folders/roles/probe"):
+                {
+                    var candidates = await JsonSerializer.DeserializeAsync<List<FolderRoleCandidate>>(
+                        request.InputStream, JsonDefaults.SingleLine) ?? [];
+                    return new { decisions = FolderRoleResolver.Resolve(candidates).Select(static d => new { d.FullName, Role = d.Role.ToString(), Evidence = d.Evidence.ToString(), d.Why }) };
+                }
+
                 // What the steps of the open path actually cost. "Opening this message pins a core
                 // for five seconds" has as many plausible explanations as it has steps, and every
                 // one of them looks cheap in the source; this is the only way to name the real one.

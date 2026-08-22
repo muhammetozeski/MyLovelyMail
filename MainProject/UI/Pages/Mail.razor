@@ -84,8 +84,11 @@
                         @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
                            Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
                         <div class="mail-folder-row" style="--folder-depth:@node.Depth">
+                            @* A \NoSelect folder is a branch, not a mailbox: it is shown so its
+                               children have a parent, and it cannot be opened. *@
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
-                                    title="@FolderFreshness(folder)"
+                                    disabled="@(!folder.Selectable)"
+                                    title="@(folder.Selectable ? FolderFreshness(folder) : "This folder only holds other folders")"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
                                 <span class="mail-folder-icon">@FolderIcon(folder)</span>
                                 <span class="mail-folder-name">@FolderLabel(folder)</span>

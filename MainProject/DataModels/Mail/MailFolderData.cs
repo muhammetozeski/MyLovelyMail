@@ -34,6 +34,13 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>True for folders that exist only on this machine (never synced to the server).</summary>
         public bool IsLocal { get; set; }
 
+        /// <summary>
+        /// False for a server folder marked \NoSelect: it exists and holds children, but no
+        /// message can live in it. Such folders used to be dropped from the list entirely, which
+        /// orphaned everything nested under them.
+        /// </summary>
+        public bool Selectable { get; set; } = true;
+
         /// <summary>The server's path separator for this folder ('/' or '.'), so a nested path can be split. 0 = not recorded yet.</summary>
         public char Delimiter { get; set; }
 

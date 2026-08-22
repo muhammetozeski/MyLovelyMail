@@ -359,9 +359,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 if (account.Protocol == IncomingProtocol.Imap)
                 {
                     var folders = MessageStore.GetFolders(account.Id);
-                    // Prefer the marked Sent folder; fall back to the conventional name for servers without SPECIAL-USE.
-                    var sentFolder = folders.FirstOrDefault(static f => f.Role == FolderRole.Sent && !f.IsLocal)
-                        ?? folders.FirstOrDefault(static f => !f.IsLocal && ImapSyncService.GuessRoleFromName(f.DisplayName) == FolderRole.Sent);
+                    // One folder holds the Sent role per account — FolderRoleResolver guarantees it,
+                    // flag first and name only as a fallback. Re-guessing the name here was the
+                    // second answer to "where does a sent message go", and it could disagree.
+                    var sentFolder = folders.FirstOrDefault(static f => f.Role == FolderRole.Sent && !f.IsLocal);
                     if (sentFolder != null)
                     {
                         await ResiliencePolicy.RunNetwork(async ct =>
