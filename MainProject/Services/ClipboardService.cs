@@ -10,17 +10,24 @@ namespace MyLovelyMail.MainProject.Services
         /// <summary>Registered by the head project (Windows: MAUI Clipboard). Null = no clipboard on this platform.</summary>
         public static Func<string, Task>? Writer;
 
-        public static async Task CopyAsync(string text)
+        /// <summary>
+        /// True only when the text really reached the clipboard. The caller needs the answer: a
+        /// "copied" line shown over a failed write is worse than no line at all, because the user
+        /// then pastes whatever was in the clipboard before.
+        /// </summary>
+        public static async Task<bool> CopyAsync(string text)
         {
-            if (Writer == null || text.Length == 0) return;
+            if (Writer == null || text.Length == 0) return false;
             try
             {
                 await Writer(text);
                 Log($"Copied {text.Length} characters to the clipboard.");
+                return true;
             }
             catch (Exception ex)
             {
                 Log($"Clipboard copy failed: {ex.Message}", LogLevel.Warning);
+                return false;
             }
         }
     }

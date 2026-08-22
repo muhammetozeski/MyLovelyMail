@@ -33,7 +33,11 @@ namespace MyLovelyMail
             TagStore.Load();
             NotificationBridge.Initialize();
             SoundBridge.Initialize();
-            ClipboardService.Writer = static text => Clipboard.Default.SetTextAsync(text);
+            // Through the UI thread: the Windows clipboard is apartment-bound, so a copy started
+            // from a background thread — a side-button click arriving over the debug API, an
+            // action finishing on a task — failed with an empty exception message.
+            ClipboardService.Writer = static text =>
+                MainThread.InvokeOnMainThreadAsync(() => Clipboard.Default.SetTextAsync(text));
 #if DEBUG
             DebugApi.Start();
 #endif

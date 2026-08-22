@@ -36,12 +36,9 @@ namespace MyLovelyMail.MainProject.Services
             return status;
         }
 
-        static async Task<string> CopyAsync(string payload)
-        {
-            await ClipboardService.CopyAsync(payload);
-            return ClipboardService.Writer == null
-                ? "❌ No clipboard on this platform"
-                : $"📋 Copied {payload}";
-        }
+        static async Task<string> CopyAsync(string payload) =>
+            await ClipboardService.CopyAsync(payload)
+                ? $"📋 Copied {payload}"
+                : "❌ Could not reach the clipboard";
     }
 }
