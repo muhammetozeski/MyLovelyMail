@@ -53,6 +53,12 @@
     <UseMonoRuntime>false</UseMonoRuntime>
   </PropertyGroup>
 
+  <!-- The exe/taskbar/window icon on Windows reuses the same lovely-mail icon as the tray, instead
+       of the auto-generated icon from the (still default-purple) MauiIcon SVGs below. -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <ApplicationIcon>Resources\Raw\trayicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- App Icon -->
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
