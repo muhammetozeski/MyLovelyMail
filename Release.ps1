@@ -50,16 +50,22 @@ $stages = @(
 )
 $assets = @()
 foreach ($stage in $stages) {
-    $out = Join-Path $PublishDir $stage.Name
-    if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+    # Package root layout mirrors Export.ps1's live deploy root, so a GitHub download and a local
+    # export behave the same way: <root>\MyLovelyMail.exe (launcher) + <root>\AppData\ (the app).
+    $stageRoot = Join-Path $PublishDir $stage.Name
+    $appData = Join-Path $stageRoot 'AppData'
+    if (Test-Path $stageRoot) { Remove-Item -Recurse -Force $stageRoot }
     Write-Host "Publishing $($stage.Name) (self-contained=$($stage.SelfContained))..." -ForegroundColor Cyan
-    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -o $out
+    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -o $appData
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
-    if (-not (Test-Path "$out\$ProjectName.exe")) { throw "Published exe missing in $out." }
+    if (-not (Test-Path "$appData\$ProjectName.exe")) { throw "Published exe missing in $appData." }
+
+    & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $stageRoot -IconSourceExe "$appData\$ProjectName.exe" -Rid $Rid
+    if (-not (Test-Path "$stageRoot\$ProjectName.exe")) { throw "Launcher exe missing in $stageRoot." }
 
     $zip = Join-Path $PublishDir $stage.Asset
     if (Test-Path $zip) { Remove-Item -Force $zip }
-    Compress-Archive -Path "$out\*" -DestinationPath $zip
+    Compress-Archive -Path "$stageRoot\*" -DestinationPath $zip
     $assets += $zip
     Write-Host "  -> $($stage.Asset) ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)" -ForegroundColor DarkGray
 }
