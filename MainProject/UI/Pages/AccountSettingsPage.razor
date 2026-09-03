@@ -55,6 +55,89 @@
             </div>
         </GlassCard>
 
+        <GlassCard CustomClass="settings-section">
+            <div class="settings-section-title">🖧 Servers</div>
+            <p class="settings-empty-text">Changes apply immediately.</p>
+
+            <div class="wizard-presets">
+                @foreach (var preset in ProviderPresets.All)
+                {
+                    <button class="wizard-preset" @onclick="() => ApplyPreset(preset)">
+                        <span class="wizard-preset-emoji">@preset.Emoji</span>
+                        <span>@preset.Name</span>
+                    </button>
+                }
+            </div>
+
+            <div class="wizard-field">
+                <span class="wizard-label">Receive protocol</span>
+                <div class="wizard-protocols">
+                    <button class="wizard-preset @(Account.Protocol == IncomingProtocol.Imap ? "wizard-preset--active" : "")"
+                            @onclick="() => SetProtocol(IncomingProtocol.Imap)">📥 @IncomingProtocol.Imap.DisplayName()</button>
+                    <button class="wizard-preset @(Account.Protocol == IncomingProtocol.Pop3 ? "wizard-preset--active" : "")"
+                            @onclick="() => SetProtocol(IncomingProtocol.Pop3)">📪 @IncomingProtocol.Pop3.DisplayName()</button>
+                </div>
+            </div>
+
+            <div class="wizard-grid">
+                <div class="wizard-field">
+                    <span class="wizard-label">Incoming host (@Account.Protocol.DisplayName())</span>
+                    <CoreInput Value="@Account.IncomingHost" ValueChanged="@SetIncomingHost" />
+                </div>
+                <div class="wizard-field wizard-field--small">
+                    <span class="wizard-label">Port</span>
+                    <CoreInput Type="number" Value="@Account.IncomingPort.ToString()" ValueChanged="@SetIncomingPort" />
+                </div>
+                <div class="wizard-field wizard-field--small">
+                    <span class="wizard-label">Security</span>
+                    <select class="wizard-select" @bind="IncomingSecurityBinding">
+                        @foreach (var security in Enum.GetValues<ConnectionSecurity>())
+                        {
+                            <option value="@security">@security</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="wizard-grid">
+                <div class="wizard-field">
+                    <span class="wizard-label">SMTP host</span>
+                    <CoreInput Value="@Account.SmtpHost" ValueChanged="@SetSmtpHost" />
+                </div>
+                <div class="wizard-field wizard-field--small">
+                    <span class="wizard-label">Port</span>
+                    <CoreInput Type="number" Value="@Account.SmtpPort.ToString()" ValueChanged="@SetSmtpPort" />
+                </div>
+                <div class="wizard-field wizard-field--small">
+                    <span class="wizard-label">Security</span>
+                    <select class="wizard-select" @bind="SmtpSecurityBinding">
+                        @foreach (var security in Enum.GetValues<ConnectionSecurity>())
+                        {
+                            <option value="@security">@security</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="wizard-field">
+                <span class="wizard-label">Username (empty = email address)</span>
+                <CoreInput Value="@Account.IncomingUsername" ValueChanged="@SetUsername" />
+            </div>
+
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Password / app password</span>
+                    <span class="settings-row-hint">Leave blank to keep the saved password</span>
+                </div>
+                <div class="settings-password-row">
+                    <div class="settings-number settings-number--wide">
+                        <CoreInput Type="password" @bind-Value="NewPassword" />
+                    </div>
+                    <SecondaryButton OnClick="@UpdatePassword" Disabled="@(NewPassword.Length == 0)">🔑 Update</SecondaryButton>
+                </div>
+            </div>
+        </GlassCard>
+
         @* Inherits exactly like every other account setting, but it gets its own card: a
            signature is written, and a one-line override row cannot hold an editor and a preview. *@
         <GlassCard CustomClass="settings-section">
@@ -134,6 +217,104 @@
         if (Account is not { } account) return;
         account.Enabled = enabled;
         AccountStore.Save(account);
+    }
+
+    string NewPassword { get; set; } = string.Empty;
+
+    ConnectionSecurity IncomingSecurityBinding
+    {
+        get => Account?.IncomingSecurity ?? ConnectionSecurity.SslOnConnect;
+        set => SetIncomingSecurity(value);
+    }
+
+    ConnectionSecurity SmtpSecurityBinding
+    {
+        get => Account?.SmtpSecurity ?? ConnectionSecurity.SslOnConnect;
+        set => SetSmtpSecurity(value);
+    }
+
+    void ApplyPreset(ProviderPreset preset)
+    {
+        if (Account is not { } account) return;
+        if (account.Protocol == IncomingProtocol.Imap)
+        {
+            account.IncomingHost = preset.ImapHost;
+            account.IncomingPort = preset.ImapPort;
+            account.IncomingSecurity = preset.ImapSecurity;
+        }
+        else
+        {
+            account.IncomingHost = preset.Pop3Host;
+            account.IncomingPort = preset.Pop3Port;
+            account.IncomingSecurity = preset.Pop3Security;
+        }
+        account.SmtpHost = preset.SmtpHost;
+        account.SmtpPort = preset.SmtpPort;
+        account.SmtpSecurity = preset.SmtpSecurity;
+        AccountStore.Save(account);
+    }
+
+    void SetProtocol(IncomingProtocol protocol)
+    {
+        if (Account is not { } account) return;
+        account.Protocol = protocol;
+        AccountStore.Save(account);
+    }
+
+    void SetIncomingHost(string host)
+    {
+        if (Account is not { } account) return;
+        account.IncomingHost = host.Trim();
+        AccountStore.Save(account);
+    }
+
+    void SetIncomingPort(string portText)
+    {
+        if (Account is not { } account || !int.TryParse(portText, out int port)) return;
+        account.IncomingPort = port;
+        AccountStore.Save(account);
+    }
+
+    void SetIncomingSecurity(ConnectionSecurity security)
+    {
+        if (Account is not { } account) return;
+        account.IncomingSecurity = security;
+        AccountStore.Save(account);
+    }
+
+    void SetSmtpHost(string host)
+    {
+        if (Account is not { } account) return;
+        account.SmtpHost = host.Trim();
+        AccountStore.Save(account);
+    }
+
+    void SetSmtpPort(string portText)
+    {
+        if (Account is not { } account || !int.TryParse(portText, out int port)) return;
+        account.SmtpPort = port;
+        AccountStore.Save(account);
+    }
+
+    void SetSmtpSecurity(ConnectionSecurity security)
+    {
+        if (Account is not { } account) return;
+        account.SmtpSecurity = security;
+        AccountStore.Save(account);
+    }
+
+    void SetUsername(string username)
+    {
+        if (Account is not { } account) return;
+        account.IncomingUsername = username.Trim();
+        AccountStore.Save(account);
+    }
+
+    void UpdatePassword()
+    {
+        if (Account is not { } account || NewPassword.Length == 0) return;
+        CredentialVault.SetPassword(account.Id, NewPassword);
+        NewPassword = string.Empty;
     }
 
 }
