@@ -48,13 +48,19 @@ namespace MyLovelyMail.MainProject.Constants
             "pop.yandex.com", 995, ConnectionSecurity.SslOnConnect,
             "smtp.yandex.com", 465, ConnectionSecurity.SslOnConnect);
 
+        public static readonly ProviderPreset CockLi = new(
+            "Cock.li", "🐓",
+            "mail.cock.li", 143, ConnectionSecurity.StartTls,
+            "", 0, ConnectionSecurity.StartTls,
+            "mail.cock.li", 587, ConnectionSecurity.StartTls);
+
         public static readonly ProviderPreset Custom = new(
             "Custom", "🛠️",
             "", 993, ConnectionSecurity.SslOnConnect,
             "", 995, ConnectionSecurity.SslOnConnect,
             "", 465, ConnectionSecurity.SslOnConnect);
 
-        public static readonly ProviderPreset[] All = [Gmail, Outlook, Yahoo, ICloud, Yandex, Custom];
+        public static readonly ProviderPreset[] All = [Gmail, Outlook, Yahoo, ICloud, Yandex, CockLi, Custom];
 
         /// <summary>Guesses the preset from the mail address domain (null → Custom is a safe pick).</summary>
         public static ProviderPreset? GuessFromEmail(string? email)
@@ -68,6 +74,7 @@ namespace MyLovelyMail.MainProject.Constants
                 "yahoo.com" or "ymail.com" => Yahoo,
                 "icloud.com" or "me.com" or "mac.com" => ICloud,
                 "yandex.com" or "yandex.ru" => Yandex,
+                "cock.li" => CockLi,
                 _ => null
             };
         }
