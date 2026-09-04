@@ -5,6 +5,7 @@
 ![UI](https://img.shields.io/badge/UI-MAUI%20Blazor%20Hybrid-68217A)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4)
 ![Protocols](https://img.shields.io/badge/mail-IMAP%20%C2%B7%20POP3%20%C2%B7%20SMTP-EC6FA9)
+![Tor](https://img.shields.io/badge/transport-Tor%20SOCKS5-7D4698)
 
 A desktop mail client for Windows with a pastel, glass-styled interface. It receives mail over
 IMAP or POP3, sends over SMTP, stores full messages on disk (only lightweight summaries stay in
@@ -27,6 +28,22 @@ and switching the theme re-skins the whole app at runtime.
 - Periodic background sync with a configurable interval; manual sync from the UI or tray
 - Folder roles resolved from IMAP SPECIAL-USE, with name-based fallback for servers without it
 - All network calls go through one Polly pipeline (retry with backoff, per-attempt and total timeouts)
+- Per-account **Tor-only** mode: an account can be marked as reachable through Tor and nothing else
+
+**Tor transport**
+- Any account can be switched to Tor-only. Its IMAP/POP3/SMTP sessions are carried by the Tor
+  SOCKS5 proxy, and the server name is resolved by Tor (SOCKS5 `DOMAINNAME`) rather than by this
+  machine, so the provider is not revealed by a local DNS query
+- The SOCKS port is proven to be Tor before it is used, via Tor's own `RESOLVE` SOCKS extension
+  (command `0xF0`) — a general-purpose SOCKS5 proxy has to reject that command with `0x07`
+- Tor is found in this order: a tor the app started, the configured host/port, the tor daemon's
+  9050, a running Tor Browser's 9150. If none answers, the app can start a tor of its own on a
+  free port under `AppCache\Tor` and wait for its bootstrap
+- Per-account circuit isolation through SOCKS username/password (`IsolateSOCKSAuth`), so accounts
+  never share a circuit and a failed connection can be retried on a fresh one
+- A connection climbs a six-rung ladder — known endpoint, fresh circuit, the app's own SOCKS5
+  client, rediscovery, and finally a tor started by the app — under a Polly pipeline with its own
+  patient budget. Every rung is a different route *through* Tor; none is a route around it
 
 **Settings with live inheritance**
 - Global settings persist as a plain `key = value` text file
@@ -76,6 +93,13 @@ and switching the theme re-skins the whole app at runtime.
   re-syncs on the target machine.
 - **HTML sanitization**: message HTML never runs scripts; the iframe is sandboxed and remote
   images are blocked by default so tracking pixels do not fire.
+- **Tor-only accounts**: the flag is enforced, not advisory. `MailConnections` is the only door to
+  a mail server in the app, and for such an account it either attaches a Tor proxy or refuses to
+  connect — there is no fall back to a direct connection when Tor is unavailable, and a last-moment
+  assertion rejects any client that reaches the connect without a proxy attached. Remote images in
+  that account's mail stay blocked whatever the global image setting says, because the WebView
+  would fetch them over the ordinary network. Port-probing diagnostics travel through Tor too, or
+  are skipped.
 - **Debug surface**: the localhost REST API used by automated tests is compiled only into
   DEBUG builds; release builds contain none of it.
 
@@ -95,6 +119,11 @@ MyLovelyMail\
 ## Building
 
 Requirements: .NET 10 SDK with the MAUI workload, Windows 11.
+
+Tor is not bundled and is only needed for Tor-only accounts. Install it any way you like — the tor
+daemon, the Tor Expert Bundle, or the Tor Browser — and the app finds it on PATH, in its own folder,
+or in the usual Tor Browser locations; the `TorExecutablePath` setting points at an unusual one.
+Without it, a Tor-only account reports that it has no route rather than connecting directly.
 
 ```powershell
 git clone https://github.com/muhammetozeski/MyLovelyMail.git
@@ -118,6 +147,7 @@ navigation constants at compile time.
 MainProject\           shared library: all UI (Blazor) and services
 ├─ DataModels\Mail\    accounts, folders, message summaries, filter rules, drafts
 ├─ Services\Mail\      IMAP/POP3/SMTP engine, rules, compose, notifications, rendering
+├─ Services\Tor\       SOCKS5 client, tor process management, endpoint discovery and verification
 ├─ Storage\            AppPaths, disk-backed MessageStore (RAM keeps summaries only)
 ├─ Stores\             settings engine, account/filter/tag stores, credential vault
 └─ UI\                 pages, components, theme constants (CSS emitted from C#)
