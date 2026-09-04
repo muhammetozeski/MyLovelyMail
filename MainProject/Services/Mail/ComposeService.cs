@@ -380,7 +380,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                             var folder = await client.GetFolderAsync(sentFolder.FullName, ct);
                             await folder.AppendAsync(message, MessageFlags.Seen, ct);
                             await client.DisconnectAsync(true, ct);
-                        }, cancellationToken);
+                        }, cancellationToken, account);
                         return;
                     }
                 }

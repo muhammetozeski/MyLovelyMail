@@ -149,7 +149,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
                 await client.DisconnectAsync(true, ct);
                 return older.Count;
-            }, cancellationToken);
+            }, cancellationToken, account);
         }
 
         /// <summary>Refreshes the folder list, the Inbox, and a couple of the stalest other folders.</summary>
@@ -164,7 +164,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
                 await RefreshStalestFoldersAsync(account, client, ct);
                 await client.DisconnectAsync(true, ct);
-            }, cancellationToken);
+            }, cancellationToken, account);
             Log($"IMAP sync finished: {account.EmailAddress}");
         }
 
@@ -209,7 +209,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 var folder = await client.GetFolderAsync(folderFullName, ct);
                 await SyncOpenedFolderAsync(account, client, folder, ct);
                 await client.DisconnectAsync(true, ct);
-            }, cancellationToken);
+            }, cancellationToken, account);
         }
 
         /// <summary>Downloads the full MIME of one message into the cache and returns it parsed.</summary>
@@ -228,7 +228,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
                 await client.DisconnectAsync(true, ct);
                 return message;
-            }, cancellationToken);
+            }, cancellationToken, account);
         }
 
         /// <summary>
@@ -409,7 +409,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     SpecialUseOf(f)))];
                 await client.DisconnectAsync(true, ct);
                 return result;
-            }, cancellationToken);
+            }, cancellationToken, account);
 
         static FolderRoleCandidate ToCandidate(ImapClient client, IMailFolder folder) =>
             new(folder.FullName, folder.Name, SpecialUseOf(folder), folder == client.Inbox, folder.Count, DepthOf(folder));

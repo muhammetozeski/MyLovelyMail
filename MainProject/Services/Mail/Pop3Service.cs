@@ -34,13 +34,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             using var syncScope = SyncScheduler.EnterSyncScope();
             Log($"POP3 sync started: {account.EmailAddress}");
             using var client = await ResiliencePolicy.RunNetwork(
-                ct => MailConnections.OpenPop3Async(account, ct), cancellationToken);
+                ct => MailConnections.OpenPop3Async(account, ct), cancellationToken, account);
 
-            var uids = await ResiliencePolicy.GuardStep(client.GetMessageUidsAsync(cancellationToken), cancellationToken);
+            var uids = await ResiliencePolicy.GuardStep(client.GetMessageUidsAsync(cancellationToken), cancellationToken, account);
             var known = MessageStore.GetSummaries(account.Id, InboxFullName).Select(static s => s.Uid).ToHashSet();
             bool isFirstSync = known.Count == 0;
 
-            bool newestAtEnd = await ProbeNewestAtEndAsync(client, uids.Count, cancellationToken);
+            bool newestAtEnd = await ProbeNewestAtEndAsync(account, client, uids.Count, cancellationToken);
 
             // Newest-first candidate indexes over the WHOLE list, cut to the user's fetch limit.
             int fetchLimit = AccountStore.GetSettings(account.Id).Pop3FetchLimit.Value;
@@ -80,7 +80,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 UnreadCount = MessageStore.GetSummaries(account.Id, InboxFullName).Count(static s => s.IsUnread)
             });
 
-            await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken);
+            await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken, account);
             Log($"POP3 sync finished: {account.EmailAddress}, {allNew.Count} new of {uids.Count} on server (newestAtEnd={newestAtEnd})");
         }
 
@@ -89,11 +89,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// server's list is newest. Two TOP round-trips; lists shorter than 2 default to true
         /// (the RFC-conventional append order).
         /// </summary>
-        static async Task<bool> ProbeNewestAtEndAsync(Pop3Client client, int messageCount, CancellationToken cancellationToken)
+        static async Task<bool> ProbeNewestAtEndAsync(MailAccountData account, Pop3Client client, int messageCount, CancellationToken cancellationToken)
         {
             if (messageCount < 2) return true;
-            var firstHeaders = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(0, cancellationToken), cancellationToken);
-            var lastHeaders = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(messageCount - 1, cancellationToken), cancellationToken);
+            var firstHeaders = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(0, cancellationToken), cancellationToken, account);
+            var lastHeaders = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(messageCount - 1, cancellationToken), cancellationToken, account);
             DateTimeOffset.TryParse(firstHeaders[HeaderId.Date], out var firstDate);
             DateTimeOffset.TryParse(lastHeaders[HeaderId.Date], out var lastDate);
             return lastDate >= firstDate;
@@ -134,7 +134,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     .ToList();
 
                 await Task.WhenAll(shares.Select((share, workerIndex) =>
-                    FetchShareAsync(workers[workerIndex], uids, share, pump, cancellationToken)));
+                    FetchShareAsync(account, workers[workerIndex], uids, share, pump, cancellationToken)));
             }
             finally
             {
@@ -147,12 +147,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>One worker: sequential TOP fetches on its own connection, each summary dropped into the pump on arrival.</summary>
-        static async Task FetchShareAsync(Pop3Client client, IList<string> uids, List<int> share, SummaryPump pump, CancellationToken cancellationToken)
+        static async Task FetchShareAsync(MailAccountData account, Pop3Client client, IList<string> uids, List<int> share,
+            SummaryPump pump, CancellationToken cancellationToken)
         {
             foreach (int index in share)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var headers = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(index, cancellationToken), cancellationToken);
+                var headers = await ResiliencePolicy.GuardStep(client.GetMessageHeadersAsync(index, cancellationToken), cancellationToken, account);
                 pump.Add(BuildSummary(headers, uids[index]));
             }
         }
@@ -199,7 +200,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
 
                 throw new InvalidOperationException("The message no longer exists on the POP3 server.");
-            }, cancellationToken);
+            }, cancellationToken, account);
         }
 
         /// <summary>Maps a POP3 string UID onto the numeric summary Uid. Kept as a named step because

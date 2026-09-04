@@ -224,7 +224,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         await folder.OpenAsync(FolderAccess.ReadWrite, ct);
                         await action(client, folder, ct);
                         await client.DisconnectAsync(true, ct);
-                    });
+                    }, account: account);
                 }
                 catch (Exception ex)
                 {

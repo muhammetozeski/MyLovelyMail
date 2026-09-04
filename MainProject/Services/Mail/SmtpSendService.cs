@@ -17,7 +17,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 using var client = await MailConnections.OpenSmtpAsync(account, ct);
                 await client.SendAsync(message, ct);
                 await client.DisconnectAsync(true, ct);
-            }, cancellationToken);
+            }, cancellationToken, account);
             Log($"SMTP send finished: '{message.Subject}'");
         }
     }
