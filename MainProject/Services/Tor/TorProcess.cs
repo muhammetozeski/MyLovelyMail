@@ -36,8 +36,16 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         public static bool IsRunning => running is { HasExited: false };
 
-        /// <summary>The SOCKS port of the tor this app started, or null when it started none.</summary>
-        public static int? OwnSocksPort { get; private set; }
+        static int? ownSocksPort;
+
+        /// <summary>
+        /// The SOCKS port of the tor this app started, or null when no such tor is running. Read
+        /// from the process rather than remembered: a tor that died on its own clears nothing, and
+        /// a stale port here is dangerous rather than merely wrong — the endpoint built from it is
+        /// labelled AppManaged, which <see cref="TorService"/> trusts without the RESOLVE proof, so
+        /// anything that had since bound the freed port would carry a Tor-only account unverified.
+        /// </summary>
+        public static int? OwnSocksPort => IsRunning ? ownSocksPort : null;
 
         static void Remember(string line)
         {
@@ -226,7 +234,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             lock (startGate)
             {
                 running = process;
-                OwnSocksPort = socksPort;
+                ownSocksPort = socksPort;
             }
             RegisterShutdownHook();
             Log($"Started tor from '{executable.Path}' on SOCKS port {socksPort}.");
@@ -325,7 +333,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             {
                 process = running;
                 running = null;
-                OwnSocksPort = null;
+                ownSocksPort = null;
             }
             if (process == null) return;
 
