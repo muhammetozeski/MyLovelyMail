@@ -130,9 +130,24 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Log($"IMAP IDLE for '{account.EmailAddress}' stopped: {ex.Message}. Reconnecting cannot fix a rejected password.", LogLevel.Error);
                     return;
                 }
+                // No Tor on the machine, or auto-starting one is switched off. Reconnecting every
+                // two minutes cannot fix either, so the loop lets go of its slot; the next
+                // Refresh() — one per sync pass — starts it again once the machine can offer a route.
+                catch (Tor.TorUnavailableException ex) when (!ex.Recoverable)
+                {
+                    SyncHealthService.MarkFailure(account.Id, ex.Message);
+                    Log($"IMAP IDLE for '{account.EmailAddress}' stopped: {ex.Message}", LogLevel.Error);
+                    lock (gate) running.Remove(account.Id);
+                    return;
+                }
                 catch (Exception ex)
                 {
                     SyncHealthService.MarkFailure(account.Id, ex.Message);
+
+                    // A long-held IDLE that dropped usually dropped because its circuit did. Coming
+                    // back on the same one repeats the failure; the next connection picks a new path.
+                    if (account.TorOnly) Tor.TorService.RotateCircuit(account.Id);
+
                     Log($"IMAP IDLE for '{account.EmailAddress}' dropped: {ex.Message}. Reconnecting in {backoff.TotalSeconds:0}s.", LogLevel.Warning);
                     try { await Task.Delay(backoff, cancellationToken); }
                     catch (OperationCanceledException) { return; }
