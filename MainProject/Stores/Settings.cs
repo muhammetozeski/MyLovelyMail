@@ -189,6 +189,25 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>How the credential vault encrypts account passwords on disk.</summary>
         public static readonly Setting<VaultMode> CredentialVaultMode = new(VaultMode.Dpapi);
 
+        // ---- Tor ----
+        // These describe how to REACH Tor. Whether an account may only speak through it is the
+        // account's own TorOnly flag, not a setting: it belongs to the mailbox, not to this machine.
+
+        /// <summary>Address of the Tor SOCKS proxy. Loopback by default — a remote proxy would carry the traffic in the clear to it.</summary>
+        public static readonly Setting<string> TorSocksHost = new("127.0.0.1");
+
+        /// <summary>Port of the Tor SOCKS proxy. 9050 is the tor daemon's; a running Tor Browser uses 9150, which is tried as well.</summary>
+        public static readonly Setting<int> TorSocksPort = new(9050);
+
+        /// <summary>Start a tor of the app's own when no SOCKS proxy answers. Off means a Tor-only account simply stays offline until one does.</summary>
+        public static readonly Setting<bool> TorAutoStart = new(true);
+
+        /// <summary>Full path to a tor executable. Empty searches PATH, the app folder and the usual Tor Browser locations.</summary>
+        public static readonly Setting<string> TorExecutablePath = new("");
+
+        /// <summary>Seconds to wait for a freshly started tor to finish bootstrapping. A first run on a slow link genuinely takes minutes.</summary>
+        public static readonly Setting<int> TorStartupTimeoutSeconds = new(180);
+
         // ---- Diagnostics ----
 
         /// <summary>Master logging on/off. On by default: entries buffer in RAM for the log viewer and persist scrambled to AppCache/Logs.</summary>

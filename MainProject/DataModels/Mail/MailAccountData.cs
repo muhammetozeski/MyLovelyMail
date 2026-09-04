@@ -64,6 +64,16 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         public MailAuthMethod AuthMethod { get; set; } = MailAuthMethod.Password;
 
+        /// <summary>
+        /// This mailbox is reachable ONLY through Tor. Every IMAP/POP3/SMTP connection is opened
+        /// through the Tor SOCKS proxy, the server name is resolved by Tor rather than by this
+        /// machine, and remote content in its mail is never fetched. When no Tor route exists the
+        /// account fails to connect — it is never downgraded to a direct connection, because the
+        /// whole point of the flag is that this address must not be seen leaving this machine.
+        /// The server itself stays an ordinary one; only the route to it changes.
+        /// </summary>
+        public bool TorOnly { get; set; }
+
         /// <summary>Accent color of this account in the UI (folder dot, avatar ring).</summary>
         public string ColorHex { get; set; } = AppColors.IdentityPalette[0];
 
