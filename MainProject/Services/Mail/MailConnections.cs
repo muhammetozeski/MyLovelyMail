@@ -48,9 +48,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>
         /// Connects and authenticates one MailKit client. On any failure the half-open client is
         /// disposed before the exception continues, so no caller ever receives or leaks a broken
-        /// connection. The two steps are separated so a failure names which of them broke: a
-        /// refused socket and a refused password are different problems with different fixes, and
-        /// on a Tor route the first is routine while the second must never be retried.
+        /// connection.
+        /// <para>
+        /// Which of the two steps broke is recorded in the log and NOWHERE else. Wrapping the
+        /// socket stage in an exception of this file's own was tried and had to come back out: two
+        /// callers dispatch on the concrete type — <see cref="ConnectTriageService.Classify"/> maps
+        /// SocketException and SslHandshakeException onto the sentence the wizard prints, and
+        /// <see cref="ResiliencePolicy"/> reads OperationCanceledException as "do not retry" — so a
+        /// wrapper turns a named diagnosis into "failed" and makes Polly retry an attempt that had
+        /// already timed out. The ladder does not need the distinction either: its
+        /// <c>catch (AuthenticationException)</c> sits after the connect and can only be reached by
+        /// the login stage.
+        /// </para>
         /// </summary>
         static async Task<TClient> ConnectAndAuthenticateAsync<TClient>(TClient client, string protocolName, string host, int port,
             ConnectionSecurity security, string username, string password, CancellationToken cancellationToken)
@@ -64,7 +73,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
                 catch (Exception ex)
                 {
-                    throw new MailConnectStageException($"{protocolName} could not reach {host}:{port} — {ex.Message}", ex);
+                    Log($"{protocolName} could not reach {host}:{port} — {ex.GetType().Name}: {ex.Message}", LogLevel.Warning);
+                    throw;
                 }
 
                 await client.AuthenticateAsync(username, password, cancellationToken);
@@ -77,9 +87,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 throw;
             }
         }
-
-        /// <summary>Carries "the socket stage failed" out of the connect, so the ladder can tell a routing problem from a rejected login.</summary>
-        sealed class MailConnectStageException(string message, Exception inner) : Exception(message, inner);
 
         /// <summary>
         /// Last line of defence for a Tor-only account: a client about to connect without a proxy
