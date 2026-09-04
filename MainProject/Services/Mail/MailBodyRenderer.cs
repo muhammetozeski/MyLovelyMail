@@ -55,7 +55,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 string body;
                 if (!string.IsNullOrWhiteSpace(message.HtmlBody))
                 {
-                    body = Sanitize(message.HtmlBody, message, allowRemoteImages, ref blocked);
+                    body = Sanitize(message.HtmlBody, message, BlocksRemoteImages(account, allowRemoteImages), ref blocked);
                     if (fold) body = FoldHtmlQuotes(body, ref folded);
                 }
                 else
@@ -84,7 +84,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        static string Sanitize(string html, MimeMessage message, bool allowRemoteImages, ref bool blockedRemoteImages)
+        /// <summary>
+        /// Whether remote images in this message stay unloaded. Normally the user's own
+        /// <see cref="Settings.ExternalImages"/> choice, and the reader's "load them once" button
+        /// overrides it — except on a Tor-only account, where neither can. Those images are fetched
+        /// by the WebView over the ordinary network, so one tracking pixel would hand the sender
+        /// the machine's real address and the moment the mail was opened: the exact pairing the
+        /// account is marked Tor-only to prevent, and it would happen without a click.
+        /// </summary>
+        static bool BlocksRemoteImages(MailAccountData account, bool allowRemoteImages) =>
+            account.TorOnly || (!allowRemoteImages && Settings.ExternalImages.Value == ExternalImagesPolicy.Block);
+
+        static string Sanitize(string html, MimeMessage message, bool blockRemoteImages, ref bool blockedRemoteImages)
         {
             html = ScriptBlocks().Replace(html, string.Empty);
             html = ForbiddenTags().Replace(html, string.Empty);
@@ -92,7 +103,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             html = JavascriptUrls().Replace(html, "$1=$2about:blank$2");
             html = InlineCidImages(html, message);
 
-            if (!allowRemoteImages && Settings.ExternalImages.Value == ExternalImagesPolicy.Block && RemoteImageSources().IsMatch(html))
+            if (blockRemoteImages && RemoteImageSources().IsMatch(html))
             {
                 blockedRemoteImages = true;
                 html = RemoteImageSources().Replace(html, $"$1$2{BlockedImagePlaceholder}$2");

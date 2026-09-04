@@ -759,8 +759,17 @@
             @if (OpenBodyBlockedImages)
             {
                 <div class="mail-image-banner">
-                    🖼️ Remote images were blocked for your privacy.
-                    <button class="mail-search-toggle" @onclick="AllowImagesOnce">Show images once</button>
+                    @* No "show once" on a Tor-only account: the WebView would fetch those images
+                       over the ordinary network, which is precisely what the account forbids. *@
+                    @if (MailUiState.SelectedAccount is { TorOnly: true })
+                    {
+                        <span>🧅 Remote images stay blocked — this account only talks through Tor.</span>
+                    }
+                    else
+                    {
+                        <span>🖼️ Remote images were blocked for your privacy.</span>
+                        <button class="mail-search-toggle" @onclick="AllowImagesOnce">Show images once</button>
+                    }
                 </div>
             }
 
