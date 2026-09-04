@@ -62,10 +62,39 @@ namespace MyLovelyMail.MainProject.Services.Tor
         static string ExecutableName => OperatingSystem.IsWindows() ? "tor.exe" : "tor";
 
         /// <summary>
+        /// Last answer of <see cref="Search"/>, keyed by the setting that steers it. Three status
+        /// lines in the UI call <see cref="Find"/> straight from their render tree, so without a
+        /// cache every re-render walked the whole PATH with File.Exists and appended another entry
+        /// to a log buffer that has no size cap.
+        /// </summary>
+        static (string SettingKey, TorExecutable? Result)? lastSearch;
+        static readonly Lock searchGate = new();
+
+        /// <summary>
         /// The first tor executable that exists, most explicit first: the setting, then PATH, then
         /// the places the usual Windows installs put one. Returns null when the machine has none.
+        /// <para>
+        /// The answer is remembered until the TorExecutablePath setting changes or the file behind
+        /// it goes away, so this is cheap enough to call from a render.
+        /// </para>
         /// </summary>
         public static TorExecutable? Find()
+        {
+            string settingKey = Settings.TorExecutablePath.Value;
+            lock (searchGate)
+            {
+                if (lastSearch is { } cached && cached.SettingKey == settingKey
+                    && (cached.Result == null || File.Exists(cached.Result.Path)))
+                    return cached.Result;
+
+                var found = Search();
+                lastSearch = (settingKey, found);
+                return found;
+            }
+        }
+
+        /// <summary>Walks the candidates for real. Only reached on a cache miss, so its logging stays readable.</summary>
+        static TorExecutable? Search()
         {
             foreach (var (candidate, foundBy) in Candidates())
             {
