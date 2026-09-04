@@ -284,6 +284,75 @@
         }
     </GlassCard>
 
+    @* How to REACH Tor lives here; whether an account may only use it is that account's own
+       switch, on its settings page — it belongs to the mailbox, not to this machine. *@
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🧅 Tor</div>
+        <p class="settings-empty-text">
+            @if (TorOnlyAccounts.Count == 0)
+            {
+                <text>No account is set to Tor-only yet. Turn it on for an account under its ⚙️ Settings; these values are how this app finds Tor.</text>
+            }
+            else
+            {
+                <text>Used by @string.Join(", ", TorOnlyAccounts). Those accounts never connect any other way.</text>
+            }
+        </p>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">SOCKS proxy</span>
+                <span class="settings-row-hint">
+                    Where Tor listens. 9050 is the tor daemon's port and 9150 a running Tor Browser's; both are
+                    tried even when the value here is neither. Keep it on loopback — traffic to a proxy elsewhere
+                    would leave this machine before Tor ever saw it.
+                </span>
+            </div>
+            <div class="settings-vault-switch">
+                <CoreInput Value="@GlobalSettings.TorSocksHost.Value" ValueChanged="@SetTorHost" />
+                <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Start Tor when none is running</span>
+                <span class="settings-row-hint">Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Tor executable</span>
+                <span class="settings-row-hint">Empty searches PATH, the app folder and the usual Tor Browser locations. @TorExecutableLine</span>
+            </div>
+            <div class="settings-number settings-number--wide">
+                <CoreInput Placeholder="(searched automatically)" Value="@GlobalSettings.TorExecutablePath.Value" ValueChanged="@SetTorExecutable" />
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Route</span>
+                <span class="settings-row-hint">@TorRouteLine</span>
+            </div>
+        </div>
+        <div class="settings-migration-actions">
+            <SecondaryButton OnClick="@CheckTorAsync" Disabled="@TorBusy">
+                @if (TorBusy)
+                {
+                    <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextPrimary" />
+                }
+                🧅 Check the Tor route
+            </SecondaryButton>
+            @if (TorProcess.IsRunning)
+            {
+                <SecondaryButton OnClick="@StopTor">🛑 Stop the app's tor</SecondaryButton>
+            }
+        </div>
+        @if (TorMessage != null)
+        {
+            <p class="settings-empty-text">@TorMessage</p>
+        }
+    </GlassCard>
+
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🗄️ Everything else</div>
         <p class="settings-empty-text">
@@ -397,6 +466,11 @@
         // The vault card switches this through CredentialVault, which re-encrypts every stored
         // password on the way. A dropdown would flip the mode without that, losing all of them.
         nameof(GlobalSettings.CredentialVaultMode),
+        // Tor card
+        nameof(GlobalSettings.TorSocksHost),
+        nameof(GlobalSettings.TorSocksPort),
+        nameof(GlobalSettings.TorAutoStart),
+        nameof(GlobalSettings.TorExecutablePath),
     ];
 
     static IEnumerable<ISetting> UncardedSettings =>
@@ -466,6 +540,65 @@
         SetAndSave(GlobalSettings.MessageListDensity, density);
         Events.MainEvents.Trigger("OnStyleChanged");
     }
+
+    #region Tor
+
+    bool TorBusy { get; set; }
+    string? TorMessage { get; set; }
+
+    static List<string> TorOnlyAccounts =>
+        [.. AccountStore.Accounts.Where(static a => a.TorOnly).Select(static a => a.EmailAddress)];
+
+    static string TorExecutableLine =>
+        TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+
+    static string TorRouteLine =>
+        TorService.Current is { } endpoint
+            ? $"In use: {endpoint}." + (TorService.LastVerification is { IsTor: true } ? " Verified as Tor." : string.Empty)
+            : TorService.LastError is { Length: > 0 } error ? $"No route. Last attempt: {error}"
+            : "No route open yet — one is found or started on the first connection of a Tor-only account.";
+
+    static void SetTorHost(string host) => SetAndSave(GlobalSettings.TorSocksHost, host.Trim());
+
+    static void SetTorPort(string text)
+    {
+        if (int.TryParse(text, out int port) && port is > 0 and < 65536)
+            SetAndSave(GlobalSettings.TorSocksPort, port);
+    }
+
+    static void SetTorExecutable(string path) => SetAndSave(GlobalSettings.TorExecutablePath, path.Trim().Trim('"'));
+
+    /// <summary>
+    /// The real check: a Tor RESOLVE over the SOCKS port, which a general-purpose SOCKS5 proxy has
+    /// to reject. "Something is listening on 9050" is not the same claim and is not worth printing.
+    /// </summary>
+    async Task CheckTorAsync()
+    {
+        TorBusy = true;
+        TorMessage = "Building a circuit…";
+        StateHasChanged();
+        try
+        {
+            var verification = await TorService.VerifyAsync(CancellationToken.None);
+            TorMessage = (verification.IsTor ? "✅ " : "❌ ") + verification.Detail;
+        }
+        catch (Exception ex)
+        {
+            TorMessage = $"❌ {ex.Message}";
+        }
+        finally
+        {
+            TorBusy = false;
+        }
+    }
+
+    void StopTor()
+    {
+        TorProcess.Stop();
+        TorMessage = "🛑 The tor this app started was stopped. The next Tor-only connection starts one again.";
+    }
+
+    #endregion
 
     string NewMasterPassword { get; set; } = string.Empty;
     string BundlePath { get; set; } = string.Empty;

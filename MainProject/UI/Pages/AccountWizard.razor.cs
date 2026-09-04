@@ -1,6 +1,7 @@
 using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Services.Tor;
 using MyLovelyMail.MainProject.Stores;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
@@ -35,6 +36,19 @@ namespace MyLovelyMail.MainProject.UI.Pages
         string SmtpHost { get; set; } = string.Empty;
         string SmtpPortText { get; set; } = "465";
         ConnectionSecurity SmtpSecurity { get; set; } = ConnectionSecurity.SslOnConnect;
+
+        /// <summary>Reach this mailbox only through Tor. Set before the first connection so the test itself is already tunnelled.</summary>
+        bool TorOnly { get; set; }
+
+        /// <summary>
+        /// What this machine can offer right now, answered without touching the network: an open
+        /// route, an executable that would be started for one, or nothing at all — which is worth
+        /// reading before saving an account that will refuse to connect without it.
+        /// </summary>
+        static string TorRouteLine =>
+            TorService.Current is { } endpoint ? $"🧅 Tor route ready: {endpoint}."
+            : TorProcess.Find() is { } executable ? $"🧅 No route open yet — one will be started from {executable.Path} on the first connection."
+            : "⚠️ No tor executable was found on this machine. Install Tor or the Tor Browser, or set TorExecutablePath in Settings.";
 
         bool Busy { get; set; }
         string BusyAction { get; set; } = string.Empty;
@@ -97,6 +111,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SmtpHost = SmtpHost.Trim(),
             SmtpPort = int.TryParse(SmtpPortText, out int smtpPort) ? smtpPort : 465,
             SmtpSecurity = SmtpSecurity,
+            TorOnly = TorOnly,
             ColorHex = SelectedColorHex
         };
 
@@ -113,7 +128,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             {
                 // Two separate scopes so a failure is attributable: one shared try around both
                 // servers printed the same sentence whichever one refused.
-                await TestStageAsync(IncomingStage, async ct =>
+                await TestStageAsync(account, IncomingStage, async ct =>
                 {
                     if (account.Protocol == IncomingProtocol.Imap)
                     {
@@ -126,13 +141,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
                         await pop3.DisconnectAsync(true, ct);
                     }
                 });
-                await TestStageAsync(SendingStage, async ct =>
+                await TestStageAsync(account, SendingStage, async ct =>
                 {
                     using var smtp = await MailConnections.OpenSmtpAsync(account, ct, Password);
                     await smtp.DisconnectAsync(true, ct);
                 });
                 TestSucceeded = true;
-                TestMessage = "✅ Connected! Both receiving and sending servers accepted the credentials.";
+                TestMessage = account.TorOnly
+                    ? "✅ Connected through Tor! Both receiving and sending servers accepted the credentials."
+                    : "✅ Connected! Both receiving and sending servers accepted the credentials.";
             }
             catch (StageFailure failure)
             {
@@ -145,7 +162,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 string host = failure.Stage == SendingStage ? account.SmtpHost : account.IncomingHost;
 
                 var diagnosis = ConnectTriageService.Classify(failure.InnerException!, failure.Stage);
-                Diagnosis = await ConnectTriageService.ProbeAsync(diagnosis, protocol, host);
+                Diagnosis = await ConnectTriageService.ProbeAsync(diagnosis, protocol, host, account: account);
                 TestMessage = $"❌ {Diagnosis.Sentence}";
             }
             finally
@@ -167,11 +184,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
             public string Stage { get; } = stage;
         }
 
-        static async Task TestStageAsync(string stage, Func<CancellationToken, Task> attempt)
+        static async Task TestStageAsync(MailAccountData account, string stage, Func<CancellationToken, Task> attempt)
         {
             try
             {
-                await Services.ResiliencePolicy.RunNetwork(attempt);
+                await Services.ResiliencePolicy.RunNetwork(attempt, account: account);
             }
             catch (Exception ex)
             {

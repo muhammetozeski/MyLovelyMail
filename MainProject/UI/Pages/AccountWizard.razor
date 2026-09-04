@@ -129,6 +129,27 @@
         </div>
     </GlassCard>
 
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">🧅 Tor</div>
+        <div class="wizard-field">
+            <div class="wizard-toggle-row">
+                <span class="wizard-label">Reach this account only through Tor</span>
+                <CoreToggle @bind-Checked="TorOnly" />
+            </div>
+            <p class="wizard-hint">
+                The server stays an ordinary one — only the route changes. Mail is fetched and sent
+                through the Tor SOCKS proxy, the server name is looked up by Tor instead of by this
+                machine, and remote images in this account's mail are never loaded. When Tor is not
+                reachable the account does not connect at all; it never falls back to a direct
+                connection.
+            </p>
+            @if (TorOnly)
+            {
+                <p class="wizard-hint">@TorRouteLine</p>
+            }
+        </div>
+    </GlassCard>
+
     @if (TestMessage != null)
     {
         <GlassCard CustomClass="wizard-card">

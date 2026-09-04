@@ -138,6 +138,39 @@
             </div>
         </GlassCard>
 
+        <GlassCard CustomClass="settings-section">
+            <div class="settings-section-title">🧅 Tor</div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Reach this account only through Tor</span>
+                    <span class="settings-row-hint">
+                        Mail is fetched and sent through the Tor SOCKS proxy, the server name is looked up by
+                        Tor rather than by this machine, and remote images in this account's mail are never
+                        loaded. When Tor is unavailable the account stays offline — it never falls back to a
+                        direct connection. The server itself stays an ordinary one; only the route changes.
+                    </span>
+                </div>
+                <CoreToggle Checked="@Account.TorOnly" CheckedChanged="@SetTorOnly" />
+            </div>
+            @if (Account.TorOnly)
+            {
+                <p class="settings-empty-text">@TorStatusLine</p>
+                <div class="settings-migration-actions">
+                    <SecondaryButton OnClick="@CheckTorAsync" Disabled="@TorChecking">
+                        @if (TorChecking)
+                        {
+                            <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextPrimary" />
+                        }
+                        🧅 Check the Tor route
+                    </SecondaryButton>
+                </div>
+                @if (TorCheckMessage != null)
+                {
+                    <p class="settings-empty-text">@TorCheckMessage</p>
+                }
+            }
+        </GlassCard>
+
         @* Inherits exactly like every other account setting, but it gets its own card: a
            signature is written, and a one-line override row cannot hold an editor and a preview. *@
         <GlassCard CustomClass="settings-section">
@@ -217,6 +250,49 @@
         if (Account is not { } account) return;
         account.Enabled = enabled;
         AccountStore.Save(account);
+    }
+
+    bool TorChecking { get; set; }
+    string? TorCheckMessage { get; set; }
+
+    /// <summary>What this machine can offer right now, answered without touching the network.</summary>
+    static string TorStatusLine =>
+        TorService.Current is { } endpoint ? $"Route in use: {endpoint}."
+        : TorProcess.Find() is { } executable ? $"No route open yet — one will be started from {executable.Path} on the next connection."
+        : "⚠️ No tor executable was found on this machine. Install Tor or the Tor Browser, or set TorExecutablePath in Settings.";
+
+    void SetTorOnly(bool torOnly)
+    {
+        if (Account is not { } account) return;
+        account.TorOnly = torOnly;
+        AccountStore.Save(account);
+        TorCheckMessage = null;
+        Log($"Account {account.EmailAddress} is now {(torOnly ? "Tor-only" : "reachable directly")}.");
+    }
+
+    /// <summary>
+    /// Runs the real check — a Tor RESOLVE over the SOCKS port — instead of reporting whether
+    /// something is listening. A plain SOCKS proxy sitting on 9050 passes the second test and fails
+    /// this one, and it is the difference between tunnelled and merely proxied.
+    /// </summary>
+    async Task CheckTorAsync()
+    {
+        TorChecking = true;
+        TorCheckMessage = "Building a circuit…";
+        StateHasChanged();
+        try
+        {
+            var verification = await TorService.VerifyAsync(CancellationToken.None);
+            TorCheckMessage = (verification.IsTor ? "✅ " : "❌ ") + verification.Detail;
+        }
+        catch (Exception ex)
+        {
+            TorCheckMessage = $"❌ {ex.Message}";
+        }
+        finally
+        {
+            TorChecking = false;
+        }
     }
 
     string NewPassword { get; set; } = string.Empty;
