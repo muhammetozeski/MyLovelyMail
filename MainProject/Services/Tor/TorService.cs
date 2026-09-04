@@ -63,8 +63,27 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         static readonly SemaphoreSlim discoveryGate = new(1, 1);
 
-        /// <summary>The endpoint the last successful discovery settled on; re-probed before reuse.</summary>
-        public static TorEndpoint? Current { get; private set; }
+        static TorEndpoint? current;
+
+        /// <summary>
+        /// The endpoint the last successful discovery settled on; re-probed before reuse.
+        /// <para>
+        /// An app-managed endpoint is only real while the process behind it is. Without this check
+        /// a stopped or crashed tor left its port here: the settings card kept reporting a route
+        /// that no longer existed, and the fast path below would hand that port back to a Tor-only
+        /// account as soon as anything answered a SOCKS5 greeting on it.
+        /// </para>
+        /// </summary>
+        public static TorEndpoint? Current
+        {
+            get
+            {
+                if (current is { Source: TorEndpointSource.AppManaged } appManaged && TorProcess.OwnSocksPort != appManaged.Port)
+                    current = null;
+                return current;
+            }
+            private set => current = value;
+        }
 
         /// <summary>Why the last discovery failed, kept for the settings card and the debug API.</summary>
         public static string? LastError { get; private set; }
