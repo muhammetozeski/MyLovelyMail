@@ -1,9 +1,11 @@
 using System.Net.Sockets;
+using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Services.Tor;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -43,6 +45,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
     {
         /// <summary>Connect-only probe budget. Short on purpose: this runs several times in a row while someone waits.</summary>
         static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(6);
+
+        /// <summary>The same probe with a circuit to build first, which six seconds does not cover.</summary>
+        static readonly TimeSpan TorProbeTimeout = TimeSpan.FromSeconds(45);
 
         /// <summary>The pairs worth trying per protocol, most likely first. AUTH is never attempted.</summary>
         static readonly Dictionary<MailProtocol, (int Port, ConnectionSecurity Security)[]> Candidates = new()
@@ -84,16 +89,36 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>
         /// Connects (and nothing more) to each candidate pair until one answers. Only worth calling
         /// for a socket or TLS failure: an auth rejection means the settings already work.
+        /// <para>
+        /// <paramref name="account"/> decides how the probe travels. For a Tor-only account every
+        /// probe goes through Tor, and if no Tor route exists the probe is skipped entirely —
+        /// a diagnostic that opened three direct sockets to the mail server would give away exactly
+        /// what the flag exists to hide, and it would do it while telling the user about privacy.
+        /// </para>
         /// </summary>
         public static async Task<ConnectDiagnosis> ProbeAsync(ConnectDiagnosis diagnosis, MailProtocol protocol, string host,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, MailAccountData? account = null)
         {
             if (diagnosis.Kind is DiagnosisKind.AuthenticationRejected or DiagnosisKind.HostNotFound or DiagnosisKind.Ok)
                 return diagnosis;
 
+            TorEndpoint? torEndpoint = null;
+            if (account is { TorOnly: true })
+            {
+                try
+                {
+                    torEndpoint = await TorService.RequireEndpointAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    Log($"Connect probe skipped: '{account.EmailAddress}' is Tor-only and no Tor route is available ({ex.Message}).", LogLevel.Warning);
+                    return diagnosis with { Sentence = $"{diagnosis.Sentence} Ports could not be probed: this account may only be reached through Tor, and Tor is not available." };
+                }
+            }
+
             foreach (var (port, security) in Candidates[protocol])
             {
-                if (!await AnswersAsync(protocol, host, port, security, cancellationToken)) continue;
+                if (!await AnswersAsync(protocol, host, port, security, torEndpoint, cancellationToken)) continue;
 
                 Log($"Connect probe: {host} answers on {port} ({security}).");
                 return diagnosis with
@@ -107,7 +132,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         static async Task<bool> AnswersAsync(MailProtocol protocol, string host, int port, ConnectionSecurity security,
-            CancellationToken cancellationToken)
+            TorEndpoint? torEndpoint, CancellationToken cancellationToken)
         {
             var options = security switch
             {
@@ -118,7 +143,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             };
 
             using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            budget.CancelAfter(ProbeTimeout);
+            // A probe that has to build a circuit first cannot be held to a clear-net stopwatch.
+            budget.CancelAfter(torEndpoint == null ? ProbeTimeout : TorProbeTimeout);
             try
             {
                 switch (protocol)
@@ -126,22 +152,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     case MailProtocol.Imap:
                     {
                         using var client = new ImapClient();
-                        await client.ConnectAsync(host, port, options, budget.Token);
-                        await client.DisconnectAsync(true, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
                         return true;
                     }
                     case MailProtocol.Pop3:
                     {
                         using var client = new Pop3Client();
-                        await client.ConnectAsync(host, port, options, budget.Token);
-                        await client.DisconnectAsync(true, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
                         return true;
                     }
                     default:
                     {
                         using var client = new SmtpClient();
-                        await client.ConnectAsync(host, port, options, budget.Token);
-                        await client.DisconnectAsync(true, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
                         return true;
                     }
                 }
@@ -151,6 +174,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 // A candidate that does not answer is the normal case, not a fault worth logging.
                 return false;
             }
+        }
+
+        /// <summary>Connect, disconnect — through Tor when an endpoint was handed in, and never any other way.</summary>
+        static async Task ProbeWithAsync(MailService client, string host, int port, SecureSocketOptions options,
+            TorEndpoint? torEndpoint, CancellationToken cancellationToken)
+        {
+            if (torEndpoint != null)
+                client.ProxyClient = TorService.CreateProxy(torEndpoint, "probe", useOwnClient: false);
+
+            await client.ConnectAsync(host, port, options, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
         }
     }
 }
