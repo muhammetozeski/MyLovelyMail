@@ -8,6 +8,7 @@ using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Services.Tor;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.Constants;
@@ -111,6 +112,7 @@ namespace MyLovelyMail.MainProject.ZTests
             public int SmtpPort { get; set; }
             public ConnectionSecurity SmtpSecurity { get; set; } = ConnectionSecurity.Auto;
             public string Username { get; set; } = string.Empty;
+            public bool TorOnly { get; set; }
         }
 
         sealed class SendRequest
@@ -480,7 +482,10 @@ namespace MyLovelyMail.MainProject.ZTests
                     var protocol = Enum.Parse<ConnectTriageService.MailProtocol>(query["protocol"] ?? "Imap", ignoreCase: true);
                     string stage = query["stage"] ?? "incoming server";
                     var seed = new ConnectDiagnosis(Enum.Parse<DiagnosisKind>(query["kind"] ?? "ConnectionRefused", ignoreCase: true), "Probe.", stage);
-                    return await ConnectTriageService.ProbeAsync(seed, protocol, host);
+                    // ?accountId= makes the probe travel the way that account is allowed to: a
+                    // Tor-only one is probed through Tor or not at all.
+                    var probeAccount = query["accountId"] is { Length: > 0 } probeAccountId ? RequireAccount(probeAccountId) : null;
+                    return await ConnectTriageService.ProbeAsync(seed, protocol, host, account: probeAccount);
                 }
 
                 // Synthetic summaries straight into the grouper: a folder of identical subjects
@@ -720,7 +725,8 @@ namespace MyLovelyMail.MainProject.ZTests
                         IncomingUsername = body.Username.Length > 0 ? body.Username : body.Email,
                         SmtpHost = body.SmtpHost,
                         SmtpPort = body.SmtpPort,
-                        SmtpSecurity = body.SmtpSecurity
+                        SmtpSecurity = body.SmtpSecurity,
+                        TorOnly = body.TorOnly
                     };
                     CredentialVault.SetPassword(account.Id, body.Password);
                     AccountStore.Save(account);
@@ -759,6 +765,79 @@ namespace MyLovelyMail.MainProject.ZTests
                     account.Enabled = RequireQueryValue(query, "enabled") == "true";
                     AccountStore.Save(account);
                     return new { account.EmailAddress, account.Enabled };
+                }
+
+                // The same flip for the Tor-only flag. It changes how every connection of that
+                // account is opened, so being able to set it and then watch /logs is what makes
+                // the routing checkable rather than asserted.
+                case ("POST", "/accounts/tor-only"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    account.TorOnly = RequireQueryValue(query, "torOnly") == "true";
+                    AccountStore.Save(account);
+                    return new { account.EmailAddress, account.TorOnly };
+                }
+
+                // Everything about the Tor route without building a circuit: which port is in use,
+                // which executable would be started, what the last attempt said.
+                case ("GET", "/tor"):
+                    return TorService.Describe();
+
+                // The check that separates Tor from any other SOCKS5 proxy — a RESOLVE over the
+                // SOCKS port. ?host= aims it somewhere else; it costs one circuit either way.
+                case ("POST", "/tor/check"):
+                {
+                    var verification = await TorService.VerifyAsync(CancellationToken.None,
+                        probeHost: query["host"] ?? "check.torproject.org");
+                    return new { verification.IsTor, verification.ProvenNotTor, verification.Detail, resolved = verification.ResolvedAddress?.ToString() };
+                }
+
+                // Starts a tor belonging to the app and waits for its bootstrap, which is the one
+                // step slow enough that a test needs to trigger it on purpose rather than have it
+                // happen inside the first mail connection.
+                case ("POST", "/tor/start"):
+                {
+                    var endpoint = await TorService.StartAppManagedAsync(CancellationToken.None);
+                    return new { endpoint = endpoint.ToString(), TorProcess.OwnSocksPort, output = TorProcess.RecentOutput.TakeLast(20) };
+                }
+
+                case ("POST", "/tor/stop"):
+                {
+                    TorProcess.Stop();
+                    return new { stopped = true, TorProcess.IsRunning };
+                }
+
+                // Opens a real connection the way the sync path does and reports which route
+                // carried it. For a Tor-only account this is the end-to-end proof: it either comes
+                // back tunnelled or it comes back as a refusal, and never as a direct connection.
+                case ("POST", "/tor/connect-test"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    string stage = query["stage"] ?? "incoming";
+                    var started = DateTime.UtcNow;
+                    if (stage == "smtp")
+                    {
+                        using var smtp = await MailConnections.OpenSmtpAsync(account, CancellationToken.None);
+                        await smtp.DisconnectAsync(true);
+                    }
+                    else if (account.Protocol == IncomingProtocol.Imap)
+                    {
+                        using var imap = await MailConnections.OpenImapAsync(account, CancellationToken.None);
+                        await imap.DisconnectAsync(true);
+                    }
+                    else
+                    {
+                        using var pop3 = await MailConnections.OpenPop3Async(account, CancellationToken.None);
+                        await pop3.DisconnectAsync(true);
+                    }
+                    return new
+                    {
+                        account.EmailAddress,
+                        account.TorOnly,
+                        stage,
+                        route = account.TorOnly ? TorService.Current?.ToString() : "direct",
+                        seconds = Math.Round((DateTime.UtcNow - started).TotalSeconds, 1)
+                    };
                 }
 
                 case ("POST", "/mute"):
