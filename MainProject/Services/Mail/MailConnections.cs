@@ -4,6 +4,7 @@ using MailKit.Net.Pop3;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Services.Tor;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
@@ -12,9 +13,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// Builds connected + authenticated MailKit clients from a <see cref="MailAccountData"/>,
     /// pulling the password from <see cref="CredentialVault"/>. One place maps
     /// <see cref="ConnectionSecurity"/> to MailKit's <see cref="SecureSocketOptions"/>.
+    /// <para>
+    /// This is also the only door to a mail server in the app, which is what makes
+    /// <see cref="MailAccountData.TorOnly"/> enforceable rather than aspirational: an account with
+    /// that flag gets a Tor proxy attached to its client here, or no connection at all. There is no
+    /// branch below that opens a direct socket for such an account, and
+    /// <see cref="RequireTunnel"/> re-checks that at the last moment before every connect.
+    /// </para>
     /// </summary>
     public static class MailConnections
     {
+        /// <summary>How long MailKit waits on one Tor round-trip. Three relays are not one hop, and its 2-minute default is measured for one.</summary>
+        const int TorClientTimeoutMs = 240_000;
+
         static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
         {
             ConnectionSecurity.SslOnConnect => SecureSocketOptions.SslOnConnect,
@@ -35,18 +46,28 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>
-        /// Connects and authenticates one MailKit client (the shared body of the three Open*Async
-        /// methods). On any failure the half-open client is disposed before the exception continues,
-        /// so no caller ever receives or leaks a broken connection.
+        /// Connects and authenticates one MailKit client. On any failure the half-open client is
+        /// disposed before the exception continues, so no caller ever receives or leaks a broken
+        /// connection. The two steps are separated so a failure names which of them broke: a
+        /// refused socket and a refused password are different problems with different fixes, and
+        /// on a Tor route the first is routine while the second must never be retried.
         /// </summary>
-        static async Task<TClient> OpenAsync<TClient>(TClient client, string protocolName, string host, int port,
-            ConnectionSecurity security, string username, MailAccountData account, string? passwordOverride,
-            CancellationToken cancellationToken) where TClient : MailService
+        static async Task<TClient> ConnectAndAuthenticateAsync<TClient>(TClient client, string protocolName, string host, int port,
+            ConnectionSecurity security, string username, string password, CancellationToken cancellationToken)
+            where TClient : MailService
         {
             try
             {
-                await client.ConnectAsync(host, port, ToSocketOptions(security), cancellationToken);
-                await client.AuthenticateAsync(username, RequirePassword(account, passwordOverride), cancellationToken);
+                try
+                {
+                    await client.ConnectAsync(host, port, ToSocketOptions(security), cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new MailConnectStageException($"{protocolName} could not reach {host}:{port} — {ex.Message}", ex);
+                }
+
+                await client.AuthenticateAsync(username, password, cancellationToken);
                 Log($"{protocolName} connected: {host}:{port}");
                 return client;
             }
@@ -57,16 +78,158 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
+        /// <summary>Carries "the socket stage failed" out of the connect, so the ladder can tell a routing problem from a rejected login.</summary>
+        sealed class MailConnectStageException(string message, Exception inner) : Exception(message, inner);
+
+        /// <summary>
+        /// Last line of defence for a Tor-only account: a client about to connect without a proxy
+        /// attached would open a direct socket to the mail server. Nothing in this file can reach
+        /// that state today; this exists so nothing added later can either.
+        /// </summary>
+        static void RequireTunnel(MailService client, MailAccountData account)
+        {
+            if (!account.TorOnly || client.ProxyClient != null) return;
+
+            throw new TorUnavailableException(
+                $"Refusing to connect: '{account.EmailAddress}' is a Tor-only account and no proxy was attached to the connection.",
+                recoverable: false);
+        }
+
+        /// <summary>One rung of the Tor ladder — a different way to reach the same mailbox through Tor.</summary>
+        /// <param name="Description">What is being tried, for the log line the user reads afterwards.</param>
+        /// <param name="Rediscover">Re-run endpoint discovery instead of reusing the known SOCKS port.</param>
+        /// <param name="StartOwnTor">Skip discovery and start a tor belonging to this app.</param>
+        /// <param name="OwnSocksClient">Use the app's SOCKS5 client instead of MailKit's.</param>
+        /// <param name="FreshCircuit">Move this account onto a new Tor circuit first.</param>
+        sealed record TorRung(string Description, bool Rediscover, bool StartOwnTor, bool OwnSocksClient, bool FreshCircuit);
+
+        /// <summary>
+        /// Ordered cheapest-and-likeliest first. Each rung changes exactly one thing about the
+        /// route, so the one that finally works also says what was wrong: a stale circuit, a tor
+        /// that went away, or a machine that had none running at all.
+        /// </summary>
+        static readonly TorRung[] TorLadder =
+        [
+            new("the known Tor endpoint", Rediscover: false, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: false),
+            new("a fresh Tor circuit", Rediscover: false, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: true),
+            new("the app's own SOCKS5 client on a fresh circuit", Rediscover: false, StartOwnTor: false, OwnSocksClient: true, FreshCircuit: true),
+            new("a rediscovered Tor endpoint", Rediscover: true, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: true),
+            new("a rediscovered endpoint with the app's own SOCKS5 client", Rediscover: true, StartOwnTor: false, OwnSocksClient: true, FreshCircuit: true),
+            new("a tor started by this app", Rediscover: false, StartOwnTor: true, OwnSocksClient: false, FreshCircuit: true)
+        ];
+
+        /// <summary>
+        /// Opens the client the way this account is allowed to be opened. A direct connection for
+        /// everyone else; for a Tor-only account, the ladder — every rung a different route through
+        /// Tor, none of them a route around it.
+        /// </summary>
+        static async Task<TClient> OpenAsync<TClient>(Func<TClient> createClient, string protocolName, string host, int port,
+            ConnectionSecurity security, string username, MailAccountData account, string? passwordOverride,
+            CancellationToken cancellationToken) where TClient : MailService
+        {
+            // Read before a circuit is built: a locked vault is not worth a Tor connection, and the
+            // ladder must not spend six attempts discovering that the password was never there.
+            string password = RequirePassword(account, passwordOverride);
+
+            if (!account.TorOnly)
+            {
+                var direct = createClient();
+                return await ConnectAndAuthenticateAsync(direct, protocolName, host, port, security, username, password, cancellationToken);
+            }
+
+            var failures = new List<string>();
+            try
+            {
+                foreach (var rung in TorLadder)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        return await OpenThroughTorAsync(createClient, protocolName, host, port, security, username,
+                            account, password, rung, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (AuthenticationException)
+                    {
+                        // The tunnel worked; the mailbox said no. Trying five more circuits only
+                        // turns one wrong password into six failed logins on the provider's side.
+                        throw;
+                    }
+                    catch (ServiceNotAuthenticatedException)
+                    {
+                        throw;
+                    }
+                    catch (TorUnavailableException ex) when (!ex.Recoverable)
+                    {
+                        // No tor on the machine, or auto-start switched off. Every remaining rung
+                        // needs the same thing, so they would all fail the same way.
+                        failures.Add($"{rung.Description}: {ex.Message}");
+                        throw new TorUnavailableException(Summarize(account, protocolName, failures), recoverable: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{rung.Description}: {ex.Message}");
+                        Log($"{protocolName} over Tor failed via {rung.Description}: {ex.Message}", LogLevel.Warning);
+                    }
+                }
+
+                throw new TorUnavailableException(Summarize(account, protocolName, failures));
+            }
+            finally
+            {
+                // Written whichever way the attempt ended: a mailbox that only works on the third
+                // rung is a mailbox with a problem, and without this line nobody would ever see it.
+                if (failures.Count > 0)
+                    Log($"Tor route report for {account.EmailAddress} ({protocolName}): {failures.Count} of {TorLadder.Length} route(s) failed. "
+                        + string.Join(" | ", failures), LogLevel.Warning);
+            }
+        }
+
+        static string Summarize(MailAccountData account, string protocolName, List<string> failures) =>
+            $"'{account.EmailAddress}' may only be reached through Tor and every route failed for {protocolName}. "
+            + string.Join(" | ", failures);
+
+        /// <summary>Builds one rung's route and runs the connect through it.</summary>
+        static async Task<TClient> OpenThroughTorAsync<TClient>(Func<TClient> createClient, string protocolName, string host, int port,
+            ConnectionSecurity security, string username, MailAccountData account, string password, TorRung rung,
+            CancellationToken cancellationToken) where TClient : MailService
+        {
+            if (rung.FreshCircuit) TorService.RotateCircuit(account.Id);
+
+            var endpoint = rung.StartOwnTor
+                ? await TorService.StartAppManagedAsync(cancellationToken)
+                : await TorService.RequireEndpointAsync(cancellationToken, rung.Rediscover);
+
+            var client = createClient();
+            try
+            {
+                client.ProxyClient = TorService.CreateProxy(endpoint, account.Id, rung.OwnSocksClient);
+                client.Timeout = TorClientTimeoutMs;
+                RequireTunnel(client, account);
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
+
+            Log($"{protocolName} for {account.EmailAddress} routing through {endpoint} via {rung.Description}.");
+            return await ConnectAndAuthenticateAsync(client, protocolName, host, port, security, username, password, cancellationToken);
+        }
+
         public static Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(new ImapClient(), "IMAP", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+            OpenAsync(static () => new ImapClient(), "IMAP", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
                 account.IncomingUsername, account, passwordOverride, cancellationToken);
 
         public static Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(new Pop3Client(), "POP3", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+            OpenAsync(static () => new Pop3Client(), "POP3", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
                 account.IncomingUsername, account, passwordOverride, cancellationToken);
 
         public static Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(new SmtpClient(), "SMTP", account.SmtpHost, account.SmtpPort, account.SmtpSecurity,
+            OpenAsync(static () => new SmtpClient(), "SMTP", account.SmtpHost, account.SmtpPort, account.SmtpSecurity,
                 string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername,
                 account, passwordOverride, cancellationToken);
     }
