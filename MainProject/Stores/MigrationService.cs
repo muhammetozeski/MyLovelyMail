@@ -45,26 +45,73 @@ namespace MyLovelyMail.MainProject.Stores
             return bundlePath;
         }
 
-        /// <summary>Restores a bundle into UserData and reloads every store. False on a wrong passphrase.</summary>
+        /// <summary>
+        /// Where an archive entry is allowed to land, or null when it is not allowed at all.
+        /// <para>
+        /// A zip entry name is attacker-controlled text, and <see cref="Path.Combine"/> honours the
+        /// <c>..</c> segments in it: an entry called
+        /// <c>../../../../AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/x.cmd</c>
+        /// used to be written exactly there, which is code running at the next sign-in. The full
+        /// resolved path has to sit under the destination, and the trailing separator matters —
+        /// without it a sibling folder whose name merely starts with the same letters would pass.
+        /// </para>
+        /// </summary>
+        static string? ContainedTarget(string root, string entryName)
+        {
+            string boundary = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string target;
+            try
+            {
+                target = Path.GetFullPath(Path.Combine(root, entryName));
+            }
+            catch
+            {
+                // A name with characters this platform cannot express in a path is not one we place.
+                return null;
+            }
+            return target.StartsWith(boundary, StringComparison.OrdinalIgnoreCase) ? target : null;
+        }
+
+        /// <summary>
+        /// Restores a bundle into UserData and reloads every store. False on a wrong passphrase.
+        /// <para>
+        /// Every entry is checked BEFORE anything is written, and one bad entry refuses the whole
+        /// bundle: an archive that tries to escape is hostile, and importing the acceptable half of
+        /// it would leave the user with a store they did not choose and no way to tell which parts
+        /// arrived.
+        /// </para>
+        /// </summary>
         public static bool ImportBundle(string bundlePath, string passphrase)
         {
             string temporaryVault = Path.Combine(AppPaths.AppCache, PortableVaultEntryName);
             using (var archive = ZipFile.OpenRead(bundlePath))
             {
+                var planned = new List<(ZipArchiveEntry Entry, string Target)>();
+                ZipArchiveEntry? vaultEntry = null;
+
                 foreach (var entry in archive.Entries)
                 {
                     if (entry.FullName.EndsWith('/')) continue;
 
                     if (entry.Name.Equals(PortableVaultEntryName, StringComparison.OrdinalIgnoreCase))
                     {
-                        entry.ExtractToFile(temporaryVault, overwrite: true);
+                        vaultEntry = entry;
                         continue;
                     }
 
-                    string target = Path.Combine(AppPaths.UserData, entry.FullName);
+                    string target = ContainedTarget(AppPaths.UserData, entry.FullName)
+                        ?? throw new InvalidOperationException(
+                            $"This bundle was refused: the entry '{entry.FullName}' points outside the data folder. Nothing was imported.");
+                    planned.Add((entry, target));
+                }
+
+                vaultEntry?.ExtractToFile(temporaryVault, overwrite: true);
+                foreach (var (entry, target) in planned)
+                {
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     entry.ExtractToFile(target, overwrite: true);
                 }
+                Log($"Migration bundle imported: {planned.Count} file(s) into UserData.");
             }
 
             SettingsManager.LoadSettings();
