@@ -38,6 +38,26 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 return onDemandInFlight.Contains(MessageStore.FolderKey(accountId, folderFullName));
         }
 
+        /// <summary>What went wrong the last time a folder was fetched on demand, and when.</summary>
+        public sealed record FolderSyncFailure(string Message, DateTime WhenUtc);
+
+        /// <summary>
+        /// The last on-demand failure per folder, keyed by <see cref="MessageStore.FolderKey"/>.
+        /// <para>
+        /// The failure of a folder opened by the user was reported nowhere but the log: the catch
+        /// below only wrote a line, and <see cref="SyncHealthService"/> is marked from the
+        /// scheduled pass and the IDLE loop, never from here. So a folder whose fetch had just been
+        /// refused looked exactly like a folder with no mail in it, and nothing on screen said
+        /// otherwise. In RAM on purpose — it describes this run, and a stale error read back from
+        /// disk after a restart would be a worse lie than none.
+        /// </para>
+        /// </summary>
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, FolderSyncFailure> onDemandFailures = new();
+
+        /// <summary>The last on-demand fetch failure for this folder, or null when the last one worked.</summary>
+        public static FolderSyncFailure? LastFolderFailure(string accountId, string folderFullName) =>
+            onDemandFailures.GetValueOrDefault(MessageStore.FolderKey(accountId, folderFullName));
+
         /// <summary>
         /// Fire-and-forget sync of one folder, used when the user opens it. The scheduled pass only
         /// fills the Inbox, so without this every other server folder would stay empty forever.
@@ -55,9 +75,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 try
                 {
                     await SyncFolderAsync(account, folderFullName);
+                    onDemandFailures.TryRemove(key, out _);
                 }
                 catch (Exception ex)
                 {
+                    onDemandFailures[key] = new FolderSyncFailure(ex.Message, DateTime.UtcNow);
                     Log($"On-demand sync of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
                 }
                 finally
