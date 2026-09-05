@@ -14,6 +14,11 @@ $MauiCsproj = Join-Path $SlnDir "$ProjectName\$ProjectName.csproj"
 $Tfm = 'net10.0-windows10.0.19041.0'
 $PublishDir = Join-Path $SlnDir 'publish'
 
+# Authenticode signing lives outside the repo: the private key never comes near it.
+$SignRoot = 'C:\E\kp\aaBenimProgramlarim\Imza'
+$SignScript = Join-Path $SignRoot 'Imzala.ps1'
+$TrustFolder = Join-Path $SignRoot 'Dagitim'
+
 # ── Next version from the HIGHEST existing release tag ──
 # Not "the newest": GitHub reports a release's createdAt from its tag, which can predate an
 # earlier release, so listing by date once handed back v1.2.0 while v1.3.0 already existed.
@@ -56,7 +61,14 @@ $resumingDraft = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] 
     Where-Object { $_ -eq $tag }
 if ($resumingDraft) { Write-Host "A draft for $tag is already open; its assets will be completed and it will be published." -ForegroundColor Yellow }
 $notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
-Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")" -Encoding UTF8
+$signatureNote = @'
+
+## Signature
+
+The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd`
+from `SignatureTrust.zip` once. The programs run without it; only the signature stays unverified.
+'@
+Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")`n$signatureNote" -Encoding UTF8
 
 if ($WhatIf) { Write-Host "WhatIf: would stamp $($tag.TrimStart('v')) and release $tag with $(($subjects -split "`n").Count) entries."; return }
 
@@ -110,12 +122,32 @@ foreach ($stage in $stages) {
     & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $stageRoot -IconSourceExe "$appData\$ProjectName.exe" -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
     if (-not (Test-Path "$stageRoot\$ProjectName.exe")) { throw "Launcher exe missing in $stageRoot." }
 
+    # Signed BEFORE zipping: an exe signed after it is packaged is not the exe in the package, and
+    # the whole point of the signature is that the downloaded file is the one that was built here.
+    & $SignScript $stageRoot
+    if ($LASTEXITCODE -ne 0) { throw "Signing failed for $($stage.Name)." }
+    foreach ($unsigned in @(Get-ChildItem $stageRoot -Recurse -Filter "$ProjectName.exe" -File |
+            Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })) {
+        throw "Unsigned after signing: $($unsigned.FullName)"
+    }
+
     $zip = Join-Path $PublishDir $stage.Asset
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Compress-Archive -Path "$stageRoot\*" -DestinationPath $zip
     $assets += $zip
     Write-Host "  -> $($stage.Asset) ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)" -ForegroundColor DarkGray
 }
+
+# The certificate Windows needs before it will call the signature valid. Shipped as its own asset
+# so the signature is checkable by anyone who cares to, and ignorable by everyone else.
+if (Test-Path $TrustFolder) {
+    $trustZip = Join-Path $PublishDir 'SignatureTrust.zip'
+    if (Test-Path $trustZip) { Remove-Item -Force $trustZip }
+    Compress-Archive -Path "$TrustFolder\*" -DestinationPath $trustZip
+    $assets += $trustZip
+    Write-Host "  -> SignatureTrust.zip ($([math]::Round((Get-Item $trustZip).Length / 1KB, 0)) KB)" -ForegroundColor DarkGray
+}
+else { Write-Host "No $TrustFolder - the release goes out without SignatureTrust.zip." -ForegroundColor Yellow }
 
 # ── Publish the release ──
 # --target is mandatory: without it gh tags the repository's DEFAULT branch, which on this

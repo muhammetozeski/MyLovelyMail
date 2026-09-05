@@ -61,7 +61,7 @@ if (-not (Test-Path "$staging\MyLovelyMail.exe")) { throw "Published exe not fou
 # so the folder grew by that much per export until the disk said no: this line is where an export
 # died with "there is not enough space on the disk", leaving a half-copied v004 behind. Keeping
 # the newest few is what the folder is actually for; the rest were only taking up room.
-$keptVersions = 3
+$keptVersions = 2
 $stale = @(Get-ChildItem $versionsDir -Directory -Filter 'v*' -ErrorAction SilentlyContinue |
     Sort-Object { [int]($_.Name -replace '\D', '0') } | Select-Object -SkipLast ($keptVersions - 1))
 foreach ($old in $stale) {

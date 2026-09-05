@@ -111,10 +111,28 @@ The deployed app manages its own folder tree next to the launcher:
 MyLovelyMail\
 ├─ MyLovelyMail.exe      launcher: starts AppData\MyLovelyMail.exe, forwards arguments
 ├─ AppData\              application files (replaced by updates)
-├─ UserData\             settings, accounts, filters, tags, credential vault
+├─ UserData\             settings, accounts, filters, tags, credential vault,
+│                        and local folders — Drafts, Outbox, Sent — which no server has a copy of
 ├─ UserCache\            synced mail (safe to delete — re-downloads from the server)
 └─ AppCache\             app-only re-creatable data (safe to delete)
 ```
+
+The split is by recoverability, not by who wrote the file: anything a server can hand back lives in
+`UserCache`, anything it cannot lives in `UserData`.
+
+## Installing
+
+Download either asset from the [latest release](../../releases/latest), unzip it anywhere, and run
+`MyLovelyMail.exe` from the folder root. The portable build needs nothing installed; the
+framework-dependent one is smaller and needs the .NET 10 desktop runtime.
+
+Both are packaged as a zip rather than a single exe because the app ships as a launcher plus an
+`AppData\` folder, which is what lets an update replace the application while the user's mail and
+settings stay where they are.
+
+The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd` from
+`SignatureTrust.zip` once. The programs run without it; only the signature stays unverified. This
+does not remove the SmartScreen prompt on first run.
 
 ## Building
 
