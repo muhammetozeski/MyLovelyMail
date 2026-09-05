@@ -342,7 +342,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             var account = draft.Account ?? throw new InvalidOperationException("The draft has no sending account.");
 
-            var message = new MimeMessage { MessageId = BuildMessageId(account) };
+            // Date in UTC, for the same reason the Message-Id no longer carries the machine name —
+            // and applied to every account for the same reason too, since a header shaped
+            // differently on one account would itself say which account that is. Left unset,
+            // MimeKit writes the moment of sending in the machine's own offset: measured here,
+            // "Date: Sat, 05 Sep 2026 11:06:54 +0300", which hands every recipient and every relay
+            // a longitude band. With it, "Sat, 05 Sep 2026 08:06:54 +0000".
+            var message = new MimeMessage
+            {
+                MessageId = BuildMessageId(account),
+                Date = DateTimeOffset.UtcNow
+            };
             message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
             message.To.AddRange(InternetAddressList.Parse(draft.To));
             if (!string.IsNullOrWhiteSpace(draft.Cc))
