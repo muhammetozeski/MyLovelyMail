@@ -126,13 +126,8 @@ Download either asset from the [latest release](../../releases/latest), unzip it
 `MyLovelyMail.exe` from the folder root. The portable build needs nothing installed; the
 framework-dependent one is smaller and needs the .NET 10 desktop runtime.
 
-Both are packaged as a zip rather than a single exe because the app ships as a launcher plus an
-`AppData\` folder, which is what lets an update replace the application while the user's mail and
-settings stay where they are.
-
 The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd` from
-`SignatureTrust.zip` once. The programs run without it; only the signature stays unverified. This
-does not remove the SmartScreen prompt on first run.
+`SignatureTrust.zip` once. The programs run without it; only the signature stays unverified.
 
 ## Building
 
