@@ -60,6 +60,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Which server is being talked to; also the word that goes in the sentence.</summary>
         public enum MailProtocol { Imap, Pop3, Smtp }
 
+        /// <summary>
+        /// The candidates worth offering THIS account. A Tor-only account never gets the
+        /// unencrypted pair suggested: the connection path refuses it anyway, so a suggestion the
+        /// user could click — "It does answer on port 143 with None" — would be an invitation to
+        /// hand the login to an exit relay in the clear, printed by the diagnostic that is supposed
+        /// to be protecting them. An onion host is exempt for the same reason it is exempt there.
+        /// </summary>
+        static IEnumerable<(int Port, ConnectionSecurity Security)> CandidatesFor(MailProtocol protocol, MailAccountData? account, string host) =>
+            account is { TorOnly: true } && !MailConnections.IsOnionHost(host)
+                ? Candidates[protocol].Where(static c => c.Security != ConnectionSecurity.None)
+                : Candidates[protocol];
+
         /// <summary>Names the failure. <paramref name="stage"/> is what the user reads: "incoming server", "sending server".</summary>
         public static ConnectDiagnosis Classify(Exception exception, string stage) => exception switch
         {
@@ -126,7 +138,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
             }
 
-            foreach (var (port, security) in Candidates[protocol])
+            foreach (var (port, security) in CandidatesFor(protocol, account, host))
             {
                 if (!await AnswersAsync(protocol, host, port, security, torEndpoint, IsolationKeyFor(account, host), cancellationToken)) continue;
 

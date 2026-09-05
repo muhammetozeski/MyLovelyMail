@@ -847,6 +847,34 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/idle"):
                     return new { running = ImapIdleService.RunningAccountIds };
 
+                // What TLS the connection path would insist on for this host and port. It is a pure
+                // function of (security, TorOnly, host, port) and the difference between two of its
+                // answers is whether an exit relay can read the password, so it is worth being able
+                // to ask directly instead of inferring it from a connection that has to be made.
+                case ("GET", "/tls-choice"):
+                {
+                    var account = RequireAccount(RequireQueryValue(query, "accountId"));
+                    string host = query["host"] ?? account.IncomingHost;
+                    int port = int.TryParse(query["port"], out int parsedPort) ? parsedPort : account.IncomingPort;
+                    var security = Enum.Parse<ConnectionSecurity>(query["security"] ?? account.IncomingSecurity.ToString(), ignoreCase: true);
+                    try
+                    {
+                        return new
+                        {
+                            account.TorOnly,
+                            host,
+                            port,
+                            requested = security.ToString(),
+                            chosen = MailConnections.ToSocketOptions(security, account, host, port).ToString(),
+                            onion = MailConnections.IsOnionHost(host)
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        return new { account.TorOnly, host, port, requested = security.ToString(), refused = ex.Message };
+                    }
+                }
+
                 // Everything about the Tor route without building a circuit: which port is in use,
                 // which executable would be started, what the last attempt said.
                 case ("GET", "/tor"):

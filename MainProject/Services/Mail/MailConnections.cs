@@ -74,6 +74,47 @@ namespace MyLovelyMail.MainProject.Services.Mail
             _ => SecureSocketOptions.Auto
         };
 
+        /// <summary>Ports that are TLS from the first byte. There is no STARTTLS to insist on here, and Auto already picks SslOnConnect.</summary>
+        static readonly int[] ImplicitTlsPorts = [993, 995, 465];
+
+        /// <summary>An onion address, where the rendezvous circuit is already encrypted end to end.</summary>
+        public static bool IsOnionHost(string host) => host.TrimEnd('.').EndsWith(".onion", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The same mapping, hardened for an account that may only travel through Tor.
+        /// <para>
+        /// <see cref="SecureSocketOptions.Auto"/> means "SslOnConnect on 993/995/465, otherwise
+        /// STARTTLS <em>if the server offers it</em>", and that last clause is the hole: a Tor exit
+        /// relay reads and writes the plaintext side of the tunnel, so it can simply delete STARTTLS
+        /// from the greeting and MailKit will carry on unencrypted. Measured against a listener that
+        /// advertises no STARTTLS: with Auto the client sent <c>AUTHENTICATE PLAIN</c> and then the
+        /// credentials, which arrived readable —
+        /// <c>\0gizli-kullanici\0GIZLI-PAROLA-123</c>. With StartTls it sent nothing at all and
+        /// failed with "does not support the STARTTLS extension", which is the right answer.
+        /// </para>
+        /// <para>
+        /// So Auto becomes StartTls (the strict one) off the implicit-TLS ports, and None is refused
+        /// outright — before any circuit is built, since no route can make a cleartext login safe.
+        /// Onion hosts keep the plain mapping: the circuit itself is end-to-end encrypted and
+        /// authenticated to the service key, and onion mail services commonly listen on plain 143.
+        /// </para>
+        /// </summary>
+        internal static SecureSocketOptions ToSocketOptions(ConnectionSecurity security, MailAccountData account, string host, int port)
+        {
+            if (!account.TorOnly || IsOnionHost(host)) return ToSocketOptions(security);
+
+            if (security == ConnectionSecurity.None)
+                throw new TorUnavailableException(
+                    $"'{account.EmailAddress}' may only be reached through Tor, and {host}:{port} is set to no encryption. "
+                    + "The exit relay would read the password in the clear. Set the security to SSL or STARTTLS.",
+                    recoverable: false);
+
+            if (security == ConnectionSecurity.Auto)
+                return ImplicitTlsPorts.Contains(port) ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
+
+            return ToSocketOptions(security);
+        }
+
         /// <summary>The vault password for the account, or an explanatory exception when locked/missing.</summary>
         static string RequirePassword(MailAccountData account, string? passwordOverride)
         {
@@ -102,14 +143,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </para>
         /// </summary>
         static async Task<TClient> ConnectAndAuthenticateAsync<TClient>(TClient client, string protocolName, string host, int port,
-            ConnectionSecurity security, string username, string password, CancellationToken cancellationToken)
+            SecureSocketOptions socketOptions, string username, string password, CancellationToken cancellationToken)
             where TClient : MailService
         {
             try
             {
                 try
                 {
-                    await client.ConnectAsync(host, port, ToSocketOptions(security), cancellationToken);
+                    await client.ConnectAsync(host, port, socketOptions, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -174,14 +215,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
             ConnectionSecurity security, string username, MailAccountData account, string? passwordOverride,
             CancellationToken cancellationToken) where TClient : MailService
         {
-            // Read before a circuit is built: a locked vault is not worth a Tor connection, and the
-            // ladder must not spend six attempts discovering that the password was never there.
+            // Both settled before a circuit is built, and both for the same reason: neither a
+            // locked vault nor a cleartext login is worth six attempts to discover. The security
+            // mapping can refuse outright here, which is the only place it can be refused once.
             string password = RequirePassword(account, passwordOverride);
+            var socketOptions = ToSocketOptions(security, account, host, port);
 
             if (!account.TorOnly)
             {
                 var direct = createClient();
-                return await ConnectAndAuthenticateAsync(direct, protocolName, host, port, security, username, password, cancellationToken);
+                return await ConnectAndAuthenticateAsync(direct, protocolName, host, port, socketOptions, username, password, cancellationToken);
             }
 
             var failures = new List<string>();
@@ -192,7 +235,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
-                        return await OpenThroughTorAsync(createClient, protocolName, host, port, security, username,
+                        return await OpenThroughTorAsync(createClient, protocolName, host, port, socketOptions, username,
                             account, password, rung, cancellationToken);
                     }
                     // Only the CALLER's cancellation ends the climb. An OperationCanceledException
@@ -246,7 +289,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         /// <summary>Builds one rung's route and runs the connect through it.</summary>
         static async Task<TClient> OpenThroughTorAsync<TClient>(Func<TClient> createClient, string protocolName, string host, int port,
-            ConnectionSecurity security, string username, MailAccountData account, string password, TorRung rung,
+            SecureSocketOptions socketOptions, string username, MailAccountData account, string password, TorRung rung,
             CancellationToken cancellationToken) where TClient : MailService
         {
             if (rung.FreshCircuit) TorService.RotateCircuit(account.Id);
@@ -277,7 +320,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             rungBudget.CancelAfter(TorRungBudget);
             try
             {
-                return await ConnectAndAuthenticateAsync(client, protocolName, host, port, security, username, password, rungBudget.Token);
+                return await ConnectAndAuthenticateAsync(client, protocolName, host, port, socketOptions, username, password, rungBudget.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
