@@ -8,12 +8,25 @@ using MyLovelyMail.MainProject.Stores;
 namespace MyLovelyMail.MainProject.Storage
 {
     /// <summary>
-    /// Disk-backed mail storage under <see cref="AppPaths.UserCache"/>. RAM holds ONLY the
-    /// per-folder summary index (<see cref="MailMessageSummary"/>); full MIME bodies live as
-    /// .eml files and are read from disk when a message is opened. Layout per folder:
-    /// <c>UserCache/Accounts/&lt;accountId&gt;/Folders/&lt;safeName&gt;/</c> holding
+    /// Disk-backed mail storage. RAM holds ONLY the per-folder summary index
+    /// (<see cref="MailMessageSummary"/>); full MIME bodies live as .eml files and are read from
+    /// disk when a message is opened. Layout per folder:
+    /// <c>&lt;root&gt;/Accounts/&lt;accountId&gt;/Folders/&lt;safeName&gt;/</c> holding
     /// <c>folder.json</c>, <c>index.jsonl</c> (one summary per line) and <c>Messages/&lt;uid&gt;.eml</c>.
-    /// Deleting UserCache is always safe: everything here re-syncs from the server.
+    /// <para>
+    /// The root is chosen by RECOVERABILITY, not by who wrote the folder. Mail mirrored from a
+    /// server goes to <see cref="AppPaths.UserCache"/>, which stays safe to delete. Local folders —
+    /// Drafts, Outbox, Sent and anything the user or a rule made — go to
+    /// <see cref="AppPaths.UserData"/>, because no server has a copy to hand back.
+    /// </para>
+    /// <para>
+    /// This class used to claim "deleting UserCache is always safe: everything here re-syncs from
+    /// the server". That was true only while it held synced mail alone, and it stopped being true
+    /// when local folders arrived — drafts and queued outgoing mail were living behind a name that
+    /// promised the opposite. It cost one real bug already: the cache trimmer believed the sentence
+    /// and had local folders in its deletion pool, so a draft could reopen empty and an Outbox
+    /// message the user had already sent could be deleted before it went out.
+    /// </para>
     /// </summary>
     public static class MessageStore
     {
@@ -38,11 +51,23 @@ namespace MyLovelyMail.MainProject.Storage
 
         #region Paths
 
-        static string AccountCacheFolder(string accountId) =>
-            Path.Combine(AppPaths.UserCache, AccountsFolderName, accountId);
+        /// <summary>Whether this folder exists only on this machine, and therefore cannot be re-fetched.</summary>
+        public static bool IsLocalFolder(string folderFullName) =>
+            folderFullName.StartsWith(LocalFolderPrefix, StringComparison.Ordinal);
+
+        /// <summary>The two roots a folder can live under, newest-first for callers that scan both.</summary>
+        public static IEnumerable<string> AccountRoots(string accountId) =>
+        [
+            Path.Combine(AppPaths.UserData, AccountsFolderName, accountId),
+            Path.Combine(AppPaths.UserCache, AccountsFolderName, accountId)
+        ];
+
+        /// <summary>UserData for a folder with no server copy, UserCache for one that re-syncs.</summary>
+        static string AccountRootFor(string accountId, string folderFullName) =>
+            Path.Combine(IsLocalFolder(folderFullName) ? AppPaths.UserData : AppPaths.UserCache, AccountsFolderName, accountId);
 
         public static string FolderCachePath(string accountId, string folderFullName) =>
-            Path.Combine(AccountCacheFolder(accountId), FoldersFolderName, ToSafeName(folderFullName));
+            Path.Combine(AccountRootFor(accountId, folderFullName), FoldersFolderName, ToSafeName(folderFullName));
 
         public static string MessagePath(string accountId, string folderFullName, uint uid) =>
             Path.Combine(FolderCachePath(accountId, folderFullName), MessagesFolderName, uid + MessageExtension);
@@ -68,28 +93,90 @@ namespace MyLovelyMail.MainProject.Storage
 
         #region Folder info
 
-        /// <summary>Reads every cached folder of the account (empty list when nothing is cached yet).</summary>
+        /// <summary>
+        /// Reads every stored folder of the account (empty list when nothing is stored yet). Both
+        /// roots are walked, because a folder's root depends on whether a server can hand it back.
+        /// </summary>
         public static List<MailFolderData> GetFolders(string accountId)
         {
-            string foldersRoot = Path.Combine(AccountCacheFolder(accountId), FoldersFolderName);
             List<MailFolderData> result = [];
-            if (!Directory.Exists(foldersRoot)) return result;
-
-            foreach (string dir in Directory.GetDirectories(foldersRoot))
+            foreach (string root in AccountRoots(accountId))
             {
-                string infoPath = Path.Combine(dir, FolderInfoFileName);
-                if (!File.Exists(infoPath)) continue;
-                try
+                string foldersRoot = Path.Combine(root, FoldersFolderName);
+                if (!Directory.Exists(foldersRoot)) continue;
+
+                foreach (string dir in Directory.GetDirectories(foldersRoot))
                 {
-                    var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonDefaults.Indented);
-                    if (folder != null) result.Add(folder);
-                }
-                catch (Exception ex)
-                {
-                    Log($"Corrupt folder info '{infoPath}': {ex.Message}", LogLevel.Warning);
+                    string infoPath = Path.Combine(dir, FolderInfoFileName);
+                    if (!File.Exists(infoPath)) continue;
+                    try
+                    {
+                        var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonDefaults.Indented);
+                        // A folder is claimed by exactly one root; a copy left in the other by an
+                        // interrupted migration must not appear twice in the list.
+                        if (folder != null && !result.Any(existing => existing.FullName == folder.FullName))
+                            result.Add(folder);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Corrupt folder info '{infoPath}': {ex.Message}", LogLevel.Warning);
+                    }
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// Moves local folders that earlier versions wrote into UserCache over to UserData, once.
+        /// Runs at startup before anything reads a folder; a folder already at its destination or
+        /// a move that fails is left where it is, so a half-done migration still reads correctly
+        /// (<see cref="GetFolders"/> walks both roots).
+        /// </summary>
+        public static int MoveLocalFoldersOutOfCache()
+        {
+            string cacheAccounts = Path.Combine(AppPaths.UserCache, AccountsFolderName);
+            if (!Directory.Exists(cacheAccounts)) return 0;
+
+            int moved = 0;
+            foreach (string accountDir in SafeDirectories(cacheAccounts))
+            {
+                string accountId = Path.GetFileName(accountDir);
+                foreach (string folderDir in SafeDirectories(Path.Combine(accountDir, FoldersFolderName)))
+                {
+                    // The directory name is the encoded folder path, so "Local/..." is readable
+                    // from it without opening folder.json — and a folder whose info file is
+                    // missing or broken still gets moved rather than being stranded in the cache.
+                    string decoded = Path.GetFileName(folderDir);
+                    if (!decoded.StartsWith(ToSafeName(LocalFolderPrefix), StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string destination = Path.Combine(AppPaths.UserData, AccountsFolderName, accountId, FoldersFolderName, decoded);
+                    if (Directory.Exists(destination)) continue;
+
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                        Directory.Move(folderDir, destination);
+                        moved++;
+                        Log($"Local folder '{decoded}' moved out of the cache into UserData.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Could not move local folder '{folderDir}' into UserData: {ex.Message}", LogLevel.Warning);
+                    }
+                }
+            }
+            if (moved > 0) Log($"Storage migration: {moved} local folder(s) now live in UserData.");
+            return moved;
+        }
+
+        static IEnumerable<string> SafeDirectories(string path)
+        {
+            try { return Directory.Exists(path) ? Directory.EnumerateDirectories(path) : []; }
+            catch (Exception ex)
+            {
+                Log($"Could not list '{path}': {ex.Message}", LogLevel.Warning);
+                return [];
+            }
         }
 
         public static void SaveFolder(MailFolderData folder)

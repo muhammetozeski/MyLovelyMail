@@ -19,6 +19,9 @@ namespace MyLovelyMail
                 Environment.Exit(0);
 
             AppPaths.EnsureCreated();
+            // Before anything reads a folder: earlier versions wrote local folders — Drafts,
+            // Outbox, Sent — into UserCache, which is the folder users are told is safe to delete.
+            MessageStore.MoveLocalFoldersOutOfCache();
             RunLock.Claim();
             WatchForExit();
             SettingsManager.LoadSettings();
