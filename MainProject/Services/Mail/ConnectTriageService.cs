@@ -181,7 +181,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
             TorEndpoint? torEndpoint, CancellationToken cancellationToken)
         {
             if (torEndpoint != null)
+            {
                 client.ProxyClient = TorService.CreateProxy(torEndpoint, "probe", useOwnClient: false);
+                // Same reason as the connection path: online revocation is fetched by the OS,
+                // outside the proxy, so leaving it on would send the server's certificate serial
+                // to the CA in the clear from a probe run on the account's behalf.
+                client.CheckCertificateRevocation = false;
+            }
 
             await client.ConnectAsync(host, port, options, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);

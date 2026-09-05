@@ -26,6 +26,28 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>How long MailKit waits on one Tor round-trip. Three relays are not one hop, and its 2-minute default is measured for one.</summary>
         const int TorClientTimeoutMs = 240_000;
 
+        /// <summary>
+        /// Why a Tor-only client turns MailKit's revocation check OFF, which looks like the wrong
+        /// direction and is not.
+        /// <para>
+        /// MailKit defaults <c>CheckCertificateRevocation</c> to true (verified: true on all three
+        /// clients). With it on, SslStream validates the chain with ONLINE revocation, which on
+        /// Windows is CryptoAPI fetching the certificate's OCSP or CRL URL over WinHTTP — a path
+        /// that knows nothing about the SOCKS proxy. So the stream is tunnelled and then the
+        /// machine posts the mail server's certificate serial to the CA in the clear, resolving
+        /// the responder's name through the system resolver: the provider identity leaves anyway,
+        /// which is the one thing the DOMAINNAME care in TorSocks5 exists to prevent.
+        /// </para>
+        /// <para>
+        /// The other half is worse. On the usual Tor-only setup, where non-Tor traffic is blocked
+        /// at the firewall, that fetch cannot complete, the chain builds RevocationStatusUnknown,
+        /// MailKit refuses it, and every rung of the ladder ends in a TLS failure — the account
+        /// never connects at all. The chain, the host name and the expiry are still verified; only
+        /// the part of validation that deliberately leaves the tunnel is dropped.
+        /// </para>
+        /// </summary>
+        const bool TorRevocationCheck = false;
+
         static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
         {
             ConnectionSecurity.SslOnConnect => SecureSocketOptions.SslOnConnect,
@@ -215,6 +237,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 client.ProxyClient = TorService.CreateProxy(endpoint, account.Id, rung.OwnSocksClient);
                 client.Timeout = TorClientTimeoutMs;
+                client.CheckCertificateRevocation = TorRevocationCheck;
                 RequireTunnel(client, account);
             }
             catch
