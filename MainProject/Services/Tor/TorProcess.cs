@@ -25,6 +25,13 @@ namespace MyLovelyMail.MainProject.Services.Tor
         static Process? running;
         static readonly Lock startGate = new();
 
+        /// <summary>
+        /// Bumped by every <see cref="Stop"/>. A start records it on the way in and checks it again
+        /// once the process exists, which is the only way a stop that arrived DURING the start can
+        /// be honoured: until the process is assigned, Stop() has nothing to look at.
+        /// </summary>
+        static int stopGeneration;
+
         /// <summary>The last 200 lines tor printed, so a failed start can be read instead of guessed at.</summary>
         static readonly Queue<string> log = new();
         const int MaxLoggedLines = 200;
@@ -218,6 +225,9 @@ namespace MyLovelyMail.MainProject.Services.Tor
             // process for that operation and then throwing leaves a tor nobody asked for.
             cancellationToken.ThrowIfCancellationRequested();
 
+            int myStopGeneration;
+            lock (startGate) myStopGeneration = stopGeneration;
+
             lock (startGate)
             {
                 if (IsRunning && OwnSocksPort is { } already)
@@ -284,12 +294,36 @@ namespace MyLovelyMail.MainProject.Services.Tor
                     $"Tor exited before it finished starting (exit code {SafeExitCode(process)}). Last output: {LastMeaningfulLine()}"));
             };
 
-            process.Start();
+            try
+            {
+                process.Start();
+            }
+            catch
+            {
+                // A Process that never started still owns handles, and nothing else will ever
+                // reach this one: it is not in `running` yet.
+                process.Dispose();
+                throw;
+            }
+
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
             lock (startGate)
             {
+                // A Stop() that arrived while this was starting saw running == null and returned,
+                // so the tor appearing a moment later outlived the request to end it. The counter
+                // is how that request is noticed by the start it was meant for.
+                if (stopGeneration != myStopGeneration)
+                {
+                    Log("Tor was asked to stop while it was starting; ending the process that just appeared.", LogLevel.Warning);
+                    KillQuietly(process);
+                    throw new TorUnavailableException("Tor was stopped while it was starting.", recoverable: false);
+                }
+
+                // A tor that died on its own leaves its Process object here; replacing it without
+                // disposing leaks the handle for the life of the app.
+                running?.Dispose();
                 running = process;
                 ownSocksPort = socksPort;
             }
@@ -382,25 +416,36 @@ namespace MyLovelyMail.MainProject.Services.Tor
             AppDomain.CurrentDomain.ProcessExit += (_, _) => Stop();
         }
 
-        /// <summary>Ends the tor this app started. Safe to call when none is running.</summary>
+        /// <summary>
+        /// Ends the tor this app started. Safe to call when none is running — and a call that
+        /// lands while one is starting is remembered rather than dropped: <see cref="StartAsync"/>
+        /// checks <see cref="stopGeneration"/> once its process exists and kills it there.
+        /// </summary>
         public static void Stop()
         {
             Process? process;
             lock (startGate)
             {
+                stopGeneration++;
                 process = running;
                 running = null;
                 ownSocksPort = null;
             }
             if (process == null) return;
 
+            KillQuietly(process);
+            Log("The tor process this app started was stopped.");
+        }
+
+        /// <summary>Ends one process and lets go of its handle. Never throws: stopping is cleanup, and cleanup that fails must not take the caller with it.</summary>
+        static void KillQuietly(Process process)
+        {
             try
             {
                 if (!process.HasExited)
                 {
                     process.Kill(entireProcessTree: true);
                     process.WaitForExit(5000);
-                    Log("The tor process this app started was stopped.");
                 }
             }
             catch (Exception ex)
