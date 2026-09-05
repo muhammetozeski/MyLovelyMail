@@ -10,6 +10,16 @@
     solution so MAUI / WindowsAppSDK workloads can keep emitting their preferred
     form while the actual build runs against the modern graph.
   -->
+  <!--
+    The ONE place the app's version number is written. Every project in the solution inherits it,
+    so the assembly the app is running carries the same number the screen prints and the release
+    tag names. Release.ps1 rewrites this element as part of publishing; editing it by hand is only
+    for a build that is not going out.
+  -->
+  <PropertyGroup>
+    <Version>1.37.0</Version>
+  </PropertyGroup>
+
   <PropertyGroup>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x64'">win-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-x86'">win-x86</RuntimeIdentifier>
