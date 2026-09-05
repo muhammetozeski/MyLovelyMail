@@ -654,10 +654,21 @@
                     @if (unsubscribeTargets is { } unsubscribe)
                     {
                         <div class="mail-unsubscribe">
-                            @if (unsubscribe.HttpUrl is { } unsubscribeUrl)
+                            @* A List-Unsubscribe URL carries a per-recipient token by design, and
+                               this chip hands it to the SYSTEM browser. One click on a Tor-only
+                               account would deliver "this token, this real address, this moment"
+                               to the sender in the clear — the pairing the account exists to
+                               prevent. The mailto form below goes out over its own tunnelled SMTP. *@
+                            @if (unsubscribe.HttpUrl is { } unsubscribeUrl && MailUiState.SelectedAccount is not { TorOnly: true })
                             {
                                 <button class="mail-unsubscribe-chip" title="@unsubscribeUrl"
                                         @onclick="() => OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on the web</button>
+                            }
+                            else if (unsubscribe.HttpUrl != null)
+                            {
+                                <span class="mail-unsubscribe-chip mail-unsubscribe-chip--blocked" title="@unsubscribe.HttpUrl">
+                                    🧅 Web unsubscribe would leave Tor
+                                </span>
                             }
                             @if (unsubscribe.MailtoAddress != null)
                             {

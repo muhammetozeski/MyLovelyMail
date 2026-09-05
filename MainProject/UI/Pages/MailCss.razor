@@ -595,6 +595,18 @@
             border-color: @AppColors.TextDanger.ToRgbaHex(true);
         }
 
+        /* Not a button: it says why the action is absent, so it must not look pressable.
+           After the base rule and the hover rule on purpose — same specificity, so order decides
+           which cursor and which colour win. */
+        .mail-unsubscribe-chip--blocked,
+        .mail-unsubscribe-chip--blocked:hover {
+            cursor: default;
+            opacity: @(AppMeasures.Opacity.Soft);
+            display: inline-block;
+            color: @textSecondary;
+            border-color: @glassBorder;
+        }
+
     .mail-reader-history {
         align-self: flex-start;
         margin-top: @(AppMeasures.Space.Px4)px;
