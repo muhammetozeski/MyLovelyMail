@@ -35,7 +35,8 @@
     <ApplicationId>com.companyname.mylovelymail</ApplicationId>
 
     <!-- Versions -->
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <!-- Follows the one <Version> in Directory.Build.props. A hard-coded 1.0 here overrode it for the MAUI head only, so MainProject.dll shipped as 1.38.0 - the assembly the settings footer reads - while the exe own Windows file properties still said 1.0. -->
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
 
     <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
