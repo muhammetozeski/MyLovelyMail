@@ -17,7 +17,13 @@ $PublishDir = Join-Path $SlnDir 'publish'
 # ── Next version from the HIGHEST existing release tag ──
 # Not "the newest": GitHub reports a release's createdAt from its tag, which can predate an
 # earlier release, so listing by date once handed back v1.2.0 while v1.3.0 already existed.
-$tags = @(gh release list --limit 100 --json tagName --jq '.[].tagName')
+# DRAFTS ARE EXCLUDED, and that is not a detail. A draft has no git tag, so picking one as the
+# last release sends the range below at a ref that exists nowhere, git fails with "ambiguous
+# argument", $subjects comes back empty and the script dies claiming there is nothing to release
+# while a dozen commits wait. A draft is also exactly what an interrupted run leaves behind: two
+# are sitting in this repository right now, both with zero assets, one from a run that lost its
+# network mid-upload and could not even delete its own.
+$tags = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft | not) | .tagName')
 $lastTag = if ($tags) {
     ($tags | Sort-Object { [version]($_.TrimStart('v')) } | Select-Object -Last 1)
 } else { 'v0.0.0' }
@@ -35,8 +41,22 @@ Write-Host "$lastTag -> $tag" -ForegroundColor Cyan
 # gh creates the tag on the remote, so the local repository has never heard of it and the range
 # below silently resolves to nothing. Fetch first or the notes come out empty.
 git fetch --tags --quiet 2>&1 | Out-Null
+# Say which of the two things went wrong. "Nothing to release" used to be printed for both, and
+# it is the wrong sentence for a missing tag: it points at the commits instead of at the ref.
+git rev-parse --verify --quiet "$lastTag^{commit}" 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "The newest published release is $lastTag, but no such tag exists here or on the remote even after fetching, so the notes cannot be built. Check whether that release was published without its tag."
+}
 $subjects = git log "$lastTag..HEAD" --no-merges --pretty=format:'- %s'
 if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
+
+# A draft already holding this number makes `gh release create` fail after both zips are built -
+# eight minutes to reach a name collision that was knowable now.
+$draftOnTag = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' 2>$null) |
+    Where-Object { $_ -eq $tag }
+if ($draftOnTag) {
+    throw "A draft release already holds $tag, left by an earlier run that did not finish. Delete it first: gh release delete $tag --yes"
+}
 $notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
 Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")" -Encoding UTF8
 
