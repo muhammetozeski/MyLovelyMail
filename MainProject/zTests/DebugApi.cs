@@ -523,6 +523,57 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { open = MailUiState.OpenPersonAddress };
                 }
 
+                // Which of the empty-folder reasons a folder lands on, and the action offered for
+                // it. The branch depends on cache state that a screenshot cannot show — a paused
+                // account, a folder never fetched, a server count with nothing behind it.
+                case ("GET", "/folder-why"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folderFullName = ReadFolder(query);
+                    // ?probe=true builds the folder from the query instead of the cache. Several
+                    // branches depend on state that is a nuisance to arrange for real — a server
+                    // count with nothing behind it, a folder never fetched — and the whole point
+                    // of Explain is that it is a pure function of exactly these fields.
+                    var folder = query["probe"] == "true"
+                        ? new MailFolderData
+                        {
+                            AccountId = accountId,
+                            FullName = folderFullName,
+                            DisplayName = folderFullName,
+                            IsLocal = query["isLocal"] == "true",
+                            TotalCount = int.TryParse(query["totalCount"], out int probeTotal) ? probeTotal : 0,
+                            LastSyncedUtc = DateTime.TryParse(query["lastSynced"], out var probeSynced) ? probeSynced.ToUniversalTime() : null
+                        }
+                        : MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName)
+                          ?? throw new InvalidOperationException("Unknown folder.");
+                    var why = FolderEmptyReason.Explain(folder);
+                    return new
+                    {
+                        folder = folder.FullName,
+                        why.Headline,
+                        why.Detail,
+                        action = why.Action.ToString(),
+                        why.ActionLabel,
+                        folder.TotalCount,
+                        folder.LastSyncedUtc,
+                        cached = MessageStore.GetSummaries(accountId, folderFullName).Count,
+                        lastFolderFailure = ImapSyncService.LastFolderFailure(accountId, folderFullName)
+                    };
+                }
+
+                // Runs whatever /folder-why offered, so the button's effect is checkable without
+                // a click on the user's screen.
+                case ("POST", "/folder-why/act"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    string folderFullName = ReadFolder(query);
+                    var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName)
+                        ?? throw new InvalidOperationException("Unknown folder.");
+                    var action = Enum.Parse<EmptyFolderAction>(query["action"] ?? FolderEmptyReason.Explain(folder).Action.ToString(), ignoreCase: true);
+                    FolderEmptyReason.RunAction(folder, action);
+                    return new { ran = action.ToString(), syncing = ImapSyncService.IsFolderSyncing(accountId, folderFullName) };
+                }
+
                 case ("GET", "/folder-tree"):
                 {
                     List<MailFolderData> folders = query["probe"] is { Length: > 0 } probe
@@ -1135,6 +1186,16 @@ namespace MyLovelyMail.MainProject.ZTests
                         a.EmailAddress,
                         health = SyncHealthService.For(a.Id)
                     });
+
+                // Marks the account healthy through the same call a successful pass makes. Several
+                // screens branch on IsFailing, and a failing account is trivial to arrange but
+                // impossible to undo without either a working server or this.
+                case ("POST", "/health/clear"):
+                {
+                    string accountId = RequireQueryValue(query, "accountId");
+                    SyncHealthService.MarkSuccess(accountId);
+                    return new { accountId, health = SyncHealthService.For(accountId) };
+                }
 
                 // A raw header can be passed instead of a message, so the parser and the link gate
                 // can be exercised on the shapes real newsletters send without hunting for one.
