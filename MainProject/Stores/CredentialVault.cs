@@ -22,6 +22,68 @@ namespace MyLovelyMail.MainProject.Stores
 
         static string VaultPath => Path.Combine(AppPaths.UserData, VaultFileName);
 
+        public const string DpapiEntropyFileName = "vault.entropy";
+
+        static string EntropyPath => Path.Combine(AppPaths.UserData, DpapiEntropyFileName);
+
+        /// <summary>
+        /// Extra input mixed into the DPAPI protection, created once and kept beside the vault.
+        /// <para>
+        /// Without it — and it was null — ANY process running as this Windows user could read
+        /// vault.json, base64-decode the payload, call Unprotect with the same null, and get every
+        /// mail password in the clear. That is the price of "unlocks automatically", but it does
+        /// not have to be that cheap: with entropy the attacker needs to have read a second file
+        /// as well, which is the difference between "any code as this user" and "any code as this
+        /// user that also went looking".
+        /// </para>
+        /// <para>
+        /// It is NOT a secret the user has to keep — losing it loses the vault, so it lives in
+        /// UserData next to the thing it protects and travels with the migration bundle.
+        /// </para>
+        /// </summary>
+        /// <summary>
+        /// Opens a DPAPI payload written either way. A vault from before the entropy existed was
+        /// protected with none, and it must keep opening — the alternative is a user whose saved
+        /// passwords vanish on upgrade. The next save re-protects it with entropy, so the fallback
+        /// is used once per vault and then never again.
+        /// </summary>
+        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+        static byte[] UnprotectWithOrWithoutEntropy(byte[] payload)
+        {
+            try
+            {
+                return ProtectedData.Unprotect(payload, DpapiEntropy(), DataProtectionScope.CurrentUser);
+            }
+            catch (CryptographicException)
+            {
+                byte[] plain = ProtectedData.Unprotect(payload, null, DataProtectionScope.CurrentUser);
+                Log("Opened a vault written before the DPAPI entropy; the next save re-protects it with one.");
+                return plain;
+            }
+        }
+
+        static byte[] DpapiEntropy()
+        {
+            try
+            {
+                if (File.Exists(EntropyPath)) return File.ReadAllBytes(EntropyPath);
+
+                byte[] fresh = RandomNumberGenerator.GetBytes(KeyBytes);
+                Directory.CreateDirectory(AppPaths.UserData);
+                File.WriteAllBytes(EntropyPath, fresh);
+                Log("Created the vault's DPAPI entropy file.");
+                return fresh;
+            }
+            catch (Exception ex)
+            {
+                // Never fail the vault over this: an unreadable entropy file must leave the user
+                // with a working mailbox, not a locked one. Empty entropy is what the old vaults
+                // were protected with anyway.
+                Log($"Could not read or create the vault entropy, falling back to none: {ex.Message}", LogLevel.Warning);
+                return [];
+            }
+        }
+
         static Dictionary<string, string> secrets = [];
         static byte[]? masterKey;
         static byte[] masterSalt = [];
@@ -75,8 +137,7 @@ namespace MyLovelyMail.MainProject.Stores
                         Log("DPAPI vault found on a non-Windows platform; it cannot be opened here.", LogLevel.Error);
                         return;
                     }
-                    byte[] plain = ProtectedData.Unprotect(
-                        Convert.FromBase64String(file.Payload), null, DataProtectionScope.CurrentUser);
+                    byte[] plain = UnprotectWithOrWithoutEntropy(Convert.FromBase64String(file.Payload));
                     secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? [];
                     IsUnlocked = true;
                 }
@@ -180,7 +241,7 @@ namespace MyLovelyMail.MainProject.Stores
                     return;
                 }
                 payload = Convert.ToBase64String(ProtectedData.Protect(
-                    plain, null, DataProtectionScope.CurrentUser));
+                    plain, DpapiEntropy(), DataProtectionScope.CurrentUser));
             }
             else
             {

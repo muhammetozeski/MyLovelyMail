@@ -31,8 +31,13 @@ namespace MyLovelyMail.MainProject.Stores
                 foreach (string file in Directory.GetFiles(AppPaths.UserData, "*", SearchOption.AllDirectories))
                 {
                     string relative = Path.GetRelativePath(AppPaths.UserData, file);
-                    // The machine-bound vault never travels; the portable copy replaces it.
-                    if (relative.Equals(CredentialVault.VaultFileName, StringComparison.OrdinalIgnoreCase))
+                    // The machine-bound vault never travels; the portable copy replaces it. Nor
+                    // does its entropy — and that one matters in the other direction: importing it
+                    // would REPLACE the entropy on the target machine, leaving whatever vault that
+                    // machine already had protected with a value no longer on disk. The portable
+                    // vault carries the secrets, so nothing is lost by leaving it behind.
+                    if (relative.Equals(CredentialVault.VaultFileName, StringComparison.OrdinalIgnoreCase)
+                        || relative.Equals(CredentialVault.DpapiEntropyFileName, StringComparison.OrdinalIgnoreCase))
                         continue;
                     archive.CreateEntryFromFile(file, relative.Replace('\\', '/'));
                 }
