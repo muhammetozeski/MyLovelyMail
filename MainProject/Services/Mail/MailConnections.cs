@@ -27,6 +27,24 @@ namespace MyLovelyMail.MainProject.Services.Mail
         const int TorClientTimeoutMs = 240_000;
 
         /// <summary>
+        /// What ONE rung may spend before the ladder moves on.
+        /// <para>
+        /// Without it a rung could spend the whole attempt: Tor's own SocksTimeout default is two
+        /// minutes, so a proxy that accepted the connection and then could not attach the stream
+        /// held rung 1 for that long, rung 2 got the remainder, and Polly restarted the whole
+        /// ladder at rung 1 on the retry. Six passes, twelve minutes, and "the app's own SOCKS5
+        /// client", "a rediscovered endpoint" and "a tor started by this app" were never reached —
+        /// the ladder's whole point is that each rung changes one thing, and that only holds for
+        /// rungs that fail fast.
+        /// </para>
+        /// <para>
+        /// It guards the CONNECT, not the endpoint work before it: starting a tor is bounded by
+        /// its own bootstrap timeout and can legitimately take minutes on a first run.
+        /// </para>
+        /// </summary>
+        static readonly TimeSpan TorRungBudget = TimeSpan.FromSeconds(45);
+
+        /// <summary>
         /// Why a Tor-only client turns MailKit's revocation check OFF, which looks like the wrong
         /// direction and is not.
         /// <para>
@@ -252,7 +270,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
 
             Log($"{protocolName} for {account.EmailAddress} routing through {endpoint} via {rung.Description}.");
-            return await ConnectAndAuthenticateAsync(client, protocolName, host, port, security, username, password, cancellationToken);
+
+            // The rung's own budget. Its expiry is NOT the caller's cancellation, so the ladder's
+            // filter lets it fall through to the next rung instead of ending the climb.
+            using var rungBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            rungBudget.CancelAfter(TorRungBudget);
+            try
+            {
+                return await ConnectAndAuthenticateAsync(client, protocolName, host, port, security, username, password, rungBudget.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"{rung.Description} did not produce a connection within {TorRungBudget.TotalSeconds:0}s; the next route is tried.");
+            }
         }
 
         public static Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>

@@ -24,10 +24,19 @@ namespace MyLovelyMail.MainProject.Services
         static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(30);
         static readonly TimeSpan TotalTimeout = TimeSpan.FromSeconds(120);
 
-        const int TorMaxRetryAttempts = 6;
-        static readonly TimeSpan TorFirstRetryDelay = TimeSpan.FromSeconds(3);
-        static readonly TimeSpan TorAttemptTimeout = TimeSpan.FromSeconds(150);
-        static readonly TimeSpan TorTotalTimeout = TimeSpan.FromMinutes(12);
+        // Sized so that ONE attempt can run the whole route ladder in MailConnections rather than
+        // being cut off part-way through it. Five connect rungs at a 45s budget each is 225s, and
+        // the sixth starts a tor, which costs a bootstrap (TorStartupTimeoutSeconds, 180s by
+        // default) plus its own connect — 450s for a pass in which everything fails slowly. At the
+        // old 150s an attempt died around rung 2 and the retry began again at rung 1, so the last
+        // four routes were unreachable no matter how many times it tried.
+        //
+        // Fewer retries follow from that: the ladder IS the retrying, six routes deep. Two retries
+        // means up to three full passes, which is eighteen attempts at a connection.
+        const int TorMaxRetryAttempts = 2;
+        static readonly TimeSpan TorFirstRetryDelay = TimeSpan.FromSeconds(5);
+        static readonly TimeSpan TorAttemptTimeout = TimeSpan.FromMinutes(8);
+        static readonly TimeSpan TorTotalTimeout = TimeSpan.FromMinutes(15);
 
         /// <summary>Guard for ONE protocol round-trip inside an already-open connection (see <see cref="GuardStep"/>).</summary>
         static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(30);
