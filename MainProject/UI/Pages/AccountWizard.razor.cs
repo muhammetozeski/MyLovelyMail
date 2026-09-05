@@ -99,6 +99,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SmtpSecurity = preset.SmtpSecurity;
         }
 
+        /// <summary>
+        /// An onion address settles the question: there is no way to reach one except through Tor,
+        /// and the direct path does not just fail — it asks the system resolver for the name first,
+        /// which tells the network exactly which provider this account belongs to. So the toggle is
+        /// turned on rather than left for the user to discover afterwards.
+        /// </summary>
+        bool WantsTorOnly =>
+            TorOnly || MailConnections.IsOnionHost(IncomingHost.Trim()) || MailConnections.IsOnionHost(SmtpHost.Trim());
+
         MailAccountData BuildAccount() => new()
         {
             DisplayName = DisplayName.Trim(),
@@ -111,7 +120,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SmtpHost = SmtpHost.Trim(),
             SmtpPort = int.TryParse(SmtpPortText, out int smtpPort) ? smtpPort : 465,
             SmtpSecurity = SmtpSecurity,
-            TorOnly = TorOnly,
+            TorOnly = WantsTorOnly,
             ColorHex = SelectedColorHex
         };
 

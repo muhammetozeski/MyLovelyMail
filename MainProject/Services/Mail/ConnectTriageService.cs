@@ -83,6 +83,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 new ConnectDiagnosis(DiagnosisKind.TlsHandshake,
                     $"The {stage} answered, but the secure handshake failed — the security setting is probably wrong for this port.", stage),
 
+            // Through Tor there is no SocketException to read: the proxy answers with a SOCKS reply
+            // code, and "host unreachable" is what a mistyped onion address comes back as. Without
+            // this arm it fell to Other, which prints the raw proxy sentence and then spends three
+            // probes on a name Tor already said it could not reach.
+            SocksReplyException { ReplyCode: TorSocks5.ReplyHostUnreachable } =>
+                new ConnectDiagnosis(DiagnosisKind.HostNotFound,
+                    $"Tor could not reach the {stage} address — check the host name.", stage),
+
             SocketException { SocketErrorCode: SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain } =>
                 new ConnectDiagnosis(DiagnosisKind.HostNotFound,
                     $"The {stage} address could not be found — check the host name.", stage),

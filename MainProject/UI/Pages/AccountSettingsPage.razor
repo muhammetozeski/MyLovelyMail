@@ -347,7 +347,24 @@
     {
         if (Account is not { } account) return;
         account.IncomingHost = host.Trim();
+        AdoptOnionAsTorOnly(account);
         AccountStore.Save(account);
+    }
+
+    /// <summary>
+    /// Typing an onion address turns the account Tor-only, because there is no other way to reach
+    /// one and the direct attempt is not merely useless: it asks the system resolver for the name
+    /// first, so the address — which identifies the provider exactly — leaves the machine before
+    /// anything fails. The live IDLE connection is dropped for the same reason the toggle does it.
+    /// </summary>
+    static void AdoptOnionAsTorOnly(MailAccountData account)
+    {
+        if (account.TorOnly) return;
+        if (!MailConnections.IsOnionHost(account.IncomingHost) && !MailConnections.IsOnionHost(account.SmtpHost)) return;
+
+        account.TorOnly = true;
+        ImapIdleService.Drop(account.Id);
+        Log($"{account.EmailAddress} became Tor-only: an onion address cannot be reached any other way.");
     }
 
     void SetIncomingPort(string portText)
@@ -368,6 +385,7 @@
     {
         if (Account is not { } account) return;
         account.SmtpHost = host.Trim();
+        AdoptOnionAsTorOnly(account);
         AccountStore.Save(account);
     }
 

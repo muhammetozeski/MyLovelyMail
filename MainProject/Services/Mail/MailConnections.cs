@@ -223,6 +223,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             if (!account.TorOnly)
             {
+                // An onion address has no meaning outside Tor, and handing one to the direct branch
+                // does not merely fail: MailKit passes it to the system resolver, so the address —
+                // which names the provider exactly — leaves the machine as a DNS query and comes
+                // back NXDOMAIN. The user then reads "the address could not be found" and never
+                // learns that the lookup itself was the disclosure.
+                if (IsOnionHost(host))
+                    throw new TorUnavailableException(
+                        $"'{account.EmailAddress}' has an onion address ({host}), which can only be reached through Tor. "
+                        + "Turn on \"Only connect through Tor\" for this account.",
+                        recoverable: false);
+
                 var direct = createClient();
                 return await ConnectAndAuthenticateAsync(direct, protocolName, host, port, socketOptions, username, password, cancellationToken);
             }
