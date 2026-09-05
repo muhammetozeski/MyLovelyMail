@@ -47,9 +47,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         static string TorRouteLine =>
             TorService.BootstrapLine is { } starting ? starting
-            : TorService.Current is { } endpoint ? $"🧅 Tor route ready: {endpoint}."
-            : !TorProcess.CanStartHere ? $"🧅 {TorProcess.OrbotAdvice}"
-            : TorProcess.Find() is { } executable ? $"🧅 No route open yet — one will be started from {executable.Path} on the first connection."
+            : TorService.Current is { } endpoint ? $"🛡️ Tor route ready: {endpoint}."
+            : !TorProcess.CanStartHere ? $"🛡️ {TorProcess.OrbotAdvice}"
+            : TorProcess.Find() is { } executable ? $"🛡️ No route open yet — one will be started from {executable.Path} on the first connection."
             : "⚠️ No tor executable was found on this machine. Install Tor or the Tor Browser, or set TorExecutablePath in Settings.";
 
         bool Busy { get; set; }

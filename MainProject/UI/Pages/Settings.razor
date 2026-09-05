@@ -300,7 +300,7 @@
     @* How to REACH Tor lives here; whether an account may only use it is that account's own
        switch, on its settings page — it belongs to the mailbox, not to this machine. *@
     <GlassCard CustomClass="settings-section">
-        <div class="settings-section-title">🧅 Tor</div>
+        <div class="settings-section-title">🛡️ Tor</div>
         <p class="settings-empty-text">
             @if (TorOnlyAccounts.Count == 0)
             {
@@ -383,7 +383,7 @@
                 {
                     <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextPrimary" />
                 }
-                🧅 Check the Tor route
+                🛡️ Check the Tor route
             </SecondaryButton>
             @if (TorProcess.IsRunning)
             {

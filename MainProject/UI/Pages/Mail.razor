@@ -667,7 +667,7 @@
                             else if (unsubscribe.HttpUrl != null)
                             {
                                 <span class="mail-unsubscribe-chip mail-unsubscribe-chip--blocked" title="@unsubscribe.HttpUrl">
-                                    🧅 Web unsubscribe would leave Tor
+                                    🛡️ Web unsubscribe would leave Tor
                                 </span>
                             }
                             @if (unsubscribe.MailtoAddress != null)
@@ -790,7 +790,7 @@
                        over the ordinary network, which is precisely what the account forbids. *@
                     @if (MailUiState.SelectedAccount is { TorOnly: true })
                     {
-                        <span>🧅 Remote images stay blocked — this account only talks through Tor.</span>
+                        <span>🛡️ Remote images stay blocked — this account only talks through Tor.</span>
                     }
                     else
                     {
