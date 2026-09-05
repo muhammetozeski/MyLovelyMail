@@ -830,16 +830,22 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { account.EmailAddress, account.Enabled };
                 }
 
-                // The same flip for the Tor-only flag. It changes how every connection of that
-                // account is opened, so being able to set it and then watch /logs is what makes
-                // the routing checkable rather than asserted.
+                // The same flip for the Tor-only flag, through the same steps the settings page
+                // takes — including dropping the IDLE loop, whose connection was opened under the
+                // previous answer and would otherwise keep using it.
                 case ("POST", "/accounts/tor-only"):
                 {
                     var account = RequireAccount(RequireQueryValue(query, "accountId"));
                     account.TorOnly = RequireQueryValue(query, "torOnly") == "true";
                     AccountStore.Save(account);
-                    return new { account.EmailAddress, account.TorOnly };
+                    ImapIdleService.Drop(account.Id);
+                    return new { account.EmailAddress, account.TorOnly, idleLoops = ImapIdleService.RunningAccountIds };
                 }
+
+                // Which accounts hold a live IDLE loop. The set is otherwise invisible, and "the
+                // old connection is still up" is exactly the state that needs watching.
+                case ("GET", "/idle"):
+                    return new { running = ImapIdleService.RunningAccountIds };
 
                 // Everything about the Tor route without building a circuit: which port is in use,
                 // which executable would be started, what the last attempt said.

@@ -53,6 +53,33 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
+        /// <summary>Account ids whose IDLE loop is alive right now. Read by the debug API; the loop set is otherwise invisible.</summary>
+        public static IReadOnlyList<string> RunningAccountIds
+        {
+            get { lock (gate) return [.. running.Keys]; }
+        }
+
+        /// <summary>
+        /// Ends one account's loop so <see cref="Refresh"/> builds a new one.
+        /// <para>
+        /// A running loop holds a connection opened under the settings of the moment it started,
+        /// and <see cref="Refresh"/> never touches a loop that is already running. So turning an
+        /// account Tor-only left its IDLE socket talking to the provider on the DIRECT route,
+        /// re-issuing IDLE every nine minutes until new mail happened to arrive — which can be all
+        /// night, with the settings page reporting a Tor route in use the whole time.
+        /// </para>
+        /// </summary>
+        public static void Drop(string accountId)
+        {
+            CancellationTokenSource? cts;
+            lock (gate)
+                if (!running.Remove(accountId, out cts)) return;
+
+            try { cts.Cancel(); } catch (ObjectDisposedException) { /* Already finished on its own. */ }
+            Log($"IMAP IDLE loop dropped for account {accountId}; a new one opens on the current settings.");
+            Refresh();
+        }
+
         static async Task RunIdleLoopAsync(MailAccountData account, CancellationToken cancellationToken)
         {
             TimeSpan backoff = ReconnectDelayMin;

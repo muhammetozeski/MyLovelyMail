@@ -267,6 +267,12 @@
         account.TorOnly = torOnly;
         AccountStore.Save(account);
         TorCheckMessage = null;
+
+        // The live IDLE connection was opened under the old answer and would keep using it: a
+        // socket already talking to the provider directly does not become tunnelled because a flag
+        // changed. Dropping the loop makes the next one take the route the account now demands.
+        ImapIdleService.Drop(account.Id);
+
         Log($"Account {account.EmailAddress} is now {(torOnly ? "Tor-only" : "reachable directly")}.");
     }
 
