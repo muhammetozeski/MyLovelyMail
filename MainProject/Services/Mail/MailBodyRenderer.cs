@@ -52,10 +52,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 bool blocked = false;
                 bool folded = false;
                 bool fold = foldQuotedText && Settings.FoldQuotedText.Value;
+                bool blockRemote = BlocksRemoteImages(account, allowRemoteImages);
                 string body;
                 if (!string.IsNullOrWhiteSpace(message.HtmlBody))
                 {
-                    body = Sanitize(message.HtmlBody, message, BlocksRemoteImages(account, allowRemoteImages), ref blocked);
+                    body = Sanitize(message.HtmlBody, message, blockRemote, ref blocked);
                     if (fold) body = FoldHtmlQuotes(body, ref folded);
                 }
                 else
@@ -63,7 +64,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     body = BuildPlainBody(message.TextBody ?? summary.PreviewText, fold, ref folded);
                 }
 
-                return new RenderedBody(WrapDocument(body), blocked, folded);
+                return new RenderedBody(WrapDocument(body, blockRemote), blocked, folded);
             }
             catch (Exception ex)
             {
@@ -80,7 +81,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Log($"Dropped the unreadable cached body of uid {summary.Uid}; it will be downloaded again.");
                     return null;
                 }
-                return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>"), false);
+                return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>", BlocksRemoteImages(account, allowRemoteImages)), false);
             }
         }
 
@@ -198,11 +199,38 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// the entire app. Read inline like the other settings this method already consults, so
         /// every caller — the reader and the debug API alike — gets the scaled document.
         /// </summary>
-        static string WrapDocument(string body)
+        /// <summary>
+        /// The policy the reader frame is loaded under. The regex above rewrites
+        /// <c>&lt;img src="http…"&gt;</c> and nothing else, and a remote fetch does not need an
+        /// img tag: <c>&lt;td background&gt;</c>, <c>style="background:url(…)"</c>, <c>srcset</c>,
+        /// <c>&lt;link rel=stylesheet&gt;</c>, <c>&lt;video poster&gt;</c>, <c>&lt;input
+        /// type=image&gt;</c>, an SVG <c>&lt;image href&gt;</c>, a protocol-relative <c>//host</c>
+        /// or simply a space inside the quotes all sail past it. Each one is a tracking pixel that
+        /// fires on open, and on a Tor-only account it fires over the ordinary network under a
+        /// banner promising the opposite. A policy does not care which attribute carried the URL.
+        /// <para>
+        /// It goes in the head this method builds, which the message cannot reach: Sanitize strips
+        /// <c>&lt;meta&gt;</c> from the body, so mail cannot forge or relax one of its own.
+        /// </para>
+        /// </summary>
+        static string ContentSecurityPolicy(bool blockRemoteContent) =>
+            "<meta http-equiv=\"Content-Security-Policy\" content=\""
+            // 'none' by default, so script, frame, object and connect are refused in every case —
+            // the sanitizer already strips them, and this is the belt to that pair of braces.
+            + "default-src 'none'; "
+            + (blockRemoteContent
+                // data: only: the cid: parts are inlined as data URIs before this point, and the
+                // blocked-image placeholder is one too, so nothing legitimate needs the network.
+                ? "img-src data:; style-src 'unsafe-inline'; font-src data:; media-src data:"
+                // The user asked for remote images. Scripts and frames stay refused anyway.
+                : "img-src data: https: http:; style-src 'unsafe-inline' https: http:; font-src data: https: http:; media-src data: https: http:")
+            + "\">";
+
+        static string WrapDocument(string body, bool blockRemoteContent)
         {
             int scale = Math.Clamp(Settings.ReaderTextScalePercent.Value, MinScalePercent, MaxScalePercent);
             int fontPx = BaseFontPx * scale / 100;
-            return "<!DOCTYPE html><html><head><style>" +
+            return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<style>" +
                 $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
                 $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
                 // plaintext direction: an Arabic or Hebrew paragraph inside an otherwise
