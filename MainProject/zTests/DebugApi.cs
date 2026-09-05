@@ -160,6 +160,9 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new
                     {
                         app = AppConstants.AppName,
+                        // Read from the running assembly, so this answers "which build is this"
+                        // for a test the way the settings footer answers it for a person.
+                        version = AppConstants.AppVersion,
                         vaultUnlocked = CredentialVault.IsUnlocked,
                         syncing = SyncScheduler.IsSyncing,
                         userDataRoot = AppPaths.Root,
