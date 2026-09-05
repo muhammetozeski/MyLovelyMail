@@ -87,6 +87,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
         };
 
         /// <summary>
+        /// Which circuit a probe rides. The literal "probe" put every account's probes on ONE
+        /// circuit: on a tor daemon or a Tor Browser — neither started with the IsolateDestAddr
+        /// flag the app's own tor gets — that lets a single exit see two Tor-only mailboxes'
+        /// servers from the same client. The account is the right key; a probe with no account
+        /// falls back to the host, which at least keeps unrelated servers apart.
+        /// </summary>
+        static string IsolationKeyFor(MailAccountData? account, string host) =>
+            account is { Id.Length: > 0 } ? account.Id : $"probe-{host}";
+
+        /// <summary>
         /// Connects (and nothing more) to each candidate pair until one answers. Only worth calling
         /// for a socket or TLS failure: an auth rejection means the settings already work.
         /// <para>
@@ -118,7 +128,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             foreach (var (port, security) in Candidates[protocol])
             {
-                if (!await AnswersAsync(protocol, host, port, security, torEndpoint, cancellationToken)) continue;
+                if (!await AnswersAsync(protocol, host, port, security, torEndpoint, IsolationKeyFor(account, host), cancellationToken)) continue;
 
                 Log($"Connect probe: {host} answers on {port} ({security}).");
                 return diagnosis with
@@ -132,7 +142,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         static async Task<bool> AnswersAsync(MailProtocol protocol, string host, int port, ConnectionSecurity security,
-            TorEndpoint? torEndpoint, CancellationToken cancellationToken)
+            TorEndpoint? torEndpoint, string isolationKey, CancellationToken cancellationToken)
         {
             var options = security switch
             {
@@ -152,19 +162,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     case MailProtocol.Imap:
                     {
                         using var client = new ImapClient();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
                         return true;
                     }
                     case MailProtocol.Pop3:
                     {
                         using var client = new Pop3Client();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
                         return true;
                     }
                     default:
                     {
                         using var client = new SmtpClient();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, budget.Token);
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
                         return true;
                     }
                 }
@@ -178,11 +188,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         /// <summary>Connect, disconnect — through Tor when an endpoint was handed in, and never any other way.</summary>
         static async Task ProbeWithAsync(MailService client, string host, int port, SecureSocketOptions options,
-            TorEndpoint? torEndpoint, CancellationToken cancellationToken)
+            TorEndpoint? torEndpoint, string isolationKey, CancellationToken cancellationToken)
         {
             if (torEndpoint != null)
             {
-                client.ProxyClient = TorService.CreateProxy(torEndpoint, "probe", useOwnClient: false);
+                client.ProxyClient = TorService.CreateProxy(torEndpoint, isolationKey, useOwnClient: false);
                 // Same reason as the connection path: online revocation is fetched by the OS,
                 // outside the proxy, so leaving it on would send the server's certificate serial
                 // to the CA in the clear from a probe run on the account's behalf.
