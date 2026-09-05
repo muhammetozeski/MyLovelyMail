@@ -72,7 +72,22 @@ namespace MyLovelyMail.MainProject.Storage
         public static string MessagePath(string accountId, string folderFullName, uint uid) =>
             Path.Combine(FolderCachePath(accountId, folderFullName), MessagesFolderName, uid + MessageExtension);
 
-        /// <summary>Turns an IMAP folder path into a valid folder name ("INBOX/Receipts" → "INBOX%2FReceipts").</summary>
+        /// <summary>
+        /// Turns an IMAP folder path into a valid folder name ("INBOX/Receipts" → "INBOX%2FReceipts").
+        /// <para>
+        /// The encoder is the one place a name chosen by a mail SERVER becomes a path, so the three
+        /// spellings Windows does not treat as ordinary names are encoded rather than passed
+        /// through. A folder named "." or ".." resolved to the account root, putting its files a
+        /// level above Folders — inside the account's own cache, so contained, but not where the
+        /// walk expects them. "INBOX." and "INBOX " both normalise to "INBOX" on Windows, so two
+        /// distinct server folders shared one directory and overwrote each other's index.
+        /// </para>
+        /// <para>
+        /// A LEADING dot is deliberately left alone: ".Sent" and ".Drafts" are ordinary names on
+        /// Maildir-style servers, they are safe as directory names, and encoding them would move
+        /// every such folder's cache for no gain.
+        /// </para>
+        /// </summary>
         internal static string ToSafeName(string folderFullName)
         {
             var sb = new StringBuilder(folderFullName.Length);
@@ -83,7 +98,20 @@ namespace MyLovelyMail.MainProject.Storage
                 else
                     sb.Append('%').Append(((int)c).ToString("X2"));
             }
-            return sb.ToString();
+
+            string encoded = sb.ToString();
+
+            // "." and ".." mean the current and parent directory, whatever else they are called.
+            if (encoded.Length > 0 && encoded.All(static c => c == '.'))
+                return string.Concat(encoded.Select(static _ => "%2E"));
+
+            // Windows silently drops a trailing dot or space, which is how two different folders
+            // ended up sharing one directory.
+            int keep = encoded.Length;
+            while (keep > 0 && (encoded[keep - 1] == '.' || encoded[keep - 1] == ' ')) keep--;
+            if (keep == encoded.Length) return encoded;
+
+            return encoded[..keep] + string.Concat(encoded[keep..].Select(static c => "%" + ((int)c).ToString("X2")));
         }
 
         /// <summary>Canonical account+folder key — the single place this pairing is ever built.</summary>
