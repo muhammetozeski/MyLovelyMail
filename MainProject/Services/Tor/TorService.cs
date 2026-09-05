@@ -327,6 +327,15 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 LastError = ex.Message;
                 throw;
             }
+            // The caller letting go is not a failure of Tor, and the generic catch below was
+            // rewriting it into one: an IDLE loop cancelled by Refresh() while a bootstrap was
+            // being awaited came back as "Tor could not be started: The operation was canceled",
+            // which marked the account as failing, rotated its circuit and put that sentence on
+            // the settings card — for an operation nobody was waiting for any more.
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 LastError = ex.Message;

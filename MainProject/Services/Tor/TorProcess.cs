@@ -212,6 +212,12 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </summary>
         public static async Task<int> StartAsync(CancellationToken cancellationToken)
         {
+            // Discovery can reach here on behalf of an operation that was cancelled while the last
+            // candidate was being verified — VerifyAsync answers with a verdict rather than
+            // throwing, so the cancellation is not noticed until something asks. Launching a tor
+            // process for that operation and then throwing leaves a tor nobody asked for.
+            cancellationToken.ThrowIfCancellationRequested();
+
             lock (startGate)
             {
                 if (IsRunning && OwnSocksPort is { } already)
