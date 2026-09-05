@@ -190,6 +190,15 @@ namespace MyLovelyMail.MainProject.ZTests
                 case ("GET", "/trim"):
                     return new { lastReport = OfflineCacheTrimmer.LastReport };
 
+                // A fresh scan of the message cache. Read-only by construction, like /rule-preview:
+                // it opens files and never writes, moves or deletes one, so it is safe to point at
+                // a real cache. GET /store/check?last=true reads the persisted report instead.
+                case ("GET", "/store/check") when query["last"] == "true":
+                    return new { lastReport = StoreCheckService.LastReport };
+
+                case ("GET", "/store/check"):
+                    return StoreCheckService.Run();
+
                 // Answers "is this element really in the page" for anything a screenshot cannot
                 // show: below the fold, inside a virtualized list, or a style that only emits CSS.
                 case ("GET", "/dom"):

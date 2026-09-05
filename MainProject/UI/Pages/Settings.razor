@@ -241,6 +241,19 @@
             </div>
             <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.Logs.RoutePath))">🧾 Open</SecondaryButton>
         </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Cached mail check</span>
+                <span class="settings-row-hint">@StoreCheckLine</span>
+            </div>
+            <SecondaryButton OnClick="@RunStoreCheck" Disabled="@StoreCheckRunning">
+                @if (StoreCheckRunning)
+                {
+                    <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextPrimary" />
+                }
+                🔎 Scan
+            </SecondaryButton>
+        </div>
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
@@ -540,6 +553,50 @@
         SetAndSave(GlobalSettings.MessageListDensity, density);
         Events.MainEvents.Trigger("OnStyleChanged");
     }
+
+    #region Cached mail check
+
+    bool StoreCheckRunning { get; set; }
+
+    /// <summary>The last scan in one line. Reads the persisted report, so it survives a restart.</summary>
+    static string StoreCheckLine =>
+        StoreCheckService.LastReport is not { } report
+            ? "Never scanned. Looks for cached mail the app cannot see: folders without their info file, bodies with no index row, zero-byte and leftover files."
+            : report.FindingCount == 0
+                ? $"Clean — {report.FoldersScanned} folder(s) checked {report.RanAtUtc.ToLocalTime():dd MMM HH:mm}."
+                : $"{report.FindingCount} finding(s) in {report.FoldersScanned} folder(s), {report.RanAtUtc.ToLocalTime():dd MMM HH:mm} — "
+                  + string.Join(", ", report.CountsByDefect.Select(static c => $"{c.Value}× {c.Key}"))
+                  + $". {Bytes(report.InvisibleFolderBytes + report.StrandedFileBytes)} the cache budget never counts.";
+
+    /// <summary>Scaled to the size it actually is: rounding a few hundred bytes to "0.0 MB" reads as "nothing", which is the opposite of the point.</summary>
+    static string Bytes(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:0.0} MB"
+        : bytes >= 1024 ? $"{bytes / 1024d:0.0} KB"
+        : $"{bytes} bytes";
+
+    /// <summary>
+    /// Off the UI thread: the scan is file I/O over the whole cache, and on a large mailbox doing
+    /// it inline would freeze the window for as long as it takes.
+    /// </summary>
+    async Task RunStoreCheck()
+    {
+        StoreCheckRunning = true;
+        StateHasChanged();
+        try
+        {
+            await Task.Run(StoreCheckService.Run);
+        }
+        catch (Exception ex)
+        {
+            Log($"Store check failed: {ex.Message}", LogLevel.Error);
+        }
+        finally
+        {
+            StoreCheckRunning = false;
+        }
+    }
+
+    #endregion
 
     #region Tor
 
