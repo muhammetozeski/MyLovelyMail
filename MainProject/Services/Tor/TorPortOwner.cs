@@ -22,8 +22,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         public static int? Of(string host, int port)
         {
             if (!OperatingSystem.IsWindows()) return null;
-            if (!IPAddress.TryParse(host, out var address) || address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
-                return null;
+            if (!TryReadAsIPv4(host, out var address)) return null;
 
             try
             {
@@ -34,6 +33,34 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 Log($"Could not read the owner of port {port}: {ex.Message}", LogLevel.Warning);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// The IPv4 address to look the owner up by, or false when there is none to use.
+        /// <para>
+        /// "localhost" is spelled out because it used to fall straight through: IPAddress.TryParse
+        /// refuses a name, so a user who wrote localhost as the SOCKS host got no owner and
+        /// therefore no cached verdict, which means a RESOLVE over a fresh circuit before EVERY
+        /// connection — every sync pass and every IDLE reconnect. It resolves to the loopback here;
+        /// if the tor at that port is actually on IPv6 only, no row matches and the answer is null
+        /// again, which is the safe direction: a missing owner costs a re-check, a wrong one would
+        /// hand a Tor-only account to whatever else holds the port.
+        /// </para>
+        /// <para>
+        /// "::1" is deliberately NOT mapped to 127.0.0.1. The table read below is the IPv4 one, so
+        /// a match there would be a DIFFERENT socket than the one being asked about.
+        /// </para>
+        /// </summary>
+        static bool TryReadAsIPv4(string host, out IPAddress address)
+        {
+            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+            {
+                address = IPAddress.Loopback;
+                return true;
+            }
+
+            return IPAddress.TryParse(host, out address!)
+                   && address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
         }
 
         const int AfInet = 2;
