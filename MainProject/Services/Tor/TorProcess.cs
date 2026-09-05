@@ -204,9 +204,14 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 }
             }
 
+            // recoverable:false, and it matters. Left recoverable, an empty PATH became six ladder
+            // rungs, then six Polly retries on 3/6/12/24/48/96-second delays, then the same again
+            // on the next sync pass and forever in the IDLE loop — minutes of spinner and a log
+            // full of route reports for an answer that was knowable at once and cannot change
+            // until the user installs something.
             var executable = Find() ?? throw new TorUnavailableException(
                 "No tor executable was found. Install Tor (or the Tor Browser) and, if it lives somewhere unusual, " +
-                "put its full path in the TorExecutablePath setting.");
+                "put its full path in the TorExecutablePath setting.", recoverable: false);
 
             int socksPort = FindFreePort();
             Directory.CreateDirectory(DataDirectory);
