@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using MailKit;
 using MimeKit;
+using MimeKit.Utils;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
@@ -37,6 +38,31 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static string LocalDraftsFullName => MessageStore.LocalFolderPrefix + LocalDraftsFolderName;
 
         static uint DraftUid(ComposeDraft draft) => Pop3Service.Fnv1aHash(DraftMessageIdPrefix + draft.DraftId);
+
+        /// <summary>
+        /// The Message-Id of an outgoing message, built from the sending address's own domain.
+        /// <para>
+        /// MimeKit generates one from the machine's host name when nothing sets it, and it was
+        /// left unset: every message this app has sent carried the Windows computer name to the
+        /// recipient, every relay on the way, and the provider's Sent folder — a stable identifier
+        /// tying the mailbox to every other message that machine ever sent. On a Tor-only account
+        /// that is the pairing the whole feature exists to prevent, arriving in the content after
+        /// the transport went to such lengths to avoid it.
+        /// </para>
+        /// <para>
+        /// Done for every account rather than only the Tor-only ones on purpose: a Message-Id
+        /// shaped differently from the others would itself say which accounts are Tor-only, and
+        /// the sender's own domain is both the ordinary shape in the wild and the one mail servers
+        /// score best.
+        /// </para>
+        /// </summary>
+        static string BuildMessageId(MailAccountData account)
+        {
+            string address = account.EmailAddress;
+            int at = address.LastIndexOf('@');
+            string domain = at >= 0 && at < address.Length - 1 ? address[(at + 1)..].Trim() : "localhost";
+            return MimeUtils.GenerateMessageId(domain);
+        }
 
         /// <summary>Writes/overwrites the draft in the local Drafts folder (autosave + close paths).</summary>
         public static void SaveDraft(ComposeDraft draft)
@@ -316,7 +342,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             var account = draft.Account ?? throw new InvalidOperationException("The draft has no sending account.");
 
-            var message = new MimeMessage();
+            var message = new MimeMessage { MessageId = BuildMessageId(account) };
             message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
             message.To.AddRange(InternetAddressList.Parse(draft.To));
             if (!string.IsNullOrWhiteSpace(draft.Cc))
