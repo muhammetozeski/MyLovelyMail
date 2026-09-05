@@ -17,7 +17,7 @@ namespace MyLovelyMail.MainProject.Stores
     {
         public const string VaultFileName = "vault.json";
         const int Pbkdf2Iterations = 200_000;
-        const int SaltBytes = 16;
+        internal const int SaltBytes = 16;
         const int KeyBytes = 32;
 
         static string VaultPath => Path.Combine(AppPaths.UserData, VaultFileName);
@@ -26,21 +26,6 @@ namespace MyLovelyMail.MainProject.Stores
 
         static string EntropyPath => Path.Combine(AppPaths.UserData, DpapiEntropyFileName);
 
-        /// <summary>
-        /// Extra input mixed into the DPAPI protection, created once and kept beside the vault.
-        /// <para>
-        /// Without it — and it was null — ANY process running as this Windows user could read
-        /// vault.json, base64-decode the payload, call Unprotect with the same null, and get every
-        /// mail password in the clear. That is the price of "unlocks automatically", but it does
-        /// not have to be that cheap: with entropy the attacker needs to have read a second file
-        /// as well, which is the difference between "any code as this user" and "any code as this
-        /// user that also went looking".
-        /// </para>
-        /// <para>
-        /// It is NOT a secret the user has to keep — losing it loses the vault, so it lives in
-        /// UserData next to the thing it protects and travels with the migration bundle.
-        /// </para>
-        /// </summary>
         /// <summary>
         /// Opens a DPAPI payload written either way. A vault from before the entropy existed was
         /// protected with none, and it must keep opening — the alternative is a user whose saved
@@ -62,6 +47,22 @@ namespace MyLovelyMail.MainProject.Stores
             }
         }
 
+        /// <summary>
+        /// Extra input mixed into the DPAPI protection, created once and kept beside the vault.
+        /// <para>
+        /// Without it — and it was null — ANY process running as this Windows user could read
+        /// vault.json, base64-decode the payload, call Unprotect with the same null, and get every
+        /// mail password in the clear. That is the price of "unlocks automatically", but it does
+        /// not have to be that cheap: with entropy the attacker needs to have read a second file
+        /// as well, which is the difference between "any code as this user" and "any code as this
+        /// user that also went looking".
+        /// </para>
+        /// <para>
+        /// Machine-bound like the vault itself, so it does NOT travel in the migration bundle:
+        /// importing it would replace the entropy on the target machine and leave whatever vault
+        /// that machine already had protected by a value no longer on disk.
+        /// </para>
+        /// </summary>
         static byte[] DpapiEntropy()
         {
             try
@@ -348,11 +349,11 @@ namespace MyLovelyMail.MainProject.Stores
 
         #region Crypto helpers
 
-        static byte[] DeriveKey(string password, byte[] salt) =>
+        internal static byte[] DeriveKey(string password, byte[] salt) =>
             Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, KeyBytes);
 
         /// <summary>Output layout: nonce (12) + tag (16) + ciphertext.</summary>
-        static byte[] EncryptAesGcm(byte[] plain, byte[] key)
+        internal static byte[] EncryptAesGcm(byte[] plain, byte[] key)
         {
             byte[] nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
             byte[] tag = new byte[AesGcm.TagByteSizes.MaxSize];
@@ -362,7 +363,7 @@ namespace MyLovelyMail.MainProject.Stores
             return [.. nonce, .. tag, .. cipher];
         }
 
-        static byte[] DecryptAesGcm(byte[] blob, byte[] key)
+        internal static byte[] DecryptAesGcm(byte[] blob, byte[] key)
         {
             int nonceLength = AesGcm.NonceByteSizes.MaxSize;
             int tagLength = AesGcm.TagByteSizes.MaxSize;

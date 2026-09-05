@@ -15,6 +15,14 @@ namespace MyLovelyMail.MainProject.Stores
         public const string BundleExtension = ".lovelybundle";
         const string PortableVaultEntryName = "portable-vault.json";
 
+        /// <summary>
+        /// First bytes of an encrypted bundle, followed by the PBKDF2 salt and the AES-GCM blob.
+        /// A file without it is a bundle from before the whole archive was encrypted, and is still
+        /// read — refusing to import someone's own backup would be a worse bug than the one this
+        /// header fixes.
+        /// </summary>
+        static readonly byte[] EncryptedMagic = "MLMBUNDLE1\n"u8.ToArray();
+
         /// <summary>Writes the bundle to <paramref name="bundlePath"/> (extension added when missing).</summary>
         public static string ExportBundle(string bundlePath, string passphrase)
         {
@@ -26,8 +34,38 @@ namespace MyLovelyMail.MainProject.Stores
             try
             {
                 if (File.Exists(bundlePath)) File.Delete(bundlePath);
-                using var archive = ZipFile.Open(bundlePath, ZipArchiveMode.Create);
 
+                // Built in memory and encrypted as a whole. It used to be written as a plain zip
+                // with one encrypted entry inside it, so the passphrase protected the PASSWORDS
+                // and nothing else: anyone holding the file — it gets emailed, left on a USB stick,
+                // synced to cloud backup — opened it with any unzip tool and read every address,
+                // every server, every port and every filter rule. For a Tor-only account that file
+                // named the provider the account exists to keep private.
+                using var buffer = new MemoryStream();
+                using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    WriteEntries(archive, temporaryVault);
+                }
+
+                byte[] salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(CredentialVault.SaltBytes);
+                byte[] sealedBytes = CredentialVault.EncryptAesGcm(buffer.ToArray(), CredentialVault.DeriveKey(passphrase, salt));
+
+                using var output = File.Create(bundlePath);
+                output.Write(EncryptedMagic);
+                output.Write(salt);
+                output.Write(sealedBytes);
+            }
+            finally
+            {
+                File.Delete(temporaryVault);
+            }
+            return bundlePath;
+        }
+
+        /// <summary>Puts the user's own data and the portable vault into the archive.</summary>
+        static void WriteEntries(ZipArchive archive, string temporaryVault)
+        {
+            {
                 foreach (string file in Directory.GetFiles(AppPaths.UserData, "*", SearchOption.AllDirectories))
                 {
                     string relative = Path.GetRelativePath(AppPaths.UserData, file);
@@ -43,11 +81,36 @@ namespace MyLovelyMail.MainProject.Stores
                 }
                 archive.CreateEntryFromFile(temporaryVault, PortableVaultEntryName);
             }
-            finally
+        }
+
+        /// <summary>
+        /// Opens a bundle for reading, whichever way it was written: the encrypted form, or the
+        /// plain zip earlier versions produced. A wrong passphrase on an encrypted bundle is
+        /// reported as itself rather than as a corrupt file.
+        /// </summary>
+        static ZipArchive OpenBundle(string bundlePath, string passphrase)
+        {
+            byte[] raw = File.ReadAllBytes(bundlePath);
+            if (raw.Length < EncryptedMagic.Length || !raw.AsSpan(0, EncryptedMagic.Length).SequenceEqual(EncryptedMagic))
             {
-                File.Delete(temporaryVault);
+                Log("Importing a bundle written before the archive itself was encrypted.", LogLevel.Warning);
+                return new ZipArchive(new MemoryStream(raw), ZipArchiveMode.Read);
             }
-            return bundlePath;
+
+            int saltStart = EncryptedMagic.Length;
+            byte[] salt = raw.AsSpan(saltStart, CredentialVault.SaltBytes).ToArray();
+            byte[] payload = raw.AsSpan(saltStart + CredentialVault.SaltBytes).ToArray();
+
+            byte[] plain;
+            try
+            {
+                plain = CredentialVault.DecryptAesGcm(payload, CredentialVault.DeriveKey(passphrase, salt));
+            }
+            catch (System.Security.Cryptography.CryptographicException)
+            {
+                throw new InvalidOperationException("That passphrase does not open this bundle.");
+            }
+            return new ZipArchive(new MemoryStream(plain), ZipArchiveMode.Read);
         }
 
         /// <summary>
@@ -89,7 +152,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static bool ImportBundle(string bundlePath, string passphrase)
         {
             string temporaryVault = Path.Combine(AppPaths.AppCache, PortableVaultEntryName);
-            using (var archive = ZipFile.OpenRead(bundlePath))
+            using (var archive = OpenBundle(bundlePath, passphrase))
             {
                 var planned = new List<(ZipArchiveEntry Entry, string Target)>();
                 ZipArchiveEntry? vaultEntry = null;
