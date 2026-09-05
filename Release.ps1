@@ -40,7 +40,27 @@ if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
 $notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
 Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")" -Encoding UTF8
 
-if ($WhatIf) { Write-Host "WhatIf: would release $tag with $(($subjects -split "`n").Count) entries."; return }
+if ($WhatIf) { Write-Host "WhatIf: would stamp $($tag.TrimStart('v')) and release $tag with $(($subjects -split "`n").Count) entries."; return }
+
+# ── Stamp the version into the single source, and land it BEFORE the tag ──
+# AppConstants.AppVersion reads the running assembly, whose number comes from the <Version> element
+# in Directory.Build.props. The tag below targets HEAD, so the stamp has to be committed first: cut
+# the release from an unstamped commit and the tag names one version while the screen prints another,
+# which is the disagreement this stamping exists to make impossible.
+$propsFile = Join-Path $SlnDir 'Directory.Build.props'
+$number = $tag.TrimStart('v')
+$propsText = Get-Content $propsFile -Raw
+if ($propsText -notmatch '<Version>[^<]*</Version>') { throw "Directory.Build.props has no <Version> element to stamp." }
+$stamped = [regex]::Replace($propsText, '<Version>[^<]*</Version>', "<Version>$number</Version>")
+if ($stamped -ne $propsText) {
+    Set-Content -Path $propsFile -Value $stamped -NoNewline -Encoding utf8
+    git add -- $propsFile
+    git commit -m "Version follows the $tag release"
+    if ($LASTEXITCODE -ne 0) { throw "Could not commit the version stamp." }
+    git push
+    if ($LASTEXITCODE -ne 0) { throw "Could not push the version stamp; the tag would point at an unstamped commit." }
+    Write-Host "Stamped $number into Directory.Build.props." -ForegroundColor DarkGray
+}
 
 # ── Publish both flavours ──
 New-Item -ItemType Directory -Force $PublishDir | Out-Null
