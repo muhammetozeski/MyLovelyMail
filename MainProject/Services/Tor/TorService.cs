@@ -122,12 +122,29 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         #region Endpoint discovery
 
+        /// <summary>An upper bound on a verdict even when the same process still holds the port.</summary>
+        static readonly TimeSpan VerdictLifetime = TimeSpan.FromMinutes(10);
+
+        /// <summary>What was decided about one port, and what that decision was about.</summary>
+        /// <param name="OwnerPid">
+        /// The process that was listening when the verdict was reached. A verdict is about a
+        /// PROGRAM, not an address; when the owner changes the verdict means nothing.
+        /// </param>
+        sealed record PortVerdict(bool IsTor, DateTime AtUtc, int? OwnerPid);
+
         /// <summary>
         /// Verdicts about ports this session has already asked, so the circuit-building RESOLVE
-        /// check runs once per port rather than once per connection. False entries are the
-        /// valuable ones: a port that proved it is NOT Tor is never offered again.
+        /// check runs once per port rather than once per connection.
+        /// <para>
+        /// A verdict kept on TIME alone was tried and measured, and it leaked: with a ten-minute
+        /// window, closing the tor that owned 9050 and putting a plain SOCKS5 proxy on the freed
+        /// port sent <c>imap.gmail.com</c> to that proxy — its own log showed the CONNECT arrive —
+        /// while the app's log named the Tor route. Three of the six ladder rungs went through the
+        /// impostor before rediscovery finally cleared the cache. So a verdict is now bound to the
+        /// process holding the socket, and is thrown away the moment that changes.
+        /// </para>
         /// </summary>
-        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> provenTor = new();
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, PortVerdict> provenTor = new();
 
         /// <summary>
         /// A SOCKS5 endpoint that is <em>proven</em> to be Tor, or an exception. Never returns
@@ -140,8 +157,16 @@ namespace MyLovelyMail.MainProject.Services.Tor
             await discoveryGate.WaitAsync(cancellationToken);
             try
             {
+                // Rediscovery is asked for by a ladder rung that has already failed on this route,
+                // so every verdict behind it is suspect: throwing them away is the point of asking.
+                if (forceRediscovery) provenTor.Clear();
+
+                // The fast path re-asks IsProvenTorAsync rather than trusting Current outright. It
+                // is nearly free for the app's own tor and for a verdict inside its lifetime, and
+                // it is the only thing standing between a recycled port and a Tor-only account.
                 if (!forceRediscovery && Current is { } cached
-                    && await SpeaksSocks5Async(cached.Host, cached.Port, cancellationToken))
+                    && await SpeaksSocks5Async(cached.Host, cached.Port, cancellationToken)
+                    && await IsProvenTorAsync(cached, cancellationToken))
                     return cached;
 
                 Current = null;
@@ -195,17 +220,39 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </summary>
         static async Task<bool> IsProvenTorAsync(TorEndpoint endpoint, CancellationToken cancellationToken)
         {
+            // A tor this app started and watched print "Bootstrapped 100%" needs no probe, and its
+            // identity cannot go stale either: TorProcess.OwnSocksPort is read off the live
+            // process, so the moment that tor dies the endpoint stops being offered at all.
             if (endpoint.Source == TorEndpointSource.AppManaged) return true;
 
             string key = $"{endpoint.Host}:{endpoint.Port}";
-            if (provenTor.TryGetValue(key, out bool remembered)) return remembered;
+            int? owner = TorPortOwner.Of(endpoint.Host, endpoint.Port);
+
+            if (provenTor.TryGetValue(key, out var remembered) && IsStillAbout(remembered, owner))
+                return remembered.IsTor;
 
             var verification = await VerifyAsync(cancellationToken, endpoint);
-            // Only the two definite answers are remembered. A check that failed because the
-            // network was down says nothing about the port, and caching it would keep a perfectly
-            // good tor daemon rejected for the rest of the session.
-            if (verification.IsTor || verification.ProvenNotTor) provenTor[key] = verification.IsTor;
+
+            // Only the two definite answers are remembered, and only when the owner could be
+            // identified. A check that failed because the network was down says nothing about the
+            // port; a verdict with no owner to pin it to says nothing about tomorrow.
+            if (owner != null && (verification.IsTor || verification.ProvenNotTor))
+                provenTor[key] = new PortVerdict(verification.IsTor, DateTime.UtcNow, owner);
+
             return verification.IsTor;
+        }
+
+        /// <summary>
+        /// Whether a remembered verdict still describes what is listening now: the same process,
+        /// and not older than <see cref="VerdictLifetime"/>. An unknown owner on either side means
+        /// the question cannot be answered, so the verdict is not reused — the RESOLVE check runs
+        /// again, which costs a circuit and is the cheaper of the two mistakes.
+        /// </summary>
+        static bool IsStillAbout(PortVerdict verdict, int? currentOwner)
+        {
+            if (verdict.OwnerPid == null || currentOwner == null) return false;
+            if (verdict.OwnerPid != currentOwner) return false;
+            return DateTime.UtcNow - verdict.AtUtc < VerdictLifetime;
         }
 
         /// <summary>Candidates in order of how much the user meant them: our own tor, the configured port, then the two standard ones.</summary>
@@ -399,7 +446,14 @@ namespace MyLovelyMail.MainProject.Services.Tor
             configured = $"{Settings.TorSocksHost.Value}:{Settings.TorSocksPort.Value}",
             lastError = LastError,
             lastVerification = LastVerification is { } verification ? new { verification.IsTor, verification.Detail } : null,
-            portVerdicts = provenTor.Select(static v => new { port = v.Key, isTor = v.Value }),
+            portVerdicts = provenTor.Select(static v => new
+            {
+                port = v.Key,
+                v.Value.IsTor,
+                v.Value.AtUtc,
+                v.Value.OwnerPid,
+                stillValid = IsStillAbout(v.Value, TorPortOwner.Of(v.Key.Split(':')[0], int.Parse(v.Key.Split(':')[1])))
+            }),
             torOnlyAccounts = AccountStore.Accounts.Where(static a => a.TorOnly).Select(static a => a.EmailAddress),
             recentTorOutput = TorProcess.RecentOutput.TakeLast(20)
         };
