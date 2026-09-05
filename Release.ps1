@@ -107,7 +107,7 @@ foreach ($stage in $stages) {
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
     if (-not (Test-Path "$appData\$ProjectName.exe")) { throw "Published exe missing in $appData." }
 
-    & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $stageRoot -IconSourceExe "$appData\$ProjectName.exe" -Rid $Rid
+    & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $stageRoot -IconSourceExe "$appData\$ProjectName.exe" -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
     if (-not (Test-Path "$stageRoot\$ProjectName.exe")) { throw "Launcher exe missing in $stageRoot." }
 
     $zip = Join-Path $PublishDir $stage.Asset

@@ -1,4 +1,4 @@
-﻿# Publishes the Windows app into the STABLE deploy root so user data survives updates.
+# Publishes the Windows app into the STABLE deploy root so user data survives updates.
 # Layout produced (and kept stable across versions):
 #   <DeployRoot>\MyLovelyMail.exe    launcher (applies pending updates, migrates data, starts the app)
 #   <DeployRoot>\AppData\            the running application (replaced in place when not locked)
@@ -107,7 +107,7 @@ if (Test-DeployedAppRunning $DeployRoot) {
 
 # ── Build the launcher (applies pending updates, migrates old vNNN user data once, starts the app) ──
 $iconSourceExe = if (Test-Path "$liveAppData\MyLovelyMail.exe") { "$liveAppData\MyLovelyMail.exe" } else { Join-Path $versionsDir "$versionTag\AppData\MyLovelyMail.exe" }
-& (Join-Path $SlnDir "BuildLauncher.ps1") -Root $DeployRoot -IconSourceExe $iconSourceExe -Rid $Rid
+& (Join-Path $SlnDir "BuildLauncher.ps1") -Root $DeployRoot -IconSourceExe $iconSourceExe -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
 
 Write-Host "Export ready: $DeployRoot ($versionTag)" -ForegroundColor Green
 $DeployRoot

@@ -5,6 +5,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][string]$IconSourceExe,
+    # The .ico to embed. Preferred over pulling one out of the exe, which yields a single small
+    # entry and leaves the desktop shortcut showing a blurred, washed-out square.
+    [string]$IconFile = "",
     [string]$Rid = "win-x64"
 )
 
@@ -15,15 +18,29 @@ New-Item -ItemType Directory -Force $WorkDir | Out-Null
 
 Add-Type -AssemblyName System.Drawing
 $IconXml = ""
-try {
-    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($IconSourceExe)
-    if ($icon) {
-        $iconStream = [System.IO.File]::OpenWrite("$WorkDir\appicon.ico")
-        $icon.Save($iconStream)
-        $iconStream.Close(); $icon.Dispose()
-        $IconXml = "<ApplicationIcon>appicon.ico</ApplicationIcon>"
-    }
-} catch { Write-Host "Icon extraction skipped: $_" }
+
+# The .ico FILE when one is given, copied byte for byte. ExtractAssociatedIcon below is the
+# fallback and it is a poor one: it returns a single small entry - measured at 40x40 on this
+# machine - and Icon.Save writes only that, so the launcher ended up carrying a 40x40 image that
+# Windows then blew up for the desktop shortcut. That washed-out square is what the user sees, and
+# no amount of care in the source artwork survives it.
+if ($IconFile -and (Test-Path $IconFile)) {
+    Copy-Item $IconFile "$WorkDir\appicon.ico" -Force
+    $IconXml = "<ApplicationIcon>appicon.ico</ApplicationIcon>"
+    Write-Host "Launcher icon: $IconFile" -ForegroundColor DarkGray
+}
+else {
+    try {
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($IconSourceExe)
+        if ($icon) {
+            $iconStream = [System.IO.File]::OpenWrite("$WorkDir\appicon.ico")
+            $icon.Save($iconStream)
+            $iconStream.Close(); $icon.Dispose()
+            $IconXml = "<ApplicationIcon>appicon.ico</ApplicationIcon>"
+            Write-Host "Launcher icon: extracted from $IconSourceExe (single small size)" -ForegroundColor DarkYellow
+        }
+    } catch { Write-Host "Icon extraction skipped: $_" }
+}
 
 Set-Content -Path "$WorkDir\Launcher.csproj" -Value @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -140,7 +157,12 @@ static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type
 '@
 
 Write-Host "Building launcher..." -ForegroundColor Cyan
-dotnet publish "$WorkDir\Launcher.csproj" -c Release -r $Rid -o "$WorkDir\Publish" | Out-Null
+# --self-contained false is explicit: -r alone leaves the SDK to default the apphost to
+# self-contained-style resolution, which makes it search for the runtime NEXT TO ITSELF instead of
+# the machine-wide install - the exe then refuses to start with "You must install or update .NET"
+# even though a matching runtime is present system-wide. Mirrors the same warning in Export.ps1's
+# own app publish call.
+dotnet publish "$WorkDir\Launcher.csproj" -c Release -r $Rid --self-contained false -o "$WorkDir\Publish" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Launcher build failed." }
 
 try {
