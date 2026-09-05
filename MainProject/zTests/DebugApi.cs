@@ -81,14 +81,23 @@ namespace MyLovelyMail.MainProject.ZTests
         {
             object? result;
             int status = 200;
-            try
+            if (RefusalReason(context.Request) is { } refusal)
             {
-                result = await RouteAsync(context.Request);
+                result = new { error = refusal };
+                status = 403;
+                Log($"DebugApi refused a request: {refusal}", LogLevel.Warning);
             }
-            catch (Exception ex)
+            else
             {
-                status = 500;
-                result = new { error = ex.Message };
+                try
+                {
+                    result = await RouteAsync(context.Request);
+                }
+                catch (Exception ex)
+                {
+                    status = 500;
+                    result = new { error = ex.Message };
+                }
             }
 
             byte[] payload = JsonSerializer.SerializeToUtf8Bytes(result, Json);
@@ -97,6 +106,41 @@ namespace MyLovelyMail.MainProject.ZTests
             context.Response.ContentEncoding = Encoding.UTF8;
             await context.Response.OutputStream.WriteAsync(payload);
             context.Response.Close();
+        }
+
+        /// <summary>The only Host values a request to this listener may carry. Anything else was addressed to some other name that resolved here.</summary>
+        static readonly string[] AllowedHosts = ["127.0.0.1:52539", "[::1]:52539", "localhost:52539"];
+
+        /// <summary>
+        /// Why this request is refused, or null to let it through.
+        /// <para>
+        /// This listener is DEBUG-only — it is started inside <c>#if DEBUG</c> and the published
+        /// builds are Release, so no shipped install opens it. But a developer machine browses the
+        /// web, and the handler answered anything: no Origin, Referer or Host was ever examined. A
+        /// page the developer visited could POST /exit to kill the app, POST /trim to drop cached
+        /// mail, or POST /dom/script, whose body is run as JavaScript inside the privileged WebView.
+        /// CORS hides the ANSWERS cross-origin; it does not stop the request from arriving, and DNS
+        /// rebinding removes even that, which is what makes the Host check the important half.
+        /// </para>
+        /// <para>
+        /// Measured before the check existed: an HttpListener bound to 127.0.0.1:52539 accepted raw
+        /// requests carrying <c>Host: evil.attacker.com</c>, so binding to loopback is no defence by
+        /// itself. A script client sends neither Origin nor Referer and addresses the loopback by
+        /// name or literal, so nothing that should reach this is turned away.
+        /// </para>
+        /// </summary>
+        static string? RefusalReason(HttpListenerRequest request)
+        {
+            if (request.Headers["Origin"] is { Length: > 0 } origin)
+                return $"a browser page sent this (Origin: {origin}). This API is for test scripts, not for pages.";
+
+            if (request.Headers["Referer"] is { Length: > 0 } referer)
+                return $"a browser page sent this (Referer: {referer}). This API is for test scripts, not for pages.";
+
+            string host = request.Headers["Host"] ?? string.Empty;
+            return AllowedHosts.Contains(host, StringComparer.OrdinalIgnoreCase)
+                ? null
+                : $"the request was addressed to '{host}', not to the loopback. Something resolved another name to this machine.";
         }
 
         sealed class AddAccountRequest
