@@ -233,12 +233,26 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// Async, not a token-building wrapper around the other overload: a non-async method would
         /// dispose the linked source the moment it handed the task back, cancelling the very timer
         /// that is the timeout.
+        /// <para>
+        /// A budget that runs out is a TIMEOUT, not a cancellation, and it is raised as one —
+        /// MailKit's own Socks5Client does the same (measured side by side: TimeoutException there,
+        /// OperationCanceledException here). The difference is not cosmetic: callers treat a
+        /// cancellation as "the caller asked us to stop" and give up entirely, so the ladder in
+        /// MailConnections would abandon its remaining routes because a single proxy stalled.
+        /// </para>
         /// </summary>
         public async Task<Stream> ConnectAsync(string host, int port, int timeout, CancellationToken cancellationToken = default)
         {
             using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             budget.CancelAfter(timeout);
-            return await ConnectAsync(host, port, budget.Token);
+            try
+            {
+                return await ConnectAsync(host, port, budget.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Connecting to {host}:{port} through {ProxyHost}:{ProxyPort} took longer than {timeout} ms.");
+            }
         }
 
         public async Task<Stream> ConnectAsync(string host, int port, CancellationToken cancellationToken = default)

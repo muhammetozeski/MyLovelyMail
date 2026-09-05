@@ -177,7 +177,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         return await OpenThroughTorAsync(createClient, protocolName, host, port, security, username,
                             account, password, rung, cancellationToken);
                     }
-                    catch (OperationCanceledException)
+                    // Only the CALLER's cancellation ends the climb. An OperationCanceledException
+                    // raised by something else — a budget inside a proxy client, a token a callee
+                    // linked for itself — means that route failed, not that the work was called
+                    // off, and abandoning the remaining rungs over it was throwing away the very
+                    // alternatives the ladder exists to provide.
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
