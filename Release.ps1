@@ -62,6 +62,15 @@ if ($stamped -ne $propsText) {
     Write-Host "Stamped $number into Directory.Build.props." -ForegroundColor DarkGray
 }
 
+# ── Snapshot of what is being built ──
+# The two flavours are two separate publishes minutes apart, and nothing checked that they saw the
+# same source. They did not, once: an edit landed between them, so the portable zip held the tagged
+# code and the framework-dependent zip held that plus an uncommitted change - one release, two
+# different programs, and no way to tell from the outside. The state is recorded here and checked
+# again before the release is cut.
+$sourceStateBefore = @(git status --porcelain) -join "`n"
+$headBefore = git rev-parse HEAD
+
 # ── Publish both flavours ──
 New-Item -ItemType Directory -Force $PublishDir | Out-Null
 $stages = @(
@@ -95,6 +104,9 @@ foreach ($stage in $stages) {
 # project trails the working branch by a hundred commits - the assets would be built from code
 # the tag does not point at.
 $head = git rev-parse HEAD
+if ($head -ne $headBefore -or (@(git status --porcelain) -join "`n") -ne $sourceStateBefore) {
+    throw "The working tree changed while the assets were being built, so they were not all made from the same source. Nothing was published; re-run the release on a settled tree."
+}
 gh release create $tag $assets --title $tag --notes-file $notesFile --target $head
 if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
