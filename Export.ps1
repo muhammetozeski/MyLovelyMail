@@ -57,8 +57,28 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 if (-not (Test-Path "$staging\MyLovelyMail.exe")) { throw "Published exe not found in staging." }
 
 # ── Archive copy for inspection/rollback ──
-Copy-Item $staging (Join-Path $versionsDir "$versionTag\AppData") -Recurse
-Write-Host "Archived as Versions\$versionTag" -ForegroundColor DarkGray
+# Every archive is a full self-contained publish - about 335 MB - and nothing ever removed one,
+# so the folder grew by that much per export until the disk said no: this line is where an export
+# died with "there is not enough space on the disk", leaving a half-copied v004 behind. Keeping
+# the newest few is what the folder is actually for; the rest were only taking up room.
+$keptVersions = 3
+$stale = @(Get-ChildItem $versionsDir -Directory -Filter 'v*' -ErrorAction SilentlyContinue |
+    Sort-Object { [int]($_.Name -replace '\D', '0') } | Select-Object -SkipLast ($keptVersions - 1))
+foreach ($old in $stale) {
+    Remove-Item -Recurse -Force $old.FullName -ErrorAction SilentlyContinue
+    Write-Host "  pruned Versions\$($old.Name)" -ForegroundColor DarkGray
+}
+
+$archive = Join-Path $versionsDir "$versionTag\AppData"
+try {
+    Copy-Item $staging $archive -Recurse -ErrorAction Stop
+    Write-Host "Archived as Versions\$versionTag" -ForegroundColor DarkGray
+} catch {
+    # A partial archive is worse than none: it looks like a build that can be rolled back to, and
+    # it takes the same disk space while being unable to run.
+    Remove-Item -Recurse -Force (Join-Path $versionsDir $versionTag) -ErrorAction SilentlyContinue
+    throw "Archiving $versionTag failed, so the partial copy was removed: $($_.Exception.Message)"
+}
 
 # ── Apply the update NOW when the app is closed; otherwise leave it staged for the launcher ──
 # This used to delete AppData first and discover the app was running only when it reached the
