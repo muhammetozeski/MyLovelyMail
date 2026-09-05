@@ -50,13 +50,11 @@ if ($LASTEXITCODE -ne 0) {
 $subjects = git log "$lastTag..HEAD" --no-merges --pretty=format:'- %s'
 if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
 
-# A draft already holding this number makes `gh release create` fail after both zips are built -
-# eight minutes to reach a name collision that was knowable now.
-$draftOnTag = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' 2>$null) |
+# A draft already holding this number is not a collision - it is this script's own way of being
+# resumable, so it is reported and reused rather than refused.
+$resumingDraft = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' 2>$null) |
     Where-Object { $_ -eq $tag }
-if ($draftOnTag) {
-    throw "A draft release already holds $tag, left by an earlier run that did not finish. Delete it first: gh release delete $tag --yes"
-}
+if ($resumingDraft) { Write-Host "A draft for $tag is already open; its assets will be completed and it will be published." -ForegroundColor Yellow }
 $notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
 Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")" -Encoding UTF8
 
@@ -127,8 +125,41 @@ $head = git rev-parse HEAD
 if ($head -ne $headBefore -or (@(git status --porcelain) -join "`n") -ne $sourceStateBefore) {
     throw "The working tree changed while the assets were being built, so they were not all made from the same source. Nothing was published; re-run the release on a settled tree."
 }
-gh release create $tag $assets --title $tag --notes-file $notesFile --target $head
-if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
+# Draft first, assets one at a time, publish last. `gh release create` with the assets attached is
+# all-or-nothing, and on a flaky link that is the wrong shape: three runs in a row built both zips -
+# eight minutes each - and then died on the upload, twice on DNS for uploads.github.com and once on
+# the local network aborting the 133 MB POST. Each failure threw away the whole build, and one left
+# a draft gh could not delete because the same network was gone.
+#
+# This way a dropped upload costs one asset, a re-run resumes into the same draft, and a half-done
+# attempt is never visible to anyone: nothing is published until every asset is confirmed present.
+if (-not $resumingDraft) {
+    gh release create $tag --draft --title $tag --notes-file $notesFile --target $head
+    if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
+}
+
+# Smallest first, so a bad link proves itself on the cheap asset instead of the big one.
+foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
+    $name = Split-Path $asset -Leaf
+    $uploaded = $false
+    foreach ($attempt in 1..5) {
+        Write-Host "Uploading $name (attempt $attempt/5)..." -ForegroundColor DarkGray
+        gh release upload $tag $asset --clobber
+        if ($LASTEXITCODE -eq 0) { $uploaded = $true; break }
+        Start-Sleep -Seconds (10 * $attempt)
+    }
+    if (-not $uploaded) {
+        throw "Could not upload $name after 5 attempts. The draft for $tag is kept with whatever did upload - re-run this script to resume."
+    }
+}
+
+$present = @(gh release view $tag --json assets --jq '.assets[].name')
+if ($present.Count -ne $assets.Count) {
+    throw "$tag has $($present.Count) of $($assets.Count) assets, so it was left as a draft. Re-run this script to finish it."
+}
+
+gh release edit $tag --draft=false
+if ($LASTEXITCODE -ne 0) { throw "The assets are all uploaded but $tag could not be published; re-run to finish it." }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 Write-Host "Released $tag" -ForegroundColor Green
 $tag
