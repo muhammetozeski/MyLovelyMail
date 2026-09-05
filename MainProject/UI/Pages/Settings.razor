@@ -359,7 +359,9 @@
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Route</span>
-                <span class="settings-row-hint">@TorRouteLine</span>
+                @* polite, not assertive: this line changes several times during a bootstrap and a
+                   screen reader should finish the sentence it is on before taking the next one. *@
+                <span class="settings-row-hint" aria-live="polite">@TorRouteLine</span>
             </div>
         </div>
         <div class="settings-migration-actions">
@@ -436,14 +438,45 @@
         base.OnInitialized();
         CredentialVault.OnVaultStateChanged += HandleVaultChanged;
         AccountStore.OnAccountsChanged += HandleVaultChanged;
+        _ = WatchTorBootstrapAsync();
     }
 
     void HandleVaultChanged() => InvokeAsync(StateHasChanged);
+
+    readonly CancellationTokenSource pageAlive = new();
+
+    /// <summary>
+    /// Tor reports its progress on its own schedule and raises no event this page could subscribe
+    /// to, so the route line is re-read once a second — and repainted ONLY when the sentence
+    /// actually changed, which is a handful of times across a whole bootstrap and never once the
+    /// route is up.
+    /// </summary>
+    async Task WatchTorBootstrapAsync()
+    {
+        using var ticker = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        string? previous = TorService.BootstrapLine;
+        try
+        {
+            while (await ticker.WaitForNextTickAsync(pageAlive.Token))
+            {
+                string? current = TorService.BootstrapLine;
+                if (current == previous) continue;
+                previous = current;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page went away; nothing to report.
+        }
+    }
 
     public void Dispose()
     {
         CredentialVault.OnVaultStateChanged -= HandleVaultChanged;
         AccountStore.OnAccountsChanged -= HandleVaultChanged;
+        pageAlive.Cancel();
+        pageAlive.Dispose();
     }
 
     static void SetAndSave<T>(Setting<T> setting, T value)
@@ -626,7 +659,8 @@
         : TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
 
     static string TorRouteLine =>
-        TorService.Current is { } endpoint
+        TorService.BootstrapLine is { } starting ? starting
+            : TorService.Current is { } endpoint
             ? $"In use: {endpoint}." + (TorService.LastVerification is { IsTor: true } ? " Verified as Tor." : string.Empty)
             : TorService.LastError is { Length: > 0 } error ? $"No route. Last attempt: {error}"
             : "No route open yet — one is found or started on the first connection of a Tor-only account.";

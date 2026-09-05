@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Net;
 using System.Net.Sockets;
 using MyLovelyMail.MainProject.Storage;
@@ -17,7 +18,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
     /// is the entire point of marking it Tor-only.
     /// </para>
     /// </summary>
-    public static class TorProcess
+    public static partial class TorProcess
     {
         /// <summary>Everything this class writes (state, cached consensus) lives in AppCache: re-creatable, never user data.</summary>
         public static string DataDirectory => System.IO.Path.Combine(AppPaths.AppCache, "Tor");
@@ -408,11 +409,42 @@ namespace MyLovelyMail.MainProject.Services.Tor
             }
         }
 
+        /// <summary>How far tor has got, and what it is stuck on if it is stuck.</summary>
+        /// <param name="Percent">0-100 as tor last reported it.</param>
+        /// <param name="Phase">Tor's own word for the step: "conn", "handshake", "requesting_descriptors", "done".</param>
+        /// <param name="Problem">Set only while tor is reporting itself stuck; cleared by the next step forward.</param>
+        public sealed record BootstrapState(int Percent, string Phase, string Summary, string? Problem, DateTime AtUtc);
+
+        /// <summary>
+        /// The most recent progress tor reported, or null before one was started.
+        /// <para>
+        /// Only "Bootstrapped 100%" used to mean anything; every other line went to the log viewer
+        /// as a warning nobody reads. So a user watched "building a circuit…" for the whole
+        /// TorStartupTimeoutSeconds — three minutes by default — while tor had said "Stuck at 10%"
+        /// within seconds, which is the one message that would have told them what to do about it.
+        /// </para>
+        /// </summary>
+        public static BootstrapState? Bootstrap { get; private set; }
+
+        [GeneratedRegex(@"Bootstrapped (\d+)%\s*\(([^)]*)\):\s*(.*)", RegexOptions.IgnoreCase)]
+        private static partial Regex BootstrapProgress();
+
+        /// <summary>
+        /// Tor writes the stuck report two ways — "Stuck at 10% (conn_done): …" and "Stuck at 5%: …"
+        /// — so the phase is optional here. The tail is taken whole rather than by hunting for a
+        /// parenthesis: a first attempt matched the FIRST bracketed group and reported the phase
+        /// name ("conn_done") as the problem, which says nothing, while the reason the user needs
+        /// ("Connection timed out; TIMEOUT; …") sat in the brackets after it.
+        /// </summary>
+        [GeneratedRegex(@"Problem bootstrapping.*?Stuck at (\d+)%(?:\s*\(([^)]*)\))?:\s*(.*)", RegexOptions.IgnoreCase)]
+        private static partial Regex BootstrapStuck();
+
         /// <summary>Tor's notice log carries its own progress; "Bootstrapped 100%" is the line that means the SOCKS port will answer.</summary>
         static void ReadTorLine(string? line, TaskCompletionSource<bool> bootstrapped)
         {
             if (string.IsNullOrWhiteSpace(line)) return;
             Remember(line);
+            TrackBootstrap(line);
 
             if (line.Contains("Bootstrapped 100%", StringComparison.OrdinalIgnoreCase))
             {
@@ -426,6 +458,30 @@ namespace MyLovelyMail.MainProject.Services.Tor
             else if (line.Contains("Bootstrapped", StringComparison.OrdinalIgnoreCase) || line.Contains("[warn]", StringComparison.OrdinalIgnoreCase))
             {
                 Log("Tor: " + line, LogLevel.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Keeps <see cref="Bootstrap"/> current from tor's own notice lines. A "stuck" report
+        /// attaches to the percentage already recorded rather than replacing it, so the display can
+        /// say both where it got to and what is wrong; the next step forward clears the problem,
+        /// because tor recovering on its own is the common case.
+        /// </summary>
+        static void TrackBootstrap(string line)
+        {
+            if (BootstrapProgress().Match(line) is { Success: true } progress
+                && int.TryParse(progress.Groups[1].Value, out int percent))
+            {
+                Bootstrap = new BootstrapState(percent, progress.Groups[2].Value.Trim(), progress.Groups[3].Value.Trim(), null, DateTime.UtcNow);
+                return;
+            }
+
+            if (BootstrapStuck().Match(line) is { Success: true } stuck
+                && int.TryParse(stuck.Groups[1].Value, out int stuckPercent))
+            {
+                string phase = stuck.Groups[2].Success ? stuck.Groups[2].Value.Trim() : Bootstrap?.Phase ?? "stuck";
+                Bootstrap = new BootstrapState(stuckPercent, phase,
+                    Bootstrap?.Summary ?? string.Empty, stuck.Groups[3].Value.Trim(), DateTime.UtcNow);
             }
         }
 

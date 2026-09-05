@@ -443,6 +443,27 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         #endregion
 
+        /// <summary>
+        /// Where the app's own tor has got to, in one line, or null when there is nothing to say —
+        /// no tor of ours running, or it has finished and the route line already says so.
+        /// <para>
+        /// Shared by all three status lines so they cannot drift apart. Tor announces its own
+        /// progress and its own trouble; before this the app forwarded neither, so a stuck
+        /// bootstrap looked exactly like a slow one for the whole startup timeout.
+        /// </para>
+        /// </summary>
+        public static string? BootstrapLine
+        {
+            get
+            {
+                if (!TorProcess.IsRunning || TorProcess.Bootstrap is not { } state || state.Percent >= 100) return null;
+
+                return state.Problem is { Length: > 0 } problem
+                    ? $"⚠️ Tor is stuck at {state.Percent}%: {problem}"
+                    : $"⏳ Tor is starting — {state.Percent}% ({state.Summary})";
+            }
+        }
+
         /// <summary>Everything the settings card and the debug API show, gathered without touching the network.</summary>
         public static object Describe() => new
         {
@@ -451,6 +472,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             appManagedProcessRunning = TorProcess.IsRunning,
             appManagedSocksPort = TorProcess.OwnSocksPort,
             canStartTor = TorProcess.CanStartHere,
+            bootstrap = TorProcess.Bootstrap,
             executable = TorProcess.Find()?.Path,
             autoStart = Settings.TorAutoStart.Value,
             configured = $"{Settings.TorSocksHost.Value}:{Settings.TorSocksPort.Value}",
