@@ -303,6 +303,11 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
             AddGeoIpFiles(startInfo, executable.Path);
 
+            // Before the process exists, so a missing transport plugin is reported as itself rather
+            // than as a tor that would not bootstrap.
+            TorBridges.AddTo(startInfo, executable.Path);
+            lastStartArguments = [.. startInfo.ArgumentList];
+
             var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             var bootstrapped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -425,6 +430,11 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </para>
         /// </summary>
         public static BootstrapState? Bootstrap { get; private set; }
+
+        static string[] lastStartArguments = [];
+
+        /// <summary>The exact command line the last start used. "Did it actually get my bridges?" has no other answer.</summary>
+        public static IReadOnlyList<string> LastStartArguments => lastStartArguments;
 
         [GeneratedRegex(@"Bootstrapped (\d+)%\s*\(([^)]*)\):\s*(.*)", RegexOptions.IgnoreCase)]
         private static partial Regex BootstrapProgress();

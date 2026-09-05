@@ -358,6 +358,19 @@
         }
         <div class="settings-row">
             <div class="settings-row-text">
+                <span class="settings-row-label">Bridges</span>
+                <span class="settings-row-hint">
+                    One per line, as bridges.torproject.org gives them. For a network that blocks Tor itself; empty uses the public network. @TorBridgeLine
+                </span>
+            </div>
+        </div>
+        <div class="settings-vault-switch">
+            <textarea class="wizard-select settings-bridge-input" rows="3" spellcheck="false"
+                      placeholder="obfs4 10.0.0.1:443 FINGERPRINT cert=... iat-mode=0"
+                      value="@BridgeText" @onchange="@(e => SetBridges(e.Value?.ToString() ?? string.Empty))"></textarea>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-text">
                 <span class="settings-row-label">Route</span>
                 @* polite, not assertive: this line changes several times during a bootstrap and a
                    screen reader should finish the sentence it is on before taking the next one. *@
@@ -657,6 +670,34 @@
     static string TorExecutableLine =>
         !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
         : TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+
+    /// <summary>The setting stores separator-joined lines; the box shows real ones.</summary>
+    static string BridgeText =>
+        GlobalSettings.TorBridgeLines.Value.Replace(TorBridges.LineSeparator, '\n');
+
+    static void SetBridges(string text)
+    {
+        SetAndSave(GlobalSettings.TorBridgeLines,
+            string.Join(TorBridges.LineSeparator,
+                text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+    }
+
+    /// <summary>Whether each configured transport has a plugin, said before the start rather than after it fails.</summary>
+    static string TorBridgeLine
+    {
+        get
+        {
+            var bridges = TorBridges.Configured;
+            if (bridges.Count == 0) return string.Empty;
+
+            var problems = ((IEnumerable<dynamic>)TorBridges.Describe(TorProcess.Find()?.Path))
+                .Where(entry => entry.problem != null).ToList();
+
+            return problems.Count == 0
+                ? $"✅ {bridges.Count} bridge line(s); every transport has its plugin."
+                : "⚠️ " + string.Join(" ", problems.Select(entry => (string)entry.problem));
+        }
+    }
 
     static string TorRouteLine =>
         TorService.BootstrapLine is { } starting ? starting

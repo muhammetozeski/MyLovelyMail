@@ -102,6 +102,18 @@
         border-color: transparent;
     }
 
+    /* Bridge lines are long and must not wrap into an unreadable block: the box scrolls sideways
+       and the text stays monospaced, so a fingerprint can be compared character by character. */
+    .settings-bridge-input {
+        width: 100%;
+        resize: vertical;
+        white-space: pre;
+        overflow-x: auto;
+        font-family: Consolas, 'Cascadia Mono', monospace;
+        font-size: @(AppMeasures.Font.Small)px;
+        line-height: 1.5;
+    }
+
     .settings-vault-switch {
         display: flex;
         gap: @(AppMeasures.Space.Px12)px;
@@ -233,3 +245,4 @@
         font-weight: @(AppMeasures.Weight.Bold);
     }
 </style>
+

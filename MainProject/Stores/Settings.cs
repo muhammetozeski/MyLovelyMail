@@ -208,6 +208,17 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Seconds to wait for a freshly started tor to finish bootstrapping. A first run on a slow link genuinely takes minutes.</summary>
         public static readonly Setting<int> TorStartupTimeoutSeconds = new(180);
 
+        /// <summary>
+        /// Bridge lines for a network that blocks Tor itself, one per line, exactly as
+        /// bridges.torproject.org hands them out — "obfs4 10.0.0.1:443 FINGERPRINT cert=… iat-mode=0",
+        /// or a bare "10.0.0.1:9001 FINGERPRINT" for a plain bridge. Empty uses the public network.
+        /// <para>
+        /// Stored with the unit-separator control character between lines, like SavedSearches: the
+        /// settings file is one key per line, so a real newline would end the value.
+        /// </para>
+        /// </summary>
+        public static readonly Setting<string> TorBridgeLines = new("");
+
         // ---- Diagnostics ----
 
         /// <summary>Master logging on/off. On by default: entries buffer in RAM for the log viewer and persist scrambled to AppCache/Logs.</summary>
