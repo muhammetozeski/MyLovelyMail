@@ -67,8 +67,16 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// cache every re-render walked the whole PATH with File.Exists and appended another entry
         /// to a log buffer that has no size cap.
         /// </summary>
-        static (string SettingKey, TorExecutable? Result)? lastSearch;
+        static (string SettingKey, TorExecutable? Result, DateTime AtUtc)? lastSearch;
         static readonly Lock searchGate = new();
+
+        /// <summary>
+        /// How long "there is no tor on this machine" is worth believing. A found executable is
+        /// cached until its file goes away, but a MISS has to expire: installing the Tor Browser or
+        /// dropping tor.exe into the app's folder are the two documented ways to fix the problem
+        /// the miss caused, and both were invisible until the app was restarted.
+        /// </summary>
+        static readonly TimeSpan MissingRecheckInterval = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// The first tor executable that exists, most explicit first: the setting, then PATH, then
@@ -83,15 +91,24 @@ namespace MyLovelyMail.MainProject.Services.Tor
             string settingKey = Settings.TorExecutablePath.Value;
             lock (searchGate)
             {
-                if (lastSearch is { } cached && cached.SettingKey == settingKey
-                    && (cached.Result == null || File.Exists(cached.Result.Path)))
+                if (lastSearch is { } cached && cached.SettingKey == settingKey && IsStillGood(cached))
                     return cached.Result;
 
                 var found = Search();
-                lastSearch = (settingKey, found);
+                lastSearch = (settingKey, found, DateTime.UtcNow);
                 return found;
             }
         }
+
+        /// <summary>
+        /// A hit stands as long as its file is still there; a miss stands only for
+        /// <see cref="MissingRecheckInterval"/>, long enough to keep a render cheap and short
+        /// enough that a tor installed while the app is running is picked up without a restart.
+        /// </summary>
+        static bool IsStillGood((string SettingKey, TorExecutable? Result, DateTime AtUtc) cached) =>
+            cached.Result != null
+                ? File.Exists(cached.Result.Path)
+                : DateTime.UtcNow - cached.AtUtc < MissingRecheckInterval;
 
         /// <summary>Walks the candidates for real. Only reached on a cache miss, so its logging stays readable.</summary>
         static TorExecutable? Search()
