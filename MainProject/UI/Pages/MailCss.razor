@@ -1627,6 +1627,17 @@
         font-size: @(AppMeasures.Font.Normal)px;
     }
 
+    /* The sentence under the headline: the evidence for it (an error, a server count, a
+       timestamp). Wrapped and width-capped because an IMAP error message can be a paragraph. */
+    .mail-empty-detail {
+        font-size: @(AppMeasures.Font.Small)px;
+        opacity: @(AppMeasures.Opacity.Soft);
+        max-width: @(AppMeasures.Size.Px360)px;
+        text-align: center;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
     /* ---- Responsive: drop to two panes, then one ---- */
 
     @@media (max-width: @(AppMeasures.Breakpoint.TwoPane)px) {

@@ -197,6 +197,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>
+        /// Runs the one action the empty-folder panel offers. The kicks are fire-and-forget, so the
+        /// repaint comes from OnFolderSyncStateChanged like every other sync; this only has to put
+        /// the spinner branch on screen for the click that started it.
+        /// </summary>
+        void RunEmptyFolderAction(MailFolderData folder, EmptyFolderAction action)
+        {
+            FolderEmptyReason.RunAction(folder, action);
+            StateHasChanged();
+        }
+
+        /// <summary>
         /// Hover text answering "how old is what I am looking at". The folder-list pass keeps every
         /// unread badge current while the messages behind it can be weeks old, so the badge alone
         /// cannot tell the user that.

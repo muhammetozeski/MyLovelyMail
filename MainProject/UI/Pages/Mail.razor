@@ -203,11 +203,27 @@
                     <div class="mail-empty-text">Nothing left to read — enjoy the quiet.</div>
                 </div>
             }
+            @* No search text means the folder itself is the answer, and "this folder is empty" is
+               a claim about the server the app is often in no position to make. FolderEmptyReason
+               says which of the reasons it actually is, and offers the one action that fixes it. *@
+            else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { } emptyFolder)
+            {
+                var why = FolderEmptyReason.Explain(emptyFolder);
+                <div class="mail-empty">
+                    <div class="mail-empty-icon">🕊️</div>
+                    <div class="mail-empty-text">@why.Headline</div>
+                    <div class="mail-empty-detail">@why.Detail</div>
+                    @if (why.Action != EmptyFolderAction.None)
+                    {
+                        <SecondaryButton OnClick="@(() => RunEmptyFolderAction(emptyFolder, why.Action))">@why.ActionLabel</SecondaryButton>
+                    }
+                </div>
+            }
             else
             {
                 <div class="mail-empty">
                     <div class="mail-empty-icon">🕊️</div>
-                    <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? "This folder is empty" : "Nothing matches your search")</div>
+                    <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? FolderEmptyReason.PlainlyEmpty : "Nothing matches your search")</div>
                     @* A refused operator becomes a literal text search, so the query looks right
                        and the screen says only that it failed. These say what would work. *@
                     <div class="mail-rescue">
