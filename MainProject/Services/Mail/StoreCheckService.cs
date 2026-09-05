@@ -90,13 +90,22 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var byFolder = new Dictionary<string, List<StoreFinding>>();
             int accounts = 0, folders = 0;
 
-            string accountsRoot = Path.Combine(AppPaths.UserCache, MessageStore.AccountsFolderName);
-            if (Directory.Exists(accountsRoot))
+            // Both roots: local folders live in UserData and server mail in UserCache, and a
+            // scan that knew only about the cache would report the half that cannot be re-fetched
+            // as if it did not exist.
+            var seenAccounts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string accountsRoot in new[]
+                     {
+                         Path.Combine(AppPaths.UserCache, MessageStore.AccountsFolderName),
+                         Path.Combine(AppPaths.UserData, MessageStore.AccountsFolderName)
+                     })
             {
+                if (!Directory.Exists(accountsRoot)) continue;
+
                 foreach (string accountDir in SafeDirectories(accountsRoot))
                 {
-                    accounts++;
                     string accountId = Path.GetFileName(accountDir);
+                    if (seenAccounts.Add(accountId)) accounts++;
                     string label = AccountStore.GetById(accountId)?.EmailAddress ?? accountId;
 
                     string foldersRoot = Path.Combine(accountDir, MessageStore.FoldersFolderName);
