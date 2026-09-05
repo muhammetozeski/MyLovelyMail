@@ -450,6 +450,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             source = Current?.Source.ToString(),
             appManagedProcessRunning = TorProcess.IsRunning,
             appManagedSocksPort = TorProcess.OwnSocksPort,
+            canStartTor = TorProcess.CanStartHere,
             executable = TorProcess.Find()?.Path,
             autoStart = Settings.TorAutoStart.Value,
             configured = $"{Settings.TorSocksHost.Value}:{Settings.TorSocksPort.Value}",

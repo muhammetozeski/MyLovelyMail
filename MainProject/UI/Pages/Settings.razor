@@ -325,22 +325,37 @@
                 <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
             </div>
         </div>
-        <div class="settings-row">
-            <div class="settings-row-text">
-                <span class="settings-row-label">Start Tor when none is running</span>
-                <span class="settings-row-hint">Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.</span>
+        @* Both rows are about running a tor of the app's own, which cannot happen on a platform
+           that will not let an app execute another package's binary. Showing them there offers a
+           switch that does nothing and a path box nothing will ever match. *@
+        @if (TorProcess.CanStartHere)
+        {
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Start Tor when none is running</span>
+                    <span class="settings-row-hint">Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.</span>
+                </div>
+                <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
             </div>
-            <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
-        </div>
-        <div class="settings-row">
-            <div class="settings-row-text">
-                <span class="settings-row-label">Tor executable</span>
-                <span class="settings-row-hint">Empty searches PATH, the app folder and the usual Tor Browser locations. @TorExecutableLine</span>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Tor executable</span>
+                    <span class="settings-row-hint">Empty searches PATH, the app folder and the usual Tor Browser locations. @TorExecutableLine</span>
+                </div>
+                <div class="settings-number settings-number--wide">
+                    <CoreInput Placeholder="(searched automatically)" Value="@GlobalSettings.TorExecutablePath.Value" ValueChanged="@SetTorExecutable" />
+                </div>
             </div>
-            <div class="settings-number settings-number--wide">
-                <CoreInput Placeholder="(searched automatically)" Value="@GlobalSettings.TorExecutablePath.Value" ValueChanged="@SetTorExecutable" />
+        }
+        else
+        {
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Running Tor here</span>
+                    <span class="settings-row-hint">@TorProcess.OrbotAdvice</span>
+                </div>
             </div>
-        </div>
+        }
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Route</span>
@@ -607,7 +622,8 @@
         [.. AccountStore.Accounts.Where(static a => a.TorOnly).Select(static a => a.EmailAddress)];
 
     static string TorExecutableLine =>
-        TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+        !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
+        : TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
 
     static string TorRouteLine =>
         TorService.Current is { } endpoint

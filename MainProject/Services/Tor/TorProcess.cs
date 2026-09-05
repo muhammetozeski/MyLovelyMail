@@ -65,6 +65,24 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         #region Finding an executable
 
+        /// <summary>
+        /// Whether this app can run a tor of its own here at all. False on Android, where an app
+        /// cannot execute an arbitrary binary from another package: every candidate path is a miss,
+        /// every search is wasted, and every status line ends up telling a phone user to install
+        /// the Tor Browser. What actually works there is Orbot's SOCKS listener on 9050, which
+        /// <see cref="TorService"/> already tries as the system-daemon candidate — the user just
+        /// had no way to learn that from the app.
+        /// <para>
+        /// Settable so both branches can be exercised on one machine; nothing but a test assigns it.
+        /// </para>
+        /// </summary>
+        public static bool CanStartHere { get; set; } = !OperatingSystem.IsAndroid();
+
+        /// <summary>What to do instead, on a platform where this app cannot start one.</summary>
+        public const string OrbotAdvice =
+            "This app cannot start Tor on Android. Install Orbot, start it, and leave it running — "
+            + "it listens on 127.0.0.1:9050, which this app finds by itself.";
+
         /// <summary>File name of the tor binary on each platform this app is built for.</summary>
         static string ExecutableName => OperatingSystem.IsWindows() ? "tor.exe" : "tor";
 
@@ -95,6 +113,11 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </summary>
         public static TorExecutable? Find()
         {
+            // No search at all where none could succeed: the walk over PATH and the Tor Browser
+            // locations is pure cost on Android, and its "no tor executable was found" warning
+            // repeats every 30 seconds once the miss expires.
+            if (!CanStartHere) return null;
+
             string settingKey = Settings.TorExecutablePath.Value;
             lock (searchGate)
             {
@@ -223,6 +246,9 @@ namespace MyLovelyMail.MainProject.Services.Tor
             // candidate was being verified — VerifyAsync answers with a verdict rather than
             // throwing, so the cancellation is not noticed until something asks. Launching a tor
             // process for that operation and then throwing leaves a tor nobody asked for.
+            if (!CanStartHere)
+                throw new TorUnavailableException(OrbotAdvice, recoverable: false);
+
             cancellationToken.ThrowIfCancellationRequested();
 
             int myStopGeneration;
