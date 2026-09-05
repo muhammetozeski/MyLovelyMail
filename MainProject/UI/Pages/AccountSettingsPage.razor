@@ -255,13 +255,22 @@
     bool TorChecking { get; set; }
     string? TorCheckMessage { get; set; }
 
-    /// <summary>What this machine can offer right now, answered without touching the network.</summary>
-    static string TorStatusLine =>
+    /// <summary>
+    /// What this account's traffic is doing right now, answered without touching the network.
+    /// Instance-scoped since the route is per account: the globally current endpoint says nothing
+    /// about which rung THIS mailbox needed.
+    /// </summary>
+    string TorStatusLine =>
         TorService.BootstrapLine is { } starting ? starting
+        : LastRouteOfThisAccount is { } carried ? $"Last connection went {carried}."
         : TorService.Current is { } endpoint ? $"Route in use: {endpoint}."
         : !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
         : TorProcess.Find() is { } executable ? $"No route open yet — one will be started from {executable.Path} on the next connection."
         : "⚠️ No tor executable was found on this machine. Install Tor or the Tor Browser, or set TorExecutablePath in Settings.";
+
+    /// <summary>The route the last successful connection of THIS account actually took, or null before one.</summary>
+    string? LastRouteOfThisAccount =>
+        Account is { } account && SyncHealthService.For(account.Id).LastRoute is { Length: > 0 } route ? route : null;
 
     void SetTorOnly(bool torOnly)
     {

@@ -14,6 +14,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public string? LastErrorMessage { get; set; }
         public int ConsecutiveFailures { get; set; }
 
+        /// <summary>
+        /// How the last successful connection actually travelled — "direct", or the Tor endpoint
+        /// and the ladder rung that carried it. Only the log knew this before, and a mailbox that
+        /// only works on the third rung is a mailbox with a problem the user could not see.
+        /// </summary>
+        public string? LastRoute { get; set; }
+
+        public DateTime? LastRouteUtc { get; set; }
+
         /// <summary>True while the last attempt is still unrecovered — what the UI paints red.</summary>
         public bool IsFailing => ConsecutiveFailures > 0;
     }
@@ -49,6 +58,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
             health.LastSuccessUtc = DateTime.UtcNow;
             health.ConsecutiveFailures = 0;
             health.LastErrorMessage = null;
+            Save();
+        }
+
+        /// <summary>
+        /// Records how a connection just travelled. Written only when the route CHANGED: this runs
+        /// on every connection an account makes — every sync pass, every IDLE reconnect — and
+        /// rewriting the health file each time would be pure disk churn for an unchanged sentence.
+        /// </summary>
+        public static void MarkRoute(string accountId, string route)
+        {
+            var health = For(accountId);
+            if (health.LastRoute == route) return;
+
+            health.LastRoute = route;
+            health.LastRouteUtc = DateTime.UtcNow;
             Save();
         }
 

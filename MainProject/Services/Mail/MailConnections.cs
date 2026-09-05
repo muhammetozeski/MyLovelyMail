@@ -235,7 +235,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         recoverable: false);
 
                 var direct = createClient();
-                return await ConnectAndAuthenticateAsync(direct, protocolName, host, port, socketOptions, username, password, cancellationToken);
+                try
+                {
+                    var opened = await ConnectAndAuthenticateAsync(direct, protocolName, host, port, socketOptions, username, password, cancellationToken);
+                    SyncHealthService.MarkRoute(account.Id, "direct");
+                    return opened;
+                }
+                catch (Exception ex) when (ex is AuthenticationException or ServiceNotAuthenticatedException)
+                {
+                    SyncHealthService.MarkRoute(account.Id, "direct");
+                    throw;
+                }
             }
 
             var failures = new List<string>();
@@ -329,9 +339,24 @@ namespace MyLovelyMail.MainProject.Services.Mail
             // filter lets it fall through to the next rung instead of ending the climb.
             using var rungBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             rungBudget.CancelAfter(TorRungBudget);
+            string route = $"{endpoint} via {rung.Description} (circuit {TorService.CircuitEpochOf(account.Id)})";
             try
             {
-                return await ConnectAndAuthenticateAsync(client, protocolName, host, port, socketOptions, username, password, rungBudget.Token);
+                var opened = await ConnectAndAuthenticateAsync(client, protocolName, host, port, socketOptions, username, password, rungBudget.Token);
+                // Naming the RUNG, not the endpoint: "which route carried this" is a different
+                // question from "what endpoint is current", and the rung is the half that says
+                // whether this mailbox is healthy or limping.
+                SyncHealthService.MarkRoute(account.Id, route);
+                return opened;
+            }
+            // A refused password is not a refused route. The tunnel carried this connection all the
+            // way to the login prompt, and someone looking at a mailbox that will not sign in needs
+            // to know which route got that far — recording nothing here would answer the transport
+            // question with silence in exactly the case where it is being asked.
+            catch (Exception ex) when (ex is AuthenticationException or ServiceNotAuthenticatedException)
+            {
+                SyncHealthService.MarkRoute(account.Id, route);
+                throw;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

@@ -563,7 +563,12 @@
     {
         var health = SyncHealthService.For(accountId);
         if (health.IsFailing) return $"⚠️ failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
-        return health.LastSuccessUtc is { } success ? $"synced {success.ToLocalTime():dd MMM HH:mm}" : "not synced yet";
+
+        // The route belongs beside the time: "synced ten minutes ago" and "synced ten minutes ago
+        // on the third fallback route" are different states of the same mailbox, and only one of
+        // them is fine.
+        string route = health.LastRoute is { Length: > 0 } last ? $" · {last}" : string.Empty;
+        return health.LastSuccessUtc is { } success ? $"synced {success.ToLocalTime():dd MMM HH:mm}{route}" : "not synced yet";
     }
 
     /// <summary>Switching this on re-picks the palette immediately, so the effect is visible without restarting.</summary>

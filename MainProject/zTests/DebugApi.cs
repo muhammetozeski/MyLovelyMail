@@ -932,7 +932,11 @@ namespace MyLovelyMail.MainProject.ZTests
                         account.EmailAddress,
                         account.TorOnly,
                         stage,
-                        route = account.TorOnly ? TorService.Current?.ToString() : "direct",
+                        // The route THIS connection took, recorded by the connect itself. It used
+                        // to report TorService.Current, which is the globally current endpoint at
+                        // the moment of the answer — so a mailbox that only got through on the
+                        // sixth rung looked identical to one that worked on the first.
+                        route = SyncHealthService.For(account.Id).LastRoute,
                         seconds = Math.Round((DateTime.UtcNow - started).TotalSeconds, 1)
                     };
                 }
