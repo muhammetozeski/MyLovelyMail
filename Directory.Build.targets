@@ -19,11 +19,6 @@
       <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'win10-arm64'">win-arm64</RuntimeIdentifier>
       <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-arm'">android-arm64</RuntimeIdentifier>
       <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == 'android-x86'">android-x64</RuntimeIdentifier>
-      <!-- .NET 10 SDK doesn't ship a Microsoft.NETCore.App.Runtime.Mono NuGet package
-           for any RID.  Tell the framework reference resolution to use the regular
-           .NET runtime instead, otherwise MAUI BlazorHybrid restores fail with
-           NU1102 (package not found). -->
-      <UseMonoRuntime Condition="'$(UseMonoRuntime)' == ''">false</UseMonoRuntime>
     </PropertyGroup>
   </Target>
 </Project>

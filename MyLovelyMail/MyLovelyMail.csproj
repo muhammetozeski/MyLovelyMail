@@ -49,9 +49,6 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win-x64</RuntimeIdentifier>
-    <!-- .NET 10 SDK doesn't ship a Microsoft.NETCore.App.Runtime.Mono NuGet package
-         for any RID.  Use the regular .NET runtime for MAUI Hybrid instead. -->
-    <UseMonoRuntime>false</UseMonoRuntime>
   </PropertyGroup>
 
   <!-- The exe/taskbar/window icon on Windows reuses the same lovely-mail icon as the tray, instead
