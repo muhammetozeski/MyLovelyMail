@@ -10,7 +10,7 @@ namespace MyLovelyMail.MainProject.Storage
     /// and <c>AppCache</c> (app-only re-creatable content, unrelated to the user). Every disk
     /// access in the app must build its path from this class.
     /// </summary>
-    public static class AppPaths
+    public static partial class AppPaths
     {
         public const string RootFolderName = AppConstants.AppName;
         public const string AppFolderName = "AppData";
@@ -40,11 +40,23 @@ namespace MyLovelyMail.MainProject.Storage
 
         static string ResolveRoot()
         {
+            string? platformRoot = null;
+            ResolvePlatformRoot(ref platformRoot);
+            if (platformRoot != null) return platformRoot;
+
             string baseDirectory = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             return string.Equals(Path.GetFileName(baseDirectory), AppFolderName, StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(baseDirectory)!
                 : Path.Combine(baseDirectory, RootFolderName);
         }
+
+        /// <summary>
+        /// Filled in by a platform whose executable folder is not the app's to write in; on Android the
+        /// app lives inside its package and gets a private files folder from the system instead. Left
+        /// empty on Windows and in the web preview, which keep the folder-next-to-the-executable layout.
+        /// </summary>
+        /// <param name="root">Set to the root folder to use; left null keeps the layout above.</param>
+        static partial void ResolvePlatformRoot(ref string? root);
 
         /// <summary>
         /// Creates the whole folder layout (root + user/cache folders). Called once at startup;
