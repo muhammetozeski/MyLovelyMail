@@ -31,15 +31,15 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Follow the Windows theme</span>
+                <span class="settings-row-label">Follow the @PlatformFeatures.SystemName theme</span>
                 <span class="settings-row-hint">Picks the light or dark palette automatically instead of the one chosen above</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.FollowSystemTheme.Value" CheckedChanged="@SetFollowSystemTheme" />
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Follow the Windows animation setting</span>
-                <span class="settings-row-hint">Takes the answer below from Windows instead of the switch</span>
+                <span class="settings-row-label">Follow the @PlatformFeatures.SystemName animation setting</span>
+                <span class="settings-row-hint">Takes the answer below from @PlatformFeatures.SystemName instead of the switch</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.FollowSystemMotion.Value" CheckedChanged="@SetFollowSystemMotion" />
         </div>
@@ -55,7 +55,7 @@
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Interface scale (%)</span>
-                <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
+                <span class="settings-row-hint">Scales the whole interface; 100 is the design size</span>
             </div>
             <div class="settings-number">
                 <CoreInput Type="number" Value="@GlobalSettings.UiScalePercent.Value.ToString()" ValueChanged="@SetUiScale" />
@@ -83,6 +83,10 @@
         </div>
     </GlassCard>
 
+    @* The tray, a minimized start and the sign-in autostart belong to a desktop window. On a phone the
+       app starts with the system on its own and has no window to hide. *@
+    @if (PlatformFeatures.HasDesktopWindow)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🪟 Window &amp; startup</div>
         <div class="settings-row">
@@ -107,13 +111,14 @@
             <CoreToggle Checked="@GlobalSettings.StartWithWindows.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.StartWithWindows, v))" />
         </div>
     </GlassCard>
+    }
 
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🔔 Notifications</div>
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Notify on new mail</span>
-                <span class="settings-row-hint">Show a Windows notification when mail arrives</span>
+                <span class="settings-row-hint">Show a notification when mail arrives</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.NotifyOnNewMail.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.NotifyOnNewMail, v))" />
         </div>
@@ -260,8 +265,8 @@
         <div class="settings-section-title">🔐 Vault protection</div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Current mode: @(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Windows account (DPAPI)" : "Master password (AES)")</span>
-                <span class="settings-row-hint">@(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Unlocks automatically on this Windows account; not portable to other machines." : "Portable, but asks for the master password.")</span>
+                <span class="settings-row-label">Current mode: @(GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound ? DeviceProtection.DisplayName : "Master password (AES)")</span>
+                <span class="settings-row-hint">@(GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound ? DeviceProtection.Description : "Portable, but asks for the master password.")</span>
             </div>
             @if (GlobalSettings.CredentialVaultMode.Value == VaultMode.MasterPassword && CredentialVault.IsUnlocked)
             {
@@ -272,7 +277,7 @@
         {
             <p class="settings-empty-text">Unlock the vault to change its protection mode.</p>
         }
-        else if (GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi)
+        else if (GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound)
         {
             <div class="settings-row">
                 <div class="settings-row-text">
@@ -289,10 +294,10 @@
         {
             <div class="settings-row">
                 <div class="settings-row-text">
-                    <span class="settings-row-label">Switch back to Windows account (DPAPI)</span>
-                    <span class="settings-row-hint">No more password prompts on this machine</span>
+                    <span class="settings-row-label">Switch back to @DeviceProtection.DisplayName</span>
+                    <span class="settings-row-hint">No more password prompts on this device</span>
                 </div>
-                <SecondaryButton OnClick="@SwitchVaultToDpapi">🔁 Switch</SecondaryButton>
+                <SecondaryButton OnClick="@SwitchVaultToDeviceBound">🔁 Switch</SecondaryButton>
             </div>
         }
     </GlassCard>
@@ -325,18 +330,17 @@
                 <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
             </div>
         </div>
-        @* Both rows are about running a tor of the app's own, which cannot happen on a platform
-           that will not let an app execute another package's binary. Showing them there offers a
-           switch that does nothing and a path box nothing will ever match. *@
-        @if (TorProcess.CanStartHere)
-        {
-            <div class="settings-row">
-                <div class="settings-row-text">
-                    <span class="settings-row-label">Start Tor when none is running</span>
-                    <span class="settings-row-hint">Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.</span>
-                </div>
-                <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Start Tor when none is running</span>
+                <span class="settings-row-hint">@TorAutoStartHint</span>
             </div>
+            <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
+        </div>
+        @* Only where the app searches for a tor. The Android app runs the one inside its own package,
+           and no path typed here could point at anything Android would let it execute. *@
+        @if (TorProcess.BundledExecutablePath == null)
+        {
             <div class="settings-row">
                 <div class="settings-row-text">
                     <span class="settings-row-label">Tor executable</span>
@@ -344,15 +348,6 @@
                 </div>
                 <div class="settings-number settings-number--wide">
                     <CoreInput Placeholder="(searched automatically)" Value="@GlobalSettings.TorExecutablePath.Value" ValueChanged="@SetTorExecutable" />
-                </div>
-            </div>
-        }
-        else
-        {
-            <div class="settings-row">
-                <div class="settings-row-text">
-                    <span class="settings-row-label">Running Tor here</span>
-                    <span class="settings-row-hint">@TorProcess.OrbotAdvice</span>
                 </div>
             </div>
         }
@@ -673,8 +668,13 @@
         [.. AccountStore.Accounts.Where(static a => a.TorOnly).Select(static a => a.EmailAddress)];
 
     static string TorExecutableLine =>
-        !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
-        : TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+        TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+
+    /// <summary>Where the app carries its own tor, that tor comes first and a running Orbot is the fallback; elsewhere a running tor comes first.</summary>
+    static string TorAutoStartHint =>
+        TorProcess.BundledExecutablePath != null
+            ? "Runs the tor inside the app on a free port, before any tor that is already running such as Orbot. Off leaves Tor-only accounts to a tor that is already running."
+            : "Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.";
 
     /// <summary>The setting stores separator-joined lines; the box shows real ones.</summary>
     static string BridgeText =>
@@ -792,7 +792,7 @@
         NewMasterPassword = string.Empty;
     }
 
-    static void SwitchVaultToDpapi() => CredentialVault.SwitchToDpapi();
+    static void SwitchVaultToDeviceBound() => CredentialVault.SwitchToDeviceBound();
 
     void RemoveAccount(string accountId)
     {

@@ -1,41 +1,37 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.ZTests;
-#if WINDOWS
-using H.NotifyIcon;
-#endif
 
 namespace MyLovelyMail
 {
-    public static class MauiProgram
+    /// <summary>
+    /// The startup order every platform shares. The steps that differ per platform are the partial
+    /// methods at the bottom, implemented in Platforms\Windows and Platforms\Android; a platform with
+    /// nothing to do at a step leaves it unimplemented and the call compiles away.
+    /// </summary>
+    public static partial class MauiProgram
     {
         public static MauiApp CreateMauiApp()
         {
-            if (!SingleInstance.Claim())
-                Environment.Exit(0);
+            OnStartupBegin();
 
             AppPaths.EnsureCreated();
             // Before anything reads a folder: earlier versions wrote local folders — Drafts,
             // Outbox, Sent — into UserCache, which is the folder users are told is safe to delete.
             MessageStore.MoveLocalFoldersOutOfCache();
-            RunLock.Claim();
-            WatchForExit();
             SettingsManager.LoadSettings();
             Logger.ActivateLogging = Settings.EnableLogging.Value;
             Logger.Log("App starting: paths ensured, settings loaded.");
-            ThemeManager.SystemDarkProbe = SystemThemeProbe.PrefersDark;
-            MotionPreference.SystemReducedMotionProbe = SystemMotionProbe.PrefersReducedMotion;
+            RegisterPlatformServices();
             ThemeManager.ApplyFromSettings();
             AccountStore.Load();
             CredentialVault.Load();
             FilterRuleStore.Load();
             TagStore.Load();
-            NotificationBridge.Initialize();
-            SoundBridge.Initialize();
             // Through the UI thread: the Windows clipboard is apartment-bound, so a copy started
             // from a background thread — a side-button click arriving over the debug API, an
             // action finishing on a task — failed with an empty exception message.
@@ -55,33 +51,26 @@ namespace MyLovelyMail
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 });
-#if WINDOWS
-            builder.UseNotifyIcon();
-#endif
+            ConfigurePlatformBuilder(builder);
 
             builder.Services.AddMauiBlazorWebView();
 
             return builder.Build();
         }
 
+        /// <summary>Runs before anything touches the disk, so a copy of the app that must not run can still leave without side effects.</summary>
+        static partial void OnStartupBegin();
+
         /// <summary>
-        /// Hooks every ending the process can still observe, so the run lock can name it. Task
-        /// Manager's "End task", a power cut and a debugger stop go through TerminateProcess,
-        /// which runs none of these - such a run simply keeps the "Unexpected" verdict the file
-        /// already carries while the app is up.
+        /// Hands MainProject the pieces only the platform can provide — the theme and motion probes, the
+        /// new-mail notification presenter, the sound player, the way the sync loop waits — and starts
+        /// whatever the platform needs to keep checking mail in the background. Settings are loaded by
+        /// now; the theme, the stores and the sync loop are not, because all three read what is set here.
         /// </summary>
-        static void WatchForExit()
-        {
-            AppDomain.CurrentDomain.ProcessExit += static (_, _) => RunLock.Release();
-            // The runtime tears the process down straight after this handler, so ProcessExit does
-            // not follow: this path has to write the file itself.
-            AppDomain.CurrentDomain.UnhandledException += static (_, _) => RunLock.Release(AppExitReason.UnhandledException);
-#if WINDOWS
-            Microsoft.Win32.SystemEvents.SessionEnding += static (_, e) =>
-                RunLock.NoteExitReason(e.Reason == Microsoft.Win32.SessionEndReasons.Logoff
-                    ? AppExitReason.UserLogOff
-                    : AppExitReason.SystemShutdown);
-#endif
-        }
+        static partial void RegisterPlatformServices();
+
+        /// <summary>Adds the platform's own MAUI handlers.</summary>
+        /// <param name="builder">The builder that already has the app and its fonts.</param>
+        static partial void ConfigurePlatformBuilder(MauiAppBuilder builder);
     }
 }

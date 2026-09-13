@@ -172,6 +172,22 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 Current = null;
                 var refusals = new List<string>();
 
+                // Where the app carries its own tor, that tor is the route and whatever already listens
+                // - Orbot on 9050 - is only the fallback. Elsewhere a tor the user already runs is
+                // preferred to starting another one, so the order below is the other way round.
+                if (TorProcess.BundledExecutablePath != null)
+                {
+                    try
+                    {
+                        return Current = await StartOwnTorAsync(cancellationToken);
+                    }
+                    catch (TorUnavailableException ex)
+                    {
+                        refusals.Add($"the app's own tor: {ex.Message}");
+                        Log($"The app's own tor did not start ({ex.Message}); trying a tor that is already running, such as Orbot.", LogLevel.Warning);
+                    }
+                }
+
                 foreach (var candidate in Candidates())
                 {
                     try
@@ -205,6 +221,14 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 }
 
                 Log($"No existing Tor endpoint qualified ({string.Join("; ", refusals)}).", LogLevel.Warning);
+
+                // The app's own tor was already tried first and failed; a second start would fail the same way.
+                if (TorProcess.BundledExecutablePath != null)
+                {
+                    LastError = $"No Tor route: {string.Join("; ", refusals)}.";
+                    throw new TorUnavailableException(LastError);
+                }
+
                 return Current = await StartOwnTorAsync(cancellationToken);
             }
             finally
@@ -471,7 +495,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             source = Current?.Source.ToString(),
             appManagedProcessRunning = TorProcess.IsRunning,
             appManagedSocksPort = TorProcess.OwnSocksPort,
-            canStartTor = TorProcess.CanStartHere,
+            bundledExecutable = TorProcess.BundledExecutablePath,
             bootstrap = TorProcess.Bootstrap,
             bridges = TorBridges.Configured.Select(static b => new { b.Line, b.Transport }),
             transportPlugins = TorBridges.Describe(TorProcess.Find()?.Path),

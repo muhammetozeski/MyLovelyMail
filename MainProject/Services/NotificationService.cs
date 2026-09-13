@@ -1,5 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.Constants;
 
@@ -31,7 +32,7 @@ namespace MyLovelyMail.MainProject.Services
     {
         public const string SilentSoundName = "none";
 
-        /// <summary>Set by the head project (Windows: AppNotification). Null = platform without toasts.</summary>
+        /// <summary>Set by the head project (Windows: AppNotification, Android: MailNotifications). Null = platform without toasts.</summary>
         public static Action<MailToast>? Presenter;
 
         /// <summary>Called by the sync services after the rule pass with genuinely NEW messages only.</summary>
@@ -63,14 +64,50 @@ namespace MyLovelyMail.MainProject.Services
                 Uid = single?.Uid ?? 0
             };
 
+            Present(toast);
+        }
+
+        /// <summary>
+        /// Shows one toast through the platform presenter and plays its sound unless it is muted. Whether
+        /// to notify at all is decided before this; the debug API calls it directly to show a probe.
+        /// </summary>
+        /// <param name="toast">The finished notification.</param>
+        internal static void Present(MailToast toast)
+        {
             try
             {
-                Presenter(toast);
+                Presenter?.Invoke(toast);
             }
             catch (Exception ex)
             {
                 Log($"Toast presenter failed: {ex.Message}", LogLevel.Warning);
             }
+
+            // Every platform's notification stays silent itself, so the sound heard is the one a rule chose.
+            if (!toast.Mute)
+                SoundService.Play(toast.SoundName);
+        }
+
+        /// <summary>
+        /// What tapping a single-message notification does on every platform: selects its account and
+        /// folder and opens the message in the reader. A batch notification carries uid 0 and only
+        /// brings the app forward, which the platform has done before calling this.
+        /// </summary>
+        /// <param name="accountId">The account the notification was about.</param>
+        /// <param name="folderFullName">The folder the message arrived in.</param>
+        /// <param name="uid">The message's uid; 0 for a batch notification.</param>
+        public static void OpenNotifiedMessage(string accountId, string folderFullName, uint uid)
+        {
+            if (uid == 0) return;
+            var account = AccountStore.GetById(accountId);
+            if (account == null) return;
+
+            var summary = MessageStore.GetSummary(accountId, folderFullName, uid);
+            var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
+
+            MailUiState.SelectAccount(account);
+            if (folder != null) MailUiState.SelectFolder(folder);
+            if (summary != null) MailUiState.OpenMessageInReader(summary);
         }
 
         /// <summary>Start==End disables the window; a wrapping window (22→7) spans midnight.</summary>

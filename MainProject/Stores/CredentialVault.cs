@@ -7,10 +7,11 @@ namespace MyLovelyMail.MainProject.Stores
 {
     /// <summary>
     /// Encrypted store of account passwords, keyed by account id. Two at-rest modes selected by
-    /// <see cref="Settings.CredentialVaultMode"/>: DPAPI (bound to the Windows user — unlocks
-    /// automatically, but a copied UserData folder cannot open it on another machine) and
-    /// AES-GCM under a PBKDF2 master password (portable, asks the user to unlock). The portable
-    /// export/import bundle always uses the passphrase path so migration works from either mode.
+    /// <see cref="Settings.CredentialVaultMode"/>: device-bound through <see cref="DeviceProtection"/>
+    /// (DPAPI on Windows, the Android Keystore on a phone — unlocks automatically, but a copied
+    /// UserData folder cannot open it anywhere else) and AES-GCM under a PBKDF2 master password
+    /// (portable, asks the user to unlock). The portable export/import bundle always uses the
+    /// passphrase path so migration works from either mode.
     /// Vault file: <c>UserData/vault.json</c>.
     /// </summary>
     public static class CredentialVault
@@ -22,74 +23,11 @@ namespace MyLovelyMail.MainProject.Stores
 
         static string VaultPath => Path.Combine(AppPaths.UserData, VaultFileName);
 
-        public const string DpapiEntropyFileName = "vault.entropy";
-
-        static string EntropyPath => Path.Combine(AppPaths.UserData, DpapiEntropyFileName);
-
-        /// <summary>
-        /// Opens a DPAPI payload written either way. A vault from before the entropy existed was
-        /// protected with none, and it must keep opening — the alternative is a user whose saved
-        /// passwords vanish on upgrade. The next save re-protects it with entropy, so the fallback
-        /// is used once per vault and then never again.
-        /// </summary>
-        [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-        static byte[] UnprotectWithOrWithoutEntropy(byte[] payload)
-        {
-            try
-            {
-                return ProtectedData.Unprotect(payload, DpapiEntropy(), DataProtectionScope.CurrentUser);
-            }
-            catch (CryptographicException)
-            {
-                byte[] plain = ProtectedData.Unprotect(payload, null, DataProtectionScope.CurrentUser);
-                Log("Opened a vault written before the DPAPI entropy; the next save re-protects it with one.");
-                return plain;
-            }
-        }
-
-        /// <summary>
-        /// Extra input mixed into the DPAPI protection, created once and kept beside the vault.
-        /// <para>
-        /// Without it — and it was null — ANY process running as this Windows user could read
-        /// vault.json, base64-decode the payload, call Unprotect with the same null, and get every
-        /// mail password in the clear. That is the price of "unlocks automatically", but it does
-        /// not have to be that cheap: with entropy the attacker needs to have read a second file
-        /// as well, which is the difference between "any code as this user" and "any code as this
-        /// user that also went looking".
-        /// </para>
-        /// <para>
-        /// Machine-bound like the vault itself, so it does NOT travel in the migration bundle:
-        /// importing it would replace the entropy on the target machine and leave whatever vault
-        /// that machine already had protected by a value no longer on disk.
-        /// </para>
-        /// </summary>
-        static byte[] DpapiEntropy()
-        {
-            try
-            {
-                if (File.Exists(EntropyPath)) return File.ReadAllBytes(EntropyPath);
-
-                byte[] fresh = RandomNumberGenerator.GetBytes(KeyBytes);
-                Directory.CreateDirectory(AppPaths.UserData);
-                File.WriteAllBytes(EntropyPath, fresh);
-                Log("Created the vault's DPAPI entropy file.");
-                return fresh;
-            }
-            catch (Exception ex)
-            {
-                // Never fail the vault over this: an unreadable entropy file must leave the user
-                // with a working mailbox, not a locked one. Empty entropy is what the old vaults
-                // were protected with anyway.
-                Log($"Could not read or create the vault entropy, falling back to none: {ex.Message}", LogLevel.Warning);
-                return [];
-            }
-        }
-
         static Dictionary<string, string> secrets = [];
         static byte[]? masterKey;
         static byte[] masterSalt = [];
 
-        /// <summary>True when secrets are readable (DPAPI mode after load, or master mode after a correct unlock).</summary>
+        /// <summary>True when secrets are readable (device-bound mode after load, or master mode after a correct unlock).</summary>
         public static bool IsUnlocked { get; private set; }
 
         /// <summary>True when the vault file exists in master-password mode and has not been unlocked yet.</summary>
@@ -106,7 +44,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         #region Load / unlock
 
-        /// <summary>Loads the vault at startup. DPAPI vaults unlock immediately; master-password vaults wait for <see cref="UnlockWithMasterPassword"/>.</summary>
+        /// <summary>Loads the vault at startup. Device-bound vaults unlock immediately; master-password vaults wait for <see cref="UnlockWithMasterPassword"/>.</summary>
         public static void Load()
         {
             secrets = [];
@@ -118,7 +56,7 @@ namespace MyLovelyMail.MainProject.Stores
             {
                 // Fresh install: an empty vault in the configured mode is unlocked by definition
                 // (nothing to decrypt). Master mode still needs a password before the FIRST save.
-                IsUnlocked = Settings.CredentialVaultMode.Value == VaultMode.Dpapi;
+                IsUnlocked = Settings.CredentialVaultMode.Value == VaultMode.DeviceBound;
                 NeedsMasterPassword = !IsUnlocked;
                 OnVaultStateChanged?.Invoke();
                 return;
@@ -131,14 +69,14 @@ namespace MyLovelyMail.MainProject.Stores
 
                 masterSalt = string.IsNullOrEmpty(file.Salt) ? [] : Convert.FromBase64String(file.Salt);
 
-                if (file.Mode == VaultMode.Dpapi)
+                if (file.Mode == VaultMode.DeviceBound)
                 {
-                    if (!OperatingSystem.IsWindows())
+                    if (!DeviceProtection.IsAvailable)
                     {
-                        Log("DPAPI vault found on a non-Windows platform; it cannot be opened here.", LogLevel.Error);
+                        Log("Device-bound vault found where this platform has no device protection; it cannot be opened here.", LogLevel.Error);
                         return;
                     }
-                    byte[] plain = UnprotectWithOrWithoutEntropy(Convert.FromBase64String(file.Payload));
+                    byte[] plain = DeviceProtection.Unprotect(Convert.FromBase64String(file.Payload));
                     secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? [];
                     IsUnlocked = true;
                 }
@@ -234,15 +172,14 @@ namespace MyLovelyMail.MainProject.Stores
             byte[] plain = JsonSerializer.SerializeToUtf8Bytes(secrets);
 
             string payload;
-            if (mode == VaultMode.Dpapi)
+            if (mode == VaultMode.DeviceBound)
             {
-                if (!OperatingSystem.IsWindows())
+                if (!DeviceProtection.IsAvailable)
                 {
-                    Log("DPAPI vault mode is Windows-only; switch to the master password mode.", LogLevel.Error);
+                    Log("This platform has no device protection for the vault; switch to the master password mode.", LogLevel.Error);
                     return;
                 }
-                payload = Convert.ToBase64String(ProtectedData.Protect(
-                    plain, DpapiEntropy(), DataProtectionScope.CurrentUser));
+                payload = Convert.ToBase64String(DeviceProtection.Protect(plain));
             }
             else
             {
@@ -277,11 +214,11 @@ namespace MyLovelyMail.MainProject.Stores
             SetMasterPassword(newMasterPassword);
         }
 
-        /// <summary>Switches an unlocked vault back to DPAPI. False when locked or not on Windows.</summary>
-        public static bool SwitchToDpapi()
+        /// <summary>Switches an unlocked vault back to device-bound protection. False when locked or when the platform has none.</summary>
+        public static bool SwitchToDeviceBound()
         {
-            if (!IsUnlocked || !OperatingSystem.IsWindows()) return false;
-            Settings.CredentialVaultMode.Set(VaultMode.Dpapi);
+            if (!IsUnlocked || !DeviceProtection.IsAvailable) return false;
+            Settings.CredentialVaultMode.Set(VaultMode.DeviceBound);
             SettingsManager.SaveSettings();
             masterKey = null;
             Save();

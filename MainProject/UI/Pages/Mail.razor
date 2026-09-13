@@ -49,6 +49,9 @@
         }
         else
         {
+            @* A wrapper only the one-pane layout draws: there the accounts and folders scroll sideways
+               as one strip under the logo, while everything else in the sidebar keeps its full width. *@
+            <nav class="mail-sidebar-nav">
             @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
             {
                 @* Side button 4 copies this account's address: the row shows a display name or a
@@ -120,6 +123,7 @@
                     }
                 }
             }
+            </nav>
         }
 
         @* Folder-level results need their own line: the reader's status sits inside the

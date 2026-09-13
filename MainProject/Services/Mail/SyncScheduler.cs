@@ -20,6 +20,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static event Action? OnSyncStateChanged;
 
         /// <summary>
+        /// How the loop waits between two passes. A plain delay by default; Android replaces it with an
+        /// alarm, because a delay cannot wake a sleeping phone and the next pass would wait for whatever
+        /// woke it next.
+        /// </summary>
+        public static Func<TimeSpan, CancellationToken, Task> WaitBetweenPasses = static (interval, cancellationToken) => Task.Delay(interval, cancellationToken);
+
+        /// <summary>
         /// Counted activity scope. Each real sync (account pass, single folder) wraps itself in
         /// this, so the heart/sweep indicators fire no matter WHO triggered the sync. Without the
         /// counter, IDLE-triggered and folder-open syncs ran invisible.
@@ -58,7 +65,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 int minutes = Math.Max(1, Settings.SyncIntervalMinutes.Value);
                 try
                 {
-                    await Task.Delay(TimeSpan.FromMinutes(minutes), cancellationToken);
+                    await WaitBetweenPasses(TimeSpan.FromMinutes(minutes), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {

@@ -53,6 +53,12 @@
         height: @paneHeight;
     }
 
+    /* Invisible to the layout above the one-pane breakpoint: its accounts and folders stay direct
+       rows of the sidebar column. */
+    .mail-sidebar-nav {
+        display: contents;
+    }
+
     .mail-logo {
         display: flex;
         align-items: center;
@@ -867,20 +873,23 @@
         margin-bottom: @(AppMeasures.Space.Px8)px;
     }
 
+    /* Grows to fill the pane but never shrinks below its content: in the phone's full-screen
+       compose a shrinking card clipped the Discard and Send buttons, and the overlay scrolls instead. */
     .mail-compose-card {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
         text-align: left;
-        flex: 1;
+        flex: 1 0 auto;
     }
 
+    /* No min-height: 0 here, for the same reason: with it the 200px body slid under the attachment
+       dropzone. */
     .mail-compose-fields {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
         flex: 1;
-        min-height: 0;
     }
 
     .mail-compose-saved {
@@ -1678,6 +1687,9 @@
             inset: 0;
             z-index: @(AppMeasures.ZLayer.Overlay);
             padding: @(AppMeasures.Space.Medium)px;
+            /* The floating bottom navigation stays on top of the overlay; without this inset the
+               last row of a scrolled-down pane - compose's Send button - sat under it. */
+            padding-bottom: @(AppMeasures.Space.ScrollBottomInset + AppMeasures.Space.Medium)px;
             /* Pinned to the window here, so this one DOES need its own scrollport - the page
                behind it cannot carry an overlay that is taller than the screen. */
             overflow-y: auto;
@@ -1687,18 +1699,46 @@
     }
 
     @@media (max-width: @(AppMeasures.Breakpoint.OnePane)px) {
+        /* The sidebar takes the height it needs and the list gets the rest of the screen. */
         .mail-screen {
             grid-template-columns: 1fr;
+            grid-template-rows: auto minmax(0, 1fr);
         }
 
+        /* Still a column: the whole sidebar as one sideways row squeezed the logo and the welcome
+           card side by side, and the card wrapped one word per line. Only the account and folder
+           rows below become the sideways strip. */
         .mail-sidebar {
-            flex-direction: row;
-            overflow-x: auto;
-            overflow-y: hidden;
+            overflow: visible;
         }
 
-        .mail-folder {
-            padding-left: @(AppMeasures.Space.Px8)px;
+        .mail-sidebar-nav {
+            display: flex;
+            align-items: center;
+            gap: @(AppMeasures.Space.Px4)px;
+            overflow-x: auto;
+            padding-bottom: @(AppMeasures.Space.Px4)px;
         }
+
+            .mail-sidebar-nav > .mail-account,
+            .mail-sidebar-nav > .mail-folder-row {
+                flex: 0 0 auto;
+            }
+
+            .mail-sidebar-nav .mail-folder {
+                padding-left: @(AppMeasures.Space.Px8)px;
+                white-space: nowrap;
+            }
+
+            /* A phone has no hover to reveal a folder's actions, and invisible buttons still take
+               their width in the strip: only the open folder shows them, and shows them outright. */
+            .mail-sidebar-nav .mail-folder-action {
+                display: none;
+            }
+
+            .mail-sidebar-nav .mail-folder-row:has(.mail-folder--active) .mail-folder-action {
+                display: inline-block;
+                opacity: @(AppMeasures.Opacity.Muted);
+            }
     }
 </style>

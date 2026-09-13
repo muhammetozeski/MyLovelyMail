@@ -36,7 +36,7 @@ public static class Logger
     /// <summary>Logs live in AppCache: diagnostic data, safe to delete, never part of the user's own data.</summary>
     public static readonly string LogsFolder = Path.Combine(AppPaths.AppCache, "Logs");
     public const string LogFileNamePrefix = "Log";
-    public readonly static string LogFileName = LogsFolder + "\\" + LogFileNamePrefix + " " + startTime + ".txt";
+    public readonly static string LogFileName = Path.Combine(LogsFolder, LogFileNamePrefix + " " + startTime + ".txt");
 
     // enter -1 to disable
     const int DeleteOlderThanLastXFile = 3;

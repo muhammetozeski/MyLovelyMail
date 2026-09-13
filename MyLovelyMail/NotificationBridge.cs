@@ -1,6 +1,4 @@
 using MyLovelyMail.MainProject.Services;
-using MyLovelyMail.MainProject.Storage;
-using MyLovelyMail.MainProject.Stores;
 #if WINDOWS
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
@@ -43,36 +41,23 @@ namespace MyLovelyMail
                 .AddArgument("folder", toast.FolderFullName)
                 .AddArgument("uid", toast.Uid.ToString());
 
-            // The toast's own audio is always muted; our SoundBridge plays the (possibly
+            // The toast's own audio is always muted; NotificationService plays the (possibly
             // rule-customized) sound instead, so per-rule sounds actually differ.
             builder.MuteAudio();
 
             AppNotificationManager.Default.Show(builder.BuildNotification());
             Logger.Log($"Toast shown: {toast.Title} — {toast.Body}");
-
-            if (!toast.Mute)
-                SoundService.Play(toast.SoundName);
         }
 
         static void HandleNotificationInvoked(object sender, AppNotificationActivatedEventArgs args)
         {
             TrayService.ShowMainWindow();
 
-            if (!args.Arguments.TryGetValue("accountId", out string? accountId)
-                || !args.Arguments.TryGetValue("folder", out string? folderFullName)
-                || !args.Arguments.TryGetValue("uid", out string? uidText)
-                || !uint.TryParse(uidText, out uint uid) || uid == 0)
-                return;
-
-            var account = AccountStore.GetById(accountId);
-            if (account == null) return;
-
-            var summary = MessageStore.GetSummary(accountId, folderFullName, uid);
-            var folder = MessageStore.GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName);
-
-            MailUiState.SelectAccount(account);
-            if (folder != null) MailUiState.SelectFolder(folder);
-            if (summary != null) MailUiState.OpenMessageInReader(summary);
+            if (args.Arguments.TryGetValue("accountId", out string? accountId)
+                && args.Arguments.TryGetValue("folder", out string? folderFullName)
+                && args.Arguments.TryGetValue("uid", out string? uidText)
+                && uint.TryParse(uidText, out uint uid))
+                NotificationService.OpenNotifiedMessage(accountId, folderFullName, uid);
         }
 #endif
     }
