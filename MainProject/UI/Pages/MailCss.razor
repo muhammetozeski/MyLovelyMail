@@ -873,20 +873,23 @@
         margin-bottom: @(AppMeasures.Space.Px8)px;
     }
 
+    /* Grows to fill the pane but never shrinks below its content: in the phone's full-screen
+       compose a shrinking card clipped the Discard and Send buttons, and the overlay scrolls instead. */
     .mail-compose-card {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
         text-align: left;
-        flex: 1;
+        flex: 1 0 auto;
     }
 
+    /* No min-height: 0 here, for the same reason: with it the 200px body slid under the attachment
+       dropzone. */
     .mail-compose-fields {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
         flex: 1;
-        min-height: 0;
     }
 
     .mail-compose-saved {
@@ -1684,6 +1687,9 @@
             inset: 0;
             z-index: @(AppMeasures.ZLayer.Overlay);
             padding: @(AppMeasures.Space.Medium)px;
+            /* The floating bottom navigation stays on top of the overlay; without this inset the
+               last row of a scrolled-down pane - compose's Send button - sat under it. */
+            padding-bottom: @(AppMeasures.Space.ScrollBottomInset + AppMeasures.Space.Medium)px;
             /* Pinned to the window here, so this one DOES need its own scrollport - the page
                behind it cannot carry an overlay that is taller than the screen. */
             overflow-y: auto;
