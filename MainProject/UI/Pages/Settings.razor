@@ -325,18 +325,17 @@
                 <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
             </div>
         </div>
-        @* Both rows are about running a tor of the app's own, which cannot happen on a platform
-           that will not let an app execute another package's binary. Showing them there offers a
-           switch that does nothing and a path box nothing will ever match. *@
-        @if (TorProcess.CanStartHere)
-        {
-            <div class="settings-row">
-                <div class="settings-row-text">
-                    <span class="settings-row-label">Start Tor when none is running</span>
-                    <span class="settings-row-hint">Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.</span>
-                </div>
-                <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Start Tor when none is running</span>
+                <span class="settings-row-hint">@TorAutoStartHint</span>
             </div>
+            <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
+        </div>
+        @* Only where the app searches for a tor. The Android app runs the one inside its own package,
+           and no path typed here could point at anything Android would let it execute. *@
+        @if (TorProcess.BundledExecutablePath == null)
+        {
             <div class="settings-row">
                 <div class="settings-row-text">
                     <span class="settings-row-label">Tor executable</span>
@@ -344,15 +343,6 @@
                 </div>
                 <div class="settings-number settings-number--wide">
                     <CoreInput Placeholder="(searched automatically)" Value="@GlobalSettings.TorExecutablePath.Value" ValueChanged="@SetTorExecutable" />
-                </div>
-            </div>
-        }
-        else
-        {
-            <div class="settings-row">
-                <div class="settings-row-text">
-                    <span class="settings-row-label">Running Tor here</span>
-                    <span class="settings-row-hint">@TorProcess.OrbotAdvice</span>
                 </div>
             </div>
         }
@@ -673,8 +663,13 @@
         [.. AccountStore.Accounts.Where(static a => a.TorOnly).Select(static a => a.EmailAddress)];
 
     static string TorExecutableLine =>
-        !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
-        : TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+        TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
+
+    /// <summary>Where the app carries its own tor, that tor comes first and a running Orbot is the fallback; elsewhere a running tor comes first.</summary>
+    static string TorAutoStartHint =>
+        TorProcess.BundledExecutablePath != null
+            ? "Runs the tor inside the app on a free port, before any tor that is already running such as Orbot. Off leaves Tor-only accounts to a tor that is already running."
+            : "Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.";
 
     /// <summary>The setting stores separator-joined lines; the box shows real ones.</summary>
     static string BridgeText =>

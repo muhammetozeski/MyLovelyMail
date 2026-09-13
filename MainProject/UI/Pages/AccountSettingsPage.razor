@@ -264,9 +264,8 @@
         TorService.BootstrapLine is { } starting ? starting
         : LastRouteOfThisAccount is { } carried ? $"Last connection went {carried}."
         : TorService.Current is { } endpoint ? $"Route in use: {endpoint}."
-        : !TorProcess.CanStartHere ? TorProcess.OrbotAdvice
         : TorProcess.Find() is { } executable ? $"No route open yet — one will be started from {executable.Path} on the next connection."
-        : "⚠️ No tor executable was found on this machine. Install Tor or the Tor Browser, or set TorExecutablePath in Settings.";
+        : $"⚠️ {TorProcess.MissingExecutableAdvice}";
 
     /// <summary>The route the last successful connection of THIS account actually took, or null before one.</summary>
     string? LastRouteOfThisAccount =>

@@ -11,11 +11,12 @@ namespace MyLovelyMail.MainProject.Services.Tor
     public sealed record TorExecutable(string Path, string FoundBy);
 
     /// <summary>
-    /// Finds a tor executable on this machine and runs one under the app's own data directory.
+    /// Finds a tor executable and runs one under the app's own data directory.
     /// <para>
-    /// The app never installs Tor. If the machine has none this class finds none and says so — a
-    /// Tor-only account then refuses to connect rather than quietly using the open network, which
-    /// is the entire point of marking it Tor-only.
+    /// On Windows the app never installs Tor. If the machine has none this class finds none and says
+    /// so — a Tor-only account then refuses to connect rather than quietly using the open network,
+    /// which is the entire point of marking it Tor-only. On Android the app carries its own tor in
+    /// its package (<see cref="BundledExecutablePath"/>), so there is nothing to search for.
     /// </para>
     /// </summary>
     public static partial class TorProcess
@@ -67,22 +68,29 @@ namespace MyLovelyMail.MainProject.Services.Tor
         #region Finding an executable
 
         /// <summary>
-        /// Whether this app can run a tor of its own here at all. False on Android, where an app
-        /// cannot execute an arbitrary binary from another package: every candidate path is a miss,
-        /// every search is wasted, and every status line ends up telling a phone user to install
-        /// the Tor Browser. What actually works there is Orbot's SOCKS listener on 9050, which
-        /// <see cref="TorService"/> already tries as the system-daemon candidate — the user just
-        /// had no way to learn that from the app.
-        /// <para>
-        /// Settable so both branches can be exercised on one machine; nothing but a test assigns it.
-        /// </para>
+        /// The tor that ships inside the app package, or null where the app looks for a tor already on
+        /// the machine. Android fills it in with libtor.so from the native library directory, because an
+        /// app there cannot run a binary it did not bring; the user's own tor is Orbot, which
+        /// <see cref="TorService"/> uses only when this one cannot start.
         /// </summary>
-        public static bool CanStartHere { get; set; } = !OperatingSystem.IsAndroid();
+        public static string? BundledExecutablePath { get; } = ResolveBundledExecutablePath();
 
-        /// <summary>What to do instead, on a platform where this app cannot start one.</summary>
-        public const string OrbotAdvice =
-            "This app cannot start Tor on Android. Install Orbot, start it, and leave it running — "
-            + "it listens on 127.0.0.1:9050, which this app finds by itself.";
+        static string? ResolveBundledExecutablePath()
+        {
+            string? path = null;
+            ResolveBundledExecutable(ref path);
+            return path;
+        }
+
+        /// <summary>Implemented by a platform that carries its own tor; the others leave the path null.</summary>
+        /// <param name="path">Set to the full path of the bundled executable.</param>
+        static partial void ResolveBundledExecutable(ref string? path);
+
+        /// <summary>What to tell the user when <see cref="Find"/> finds nothing: the start error and every status line say the same.</summary>
+        public static string MissingExecutableAdvice => BundledExecutablePath is { } missing
+            ? $"The tor that ships inside the app is missing from {missing}; reinstalling the app puts it back."
+            : "No tor executable was found. Install Tor (or the Tor Browser) and, if it lives somewhere unusual, "
+              + "put its full path in the TorExecutablePath setting.";
 
         /// <summary>File name of the tor binary on each platform this app is built for.</summary>
         static string ExecutableName => OperatingSystem.IsWindows() ? "tor.exe" : "tor";
@@ -105,8 +113,9 @@ namespace MyLovelyMail.MainProject.Services.Tor
         static readonly TimeSpan MissingRecheckInterval = TimeSpan.FromSeconds(30);
 
         /// <summary>
-        /// The first tor executable that exists, most explicit first: the setting, then PATH, then
-        /// the places the usual Windows installs put one. Returns null when the machine has none.
+        /// The tor bundled with the app where there is one; otherwise the first tor executable that
+        /// exists, most explicit first: the setting, then PATH, then the places the usual Windows
+        /// installs put one. Returns null when there is none.
         /// <para>
         /// The answer is remembered until the TorExecutablePath setting changes or the file behind
         /// it goes away, so this is cheap enough to call from a render.
@@ -114,10 +123,10 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </summary>
         public static TorExecutable? Find()
         {
-            // No search at all where none could succeed: the walk over PATH and the Tor Browser
-            // locations is pure cost on Android, and its "no tor executable was found" warning
-            // repeats every 30 seconds once the miss expires.
-            if (!CanStartHere) return null;
+            // A tor in the package is the answer by definition, and neither the setting nor PATH can
+            // point at anything an Android app would be allowed to run.
+            if (BundledExecutablePath is { } bundled)
+                return File.Exists(bundled) ? new TorExecutable(bundled, "the app package") : null;
 
             string settingKey = Settings.TorExecutablePath.Value;
             lock (searchGate)
@@ -247,9 +256,6 @@ namespace MyLovelyMail.MainProject.Services.Tor
             // candidate was being verified — VerifyAsync answers with a verdict rather than
             // throwing, so the cancellation is not noticed until something asks. Launching a tor
             // process for that operation and then throwing leaves a tor nobody asked for.
-            if (!CanStartHere)
-                throw new TorUnavailableException(OrbotAdvice, recoverable: false);
-
             cancellationToken.ThrowIfCancellationRequested();
 
             int myStopGeneration;
@@ -269,9 +275,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             // on the next sync pass and forever in the IDLE loop — minutes of spinner and a log
             // full of route reports for an answer that was knowable at once and cannot change
             // until the user installs something.
-            var executable = Find() ?? throw new TorUnavailableException(
-                "No tor executable was found. Install Tor (or the Tor Browser) and, if it lives somewhere unusual, " +
-                "put its full path in the TorExecutablePath setting.", recoverable: false);
+            var executable = Find() ?? throw new TorUnavailableException(MissingExecutableAdvice, recoverable: false);
 
             int socksPort = FindFreePort();
             Directory.CreateDirectory(DataDirectory);
