@@ -229,6 +229,24 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { selected = folder != null, folder = folder?.FullName, requested = wanted };
                 }
 
+                // Shows a made-up new-mail notification through the real presenter and sound, so the
+                // notification path can be checked on a device whose accounts have no fresh mail.
+                // Give accountId, folder and uid of a cached message to test what a tap opens.
+                case ("POST", "/notify/probe"):
+                {
+                    var toast = new MailToast
+                    {
+                        Title = query["title"] ?? "Probe sender",
+                        Body = query["body"] ?? "Probe subject",
+                        SoundName = query["sound"] ?? "default",
+                        AccountId = query["accountId"] ?? string.Empty,
+                        FolderFullName = ReadFolder(query),
+                        Uid = uint.TryParse(query["uid"], out uint probeUid) ? probeUid : 0
+                    };
+                    NotificationService.Present(toast);
+                    return new { presenterRegistered = NotificationService.Presenter != null, toast.Title, toast.Body, toast.Uid };
+                }
+
                 // ?dry=true measures without deleting, which is the only safe way to check the
                 // budget stage against a real cache. GET returns the persisted receipt instead.
                 case ("POST", "/trim"):

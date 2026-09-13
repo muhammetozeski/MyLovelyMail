@@ -64,9 +64,19 @@ namespace MyLovelyMail.MainProject.Services
                 Uid = single?.Uid ?? 0
             };
 
+            Present(toast);
+        }
+
+        /// <summary>
+        /// Shows one toast through the platform presenter and plays its sound unless it is muted. Whether
+        /// to notify at all is decided before this; the debug API calls it directly to show a probe.
+        /// </summary>
+        /// <param name="toast">The finished notification.</param>
+        internal static void Present(MailToast toast)
+        {
             try
             {
-                Presenter(toast);
+                Presenter?.Invoke(toast);
             }
             catch (Exception ex)
             {
