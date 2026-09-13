@@ -1,11 +1,26 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- net10.0 is what the Windows and Web heads consume. net10.0-android is the same library plus
+         the Platforms\Android folder, and only the Android head consumes it. -->
+    <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MyLovelyMail.MainProject</RootNamespace>
   </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <!-- Android 11. Writing into the shared Download folder by path and typed foreground services both
+         exist on every version from here on, so the Android code carries no older-version branches. -->
+    <SupportedOSPlatformVersion>30.0</SupportedOSPlatformVersion>
+    <!-- Resources\Fonts are web fonts for the Blazor UI, not Android resources. -->
+    <EnableDefaultAndroidItems>false</EnableDefaultAndroidItems>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'">
+    <Compile Remove="Platforms\Android\**" />
+    <None Include="Platforms\Android\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <SupportedPlatform Include="browser" />
