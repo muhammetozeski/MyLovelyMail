@@ -53,6 +53,12 @@
         height: @paneHeight;
     }
 
+    /* Invisible to the layout above the one-pane breakpoint: its accounts and folders stay direct
+       rows of the sidebar column. */
+    .mail-sidebar-nav {
+        display: contents;
+    }
+
     .mail-logo {
         display: flex;
         align-items: center;
@@ -1687,18 +1693,46 @@
     }
 
     @@media (max-width: @(AppMeasures.Breakpoint.OnePane)px) {
+        /* The sidebar takes the height it needs and the list gets the rest of the screen. */
         .mail-screen {
             grid-template-columns: 1fr;
+            grid-template-rows: auto minmax(0, 1fr);
         }
 
+        /* Still a column: the whole sidebar as one sideways row squeezed the logo and the welcome
+           card side by side, and the card wrapped one word per line. Only the account and folder
+           rows below become the sideways strip. */
         .mail-sidebar {
-            flex-direction: row;
-            overflow-x: auto;
-            overflow-y: hidden;
+            overflow: visible;
         }
 
-        .mail-folder {
-            padding-left: @(AppMeasures.Space.Px8)px;
+        .mail-sidebar-nav {
+            display: flex;
+            align-items: center;
+            gap: @(AppMeasures.Space.Px4)px;
+            overflow-x: auto;
+            padding-bottom: @(AppMeasures.Space.Px4)px;
         }
+
+            .mail-sidebar-nav > .mail-account,
+            .mail-sidebar-nav > .mail-folder-row {
+                flex: 0 0 auto;
+            }
+
+            .mail-sidebar-nav .mail-folder {
+                padding-left: @(AppMeasures.Space.Px8)px;
+                white-space: nowrap;
+            }
+
+            /* A phone has no hover to reveal a folder's actions, and invisible buttons still take
+               their width in the strip: only the open folder shows them, and shows them outright. */
+            .mail-sidebar-nav .mail-folder-action {
+                display: none;
+            }
+
+            .mail-sidebar-nav .mail-folder-row:has(.mail-folder--active) .mail-folder-action {
+                display: inline-block;
+                opacity: @(AppMeasures.Opacity.Muted);
+            }
     }
 </style>
