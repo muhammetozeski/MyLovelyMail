@@ -26,12 +26,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         public static MailboxExportResult ExportFolder(MailAccountData account, string folderFullName)
         {
-            string path = AttachmentService.UniquePath(
-                AttachmentService.DownloadsFolder(),
+            string writtenPath = AttachmentService.UniquePath(
+                UserDownloads.WriteFolder,
                 AttachmentService.SafeFileStem(folderFullName, "mailbox") + Extension);
 
             int written = 0, skipped = 0;
-            using (var file = File.Create(path))
+            using (var file = File.Create(writtenPath))
             {
                 // Oldest first: mbox is an append-ordered format and readers show it in file order.
                 foreach (var summary in MessageStore.GetSummaries(account.Id, folderFullName).OrderBy(static s => s.DateUtc))
@@ -52,7 +52,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
             }
 
-            Log($"Exported '{folderFullName}' as mbox: {written} message(s) written, {skipped} without a cached body.");
+            string path = UserDownloads.Publish(writtenPath);
+            Log($"Exported '{folderFullName}' as mbox to {path}: {written} message(s) written, {skipped} without a cached body.");
             return new MailboxExportResult(path, written, skipped);
         }
 

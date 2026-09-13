@@ -5,7 +5,7 @@ using MyLovelyMail.MainProject.Storage;
 namespace MyLovelyMail.MainProject.Services.Mail
 {
     /// <summary>
-    /// Saves an opened message to the Downloads folder: .eml is the cached raw MIME byte-for-byte,
+    /// Saves an opened message to the user's downloads (<see cref="UserDownloads"/>): .eml is the cached raw MIME byte-for-byte,
     /// .html is the sanitized rendered body (remote images allowed — the snapshot should be whole)
     /// with a From/To/Date/Subject header block on top. The .html doubles as the print path:
     /// open it in a browser and Ctrl+P. Both require the body to be cached, which opening the
@@ -18,9 +18,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             byte[] mimeBytes = MessageStore.TryLoadFullMessage(account.Id, folderFullName, summary.Uid)
                 ?? throw new InvalidOperationException("The message body is not cached yet.");
-            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(),
+            string written = AttachmentService.UniquePath(UserDownloads.WriteFolder,
                 AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".eml");
-            File.WriteAllBytes(path, mimeBytes);
+            File.WriteAllBytes(written, mimeBytes);
+            string path = UserDownloads.Publish(written);
             Log($"Exported uid {summary.Uid} as eml: {path}");
             return path;
         }
@@ -39,9 +40,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 $"<div><b>Date:</b> {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}</div>" +
                 $"<div><b>Subject:</b> {WebUtility.HtmlEncode(summary.Subject)}</div></div>";
 
-            string path = AttachmentService.UniquePath(AttachmentService.DownloadsFolder(),
+            string written = AttachmentService.UniquePath(UserDownloads.WriteFolder,
                 AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".html");
-            File.WriteAllText(path, headerBlock + rendered.Html);
+            File.WriteAllText(written, headerBlock + rendered.Html);
+            string path = UserDownloads.Publish(written);
             Log($"Exported uid {summary.Uid} as html: {path}");
             return path;
         }

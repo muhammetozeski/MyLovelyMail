@@ -8,9 +8,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
     public sealed record AttachmentInfo(int Index, string FileName, string MimeType, string HumanSize);
 
     /// <summary>
-    /// Lists and extracts attachments from the cached MIME of a message. Files land in the
-    /// user's Downloads folder (name collisions get " (2)" style suffixes); "save all" puts
-    /// every part into a subfolder named after the subject.
+    /// Lists and extracts attachments from the cached MIME of a message. Files land where
+    /// <see cref="UserDownloads"/> puts saves (name collisions get " (2)" style suffixes); "save all"
+    /// puts every part into a subfolder named after the subject.
     /// </summary>
     public static class AttachmentService
     {
@@ -37,7 +37,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ? part.FileName ?? $"attachment-{index + 1}"
                 : ((MessagePart)attachment).Message?.Subject is { Length: > 0 } subject ? subject + ".eml" : $"message-{index + 1}.eml";
 
-        /// <summary>Decodes one attachment into the Downloads folder and returns the saved path.</summary>
+        /// <summary>Decodes one attachment into the user's downloads and returns where it landed.</summary>
         public static async Task<string> SaveAsync(MailAccountData account, string folderFullName, MailMessageSummary summary, int attachmentIndex)
         {
             var message = TryLoadMessage(account, folderFullName, summary)
@@ -45,18 +45,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var attachment = message.Attachments.ElementAtOrDefault(attachmentIndex)
                 ?? throw new InvalidOperationException("Attachment not found in the message.");
 
-            string target = UniquePath(DownloadsFolder(), DisplayName(attachment, attachmentIndex));
+            string target = UniquePath(UserDownloads.WriteFolder, DisplayName(attachment, attachmentIndex));
             await WriteEntityAsync(attachment, target);
-            return target;
+            return UserDownloads.Publish(target);
         }
 
-        /// <summary>Saves every attachment into Downloads\&lt;subject&gt;\ and returns that folder.</summary>
+        /// <summary>Saves every attachment into a &lt;subject&gt; folder in the user's downloads and returns where that folder landed.</summary>
         public static async Task<string> SaveAllAsync(MailAccountData account, string folderFullName, MailMessageSummary summary)
         {
             var message = TryLoadMessage(account, folderFullName, summary)
                 ?? throw new InvalidOperationException("The message is not cached yet.");
 
-            string targetFolder = Path.Combine(DownloadsFolder(), SafeFileStem(summary.Subject, "attachments"));
+            string targetFolder = Path.Combine(UserDownloads.WriteFolder, SafeFileStem(summary.Subject, "attachments"));
             Directory.CreateDirectory(targetFolder);
 
             int index = 0;
@@ -65,7 +65,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await WriteEntityAsync(attachment, UniquePath(targetFolder, DisplayName(attachment, index)));
                 index++;
             }
-            return targetFolder;
+            return UserDownloads.Publish(targetFolder);
         }
 
         static MimeMessage? TryLoadMessage(MailAccountData account, string folderFullName, MailMessageSummary summary)
@@ -95,13 +95,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 await inner.WriteToAsync(output);
             }
-        }
-
-        /// <summary>Shared by attachment saves and message exports (MessageExportService).</summary>
-        internal static string DownloadsFolder()
-        {
-            string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            return Directory.Exists(downloads) ? downloads : AppPaths.UserData;
         }
 
         /// <summary>Filesystem-safe stem from <paramref name="text"/> (invalid chars become "_", capped at 60 chars); <paramref name="fallback"/> replaces an empty text. Shared with MessageExportService.</summary>
