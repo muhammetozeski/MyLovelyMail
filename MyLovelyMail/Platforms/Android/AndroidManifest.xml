@@ -2,8 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- allowBackup off: Android's cloud backup would upload the account list, the settings and the
          cached mail - including which servers a Tor-only account talks to - to the phone's Google
-         account, and the vault inside it could not be opened on another phone anyway. -->
-    <application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
+         account, and the vault inside it could not be opened on another phone anyway.
+         extractNativeLibs on: the bundled tor is an executable that has to exist as a file in the
+         native library directory; left inside the APK it cannot be started. -->
+    <application android:allowBackup="false" android:extractNativeLibs="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

@@ -26,6 +26,8 @@
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <Compile Remove="Platforms\Windows\**" />
     <None Include="Platforms\Windows\**" />
+    <!-- The tor the Android app starts itself; see Platforms\Android\Tor\README.md. -->
+    <AndroidNativeLibrary Include="Platforms\Android\Tor\arm64-v8a\libtor.so" Abi="arm64-v8a" />
   </ItemGroup>
 
   <ItemGroup>
