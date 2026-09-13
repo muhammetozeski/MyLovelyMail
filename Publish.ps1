@@ -20,7 +20,7 @@ dotnet publish $WebCsproj -c Release -o "$PublishDir\Web"
 $WindowsRids = @("win-x64", "win-x86", "win-arm64")
 foreach ($rid in $WindowsRids) {
     Write-Host "Publishing Windows / $rid..." -ForegroundColor Cyan
-    dotnet publish $MauiCsproj -f net10.0-windows10.0.19041.0 -r $rid -c Release -o "$PublishDir\Windows\$rid"
+    dotnet publish $MauiCsproj -f net10.0-windows10.0.19041.0 -r $rid -c Release -p:SkipAndroidTargets=true -o "$PublishDir\Windows\$rid"
 }
 
 # ── Android ──

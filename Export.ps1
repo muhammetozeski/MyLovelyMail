@@ -52,7 +52,7 @@ if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 Write-Host "Publishing $Tfm / $Rid ($versionTag) into staging..." -ForegroundColor Cyan
 # --self-contained is explicit: since SDK 6, -r alone no longer implies it, and without it the
 # deploy silently becomes framework-dependent (breaks on machines without the .NET runtime).
-dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained true -o $staging
+dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained true -p:SkipAndroidTargets=true -o $staging
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 if (-not (Test-Path "$staging\MyLovelyMail.exe")) { throw "Published exe not found in staging." }
 

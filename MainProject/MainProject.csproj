@@ -3,7 +3,9 @@
   <PropertyGroup>
     <!-- net10.0 is what the Windows and Web heads consume. net10.0-android is the same library plus
          the Platforms\Android folder, and only the Android head consumes it. -->
-    <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <!-- Dropped by SkipAndroidTargets=true, which the Windows publishes pass; see MyLovelyMail.csproj for why. -->
+    <TargetFrameworks Condition="'$(SkipAndroidTargets)' != 'true'">$(TargetFrameworks);net10.0-android</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MyLovelyMail.MainProject</RootNamespace>

@@ -122,7 +122,7 @@ foreach ($stage in $stages) {
     $appData = Join-Path $stageRoot 'AppData'
     if (Test-Path $stageRoot) { Remove-Item -Recurse -Force $stageRoot }
     Write-Host "Publishing $($stage.Name) (self-contained=$($stage.SelfContained))..." -ForegroundColor Cyan
-    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -o $appData
+    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -p:SkipAndroidTargets=true -o $appData
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
     if (-not (Test-Path "$appData\$ProjectName.exe")) { throw "Published exe missing in $appData." }
 

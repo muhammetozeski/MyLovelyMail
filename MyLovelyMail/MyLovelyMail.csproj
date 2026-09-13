@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <!-- SkipAndroidTargets=true drops the Android target framework here and in MainProject. A Windows
+         publish passes -r win-x64, a global property, and restore evaluates every target framework with it:
+         the Android one, which runs on Mono, then asks NuGet for Microsoft.NETCore.App.Runtime.Mono.win-x64,
+         which .NET 10 does not publish, and the Windows publish fails with NU1102. -->
+    <TargetFrameworks Condition="'$(SkipAndroidTargets)' != 'true'">net10.0-android</TargetFrameworks>
     <!--<TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>-->
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
