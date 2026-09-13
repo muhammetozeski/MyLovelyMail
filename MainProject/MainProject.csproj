@@ -17,9 +17,15 @@
     <EnableDefaultAndroidItems>false</EnableDefaultAndroidItems>
   </PropertyGroup>
 
+  <!-- Each platform folder compiles only into its own target: Platforms\Windows into net10.0, which the
+       Windows head runs, and Platforms\Android into net10.0-android. -->
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'">
     <Compile Remove="Platforms\Android\**" />
     <None Include="Platforms\Android\**" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <Compile Remove="Platforms\Windows\**" />
+    <None Include="Platforms\Windows\**" />
   </ItemGroup>
 
   <ItemGroup>
