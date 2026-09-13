@@ -62,9 +62,10 @@ namespace MyLovelyMail
         static partial void OnStartupBegin();
 
         /// <summary>
-        /// Hands MainProject the pieces only the platform can provide: the theme and motion probes, the
-        /// new-mail notification presenter, the sound player and the vault's device protection. Settings
-        /// are loaded by now; the theme and the stores are not, because both read what is set here.
+        /// Hands MainProject the pieces only the platform can provide — the theme and motion probes, the
+        /// new-mail notification presenter, the sound player, the way the sync loop waits — and starts
+        /// whatever the platform needs to keep checking mail in the background. Settings are loaded by
+        /// now; the theme, the stores and the sync loop are not, because all three read what is set here.
         /// </summary>
         static partial void RegisterPlatformServices();
 

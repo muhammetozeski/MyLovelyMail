@@ -8,7 +8,7 @@ namespace MyLovelyMail
     {
         /// <summary>
         /// The phone's dark theme and animation switch, new-mail notifications, the notification sound
-        /// player, and the foreground service that keeps the sync loop running.
+        /// player, the alarm the sync loop waits on, and the foreground service that keeps it running.
         /// </summary>
         static partial void RegisterPlatformServices()
         {
@@ -17,6 +17,7 @@ namespace MyLovelyMail
             MailNotifications.CreateChannel();
             NotificationService.Presenter = MailNotifications.Show;
             SoundService.Player = static soundName => _ = NotificationSoundPlayer.PlayAsync(soundName);
+            SyncScheduler.WaitBetweenPasses = SyncAlarm.WaitAsync;
             MailSyncService.Start();
         }
     }
