@@ -1,5 +1,4 @@
 using MyLovelyMail.MainProject.Services;
-using MyLovelyMail.MainProject.Storage;
 #if WINDOWS
 using Windows.Media.Core;
 using Windows.Media.Playback;
@@ -8,9 +7,9 @@ using Windows.Media.Playback;
 namespace MyLovelyMail
 {
     /// <summary>
-    /// Windows player for <see cref="SoundService"/>: bundled wav assets are extracted once into
-    /// AppCache and played through a cached WinRT MediaPlayer. Unknown sound names fall back to
-    /// the success sound; every failure logs and is swallowed — audio must never crash mail flow.
+    /// Windows player for <see cref="SoundService"/>: the bundled wav that <see cref="SoundService.ExtractToCacheAsync"/>
+    /// copies into AppCache, played through a cached WinRT MediaPlayer. Every failure logs and is
+    /// swallowed — audio must never crash mail flow.
     /// </summary>
     public static class SoundBridge
     {
@@ -28,21 +27,7 @@ namespace MyLovelyMail
         {
             try
             {
-                // The user rejected the old long success.wav outright — nothing maps to it anymore.
-                string fileName = soundName.ToLowerInvariant() switch
-                {
-                    "spin" => "spin.wav",
-                    _ => "notify.wav"
-                };
-
-                string cachedPath = Path.Combine(AppPaths.AppCache, "Sounds", fileName);
-                if (!File.Exists(cachedPath))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(cachedPath)!);
-                    using var packaged = await FileSystem.OpenAppPackageFileAsync($"Sounds/{fileName}");
-                    await using var output = File.Create(cachedPath);
-                    await packaged.CopyToAsync(output);
-                }
+                string cachedPath = await SoundService.ExtractToCacheAsync(soundName, static packagePath => FileSystem.OpenAppPackageFileAsync(packagePath));
 
                 cachedPlayer ??= new MediaPlayer();
                 cachedPlayer.Source = MediaSource.CreateFromUri(new Uri(cachedPath));
