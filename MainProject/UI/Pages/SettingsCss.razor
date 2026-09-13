@@ -28,8 +28,11 @@
         margin-bottom: @(AppMeasures.Space.Px12)px;
     }
 
+    /* Wraps when the controls and a readable text column do not fit side by side: on a phone the
+       three density buttons squeezed the label to one word per line. */
     .settings-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: @(AppMeasures.Space.Px16)px;
@@ -46,6 +49,7 @@
         flex-direction: column;
         gap: @(AppMeasures.Space.Px2)px;
         min-width: 0;
+        flex: 1 1 @(AppMeasures.Size.Px140)px;
     }
 
     .settings-row-label {
@@ -114,15 +118,18 @@
         line-height: 1.5;
     }
 
+    /* Wraps when both do not fit: on a phone the second box or button slid past the card's right edge. */
     .settings-vault-switch {
         display: flex;
+        flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px12)px;
         align-items: center;
         margin-top: @(AppMeasures.Space.Px8)px;
     }
 
         .settings-vault-switch > :first-child {
-            flex: 1;
+            flex: 1 1 @(AppMeasures.Size.Px200)px;
+            min-width: 0;
         }
 
     .settings-migration-actions {
