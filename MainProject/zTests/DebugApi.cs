@@ -247,6 +247,22 @@ namespace MyLovelyMail.MainProject.ZTests
                     return new { presenterRegistered = NotificationService.Presenter != null, toast.Title, toast.Body, toast.Uid };
                 }
 
+                // Saves a small text file the way attachments and exports are saved, so the path from
+                // the write folder to where the user finds downloads can be checked without a message.
+                case ("POST", "/downloads/probe"):
+                {
+                    string written = AttachmentService.UniquePath(UserDownloads.WriteFolder, query["name"] ?? "download-probe.txt");
+                    File.WriteAllText(written, $"Download probe written {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    return new { writeFolder = UserDownloads.WriteFolder, written, location = UserDownloads.Publish(written) };
+                }
+
+                // Hands a link to the platform's default handler exactly as the unsubscribe chip does.
+                case ("POST", "/link/open"):
+                {
+                    bool opened = ExternalLinkService.TryOpen(RequireQueryValue(query, "url"), out string failureReason);
+                    return new { opened, failureReason };
+                }
+
                 // ?dry=true measures without deleting, which is the only safe way to check the
                 // budget stage against a real cache. GET returns the persisted receipt instead.
                 case ("POST", "/trim"):
