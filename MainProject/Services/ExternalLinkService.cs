@@ -7,7 +7,7 @@ namespace MyLovelyMail.MainProject.Services
     /// links the app must never follow on its own, so every caller has to be a deliberate user
     /// action; keeping the shell call here means that rule is auditable from a single file.
     /// </summary>
-    public static class ExternalLinkService
+    public static partial class ExternalLinkService
     {
         /// <summary>Schemes the app is willing to hand over. Anything else (file:, javascript:, …) is refused.</summary>
         static readonly string[] AllowedSchemes = ["http", "https", "mailto"];
@@ -43,7 +43,11 @@ namespace MyLovelyMail.MainProject.Services
 
             try
             {
-                Process.Start(new ProcessStartInfo(target.AbsoluteUri) { UseShellExecute = true });
+                bool handedOver = false;
+                OpenOnPlatform(target, ref handedOver);
+                if (!handedOver)
+                    Process.Start(new ProcessStartInfo(target.AbsoluteUri) { UseShellExecute = true });
+
                 failureReason = string.Empty;
                 Log($"Opened an external {target.Scheme} link in the default handler.");
                 return true;
@@ -55,5 +59,13 @@ namespace MyLovelyMail.MainProject.Services
                 return false;
             }
         }
+
+        /// <summary>
+        /// Implemented by a platform whose default handler is not reached through a shell execute; on
+        /// Android that is a view intent. A failure is thrown, and reported by the caller like the shell's.
+        /// </summary>
+        /// <param name="target">The already vetted absolute URL.</param>
+        /// <param name="handedOver">Set to true once the platform took the link.</param>
+        static partial void OpenOnPlatform(Uri target, ref bool handedOver);
     }
 }
