@@ -75,7 +75,7 @@ namespace MyLovelyMail.MainProject.Stores
                     // machine already had protected with a value no longer on disk. The portable
                     // vault carries the secrets, so nothing is lost by leaving it behind.
                     if (relative.Equals(CredentialVault.VaultFileName, StringComparison.OrdinalIgnoreCase)
-                        || relative.Equals(CredentialVault.DpapiEntropyFileName, StringComparison.OrdinalIgnoreCase))
+                        || DeviceProtection.MachineBoundFileNames.Contains(relative, StringComparer.OrdinalIgnoreCase))
                         continue;
                     archive.CreateEntryFromFile(file, relative.Replace('\\', '/'));
                 }

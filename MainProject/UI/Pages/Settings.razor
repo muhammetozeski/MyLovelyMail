@@ -260,8 +260,8 @@
         <div class="settings-section-title">🔐 Vault protection</div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Current mode: @(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Windows account (DPAPI)" : "Master password (AES)")</span>
-                <span class="settings-row-hint">@(GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi ? "Unlocks automatically on this Windows account; not portable to other machines." : "Portable, but asks for the master password.")</span>
+                <span class="settings-row-label">Current mode: @(GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound ? DeviceProtection.DisplayName : "Master password (AES)")</span>
+                <span class="settings-row-hint">@(GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound ? DeviceProtection.Description : "Portable, but asks for the master password.")</span>
             </div>
             @if (GlobalSettings.CredentialVaultMode.Value == VaultMode.MasterPassword && CredentialVault.IsUnlocked)
             {
@@ -272,7 +272,7 @@
         {
             <p class="settings-empty-text">Unlock the vault to change its protection mode.</p>
         }
-        else if (GlobalSettings.CredentialVaultMode.Value == VaultMode.Dpapi)
+        else if (GlobalSettings.CredentialVaultMode.Value == VaultMode.DeviceBound)
         {
             <div class="settings-row">
                 <div class="settings-row-text">
@@ -289,10 +289,10 @@
         {
             <div class="settings-row">
                 <div class="settings-row-text">
-                    <span class="settings-row-label">Switch back to Windows account (DPAPI)</span>
-                    <span class="settings-row-hint">No more password prompts on this machine</span>
+                    <span class="settings-row-label">Switch back to @DeviceProtection.DisplayName</span>
+                    <span class="settings-row-hint">No more password prompts on this device</span>
                 </div>
-                <SecondaryButton OnClick="@SwitchVaultToDpapi">🔁 Switch</SecondaryButton>
+                <SecondaryButton OnClick="@SwitchVaultToDeviceBound">🔁 Switch</SecondaryButton>
             </div>
         }
     </GlassCard>
@@ -792,7 +792,7 @@
         NewMasterPassword = string.Empty;
     }
 
-    static void SwitchVaultToDpapi() => CredentialVault.SwitchToDpapi();
+    static void SwitchVaultToDeviceBound() => CredentialVault.SwitchToDeviceBound();
 
     void RemoveAccount(string accountId)
     {

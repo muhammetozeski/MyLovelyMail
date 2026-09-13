@@ -29,7 +29,10 @@ namespace MyLovelyMail.MainProject.Stores
     /// <summary>How the credential vault encrypts stored passwords.</summary>
     public enum VaultMode
     {
-        Dpapi,
+        /// <summary>Bound to this device through <see cref="DeviceProtection"/>: DPAPI on Windows, the Android Keystore on a phone.</summary>
+        DeviceBound,
+
+        /// <summary>AES-GCM under a key derived from a password the user types at every start.</summary>
         MasterPassword
     }
 
@@ -187,7 +190,7 @@ namespace MyLovelyMail.MainProject.Stores
         // ---- Security ----
 
         /// <summary>How the credential vault encrypts account passwords on disk.</summary>
-        public static readonly Setting<VaultMode> CredentialVaultMode = new(VaultMode.Dpapi);
+        public static readonly Setting<VaultMode> CredentialVaultMode = new(VaultMode.DeviceBound);
 
         // ---- Tor ----
         // These describe how to REACH Tor. Whether an account may only speak through it is the
