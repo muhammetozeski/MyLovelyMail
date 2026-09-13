@@ -12,6 +12,7 @@ $SlnDir = $PSScriptRoot
 $ProjectName = Split-Path $PSScriptRoot -Leaf
 $MauiCsproj = Join-Path $SlnDir "$ProjectName\$ProjectName.csproj"
 $Tfm = 'net10.0-windows10.0.19041.0'
+$AndroidTfm = 'net10.0-android'
 $PublishDir = Join-Path $SlnDir 'publish'
 
 # Authenticode signing lives outside the repo: the private key never comes near it.
@@ -68,7 +69,13 @@ $signatureNote = @'
 The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd`
 from `SignatureTrust.zip` once. The programs run without it; only the signature stays unverified.
 '@
-Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")`n$signatureNote" -Encoding UTF8
+$androidNote = @"
+
+## Android
+
+``$ProjectName-$tag-android-arm64.apk`` installs on arm64 phones running Android 11 or later.
+"@
+Set-Content -Path $notesFile -Value "## What changed`n`n$($subjects -join "`n")`n$signatureNote$androidNote" -Encoding UTF8
 
 if ($WhatIf) { Write-Host "WhatIf: would stamp $($tag.TrimStart('v')) and release $tag with $(($subjects -split "`n").Count) entries."; return }
 
@@ -137,6 +144,22 @@ foreach ($stage in $stages) {
     $assets += $zip
     Write-Host "  -> $($stage.Asset) ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)" -ForegroundColor DarkGray
 }
+
+# ── Android APK ──
+# One arm64 package, because the bundled tor exists only for arm64-v8a. It is signed with this
+# computer's Android debug key, as the other MAUI projects here are, so an APK installs over an
+# earlier one only when both were built on this computer.
+$androidStage = Join-Path $PublishDir 'AndroidStage'
+if (Test-Path $androidStage) { Remove-Item -Recurse -Force $androidStage }
+Write-Host 'Publishing the Android APK...' -ForegroundColor Cyan
+dotnet publish $MauiCsproj -f $AndroidTfm -c Release -o $androidStage
+if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed for Android.' }
+$signedApk = Get-ChildItem $androidStage -Filter '*-Signed.apk' | Select-Object -First 1
+if (-not $signedApk) { throw "The signed APK is missing in $androidStage." }
+$apk = Join-Path $PublishDir "$ProjectName-$tag-android-arm64.apk"
+Copy-Item -LiteralPath $signedApk.FullName -Destination $apk -Force
+$assets += $apk
+Write-Host "  -> $(Split-Path $apk -Leaf) ($([math]::Round((Get-Item $apk).Length / 1MB, 1)) MB)" -ForegroundColor DarkGray
 
 # The certificate Windows needs before it will call the signature valid. Shipped as its own asset
 # so the signature is checkable by anyone who cares to, and ignorable by everyone else.
