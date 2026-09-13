@@ -49,7 +49,7 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Name of the active theme in AppThemes ("LovelyBloom" pastel default, "PlayfulStarlight" dark).</summary>
         public static readonly Setting<string> Theme = new("LovelyBloom");
 
-        /// <summary>Pick the light/dark theme automatically from the Windows app theme instead of the fixed Theme value.</summary>
+        /// <summary>Pick the light/dark theme automatically from the operating system's app theme instead of the fixed Theme value.</summary>
         public static readonly Setting<bool> FollowSystemTheme = new(false);
 
         /// <summary>Global UI scale multiplier in percent (100 = design size).</summary>
@@ -61,7 +61,7 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Stop looping animations (aurora drift, sync heart, pulses) and shorten transitions.</summary>
         public static readonly Setting<bool> ReduceMotion = new(false);
 
-        /// <summary>Take the calm-motion answer from the Windows animation setting instead of the fixed value above.</summary>
+        /// <summary>Take the calm-motion answer from the operating system's animation setting instead of the fixed value above.</summary>
         public static readonly Setting<bool> FollowSystemMotion = new(true);
 
         /// <summary>Show the unread-count badge on folders and the tray icon.</summary>
@@ -154,7 +154,7 @@ namespace MyLovelyMail.MainProject.Stores
 
         // ---- Notifications ----
 
-        /// <summary>Show a Windows notification when new mail arrives.</summary>
+        /// <summary>Show a system notification when new mail arrives.</summary>
         public static readonly Setting<bool> NotifyOnNewMail = new(true);
 
         /// <summary>Notification sound name from Resources/Sounds ("none" silences, filters can override per rule).</summary>
@@ -164,7 +164,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static readonly Setting<int> QuietHoursStart = new(0);
         public static readonly Setting<int> QuietHoursEnd = new(0);
 
-        // ---- Window and startup ----
+        // ---- Window and startup (Windows only; see PlatformFeatures.HasDesktopWindow) ----
 
         /// <summary>Closing the window hides to the system tray instead of exiting.</summary>
         public static readonly Setting<bool> CloseToTray = new(true);

@@ -31,15 +31,15 @@
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Follow the Windows theme</span>
+                <span class="settings-row-label">Follow the @PlatformFeatures.SystemName theme</span>
                 <span class="settings-row-hint">Picks the light or dark palette automatically instead of the one chosen above</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.FollowSystemTheme.Value" CheckedChanged="@SetFollowSystemTheme" />
         </div>
         <div class="settings-row">
             <div class="settings-row-text">
-                <span class="settings-row-label">Follow the Windows animation setting</span>
-                <span class="settings-row-hint">Takes the answer below from Windows instead of the switch</span>
+                <span class="settings-row-label">Follow the @PlatformFeatures.SystemName animation setting</span>
+                <span class="settings-row-hint">Takes the answer below from @PlatformFeatures.SystemName instead of the switch</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.FollowSystemMotion.Value" CheckedChanged="@SetFollowSystemMotion" />
         </div>
@@ -55,7 +55,7 @@
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Interface scale (%)</span>
-                <span class="settings-row-hint">Scales the whole window; 100 is the design size</span>
+                <span class="settings-row-hint">Scales the whole interface; 100 is the design size</span>
             </div>
             <div class="settings-number">
                 <CoreInput Type="number" Value="@GlobalSettings.UiScalePercent.Value.ToString()" ValueChanged="@SetUiScale" />
@@ -83,6 +83,10 @@
         </div>
     </GlassCard>
 
+    @* The tray, a minimized start and the sign-in autostart belong to a desktop window. On a phone the
+       app starts with the system on its own and has no window to hide. *@
+    @if (PlatformFeatures.HasDesktopWindow)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🪟 Window &amp; startup</div>
         <div class="settings-row">
@@ -107,13 +111,14 @@
             <CoreToggle Checked="@GlobalSettings.StartWithWindows.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.StartWithWindows, v))" />
         </div>
     </GlassCard>
+    }
 
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🔔 Notifications</div>
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Notify on new mail</span>
-                <span class="settings-row-hint">Show a Windows notification when mail arrives</span>
+                <span class="settings-row-hint">Show a notification when mail arrives</span>
             </div>
             <CoreToggle Checked="@GlobalSettings.NotifyOnNewMail.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.NotifyOnNewMail, v))" />
         </div>
