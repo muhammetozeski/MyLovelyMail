@@ -1,5 +1,9 @@
 # Lessons learned
 
+- **Release uploads can leave an asset in `starter` state.** Verify the release asset's state and size before publication. During the v1.40.1 delivery, HTTP/2 uploads stalled while HTTP/1.1 completed both the Android and Windows packages. `Release.ps1` uses REST release IDs for draft assets and temporarily selects HTTP/1.1 during transfer, restoring the caller's environment afterward. Resume the prepared packages rather than rebuilding them because an upload failed.
+
+- **Starting the installed program may honor `StartMinimized`.** A second ordinary launch uses `SingleInstance.Claim` to restore the existing window. This opened the updated v1.40.1 installation without changing the user's startup setting.
+
 Short "problem → solution" notes so the same wall is never hit twice.
 
 - **Parameterless `*Css.razor` components do not re-render on theme change.** Blazor skips
