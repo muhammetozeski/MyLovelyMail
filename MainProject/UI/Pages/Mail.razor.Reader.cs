@@ -15,8 +15,20 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal bool OpenBodyLoading { get; set; }
         internal bool OpenBodyBlockedImages { get; set; }
         internal string? BodyError { get; set; }
-        uint loadedBodyUid;
-        uint remoteImagesAllowedUid;
+        ReaderMessageIdentity? loadedBodyKey;
+        ReaderMessageIdentity? remoteImagesAllowedKey;
+        int bodyLoadGeneration;
+
+        /// <summary>Message numbers are unique only inside an account's folder.</summary>
+        readonly record struct ReaderMessageIdentity(string AccountId, string FolderFullName, uint Uid);
+
+        /// <summary>Resolves a reader message through the current account and search-hit folder map.</summary>
+        /// <param name="message">The opened message, or null when the reader is closed.</param>
+        /// <returns>The complete cache identity, or null when no account or folder is selected.</returns>
+        ReaderMessageIdentity? ReaderIdentityOf(MailMessageSummary? message) =>
+            message != null && MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folder
+                ? new(account.Id, folder, message.Uid)
+                : null;
 
         internal List<AttachmentInfo> OpenAttachments { get; set; } = [];
         internal string? SaveStatus { get; set; }
@@ -106,7 +118,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         PersonProfile? senderHistory;
-        uint senderHistoryUid;
+        ReaderMessageIdentity? senderHistoryKey;
 
         /// <summary>
         /// Everything the cache knows about this sender. The scan walks every cached summary, so
@@ -116,8 +128,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         internal PersonProfile? HistoryOfOpenSender(MailMessageSummary open)
         {
-            if (senderHistoryUid == open.Uid) return senderHistory;
-            senderHistoryUid = open.Uid;
+            var key = ReaderIdentityOf(open);
+            if (key != null && senderHistoryKey == key) return senderHistory;
+            senderHistoryKey = key;
             senderHistory = null;
 
             if (MailUiState.SelectedAccount is not { } account || open.FromAddress.Length == 0) return null;
@@ -130,7 +143,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         List<MailMessageSummary>? openThread;
-        uint openThreadUid;
+        ReaderMessageIdentity? openThreadKey;
 
         /// <summary>
         /// The conversation the open message belongs to, oldest first, or null when it stands
@@ -143,8 +156,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         internal List<MailMessageSummary>? ThreadOfOpenMessage(MailMessageSummary open)
         {
-            if (openThreadUid == open.Uid) return openThread;
-            openThreadUid = open.Uid;
+            var key = ReaderIdentityOf(open);
+            if (key != null && openThreadKey == key) return openThread;
+            openThreadKey = key;
             openThread = null;
 
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(open) is not { } folderName)
@@ -190,7 +204,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             var setting = GlobalSettings.ReaderTextScalePercent;
             setting.Value = delta == 0 ? 100 : Math.Clamp(setting.Value + delta * ReaderScaleStep, 70, 200);
             SettingsManager.SaveSettings();
-            loadedBodyUid = 0;
+            loadedBodyKey = null;
             _ = LoadOpenBodyIfNeededAsync();
         }
 
@@ -198,14 +212,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal void AllowImagesOnce()
         {
             if (MailUiState.OpenMessage is not { } open) return;
-            remoteImagesAllowedUid = open.Uid;
-            loadedBodyUid = 0;
+            remoteImagesAllowedKey = ReaderIdentityOf(open);
+            loadedBodyKey = null;
             _ = LoadOpenBodyIfNeededAsync();
         }
 
         /// <summary>
-        /// Renders the opened message's cached body; downloads it first when missing. A uid guard
-        /// drops stale results when the user opens another message mid-download.
+        /// Renders or downloads the opened body. Account, folder and load generation reject stale results.
         /// </summary>
         async Task LoadOpenBodyIfNeededAsync()
         {
@@ -214,19 +227,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (account == null || open == null)
             {
                 OpenBodyHtml = null;
-                loadedBodyUid = 0;
+                OpenBodyLoading = false;
+                loadedBodyKey = null;
+                bodyLoadGeneration++;
                 return;
             }
-            if (loadedBodyUid == open.Uid && (OpenBodyHtml != null || OpenBodyLoading)) return;
             if (ResolveFolderOf(open) is not { } folderName) return;
+            var key = new ReaderMessageIdentity(account.Id, folderName, open.Uid);
+            if (loadedBodyKey == key && (OpenBodyHtml != null || OpenBodyLoading)) return;
 
-            loadedBodyUid = open.Uid;
+            int generation = ++bodyLoadGeneration;
+            loadedBodyKey = key;
             OpenBodyHtml = null;
             BodyError = null;
             OpenBodyLoading = true;
             await InvokeAsync(StateHasChanged);
 
-            bool allowRemote = open.Uid == remoteImagesAllowedUid;
+            bool allowRemote = key == remoteImagesAllowedKey;
             RenderedBody? rendered;
             using (PerfTrace.Measure("reader.render"))
                 rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
@@ -242,11 +259,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 }
                 catch (Exception ex)
                 {
+                    if (generation != bodyLoadGeneration || ReaderIdentityOf(MailUiState.OpenMessage) != key) return;
                     BodyError = ex.Message;
                 }
             }
 
-            if (MailUiState.OpenMessage?.Uid != open.Uid) return;
+            if (generation != bodyLoadGeneration || ReaderIdentityOf(MailUiState.OpenMessage) != key) return;
 
             OpenBodyHtml = rendered?.Html;
             OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
@@ -280,7 +298,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ = Task.Run(async () =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
-                if (MailUiState.OpenMessage?.Uid == open.Uid)
+                if (ReferenceEquals(MailUiState.OpenMessage, open) && MailUiState.SelectedAccount?.Id == account.Id)
                     MessageActions.MarkRead(account, folderName, open);
             });
         }
