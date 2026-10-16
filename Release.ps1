@@ -29,7 +29,7 @@ $TrustFolder = Join-Path $SignRoot 'Dagitim'
 # while a dozen commits wait. A draft is also exactly what an interrupted run leaves behind: two
 # are sitting in this repository right now, both with zero assets, one from a run that lost its
 # network mid-upload and could not even delete its own.
-$tags = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft | not) | .tagName')
+$tags = @(gh api 'repos/:owner/:repo/releases?per_page=100' --jq '.[] | select(.draft | not) | .tag_name')
 $lastTag = if ($tags) {
     ($tags | Sort-Object { [version]($_.TrimStart('v')) } | Select-Object -Last 1)
 } else { 'v0.0.0' }
@@ -58,7 +58,7 @@ if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
 
 # A draft already holding this number is not a collision - it is this script's own way of being
 # resumable, so it is reported and reused rather than refused.
-$resumingDraft = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' 2>$null) |
+$resumingDraft = @(gh api 'repos/:owner/:repo/releases?per_page=100' --jq '.[] | select(.draft) | .tag_name') |
     Where-Object { $_ -eq $tag }
 if ($resumingDraft) { Write-Host "A draft for $tag is already open; its assets will be completed and it will be published." -ForegroundColor Yellow }
 $notesFolder = (NewTemp MyLovelyMailRelease | Select-Object -Last 1).ToString().Trim()
@@ -195,9 +195,20 @@ if ($head -ne $headBefore -or (@(git status --porcelain) -join "`n") -ne $source
 # This way a dropped upload costs one asset, a re-run resumes into the same draft, and a half-done
 # attempt is never visible to anyone: nothing is published until every asset is confirmed present.
 if (-not $resumingDraft) {
-    gh release create $tag --draft --title $tag --notes-file $notesFile --target $head
+    $releaseBody = @{
+        tag_name = $tag
+        name = $tag
+        body = Get-Content -LiteralPath $notesFile -Raw
+        target_commitish = $head
+        draft = $true
+    } | ConvertTo-Json
+    $releaseBody | gh api 'repos/:owner/:repo/releases' --method POST --input - --jq '.id'
     if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
 }
+$releaseId = gh api 'repos/:owner/:repo/releases?per_page=100' --jq ".[] | select(.tag_name==`"$tag`") | .id"
+if ($LASTEXITCODE -ne 0 -or -not $releaseId) { throw "Could not resolve the release id for $tag." }
+$repository = gh api 'repos/:owner/:repo' --jq '.full_name'
+if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the repository for asset upload.' }
 
 # Smallest first, so a bad link proves itself on the cheap asset instead of the big one.
 foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
@@ -205,7 +216,14 @@ foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
     $uploaded = $false
     foreach ($attempt in 1..5) {
         Write-Host "Uploading $name (attempt $attempt/5)..." -ForegroundColor DarkGray
-        gh release upload $tag $asset --clobber
+        $existingId = gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq ".[] | select(.name==`"$name`") | .id"
+        if ($LASTEXITCODE -ne 0) { throw "Could not inspect the existing assets for $tag." }
+        if ($existingId) {
+            gh api "repos/:owner/:repo/releases/assets/$existingId" --method DELETE
+            if ($LASTEXITCODE -ne 0) { throw "Could not replace the incomplete asset $name." }
+        }
+        $uploadUrl = "https://uploads.github.com/repos/$repository/releases/$releaseId/assets?name=$([Uri]::EscapeDataString($name))"
+        gh api $uploadUrl --method POST --header 'Content-Type: application/octet-stream' --input $asset --jq '.name'
         if ($LASTEXITCODE -eq 0) { $uploaded = $true; break }
         Start-Sleep -Seconds (10 * $attempt)
     }
@@ -214,12 +232,12 @@ foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
     }
 }
 
-$present = @(gh release view $tag --json assets --jq '.assets[].name')
+$present = @(gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq '.[].name')
 if ($present.Count -ne $assets.Count) {
     throw "$tag has $($present.Count) of $($assets.Count) assets, so it was left as a draft. Re-run this script to finish it."
 }
 
-gh release edit $tag --draft=false
+'{"draft":false}' | gh api "repos/:owner/:repo/releases/$releaseId" --method PATCH --input - --jq '.html_url'
 if ($LASTEXITCODE -ne 0) { throw "The assets are all uploaded but $tag could not be published; re-run to finish it." }
 [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($notesFile, 'OnlyErrorDialogs', 'SendToRecycleBin')
 Write-Host "Released $tag" -ForegroundColor Green
