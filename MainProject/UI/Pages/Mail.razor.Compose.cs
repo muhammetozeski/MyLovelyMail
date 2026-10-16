@@ -27,8 +27,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         Timer? undoCountdownTimer;
         internal DateTime? DraftSavedAt { get; set; }
 
-        /// <summary>Hands the draft to the outbox and closes the pane; the undo bar takes over.
-        /// The draft is saved first so a failed submit still leaves it in Drafts.</summary>
         /// <summary>What the pre-send checks found; empty means nothing is worth stopping for.</summary>
         internal IReadOnlyList<SendWarning> SendWarnings { get; set; } = [];
 
