@@ -16,7 +16,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         Fetch,
 
         /// <summary>
-        /// Throw the folder's cache away and refill it (<see cref="ImapSyncService.KickFolderResync"/>).
+        /// Throw the folder's cache away and refill it (<see cref="ImapSyncService.KickFolderSync"/>).
         /// NOT a backfill: <see cref="ImapSyncService.BackfillFolderAsync"/> returns 0 when
         /// OldestFetchedUid is not above 1, so a backfill on an empty cache does nothing at all.
         /// </summary>
@@ -112,7 +112,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     break;
 
                 case EmptyFolderAction.Refill:
-                    ImapSyncService.KickFolderResync(account, folder.FullName);
+                    ImapSyncService.KickFolderSync(account, folder.FullName, resetCache: true);
                     break;
             }
         }

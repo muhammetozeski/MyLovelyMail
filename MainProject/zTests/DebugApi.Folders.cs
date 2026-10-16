@@ -166,7 +166,7 @@ public static partial class DebugApi
                 {
                     string accountId = RequireQueryValue(query, "accountId");
                     string folder = ReadFolder(query);
-                    ImapSyncService.KickFolderResync(RequireAccount(accountId), folder);
+                    ImapSyncService.KickFolderSync(RequireAccount(accountId), folder, resetCache: true);
                     return new { ok = true };
                 }
 

@@ -42,13 +42,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static FolderSyncFailure? LastFolderFailure(string accountId, string folderFullName) =>
             onDemandFailures.GetValueOrDefault(MessageStore.FolderKey(accountId, folderFullName));
 
-        /// <summary>
-        /// Fire-and-forget sync of one folder, used when the user opens it. The scheduled pass only
-        /// fills the Inbox, so without this every other server folder would stay empty forever.
-        /// Repeat calls while a sync is already running are ignored.
-        /// </summary>
-        public static void KickFolderSync(MailAccountData account, string folderFullName)
+        /// <summary>Starts one folder operation, ignoring duplicates while that folder is already busy.</summary>
+        /// <param name="account">The account whose server and credentials are used.</param>
+        /// <param name="folderFullName">The server folder to synchronize.</param>
+        /// <param name="resetCache">Discard the cached folder before a full refill.</param>
+        /// <param name="backfillCount">Fetch this many older messages instead of checking for new mail.</param>
+        /// <param name="cancellationToken">Cancels the operation without recording a server failure.</param>
+        public static void KickFolderSync(MailAccountData account, string folderFullName,
+            bool resetCache = false, int? backfillCount = null, CancellationToken cancellationToken = default)
         {
+            if (backfillCount is <= 0)
+                throw new ArgumentOutOfRangeException(nameof(backfillCount));
+            if (resetCache && backfillCount.HasValue)
+                throw new ArgumentException("A cache refill cannot also be an older-message fetch.");
+
             string key = MessageStore.FolderKey(account.Id, folderFullName);
             lock (onDemandInFlight)
                 if (!onDemandInFlight.Add(key)) return;
@@ -58,57 +65,29 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 try
                 {
-                    await SyncFolderAsync(account, folderFullName);
-                    onDemandFailures.TryRemove(key, out _);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (backfillCount is { } count)
+                    {
+                        int landed = await BackfillFolderAsync(account, folderFullName, count, cancellationToken);
+                        Log($"Backfill of '{folderFullName}': {landed} older summaries added for {account.EmailAddress}.");
+                    }
+                    else
+                    {
+                        if (resetCache) MessageStore.ClearFolderCache(account.Id, folderFullName);
+                        await SyncFolderAsync(account, folderFullName, cancellationToken);
+                        onDemandFailures.TryRemove(key, out _);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    Log($"Folder sync canceled for '{folderFullName}' on {account.EmailAddress}.");
                 }
                 catch (Exception ex)
                 {
-                    onDemandFailures[key] = new FolderSyncFailure(ex.Message, DateTime.UtcNow);
-                    Log($"On-demand sync of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
-                }
-                finally
-                {
-                    lock (onDemandInFlight)
-                        onDemandInFlight.Remove(key);
-                    OnFolderSyncStateChanged?.Invoke();
-                }
-            });
-        }
-
-        /// <summary>
-        /// Throws the folder's cache away and refills it. Incremental sync only ever asks for uids
-        /// ABOVE LastSeenUid, so a folder whose cache was truncated can never heal itself — this is
-        /// the way back. The refill lands in the usual slices, so the list repaints while it runs.
-        /// </summary>
-        public static void KickFolderResync(MailAccountData account, string folderFullName)
-        {
-            MessageStore.ClearFolderCache(account.Id, folderFullName);
-            KickFolderSync(account, folderFullName);
-        }
-
-        /// <summary>
-        /// Fetches the next <paramref name="count"/> messages BELOW the folder's oldest fetched
-        /// uid — the only way to reach mail past the first fill, since incremental sync asks for
-        /// uids above LastSeenUid and a resync just re-fetches the same newest slice.
-        /// Never touches LastSeenUid, so the new-mail path and its notification stay untouched.
-        /// </summary>
-        public static void KickFolderBackfill(MailAccountData account, string folderFullName, int count)
-        {
-            string key = MessageStore.FolderKey(account.Id, folderFullName);
-            lock (onDemandInFlight)
-                if (!onDemandInFlight.Add(key)) return;
-
-            OnFolderSyncStateChanged?.Invoke();
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    int landed = await BackfillFolderAsync(account, folderFullName, count);
-                    Log($"Backfill of '{folderFullName}': {landed} older summaries added for {account.EmailAddress}.");
-                }
-                catch (Exception ex)
-                {
-                    Log($"Backfill of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
+                    if (!backfillCount.HasValue)
+                        onDemandFailures[key] = new FolderSyncFailure(ex.Message, DateTime.UtcNow);
+                    string operation = backfillCount.HasValue ? "Backfill" : "On-demand sync";
+                    Log($"{operation} of '{folderFullName}' failed for {account.EmailAddress}: {ex.Message}", LogLevel.Error);
                 }
                 finally
                 {
@@ -120,7 +99,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>The backfill itself; returns how many summaries landed. Awaited by the debug API.</summary>
-        public static async Task<int> BackfillFolderAsync(MailAccountData account, string folderFullName, int count,
+        public static async Task<int> BackfillFolderAsync(MailAccountData account, string folderFullName, int count = InitialFetchCount,
             CancellationToken cancellationToken = default)
         {
             var cached = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folderFullName);

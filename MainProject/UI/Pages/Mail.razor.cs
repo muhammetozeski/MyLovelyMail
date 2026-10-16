@@ -263,7 +263,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void LoadOlder(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
-            ImapSyncService.KickFolderBackfill(account, folder.FullName, BackfillBatchSize);
+            ImapSyncService.KickFolderSync(account, folder.FullName, backfillCount: BackfillBatchSize);
         }
 
         /// <summary>Drops the folder's cache and refills it — the way back from a truncated folder that incremental sync can never heal.</summary>
@@ -271,7 +271,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
             MailUiState.SelectFolder(folder);
-            ImapSyncService.KickFolderResync(account, folder.FullName);
+            ImapSyncService.KickFolderSync(account, folder.FullName, resetCache: true);
         }
 
         /// <summary>One-click filters; each just adds or removes its own token in the search box, so they compose with each other and with typed text.</summary>
