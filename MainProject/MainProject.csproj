@@ -33,7 +33,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <SupportedPlatform Include="browser" />
     <SupportedPlatform Include="android" />
     <SupportedPlatform Include="windows" />
   </ItemGroup>

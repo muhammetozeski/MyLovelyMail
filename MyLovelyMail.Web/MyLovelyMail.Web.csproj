@@ -7,8 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MyLovelyMail.Web.Client\MyLovelyMail.Web.Client.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
+    <ProjectReference Include="..\MainProject\MainProject.csproj" />
   </ItemGroup>
 
 </Project>
