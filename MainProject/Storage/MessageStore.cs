@@ -15,7 +15,6 @@ namespace MyLovelyMail.MainProject.Storage
         public const string IndexFileName = "index.jsonl";
         public const string MessageExtension = ".eml";
 
-        static readonly ConcurrentDictionary<string, FolderIndex> Indexes = [];
 
         /// <summary>Raised after summaries of (accountId, folderFullName) changed, so open lists can refresh.</summary>
         public static event Action<string, string>? OnFolderChanged;

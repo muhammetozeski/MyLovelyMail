@@ -7,6 +7,8 @@ namespace MyLovelyMail.MainProject.Storage
 {
     public static partial class MessageStore
     {
+        static readonly ConcurrentDictionary<string, FolderIndex> Indexes = [];
+
         sealed class FolderIndex
         {
             public readonly ConcurrentDictionary<uint, MailMessageSummary> Summaries = [];
