@@ -1,7 +1,4 @@
-using System.Collections.Concurrent;
-using System.Text;
 using System.Text.Json;
-using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Stores;
 

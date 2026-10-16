@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using MailKit.Net.Proxy;
-using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Tor
 {

@@ -1,7 +1,3 @@
-using System.Diagnostics;
-using System.Text.RegularExpressions;
-using System.Net;
-using System.Net.Sockets;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 
@@ -98,17 +94,17 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 yield return (configured.Trim('"'), "the TorExecutablePath setting");
 
             foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                         .Split(System.IO.Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                         .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string candidate;
-                try { candidate = System.IO.Path.Combine(directory, ExecutableName); }
+                try { candidate = Path.Combine(directory, ExecutableName); }
                 catch { continue; } // A malformed PATH entry is not worth failing the whole search over.
                 yield return (candidate, "PATH");
             }
 
             // Beside the app, which is where a portable copy would be dropped.
-            yield return (System.IO.Path.Combine(AppPaths.AppFolder, "Tor", ExecutableName), "the app folder");
-            yield return (System.IO.Path.Combine(AppPaths.Root, "Tor", ExecutableName), "the install folder");
+            yield return (Path.Combine(AppPaths.AppFolder, "Tor", ExecutableName), "the app folder");
+            yield return (Path.Combine(AppPaths.Root, "Tor", ExecutableName), "the install folder");
 
             if (!OperatingSystem.IsWindows()) yield break;
 
@@ -120,11 +116,11 @@ namespace MyLovelyMail.MainProject.Services.Tor
                          Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
                      }.Where(static r => r.Length > 0).Distinct())
             {
-                yield return (System.IO.Path.Combine(root, "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"), "a Tor Browser install");
-                yield return (System.IO.Path.Combine(root, "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"), "a Tor Browser install");
+                yield return (Path.Combine(root, "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"), "a Tor Browser install");
+                yield return (Path.Combine(root, "Programs", "Tor Browser", "Browser", "TorBrowser", "Tor", "tor.exe"), "a Tor Browser install");
             }
 
-            yield return (System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "tor", "tor.exe"), "the Tor Expert Bundle");
+            yield return (Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "tor", "tor.exe"), "the Tor Expert Bundle");
         }
 
         /// <summary>
@@ -134,7 +130,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// </summary>
         static string ResolveScoopShim(string candidate)
         {
-            string shim = System.IO.Path.ChangeExtension(candidate, ".shim");
+            string shim = Path.ChangeExtension(candidate, ".shim");
             if (!File.Exists(shim)) return candidate;
 
             foreach (string line in File.ReadAllLines(shim))

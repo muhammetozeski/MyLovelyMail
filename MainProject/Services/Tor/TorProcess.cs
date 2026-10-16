@@ -14,7 +14,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
     public static partial class TorProcess
     {
         /// <summary>Everything this class writes (state, cached consensus) lives in AppCache: re-creatable, never user data.</summary>
-        public static string DataDirectory => System.IO.Path.Combine(AppPaths.AppCache, "Tor");
+        public static string DataDirectory => Path.Combine(AppPaths.AppCache, "Tor");
 
         static Process? running;
         static readonly Lock startGate = new();
@@ -104,7 +104,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = System.IO.Path.GetDirectoryName(executable.Path) ?? DataDirectory
+                WorkingDirectory = Path.GetDirectoryName(executable.Path) ?? DataDirectory
             };
 
             // IsolateSOCKSAuth is tor's default and is what makes the per-account SOCKS credentials
@@ -216,21 +216,21 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// <summary>Tor warns without these and still runs; passing them when they exist keeps the notice log clean and path selection informed.</summary>
         static void AddGeoIpFiles(ProcessStartInfo startInfo, string executablePath)
         {
-            string? folder = System.IO.Path.GetDirectoryName(executablePath);
+            string? folder = Path.GetDirectoryName(executablePath);
             if (folder == null) return;
 
             foreach (var (option, fileName) in new[] { ("--GeoIPFile", "geoip"), ("--GeoIPv6File", "geoip6") })
             {
                 foreach (string candidate in new[]
                          {
-                             System.IO.Path.Combine(folder, fileName),
-                             System.IO.Path.Combine(folder, "data", fileName),
-                             System.IO.Path.Combine(folder, "..", "Data", "Tor", fileName)
+                             Path.Combine(folder, fileName),
+                             Path.Combine(folder, "data", fileName),
+                             Path.Combine(folder, "..", "Data", "Tor", fileName)
                          })
                 {
                     if (!File.Exists(candidate)) continue;
                     startInfo.ArgumentList.Add(option);
-                    startInfo.ArgumentList.Add(System.IO.Path.GetFullPath(candidate));
+                    startInfo.ArgumentList.Add(Path.GetFullPath(candidate));
                     break;
                 }
             }
