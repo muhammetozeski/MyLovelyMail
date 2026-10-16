@@ -4,7 +4,9 @@ using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+#if DEBUG
 using MyLovelyMail.MainProject.Diagnostics;
+#endif
 
 namespace MyLovelyMail
 {
