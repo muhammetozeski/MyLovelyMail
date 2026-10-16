@@ -120,7 +120,7 @@ foreach ($stage in $stages) {
     # export behave the same way: <root>\MyLovelyMail.exe (launcher) + <root>\AppData\ (the app).
     $stageRoot = Join-Path $PublishDir $stage.Name
     $appData = Join-Path $stageRoot 'AppData'
-    if (Test-Path $stageRoot) { Remove-Item -Recurse -Force $stageRoot }
+    if (Test-Path $stageRoot) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($stageRoot, 'OnlyErrorDialogs', 'SendToRecycleBin') }
     Write-Host "Publishing $($stage.Name) (self-contained=$($stage.SelfContained))..." -ForegroundColor Cyan
     dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -p:SkipAndroidTargets=true -o $appData
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
@@ -139,7 +139,7 @@ foreach ($stage in $stages) {
     }
 
     $zip = Join-Path $PublishDir $stage.Asset
-    if (Test-Path $zip) { Remove-Item -Force $zip }
+    if (Test-Path $zip) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($zip, 'OnlyErrorDialogs', 'SendToRecycleBin') }
     $packageRoot = Join-Path $PublishDir "PackageRoot\$ProjectName"
     if (Test-Path $packageRoot) {
         [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($packageRoot, 'OnlyErrorDialogs', 'SendToRecycleBin')
@@ -156,7 +156,7 @@ foreach ($stage in $stages) {
 # computer's Android debug key, as the other MAUI projects here are, so an APK installs over an
 # earlier one only when both were built on this computer.
 $androidStage = Join-Path $PublishDir 'AndroidStage'
-if (Test-Path $androidStage) { Remove-Item -Recurse -Force $androidStage }
+if (Test-Path $androidStage) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($androidStage, 'OnlyErrorDialogs', 'SendToRecycleBin') }
 Write-Host 'Publishing the Android APK...' -ForegroundColor Cyan
 dotnet publish $MauiCsproj -f $AndroidTfm -c Release -o $androidStage
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed for Android.' }
@@ -171,7 +171,7 @@ Write-Host "  -> $(Split-Path $apk -Leaf) ($([math]::Round((Get-Item $apk).Lengt
 # so the signature is checkable by anyone who cares to, and ignorable by everyone else.
 if (Test-Path $TrustFolder) {
     $trustZip = Join-Path $PublishDir 'SignatureTrust.zip'
-    if (Test-Path $trustZip) { Remove-Item -Force $trustZip }
+    if (Test-Path $trustZip) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($trustZip, 'OnlyErrorDialogs', 'SendToRecycleBin') }
     Compress-Archive -Path "$TrustFolder\*" -DestinationPath $trustZip
     $assets += $trustZip
     Write-Host "  -> SignatureTrust.zip ($([math]::Round((Get-Item $trustZip).Length / 1KB, 0)) KB)" -ForegroundColor DarkGray
@@ -221,6 +221,6 @@ if ($present.Count -ne $assets.Count) {
 
 gh release edit $tag --draft=false
 if ($LASTEXITCODE -ne 0) { throw "The assets are all uploaded but $tag could not be published; re-run to finish it." }
-Remove-Item $notesFile -ErrorAction SilentlyContinue
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($notesFile, 'OnlyErrorDialogs', 'SendToRecycleBin')
 Write-Host "Released $tag" -ForegroundColor Green
 $tag

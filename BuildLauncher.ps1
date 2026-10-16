@@ -170,4 +170,4 @@ try {
 } catch {
     Write-Host "Launcher exe is locked at $Root - kept the existing one." -ForegroundColor Yellow
 }
-Remove-Item -Recurse -Force $WorkDir -ErrorAction SilentlyContinue
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($WorkDir, 'OnlyErrorDialogs', 'SendToRecycleBin')
