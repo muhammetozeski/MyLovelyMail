@@ -1,0 +1,183 @@
+<!-- BU SADECE YARDIMCI ARAÇ. PROJE İLE ALAKALI DEĞİL. BU DOSYAYI GÖRMEZDEN GELEBİLİRSİN. KULLANMAK İÇİN SADECE DOSYAYI AÇMAN YETERLİ. -->
+<!-- YAPAY ZEKALAR BU DOSYAYI OKUMAKLA UĞRAŞMASIN VE BU DOSYAYA DOKUNMASINLAR -->
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Lumina Theme Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="theme-studio.css">
+</head>
+<body>
+
+  <!-- SVG Filtreleri: Renk Körlüğü Simülasyonu İçin -->
+  <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+    <!-- Kırmızı Körlüğü -->
+    <filter id="protanopia">
+      <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Yeşil Körlüğü -->
+    <filter id="deuteranopia">
+      <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Mavi Körlüğü -->
+    <filter id="tritanopia">
+      <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0" />
+    </filter>
+    <!-- Tam Renk Körlüğü (Siyah-Beyaz) -->
+    <filter id="achromatopsia">
+      <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0" />
+    </filter>
+  </svg>
+
+  <!-- ==================== BAŞLIK & HEADER ==================== -->
+  <header class="header-area">
+    <div>
+      <h1>Lumina Theme Studio</h1>
+      <p style="margin:0;">MAUI & Blazor Renk Uzmanı</p>
+    </div>
+    <button class="btn-icon" id="btn-info" title="Ayrıntılı Dokümantasyon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+    </button>
+  </header>
+
+  <!-- ==================== KONTROL MERKEZİ ==================== -->
+  <section class="container glass-panel">
+    <div class="controls-grid">
+      <!-- Arama Kutusu -->
+      <div class="input-group">
+        <label class="input-label">Renk Kodu Veya Adı Ara</label>
+        <div style="position: relative;">
+          <input id="search-input" type="text" class="search-input" placeholder="Örn: SurfaceNormal, #FF7A6B veya rgb(255,0,0)">
+          <div id="search-color-preview" class="search-preview"></div>
+        </div>
+      </div>
+      
+      <!-- Sıralama Kutusu -->
+      <div class="input-group">
+        <label class="input-label">Sıralama Seçenekleri</label>
+        <div class="sort-buttons">
+          <button id="sort-btn-similarity" class="btn-sort active" title="Gökkuşağı mantığında (HSL) veya aranan renge göre sıralar.">Benzerlik (Gökkuşağı)</button>
+          <button id="sort-btn-readability" class="btn-sort" title="Seçilen metin rengine göre en okunaklıdan en okunmaza doğru sıralar.">Okunabilirlik</button>
+          <button id="sort-btn-default" class="btn-sort">Özgün</button>
+          <button id="sort-btn-name-asc" class="btn-sort">Ad (A-Z)</button>
+        </div>
+      </div>
+
+      <!-- Test Araçları (Satır 2) -->
+      <div class="test-area">
+        <!-- Okunabilirlik Modu -->
+        <div style="display:flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;">
+          <label class="input-label">Metin Rengi Testi</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="text-color-mode" class="test-select" style="flex:1;">
+              <option value="auto">Otomatik (En İyi Zıt Renk)</option>
+              <option value="custom">Canlı Gözlem (Özel Renk Seç)</option>
+            </select>
+            <div id="custom-color-controls" style="display: none; align-items: center; gap: 0.5rem;">
+              <input type="color" id="custom-text-color" value="#A8B1D9" class="color-preview-circle">
+            </div>
+          </div>
+        </div>
+
+        <!-- Renk Körlüğü Simülatörü -->
+        <div style="display:flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;">
+          <label class="input-label">Erişilebilirlik (Renk Körlüğü)</label>
+          <select id="color-blindness-mode" class="test-select">
+            <option value="none">Normal Görüş (Filtre Yok)</option>
+            <option value="protanopia">Protanopia (Kırmızı Körlüğü)</option>
+            <option value="deuteranopia">Deuteranopia (Yeşil Körlüğü)</option>
+            <option value="tritanopia">Tritanopia (Mavi Körlüğü)</option>
+            <option value="achromatopsia">Achromatopsia (Tam Renk Körlüğü / Siyah Beyaz)</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== DİNAMİK VERİ ALANLARI ==================== -->
+  <div class="simulated-container" id="simulated-container">
+    <section class="container glass-panel">
+      <h2>Temel Renkler (Colors)</h2>
+      <ul id="color-list" class="item-list"></ul>
+    </section>
+
+    <section class="container glass-panel">
+      <h2>Aylık Gradyanlar (Month Gradients)</h2>
+      <ul id="gradient-list" class="item-list"></ul>
+    </section>
+
+    <section class="container glass-panel">
+      <h2>Aurora Noktaları (Aurora Stops)</h2>
+      <ul id="aurora-list" class="item-list"></ul>
+    </section>
+  </div>
+
+  <!-- ==================== C# IMPORT & EXPORT MERKEZİ ==================== -->
+  <section class="container glass-panel" style="border-color: rgba(99, 102, 241, 0.3);">
+    <h2>⚙️ C# Kod Senkronizasyonu (İçe / Dışa Aktar)</h2>
+    <p><code>AppThemes.cs</code> dosyanızdaki veriyi kopyalayıp yapıştırın. Değişimleri C# dosyasına geri alın.</p>
+    
+    <textarea id="csharp-input" class="textarea" rows="6" placeholder="BackgroundDeep = Color.FromArgb(&quot;#070A1A&quot;),&#10;SurfaceNormal = Colors.White.WithAlpha(0.08f),&#10;..."></textarea>
+    
+    <div class="flex-between">
+      <button id="parse-btn" class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        C#'tan İçeri Aktar
+      </button>
+      <button id="export-btn" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        C# Olarak Kopyala
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== INFO MODAL (KAYDIRILABİLİR KILAVUZ) ==================== -->
+  <div id="info-modal" class="modal-overlay">
+    <div class="modal-content" style="position: relative;">
+      <button id="close-modal" class="modal-close">&times;</button>
+      <h2 style="color: var(--accent); border: none; margin-bottom: 0;">Lumina Theme Studio</h2>
+      <p style="font-weight: bold; color: #fff;">MAUI Blazor Hybrid Temanızı Yönetmenin En Akıllı Yolu</p>
+      
+      <h3>🎯 Neden Geliştirildi? (Kullanım Senaryosu)</h3>
+      <p>Android veya iOS emülatöründe test yaparken bir butonun, kartın veya yazının renginin hatalı göründüğünü fark ettiniz. Ancak 100 farklı tema rengi arasından bunun <code>PrimaryDark</code> mı yoksa <code>SurfaceTint</code> mi olduğunu hatırlayamıyorsunuz.</p>
+      <p><strong>Çözüm:</strong> Bir Color Picker ile (örneğin Powertoys) hatalı rengin Hex kodunu alın ve bu araçta aratın! Araç, C# kodunuzdaki değişken isimlerini eşleştirerek size anında o rengin hangi değişkenden geldiğini bulacaktır.</p>
+
+      <h3>🎨 Metin Rengi Okunabilirliği (% Testi)</h3>
+      <p>Arayüzde teknik WCAG terimleri yerine insan algısına hitap eden <strong>Yüzdelik Oran (%)</strong> sistemi kullanılmıştır. Rozetler kendi arka planlarına duyarlı olarak dinamik renk alır ki yüzdelerin kendisi de her zaman okunabilsin!</p>
+      <ul>
+        <li><span style="color: #34d399; font-weight:bold;">%100 - %75 Okunabilir:</span> Gözü yormaz, harika kontrast.</li>
+        <li><span style="color: #fbbf24; font-weight:bold;">%74 - %45 İdare Eder:</span> Ortalama bir okunabilirlik sunar.</li>
+        <li><span style="color: #f87171; font-weight:bold;">%45 ve Altı (Göz Yorar):</span> Metni okumak işkenceye dönüşür. (Gölge efektleri kaldırıldığı için bu renklerde metin tamamen kaybolabilir, bu normaldir!)</li>
+      </ul>
+      <p><strong>Canlı Gözlem Modu:</strong> "Metin Rengi Testi" alanından <em>"Canlı Gözlem"</em>i seçerseniz, belirlediğiniz özel renk tüm listeye uygulanır ve okunabilirliği çıplak gözle görebilirsiniz.</p>
+      
+      <h3>👁️ Yeni: Renk Körlüğü ve Erişilebilirlik Simülatörü</h3>
+      <p>Dünya nüfusunun yaklaşık %8'i renk körüdür. MAUI uygulamanızı tasarlarken "Başarılı" mesajı için Yeşil, "Hatalı" mesajı için Kırmızı bir kutu koyarsanız, <strong>Deuteranopia</strong> (Yeşil Körlüğü) olan bir kullanıcı ikisini de çamur sarısı bir tonda görecektir!</p>
+      <p>Bu sebeple üst panele bir <strong>Renk Körlüğü Simülatörü</strong> eklendi. Seçtiğiniz filtre (SVG matrix algoritması) ile anında uygulamanızın engelli kullanıcılar tarafından nasıl göründüğünü test edebilir, renk paletinizi buna göre erişilebilir kılabilirsiniz.</p>
+
+      <h3>🌈 Zeki Benzerlik ve Yeni "Okunabilirlik" Sıralaması</h3>
+      <ul>
+        <li><strong>Benzerlik (Gökkuşağı):</strong> Bir renk aratmıyorsanız; Siyah, beyaz ve gri tonlarını kenara ayırır, diğer renkleri <strong>HSL (Renk Özü)</strong> uzayında işleyerek kusursuz bir gökkuşağı sarmalında sunar.</li>
+        <li><strong>Okunabilirlik (Yeni):</strong> Sizin seçtiğiniz metin rengiyle (veya otomatik modda) hangi arkaplan renginin en yüksek okunabilirlik oranına sahip olduğunu hesaplar ve listeyi en iyi okunandan, hiç okunmayana doğru sıralar.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST & WIDGET ==================== -->
+  <div id="toast" class="toast">Kopyalandı!</div>
+  
+  <div id="color-picker-widget" class="widget">
+    <div id="widget-header" class="widget-header">Renk Seçici</div>
+    <div class="widget-body">
+      <input id="widget-color-input" type="color">
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
+  <script src="color-math.js"></script>
+  <script src="theme-studio.js"></script>
+</body>
+</html>
