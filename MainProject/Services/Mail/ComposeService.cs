@@ -199,7 +199,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return draft.Body[block.Length..];
         }
 
-        public static ComposeDraft BuildReply(MailAccountData account, string folderFullName, MailMessageSummary summary, bool replyAll)
+        public static ComposeDraft BuildReply(MailAccountData account, string folderFullName, MailMessageSummary summary, bool replyAll = false)
         {
             var draft = new ComposeDraft
             {
