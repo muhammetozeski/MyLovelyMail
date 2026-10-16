@@ -37,24 +37,25 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             List<FolderNode> nodes = [];
             var byPath = folders.ToDictionary(f => f.FullName, StringComparer.OrdinalIgnoreCase);
+            var children = folders.ToLookup(folder => ParentPathOf(folder, byPath), StringComparer.Ordinal);
 
-            foreach (var root in folders.Where(f => ParentPathOf(f, byPath) == null)
+            foreach (var root in children[null]
                                         .OrderBy(f => RoleRank(f.Role))
                                         .ThenBy(f => f.DisplayName, StringComparer.OrdinalIgnoreCase))
             {
-                AppendWithChildren(root, folders, byPath, depth: 0, nodes);
+                AppendWithChildren(root, children, depth: 0, nodes);
             }
             return nodes;
         }
 
-        static void AppendWithChildren(MailFolderData folder, List<MailFolderData> all,
-            Dictionary<string, MailFolderData> byPath, int depth, List<FolderNode> nodes)
+        static void AppendWithChildren(MailFolderData folder, ILookup<string?, MailFolderData> children,
+            int depth, List<FolderNode> nodes)
         {
             nodes.Add(new FolderNode(folder, depth));
-            foreach (var child in all.Where(f => ParentPathOf(f, byPath) == folder.FullName)
+            foreach (var child in children[folder.FullName]
                                      .OrderBy(f => f.DisplayName, StringComparer.OrdinalIgnoreCase))
             {
-                AppendWithChildren(child, all, byPath, depth + 1, nodes);
+                AppendWithChildren(child, children, depth + 1, nodes);
             }
         }
 
