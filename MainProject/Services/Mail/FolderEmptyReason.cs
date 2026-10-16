@@ -83,7 +83,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 return new FolderEmptyExplanation("Never fetched yet",
                     "This folder has not been asked for since the account was added.", EmptyFolderAction.Fetch, "⬇️ Fetch it now");
 
-            int cached = MessageStore.GetSummaries(folder.AccountId, folder.FullName).Count;
+            int cached = MessageStore.CountSummaries(folder.AccountId, folder.FullName);
             if (folder.TotalCount > 0 && cached == 0)
                 return new FolderEmptyExplanation($"The server has {folder.TotalCount} message(s) here, none are cached",
                     "The last fetch reported a count but landed no mail — refilling asks for the folder from scratch.",

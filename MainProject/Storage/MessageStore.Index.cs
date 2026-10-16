@@ -59,6 +59,18 @@ namespace MyLovelyMail.MainProject.Storage
         public static List<MailMessageSummary> GetSummaries(string accountId, string folderFullName) =>
             [.. GetIndex(accountId, folderFullName).Summaries.Values.OrderByDescending(s => s.DateUtc)];
 
+        /// <summary>Counts cached summaries without sorting or building the displayed message list.</summary>
+        /// <param name="accountId">Account owning the folder.</param>
+        /// <param name="folderFullName">Server path or local folder name.</param>
+        /// <param name="predicate">Optional condition, such as unread messages or a search query.</param>
+        /// <returns>The number of matching summaries in the cached index.</returns>
+        public static int CountSummaries(string accountId, string folderFullName,
+            Func<MailMessageSummary, bool>? predicate = null)
+        {
+            var summaries = GetIndex(accountId, folderFullName).Summaries;
+            return predicate == null ? summaries.Count : summaries.Values.Count(predicate);
+        }
+
         public static MailMessageSummary? GetSummary(string accountId, string folderFullName, uint uid) =>
             GetIndex(accountId, folderFullName).Summaries.TryGetValue(uid, out var summary) ? summary : null;
 

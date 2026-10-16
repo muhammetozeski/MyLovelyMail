@@ -29,7 +29,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var serverFolders = await ListEveryFolderAsync(client, cancellationToken);
             await CreateMissingRequiredFoldersAsync(account, client, serverFolders, cancellationToken);
 
-            var cachedFolders = MessageStore.GetFolders(account.Id);
+            var cachedFolders = MessageStore.GetFolders(account.Id).ToDictionary(static folder => folder.FullName, StringComparer.Ordinal);
             Dictionary<string, IMailFolder> byFullName = new(StringComparer.Ordinal);
             List<FolderRoleCandidate> candidates = [];
 
@@ -54,7 +54,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             foreach (var decision in FolderRoleResolver.Resolve(candidates))
             {
                 var folder = byFullName[decision.FullName];
-                var cached = cachedFolders.FirstOrDefault(f => f.FullName == folder.FullName);
+                cachedFolders.TryGetValue(folder.FullName, out var cached);
                 if (cached is { Role: not FolderRole.None } && decision.Role == FolderRole.None)
                     Log($"'{folder.FullName}' no longer holds the {cached.Role} role: {decision.Why}");
 
@@ -84,7 +84,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             // A folder deleted on the server used to live on in the cache forever, still offering
             // its stale count and still selectable in the move menu.
-            foreach (var stale in cachedFolders.Where(f => !f.IsLocal
+            foreach (var stale in cachedFolders.Values.Where(f => !f.IsLocal
                 && !f.FullName.StartsWith(MessageStore.LocalFolderPrefix, StringComparison.Ordinal)
                 && !byFullName.ContainsKey(f.FullName)))
             {
@@ -159,6 +159,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 try
                 {
                     var created = await parent.CreateAsync(name, isMessageFolder: true, cancellationToken);
+                    if (created == null)
+                        throw new IOException($"The server did not return the created {role} folder.");
                     folders.Add(created);
                     Log($"Created the missing {role} folder '{created.FullName}' on {account.EmailAddress}.");
                 }

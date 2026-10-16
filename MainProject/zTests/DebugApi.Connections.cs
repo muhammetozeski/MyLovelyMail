@@ -36,7 +36,7 @@ public static partial class DebugApi
                     await ImapSyncService.SyncAccountAsync(account);
                     return new { refreshed = MessageStore.GetFolders(account.Id)
                         .Where(f => !f.IsLocal && f.LastSyncedUtc != null && before.GetValueOrDefault(f.FullName) != f.LastSyncedUtc)
-                        .Select(f => new { f.FullName, f.LastSyncedUtc, CachedCount = MessageStore.GetSummaries(account.Id, f.FullName).Count }) };
+                        .Select(f => new { f.FullName, f.LastSyncedUtc, CachedCount = MessageStore.CountSummaries(account.Id, f.FullName) }) };
                 }
 
                 // Connect-only, never AUTH: this reports what a host answers on, not whether a

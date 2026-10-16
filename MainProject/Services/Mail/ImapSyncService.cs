@@ -60,7 +60,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 .Where(f => !f.IsLocal && f.Selectable && !f.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase))
                 // A server count that disagrees with the cache is free evidence something changed,
                 // so those folders go first; the rest fall back to plain age.
-                .OrderByDescending(f => f.TotalCount != MessageStore.GetSummaries(account.Id, f.FullName).Count)
+                .OrderByDescending(f => f.TotalCount != MessageStore.CountSummaries(account.Id, f.FullName))
                 .ThenBy(f => f.LastSyncedUtc ?? DateTime.MinValue)
                 .Take(count)
                 .ToList();

@@ -77,7 +77,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 DisplayName = "Inbox",
                 Role = FolderRole.Inbox,
                 TotalCount = uids.Count,
-                UnreadCount = MessageStore.GetSummaries(account.Id, InboxFullName).Count(static s => s.IsUnread)
+                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
             });
 
             await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken, account);

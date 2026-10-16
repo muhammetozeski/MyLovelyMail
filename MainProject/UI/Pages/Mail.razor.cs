@@ -253,7 +253,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         /// <summary>Messages cached for the open folder — the honest half of "showing X of Y".</summary>
         int CachedCount => MailUiState.SelectedFolder is { } folder
-            ? MessageStore.GetSummaries(folder.AccountId, folder.FullName).Count
+            ? MessageStore.CountSummaries(folder.AccountId, folder.FullName)
             : 0;
 
         /// <summary>The open folder when the server holds more than the cache does, else null.</summary>

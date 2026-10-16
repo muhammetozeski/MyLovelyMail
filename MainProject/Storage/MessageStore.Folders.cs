@@ -18,6 +18,7 @@ namespace MyLovelyMail.MainProject.Storage
         public static List<MailFolderData> GetFolders(string accountId)
         {
             List<MailFolderData> result = [];
+            HashSet<string> seenNames = new(StringComparer.Ordinal);
             foreach (string root in AccountRoots(accountId))
             {
                 string foldersRoot = Path.Combine(root, FoldersFolderName);
@@ -32,7 +33,7 @@ namespace MyLovelyMail.MainProject.Storage
                         var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonDefaults.Indented);
                         // A folder is claimed by exactly one root; a copy left in the other by an
                         // interrupted migration must not appear twice in the list.
-                        if (folder != null && !result.Any(existing => existing.FullName == folder.FullName))
+                        if (folder != null && seenNames.Add(folder.FullName))
                             result.Add(folder);
                     }
                     catch (Exception ex)
@@ -89,7 +90,7 @@ namespace MyLovelyMail.MainProject.Storage
 
         static IEnumerable<string> SafeDirectories(string path)
         {
-            try { return Directory.Exists(path) ? Directory.EnumerateDirectories(path) : []; }
+            try { return Directory.Exists(path) ? Directory.GetDirectories(path) : []; }
             catch (Exception ex)
             {
                 Log($"Could not list '{path}': {ex.Message}", LogLevel.Warning);

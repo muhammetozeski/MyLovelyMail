@@ -107,7 +107,7 @@ public static partial class DebugApi
                         why.ActionLabel,
                         folder.TotalCount,
                         folder.LastSyncedUtc,
-                        cached = MessageStore.GetSummaries(accountId, folderFullName).Count,
+                        cached = MessageStore.CountSummaries(accountId, folderFullName),
                         lastFolderFailure = ImapSyncService.LastFolderFailure(accountId, folderFullName)
                     };
                 }
@@ -142,7 +142,7 @@ public static partial class DebugApi
                         {
                             f.FullName, f.DisplayName, f.Role, f.TotalCount, f.UnreadCount, f.IsLocal,
                             f.LastSeenUid, f.OldestFetchedUid, f.LastSyncedUtc, f.Delimiter,
-                            CachedCount = MessageStore.GetSummaries(accountId, f.FullName).Count
+                            CachedCount = MessageStore.CountSummaries(accountId, f.FullName)
                         });
                 }
 
