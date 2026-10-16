@@ -210,35 +210,43 @@ if ($LASTEXITCODE -ne 0 -or -not $releaseId) { throw "Could not resolve the rele
 $repository = gh api 'repos/:owner/:repo' --jq '.full_name'
 if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the repository for asset upload.' }
 
-# Smallest first, so a bad link proves itself on the cheap asset instead of the big one.
-foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
-    $name = Split-Path $asset -Leaf
-    $uploaded = $false
-    foreach ($attempt in 1..5) {
-        Write-Host "Uploading $name (attempt $attempt/5)..." -ForegroundColor DarkGray
-        $existingId = gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq ".[] | select(.name==`"$name`") | .id"
-        if ($LASTEXITCODE -ne 0) { throw "Could not inspect the existing assets for $tag." }
-        if ($existingId) {
-            gh api "repos/:owner/:repo/releases/assets/$existingId" --method DELETE
-            if ($LASTEXITCODE -ne 0) { throw "Could not replace the incomplete asset $name." }
+$previousGoDebug = $env:GODEBUG
+try {
+    # HTTP/1.1 avoids stalled HTTP/2 upload bodies on this connection.
+    $env:GODEBUG = if ($previousGoDebug) { "$previousGoDebug,http2client=0" } else { 'http2client=0' }
+    # Smallest first, so a bad link proves itself on the cheap asset instead of the big one.
+    foreach ($asset in ($assets | Sort-Object { (Get-Item $_).Length })) {
+        $name = Split-Path $asset -Leaf
+        $uploaded = $false
+        foreach ($attempt in 1..5) {
+            Write-Host "Uploading $name (attempt $attempt/5)..." -ForegroundColor DarkGray
+            $existingId = gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq ".[] | select(.name==`"$name`") | .id"
+            if ($LASTEXITCODE -ne 0) { throw "Could not inspect the existing assets for $tag." }
+            if ($existingId) {
+                gh api "repos/:owner/:repo/releases/assets/$existingId" --method DELETE
+                if ($LASTEXITCODE -ne 0) { throw "Could not replace the incomplete asset $name." }
+            }
+            $uploadUrl = "https://uploads.github.com/repos/$repository/releases/$releaseId/assets?name=$([Uri]::EscapeDataString($name))"
+            gh api $uploadUrl --method POST --header 'Content-Type: application/octet-stream' --input $asset --jq '.name'
+            if ($LASTEXITCODE -eq 0) { $uploaded = $true; break }
+            Start-Sleep -Seconds (10 * $attempt)
         }
-        $uploadUrl = "https://uploads.github.com/repos/$repository/releases/$releaseId/assets?name=$([Uri]::EscapeDataString($name))"
-        gh api $uploadUrl --method POST --header 'Content-Type: application/octet-stream' --input $asset --jq '.name'
-        if ($LASTEXITCODE -eq 0) { $uploaded = $true; break }
-        Start-Sleep -Seconds (10 * $attempt)
+        if (-not $uploaded) {
+            throw "Could not upload $name after 5 attempts. The draft for $tag is kept with whatever did upload - re-run this script to resume."
+        }
     }
-    if (-not $uploaded) {
-        throw "Could not upload $name after 5 attempts. The draft for $tag is kept with whatever did upload - re-run this script to resume."
+
+    $present = @(gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq '.[].name')
+    if ($present.Count -ne $assets.Count) {
+        throw "$tag has $($present.Count) of $($assets.Count) assets, so it was left as a draft. Re-run this script to finish it."
     }
-}
 
-$present = @(gh api "repos/:owner/:repo/releases/$releaseId/assets" --jq '.[].name')
-if ($present.Count -ne $assets.Count) {
-    throw "$tag has $($present.Count) of $($assets.Count) assets, so it was left as a draft. Re-run this script to finish it."
-}
+    '{"draft":false}' | gh api "repos/:owner/:repo/releases/$releaseId" --method PATCH --input - --jq '.html_url'
+    if ($LASTEXITCODE -ne 0) { throw "The assets are all uploaded but $tag could not be published; re-run to finish it." }
 
-'{"draft":false}' | gh api "repos/:owner/:repo/releases/$releaseId" --method PATCH --input - --jq '.html_url'
-if ($LASTEXITCODE -ne 0) { throw "The assets are all uploaded but $tag could not be published; re-run to finish it." }
+} finally {
+    $env:GODEBUG = $previousGoDebug
+}
 [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($notesFile, 'OnlyErrorDialogs', 'SendToRecycleBin')
 Write-Host "Released $tag" -ForegroundColor Green
 $tag
