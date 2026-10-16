@@ -40,7 +40,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Sticky: when Android kills the process for memory, it restarts the service and with it the app's sync loop.</summary>
         public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
         {
-            StartForeground(NotificationId, BuildNotification(), ForegroundService.TypeSpecialUse);
+            var notification = BuildNotification();
+            if (OperatingSystem.IsAndroidVersionAtLeast(34))
+                StartForeground(NotificationId, notification, ForegroundService.TypeSpecialUse);
+            else
+                StartForeground(NotificationId, notification);
             Log("Mail sync service is running in the foreground.");
             return StartCommandResult.Sticky;
         }
