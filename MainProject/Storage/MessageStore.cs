@@ -7,27 +7,7 @@ using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Storage
 {
-    /// <summary>
-    /// Disk-backed mail storage. RAM holds ONLY the per-folder summary index
-    /// (<see cref="MailMessageSummary"/>); full MIME bodies live as .eml files and are read from
-    /// disk when a message is opened. Layout per folder:
-    /// <c>&lt;root&gt;/Accounts/&lt;accountId&gt;/Folders/&lt;safeName&gt;/</c> holding
-    /// <c>folder.json</c>, <c>index.jsonl</c> (one summary per line) and <c>Messages/&lt;uid&gt;.eml</c>.
-    /// <para>
-    /// The root is chosen by RECOVERABILITY, not by who wrote the folder. Mail mirrored from a
-    /// server goes to <see cref="AppPaths.UserCache"/>, which stays safe to delete. Local folders —
-    /// Drafts, Outbox, Sent and anything the user or a rule made — go to
-    /// <see cref="AppPaths.UserData"/>, because no server has a copy to hand back.
-    /// </para>
-    /// <para>
-    /// This class used to claim "deleting UserCache is always safe: everything here re-syncs from
-    /// the server". That was true only while it held synced mail alone, and it stopped being true
-    /// when local folders arrived — drafts and queued outgoing mail were living behind a name that
-    /// promised the opposite. It cost one real bug already: the cache trimmer believed the sentence
-    /// and had local folders in its deletion pool, so a draft could reopen empty and an Outbox
-    /// message the user had already sent could be deleted before it went out.
-    /// </para>
-    /// </summary>
+    /// <summary>Keeps summaries in memory and MIME bodies on disk. Server copies live under UserCache; local folders live under UserData. Each folder contains folder.json, index.jsonl and Messages/&lt;uid&gt;.eml.</summary>
     public static partial class MessageStore
     {
         public const string AccountsFolderName = "Accounts";
@@ -65,22 +45,7 @@ namespace MyLovelyMail.MainProject.Storage
         public static string MessagePath(string accountId, string folderFullName, uint uid) =>
             Path.Combine(FolderCachePath(accountId, folderFullName), MessagesFolderName, uid + MessageExtension);
 
-        /// <summary>
-        /// Turns an IMAP folder path into a valid folder name ("INBOX/Receipts" → "INBOX%2FReceipts").
-        /// <para>
-        /// The encoder is the one place a name chosen by a mail SERVER becomes a path, so the three
-        /// spellings Windows does not treat as ordinary names are encoded rather than passed
-        /// through. A folder named "." or ".." resolved to the account root, putting its files a
-        /// level above Folders — inside the account's own cache, so contained, but not where the
-        /// walk expects them. "INBOX." and "INBOX " both normalise to "INBOX" on Windows, so two
-        /// distinct server folders shared one directory and overwrote each other's index.
-        /// </para>
-        /// <para>
-        /// A LEADING dot is deliberately left alone: ".Sent" and ".Drafts" are ordinary names on
-        /// Maildir-style servers, they are safe as directory names, and encoding them would move
-        /// every such folder's cache for no gain.
-        /// </para>
-        /// </summary>
+        /// <summary>Encodes server folder names for disk, including dot-only names and trailing dots or spaces that Windows normalizes. Leading dots remain valid, so existing Maildir caches keep their paths.</summary>
         internal static string ToSafeName(string folderFullName)
         {
             var sb = new StringBuilder(folderFullName.Length);

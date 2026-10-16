@@ -10,15 +10,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
     /// <summary>Where a tor executable was found, which is worth showing: an app-managed copy and the user's own daemon behave differently.</summary>
     public sealed record TorExecutable(string Path, string FoundBy);
 
-    /// <summary>
-    /// Finds a tor executable and runs one under the app's own data directory.
-    /// <para>
-    /// On Windows the app never installs Tor. If the machine has none this class finds none and says
-    /// so — a Tor-only account then refuses to connect rather than quietly using the open network,
-    /// which is the entire point of marking it Tor-only. On Android the app carries its own tor in
-    /// its package (<see cref="BundledExecutablePath"/>), so there is nothing to search for.
-    /// </para>
-    /// </summary>
+    /// <summary>Starts Tor with state under AppCache. Android supplies the bundled executable; Windows discovers an existing installation.</summary>
     public static partial class TorProcess
     {
         /// <summary>Everything this class writes (state, cached consensus) lives in AppCache: re-creatable, never user data.</summary>
@@ -47,13 +39,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         static int? ownSocksPort;
 
-        /// <summary>
-        /// The SOCKS port of the tor this app started, or null when no such tor is running. Read
-        /// from the process rather than remembered: a tor that died on its own clears nothing, and
-        /// a stale port here is dangerous rather than merely wrong — the endpoint built from it is
-        /// labelled AppManaged, which <see cref="TorService"/> trusts without the RESOLVE proof, so
-        /// anything that had since bound the freed port would carry a Tor-only account unverified.
-        /// </summary>
+        /// <summary>The managed process's SOCKS port while that process is alive. A stale port must never be trusted as an app-managed Tor endpoint.</summary>
         public static int? OwnSocksPort => IsRunning ? ownSocksPort : null;
 
         static void Remember(string line)

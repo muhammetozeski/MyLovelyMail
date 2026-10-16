@@ -11,12 +11,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
     {
         #region Finding an executable
 
-        /// <summary>
-        /// The tor that ships inside the app package, or null where the app looks for a tor already on
-        /// the machine. Android fills it in with libtor.so from the native library directory, because an
-        /// app there cannot run a binary it did not bring; the user's own tor is Orbot, which
-        /// <see cref="TorService"/> uses only when this one cannot start.
-        /// </summary>
+        /// <summary>Executable supplied by the Android package, or null when discovery should search installed copies.</summary>
         public static string? BundledExecutablePath { get; } = ResolveBundledExecutablePath();
 
         static string? ResolveBundledExecutablePath()
@@ -39,32 +34,14 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// <summary>File name of the tor binary on each platform this app is built for.</summary>
         static string ExecutableName => OperatingSystem.IsWindows() ? "tor.exe" : "tor";
 
-        /// <summary>
-        /// Last answer of <see cref="Search"/>, keyed by the setting that steers it. Three status
-        /// lines in the UI call <see cref="Find"/> straight from their render tree, so without a
-        /// cache every re-render walked the whole PATH with File.Exists and appended another entry
-        /// to a log buffer that has no size cap.
-        /// </summary>
+        /// <summary>Caches executable discovery by setting value; successful results expire when the file disappears.</summary>
         static (string SettingKey, TorExecutable? Result, DateTime AtUtc)? lastSearch;
         static readonly Lock searchGate = new();
 
-        /// <summary>
-        /// How long "there is no tor on this machine" is worth believing. A found executable is
-        /// cached until its file goes away, but a MISS has to expire: installing the Tor Browser or
-        /// dropping tor.exe into the app's folder are the two documented ways to fix the problem
-        /// the miss caused, and both were invisible until the app was restarted.
-        /// </summary>
+        /// <summary>Expiry for failed searches, allowing an installation made during this session to be detected.</summary>
         static readonly TimeSpan MissingRecheckInterval = TimeSpan.FromSeconds(30);
 
-        /// <summary>
-        /// The tor bundled with the app where there is one; otherwise the first tor executable that
-        /// exists, most explicit first: the setting, then PATH, then the places the usual Windows
-        /// installs put one. Returns null when there is none.
-        /// <para>
-        /// The answer is remembered until the TorExecutablePath setting changes or the file behind
-        /// it goes away, so this is cheap enough to call from a render.
-        /// </para>
-        /// </summary>
+        /// <summary>Returns the bundled executable or searches the configured path, PATH and standard installation folders. Caches successful paths until removed and misses for MissingRecheckInterval.</summary>
         public static TorExecutable? Find()
         {
             // A tor in the package is the answer by definition, and neither the setting nor PATH can

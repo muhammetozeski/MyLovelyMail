@@ -5,11 +5,7 @@ using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Tor
 {
-    /// <summary>
-    /// No Tor route exists right now. A Tor-only account turns this into a refusal to connect —
-    /// it is never downgraded into "connect directly instead", which is the whole reason the
-    /// account was marked Tor-only.
-    /// </summary>
+    /// <summary>No verified Tor route is available. Recoverable distinguishes temporary failures from missing executables or disabled startup.</summary>
     public sealed class TorUnavailableException(string message, bool recoverable = true) : Exception(message)
     {
         /// <summary>False when trying again cannot help (no tor executable on the machine, auto-start switched off).</summary>
@@ -44,11 +40,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
     /// </param>
     public sealed record TorVerification(bool IsTor, string Detail, bool ProvenNotTor = false, IPAddress? ResolvedAddress = null);
 
-    /// <summary>
-    /// The one place that answers "can this app reach the Tor network, and how". Everything a
-    /// Tor-only account needs goes through here: finding a SOCKS port, starting tor when there is
-    /// none, handing out proxy clients, and rotating an account onto a fresh circuit.
-    /// </summary>
+    /// <summary>Discovers and verifies Tor endpoints, creates isolated proxy clients and starts the managed Tor process when needed.</summary>
     public static partial class TorService
     {
         /// <summary>Standard ports, tried after the configured one: a tor daemon and a running Tor Browser.</summary>
@@ -65,15 +57,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
         static TorEndpoint? current;
 
-        /// <summary>
-        /// The endpoint the last successful discovery settled on; re-probed before reuse.
-        /// <para>
-        /// An app-managed endpoint is only real while the process behind it is. Without this check
-        /// a stopped or crashed tor left its port here: the settings card kept reporting a route
-        /// that no longer existed, and the fast path below would hand that port back to a Tor-only
-        /// account as soon as anything answered a SOCKS5 greeting on it.
-        /// </para>
-        /// </summary>
+        /// <summary>The last verified endpoint. A managed endpoint is discarded when its Tor process no longer owns that port.</summary>
         public static TorEndpoint? Current
         {
             get
@@ -317,11 +301,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             }
         }
 
-        /// <summary>
-        /// Starts a tor of the app's own — the last resort, and the only branch that can install
-        /// nothing and therefore fail permanently. Nested deliberately: a first attempt, then one
-        /// retry against a tor that may already have come up while the first attempt was waiting.
-        /// </summary>
+        /// <summary>Starts the managed Tor process. If bootstrap times out, checks its live SOCKS port before reporting failure.</summary>
         static async Task<TorEndpoint> StartOwnTorAsync(CancellationToken cancellationToken)
         {
             if (!Settings.TorAutoStart.Value)
@@ -414,15 +394,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         #endregion
 
 
-        /// <summary>
-        /// Where the app's own tor has got to, in one line, or null when there is nothing to say —
-        /// no tor of ours running, or it has finished and the route line already says so.
-        /// <para>
-        /// Shared by all three status lines so they cannot drift apart. Tor announces its own
-        /// progress and its own trouble; before this the app forwarded neither, so a stuck
-        /// bootstrap looked exactly like a slow one for the whole startup timeout.
-        /// </para>
-        /// </summary>
+        /// <summary>The managed Tor process's current bootstrap progress or problem; null when absent or complete.</summary>
         public static string? BootstrapLine
         {
             get

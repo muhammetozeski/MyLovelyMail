@@ -18,18 +18,7 @@ using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
 namespace MyLovelyMail.MainProject.Diagnostics
 {
-    /// <summary>
-    /// DEBUG-ONLY localhost REST API so the running app can be driven and inspected from outside
-    /// (automated end-to-end tests against a local mail server). Never started in Release builds.
-    /// Strictly a consumer of the existing services — it owns no mail logic of its own.
-    /// Base address: <c>http://127.0.0.1:52539/</c>.
-    /// <para>
-    /// The routes are the <c>case ("VERB", "/path")</c> labels of <see cref="RouteAsync"/> and are
-    /// deliberately NOT listed here: the list that used to live in this comment named eighteen
-    /// while the switch had grown past forty, so it read as documentation and worked as
-    /// misinformation. Read the switch — every case carries the reason it exists.
-    /// </para>
-    /// </summary>
+    /// <summary>Debug-only loopback endpoints for inspecting and driving the app through its existing services. RouteAsync dispatches to groups under Diagnostics/DebugApi.</summary>
     [UnsupportedOSPlatform("browser")]
     public static partial class DebugApi
     {
@@ -113,24 +102,7 @@ namespace MyLovelyMail.MainProject.Diagnostics
         /// <summary>The only Host values a request to this listener may carry. Anything else was addressed to some other name that resolved here.</summary>
         static readonly string[] AllowedHosts = ["127.0.0.1:52539", "[::1]:52539", "localhost:52539"];
 
-        /// <summary>
-        /// Why this request is refused, or null to let it through.
-        /// <para>
-        /// This listener is DEBUG-only — it is started inside <c>#if DEBUG</c> and the published
-        /// builds are Release, so no shipped install opens it. But a developer machine browses the
-        /// web, and the handler answered anything: no Origin, Referer or Host was ever examined. A
-        /// page the developer visited could POST /exit to kill the app, POST /trim to drop cached
-        /// mail, or POST /dom/script, whose body is run as JavaScript inside the privileged WebView.
-        /// CORS hides the ANSWERS cross-origin; it does not stop the request from arriving, and DNS
-        /// rebinding removes even that, which is what makes the Host check the important half.
-        /// </para>
-        /// <para>
-        /// Measured before the check existed: an HttpListener bound to 127.0.0.1:52539 accepted raw
-        /// requests carrying <c>Host: evil.attacker.com</c>, so binding to loopback is no defence by
-        /// itself. A script client sends neither Origin nor Referer and addresses the loopback by
-        /// name or literal, so nothing that should reach this is turned away.
-        /// </para>
-        /// </summary>
+        /// <summary>Rejects browser-originated requests and non-loopback Host values. Loopback binding alone does not prevent a browser page from sending requests.</summary>
         static string? RefusalReason(HttpListenerRequest request)
         {
             if (request.Headers["Origin"] is { Length: > 0 } origin)

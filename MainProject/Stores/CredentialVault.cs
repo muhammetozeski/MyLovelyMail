@@ -200,9 +200,6 @@ namespace MyLovelyMail.MainProject.Stores
             AtomicFile.WriteAllText(VaultPath, JsonSerializer.Serialize(file));
         }
 
-        /// <summary>Re-encrypts the vault in the newly selected mode (call after changing <see cref="Settings.CredentialVaultMode"/>).</summary>
-        public static void ReencryptInCurrentMode() => Save();
-
         /// <summary>True when a vault file exists on disk (distinguishes "set a NEW master password" from "unlock").</summary>
         public static bool VaultFileExists => File.Exists(VaultPath);
 

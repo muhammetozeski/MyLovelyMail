@@ -25,17 +25,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>What went wrong the last time a folder was fetched on demand, and when.</summary>
         public sealed record FolderSyncFailure(string Message, DateTime WhenUtc);
 
-        /// <summary>
-        /// The last on-demand failure per folder, keyed by <see cref="MessageStore.FolderKey"/>.
-        /// <para>
-        /// The failure of a folder opened by the user was reported nowhere but the log: the catch
-        /// below only wrote a line, and <see cref="SyncHealthService"/> is marked from the
-        /// scheduled pass and the IDLE loop, never from here. So a folder whose fetch had just been
-        /// refused looked exactly like a folder with no mail in it, and nothing on screen said
-        /// otherwise. In RAM on purpose — it describes this run, and a stale error read back from
-        /// disk after a restart would be a worse lie than none.
-        /// </para>
-        /// </summary>
+        /// <summary>Last foreground folder failure, kept for this process so the empty-folder UI can distinguish a failed fetch from an empty mailbox.</summary>
         static readonly System.Collections.Concurrent.ConcurrentDictionary<string, FolderSyncFailure> onDemandFailures = new();
 
         /// <summary>The last on-demand fetch failure for this folder, or null when the last one worked.</summary>
