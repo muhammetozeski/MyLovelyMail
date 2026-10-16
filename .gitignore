@@ -237,6 +237,7 @@ ClientBin/
 *.dbproj.schemaview
 *.jfm
 *.pfx
+PFX-PAROLA.txt
 *.publishsettings
 orleans.codegen.cs
 
