@@ -1,0 +1,87 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits ThemedComponentBase
+
+<style>
+    /* ---- Responsive: drop to two panes, then one ---- */
+
+    @@media (max-width: @(AppMeasures.Breakpoint.TwoPane)px) {
+        /* Below this width the reader is a full-window overlay with its own scrollport, so the
+           screen has nothing left to grow for: it goes back to fitting the window exactly, and
+           the two panes back to sharing that height instead of being pinned inside it. */
+        .mail-screen {
+            grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
+            height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+            align-items: stretch;
+        }
+
+        .mail-sidebar,
+        .mail-list {
+            position: static;
+            height: auto;
+        }
+
+        .mail-reader {
+            display: none;
+        }
+
+        .mail-screen--pane-open .mail-reader {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: @(AppMeasures.ZLayer.Overlay);
+            padding: @(AppMeasures.Space.Medium)px;
+            /* The floating bottom navigation stays on top of the overlay; without this inset the
+               last row of a scrolled-down pane - compose's Send button - sat under it. */
+            padding-bottom: @(AppMeasures.Space.ScrollBottomInset + AppMeasures.Space.Medium)px;
+            /* Pinned to the window here, so this one DOES need its own scrollport - the page
+               behind it cannot carry an overlay that is taller than the screen. */
+            overflow-y: auto;
+            min-height: 0;
+            @((MarkupString)AppStyles.BuildAuroraBackground())
+        }
+    }
+
+    @@media (max-width: @(AppMeasures.Breakpoint.OnePane)px) {
+        /* The sidebar takes the height it needs and the list gets the rest of the screen. */
+        .mail-screen {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        /* Still a column: the whole sidebar as one sideways row squeezed the logo and the welcome
+           card side by side, and the card wrapped one word per line. Only the account and folder
+           rows below become the sideways strip. */
+        .mail-sidebar {
+            overflow: visible;
+        }
+
+        .mail-sidebar-nav {
+            display: flex;
+            align-items: center;
+            gap: @(AppMeasures.Space.Px4)px;
+            overflow-x: auto;
+            padding-bottom: @(AppMeasures.Space.Px4)px;
+        }
+
+            .mail-sidebar-nav > .mail-account,
+            .mail-sidebar-nav > .mail-folder-row {
+                flex: 0 0 auto;
+            }
+
+            .mail-sidebar-nav .mail-folder {
+                padding-left: @(AppMeasures.Space.Px8)px;
+                white-space: nowrap;
+            }
+
+            /* A phone has no hover to reveal a folder's actions, and invisible buttons still take
+               their width in the strip: only the open folder shows them, and shows them outright. */
+            .mail-sidebar-nav .mail-folder-action {
+                display: none;
+            }
+
+            .mail-sidebar-nav .mail-folder-row:has(.mail-folder--active) .mail-folder-action {
+                display: inline-block;
+                opacity: @(AppMeasures.Opacity.Muted);
+            }
+    }
+</style>

@@ -1,0 +1,194 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits ThemedComponentBase
+
+@{
+    string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string textMuted = AppColors.TextMuted.ToRgbaHex(true);
+    string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+}
+
+<style>
+    /* ---- Shared empty state ---- */
+
+    .mail-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        color: @textMuted;
+        min-height: @(AppMeasures.Size.Px200)px;
+    }
+
+    /* The undo bar carries one message; the send guard can carry several, so its rows stack
+       instead of being squeezed side by side into a single line. */
+    .mail-send-guard {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    /* Which mailbox this draft leaves from — the pane used to render it as plain text. */
+    .mail-from-chip {
+        border: @(AppMeasures.Border.Thin)px solid transparent;
+        cursor: pointer;
+        margin-left: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        opacity: @(AppMeasures.Opacity.Muted);
+    }
+
+    .mail-from-chip--on {
+        opacity: 1;
+        font-weight: @(AppMeasures.Weight.Bold);
+        border-color: @glassBorder;
+    }
+
+    /* Reader text-size stepper, in the action strip. */
+    .mail-text-scale {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px2)px;
+    }
+
+        .mail-text-scale .mail-text-scale-step {
+            opacity: 1;
+            border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+            color: @textSecondary;
+            font-size: @(AppMeasures.Font.XSmall)px;
+        }
+
+    /* Chips under an empty result: what would find something. */
+    .mail-rescue {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding-top: @(AppMeasures.Space.Px12)px;
+    }
+
+    /* Result of a folder-level action, under the folder list. */
+    .mail-sidebar-status {
+        padding: @(AppMeasures.Space.Px8)px;
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        word-break: break-all;
+    }
+
+    /* New-tag row inside the bulk tag menu. */
+    .mail-bulk-tag-new {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-top: @(AppMeasures.Space.Px4)px;
+    }
+
+    /* How a queued message is doing, on its own row. */
+    .mail-row-outbox {
+        color: @AppColors.TextWarning.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    /* Which of the three the pane is showing; only rendered when more than one exists. */
+    .mail-pane-tabs {
+        display: flex;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-bottom: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-pane-tab {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: transparent;
+        cursor: pointer;
+        color: @textSecondary;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-pane-tab--on {
+        background: @surfaceTint;
+        color: @textPrimary;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    /* One panel for everything the cache knows about a correspondent. */
+    .mail-person-sheet {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .mail-person-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-person-name {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+    }
+
+    /* Its own class, not mail-folder-action: that one is invisible until its row is hovered. */
+    .mail-person-close {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: @textMuted;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+        .mail-person-close:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-person-address {
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Small)px;
+        word-break: break-all;
+    }
+
+    .mail-person-stats {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        padding: @(AppMeasures.Space.Px8)px 0;
+        color: @textPrimary;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-person-folder {
+        color: @textMuted;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-person-tags,
+    .mail-person-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-top: @(AppMeasures.Space.Px8)px;
+    }
+
+</style>

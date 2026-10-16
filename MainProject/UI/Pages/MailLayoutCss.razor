@@ -1,0 +1,227 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits ThemedComponentBase
+
+@{
+    string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string textMuted = AppColors.TextMuted.ToRgbaHex(true);
+    string primary = AppColors.Primary.ToRgbaHex(true);
+    string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string paneHeight = $"calc({AppMeasures.Viewport.Full}vh - {AppMeasures.Space.Px90 + AppMeasures.Space.Medium * 2}px)";
+}
+
+<style>
+    .mail-screen {
+        display: grid;
+        grid-template-columns: @(AppMeasures.Size.Px260)px @(AppMeasures.Size.Px360)px 1fr;
+        gap: @(AppMeasures.Space.Medium)px;
+        padding: @(AppMeasures.Space.Medium)px;
+        box-sizing: border-box;
+        /* min-height, NOT height: a message whose headers, rule traces and body add up to more
+           than the window makes the PAGE grow and scroll. Clipped to the window there was no
+           room left even to scroll - the body ended up a few pixels tall under the metadata. */
+        min-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+        /* Each column owns its height; stretched, the two left ones would follow the reader down. */
+        align-items: start;
+    }
+
+    /* ---- Sidebar ---- */
+
+    .mail-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        overflow-y: auto;
+        min-height: 0;
+        /* Window-tall and pinned: the reader column can now run to several screens, and folders
+           you cannot reach without scrolling back up are worse than no folder rail at all. */
+        position: sticky;
+        top: @(AppMeasures.Space.Medium)px;
+        height: @paneHeight;
+    }
+
+    /* Invisible to the layout above the one-pane breakpoint: its accounts and folders stay direct
+       rows of the sidebar column. */
+    .mail-sidebar-nav {
+        display: contents;
+    }
+
+    .mail-logo {
+        display: flex;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+        padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-logo-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mail-welcome-card {
+        text-align: center;
+    }
+
+    .mail-welcome-icon {
+        font-size: @(AppMeasures.Font.Giant)px;
+    }
+
+    .mail-welcome-title {
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        margin: @(AppMeasures.Space.Px8)px 0;
+    }
+
+    .mail-welcome-text {
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Normal)px;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        margin: 0 0 @(AppMeasures.Space.Px16)px 0;
+    }
+
+    .mail-account {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        color: @textPrimary;
+        text-align: left;
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-account:hover,
+        .mail-account--active {
+            background: @surfaceTint;
+        }
+
+    .mail-account-dot {
+        width: @(AppMeasures.Size.Px12)px;
+        height: @(AppMeasures.Size.Px12)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        flex-shrink: 0;
+    }
+
+    /* A paused account stays clickable — its cached mail is still readable — but stops looking
+       like one that is up to date. */
+    .mail-account--paused {
+        opacity: @(AppMeasures.Opacity.Muted);
+    }
+
+        .mail-account--paused .mail-account-dot {
+            filter: grayscale(1);
+        }
+
+    /* Ctrl+N ordinal so the keyboard mapping is discoverable at a glance. */
+    /* Only shown while an account is actually failing, so it means something when it appears. */
+    .mail-account-failing,
+    .mail-account-paused {
+        flex-shrink: 0;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .mail-account-ordinal {
+        flex-shrink: 0;
+        min-width: @(AppMeasures.Size.Px16)px;
+        text-align: center;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Px4)px;
+        padding: 0 @(AppMeasures.Space.Px2)px;
+    }
+
+    .mail-account-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-account-unread {
+        /* Ink comes from the inline style (AppColors.InkOn), which measures contrast against the actual chip color. */
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Heavy);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        flex-shrink: 0;
+    }
+
+    /* Wrapper so the hover actions can sit beside the folder button (a button cannot nest). */
+    .mail-folder-row {
+        display: flex;
+        align-items: center;
+    }
+
+        .mail-folder-row > .mail-folder {
+            flex: 1;
+            min-width: 0;
+            /* One step of indent per level of the server's own folder path. */
+            padding-left: calc(@(AppMeasures.Space.Px24)px + var(--folder-depth, 0) * @(AppMeasures.Space.Px12)px);
+        }
+
+    .mail-folder-action {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        opacity: 0;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: opacity @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-folder-row:hover .mail-folder-action {
+            opacity: @(AppMeasures.Opacity.Muted);
+        }
+
+        .mail-folder-action:hover {
+            opacity: 1;
+            background: @surfaceTint;
+        }
+
+    .mail-folder {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px24)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Normal)px;
+        text-align: left;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-folder:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-folder--active {
+        background: @surfaceTint;
+        color: var(--account-accent, @primary);
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    .mail-folder-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+</style>

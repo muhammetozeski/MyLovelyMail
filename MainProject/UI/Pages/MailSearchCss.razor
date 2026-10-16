@@ -1,0 +1,137 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits ThemedComponentBase
+
+@{
+    string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string primary = AppColors.Primary.ToRgbaHex(true);
+    string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+}
+
+<style>
+    /* ---- Search tools and saved searches ---- */
+
+    .mail-search {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    /* Indeterminate sync line: a soft accent runner sweeping under the search bar while syncing. */
+    .mail-sync-line {
+        height: @(AppMeasures.Size.Px4)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .mail-sync-line-runner {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: @(AppMeasures.Percent.Half)%;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: linear-gradient(90deg, transparent, var(--account-accent, @primary), transparent);
+        animation: sync-sweep @(AppMeasures.Duration.Longer)s ease-in-out infinite;
+    }
+
+    @@keyframes sync-sweep {
+        0% { left: -@(AppMeasures.Percent.Half)%; }
+        100% { left: @(AppMeasures.Percent.Full)%; }
+    }
+
+    /* The fold handle is a pill like the filters it hides, and sits on its own line so it keeps
+       pill width instead of stretching across the column the way a flex child would. */
+    .mail-search-fold-row {
+        display: flex;
+    }
+
+    .mail-search-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        /* Without wrapping, the filter pills run past the list column and slide under the reader. */
+        animation: filters-unfold @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    @@keyframes filters-unfold {
+        from {
+            opacity: 0;
+            transform: translateY(-@(AppMeasures.Space.Px4)px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .mail-search-toggle {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textSecondary;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        /* Without this the emoji wraps onto its own line above the label inside the pill. */
+        white-space: nowrap;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-search-toggle:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-search-toggle--on {
+        background: linear-gradient(135deg, @primary, @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
+    }
+
+    .mail-saved-searches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: 0 @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .mail-saved-chip {
+        display: inline-flex;
+        align-items: center;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        overflow: hidden;
+    }
+
+    .mail-saved-run,
+    .mail-saved-remove {
+        border: none;
+        background: transparent;
+        color: @textSecondary;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        max-width: @(AppMeasures.Size.Px180)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+        .mail-saved-run:hover,
+        .mail-saved-remove:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-row-folder {
+        color: var(--account-accent, @primary);
+        margin-right: @(AppMeasures.Space.Px6)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+</style>
