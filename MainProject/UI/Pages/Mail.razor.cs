@@ -76,7 +76,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal void SelectAccount(MailAccountData account)
         {
             MailUiState.SelectAccount(account);
-            Folders = SortFolders(MessageStore.GetFolders(account.Id));
+            Folders = FolderTreeService.Build(MessageStore.GetFolders(account.Id));
 
             if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), [.. Folders.Select(static n => n.Folder)]) is { } target)
                 MailUiState.SelectFolder(target);
@@ -117,7 +117,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void RefreshLists()
         {
             var account = MailUiState.SelectedAccount;
-            Folders = account == null ? [] : SortFolders(MessageStore.GetFolders(account.Id));
+            Folders = account == null ? [] : FolderTreeService.Build(MessageStore.GetFolders(account.Id));
 
             if (account != null && SearchAllFolders && !string.IsNullOrWhiteSpace(SearchText))
             {
@@ -340,23 +340,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SearchAllFolders = true;
             RefreshLists();
         }
-
-        /// <summary>Display order and nesting depth; the ordering rules live in FolderTreeService now.</summary>
-        static List<FolderNode> SortFolders(List<MailFolderData> folders) => FolderTreeService.Build(folders);
-
-        static int RoleRank(FolderRole role) => role switch
-        {
-            FolderRole.Inbox => 0,
-            FolderRole.Flagged => 1,
-            FolderRole.Drafts => 2,
-            FolderRole.Sent => 3,
-            FolderRole.Outbox => 4,
-            FolderRole.Archive => 5,
-            FolderRole.Junk => 6,
-            FolderRole.Trash => 7,
-            FolderRole.AllMail => 8,
-            _ => 9
-        };
 
         /// <summary>Glyph for a folder that exists only on this machine.</summary>
         const string LocalFolderIcon = "💾";

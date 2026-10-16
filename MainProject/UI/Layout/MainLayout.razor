@@ -2,17 +2,14 @@
 @inject NavigationManager NavManager
 @implements IDisposable
 
-<div class="app-page @(_showBottomNav ? "has-bottom-nav" : "")">
+<div class="app-page has-bottom-nav">
     <main>
         <article class="content">
             @Body
         </article>
     </main>
 
-    @if (_showBottomNav)
-    {
-        <AppBottomNav />
-    }
+    <AppBottomNav />
 </div>
 
 <VaultUnlockOverlay />
@@ -21,26 +18,15 @@
 
 @code {
 
-    private bool _showBottomNav = false;
-
     protected override void OnInitialized()
     {
         
-        NavManager.LocationChanged += HandleLocationChanged;
         Events.MainEvents.OnDataChanged += HandleDataChanged;
-        EvaluateBottomNavVisibility(NavManager.Uri);
         // The layout outlives every page, so it is the right owner of the app-wide navigator.
         Services.NavigationBridge.Navigator = route => InvokeAsync(() => NavManager.NavigateTo(route));
     }
 
-    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-    {
-        
-        EvaluateBottomNavVisibility(e.Location);
-        StateHasChanged();
-    }
-
-    private void HandleDataChanged(string eventName, object? data)
+    void HandleDataChanged(string eventName, object? data)
     {
         if (eventName == "OnThemeChanged")
         {
@@ -48,14 +34,8 @@
         }
     }
 
-    private void EvaluateBottomNavVisibility(string uri)
-    {
-        _showBottomNav = true;
-    }
-
     public void Dispose()
     {
-        NavManager.LocationChanged -= HandleLocationChanged;
         Events.MainEvents.OnDataChanged -= HandleDataChanged;
         Services.NavigationBridge.Navigator = null;
     }

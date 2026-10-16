@@ -23,8 +23,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.SelectedAccount is { } account ? ContactIndexService.Suggest(account.Id) : [];
 
         internal string? SendError { get; set; }
-        System.Timers.Timer? draftAutosaveTimer;
-        System.Timers.Timer? undoCountdownTimer;
+        Timer? draftAutosaveTimer;
+        Timer? undoCountdownTimer;
         internal DateTime? DraftSavedAt { get; set; }
 
         /// <summary>Hands the draft to the outbox and closes the pane; the undo bar takes over.
