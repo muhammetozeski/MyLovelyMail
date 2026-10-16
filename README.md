@@ -137,11 +137,11 @@ app's private files folder, and the app is excluded from Android's cloud backup.
 
 ## Installing
 
-Download either asset from the [latest release](../../releases/latest), unzip it anywhere, and run
-`MyLovelyMail.exe` from the folder root. The portable build needs nothing installed; the
-framework-dependent one is smaller and needs the .NET 10 desktop runtime.
+Download the Windows ZIP from the [latest release](../../releases/latest), unzip it anywhere, and run
+`MyLovelyMail.exe` from the `MyLovelyMail` folder. This build requires the .NET 10 runtime.
+The Android APK is available in the same release.
 
-The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd` from
+The executables are digitally signed. To let Windows verify the signature, run `Install-Certificate.cmd` from
 `SignatureTrust.zip` once. The programs run without it; only the signature stays unverified.
 
 ## Building
