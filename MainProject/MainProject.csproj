@@ -38,6 +38,10 @@
     <SupportedPlatform Include="windows" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Compile Remove="Diagnostics\DebugApi\**\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />

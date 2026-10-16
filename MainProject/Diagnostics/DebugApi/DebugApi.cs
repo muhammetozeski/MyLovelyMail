@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Web;
+using System.Runtime.Versioning;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
@@ -29,6 +30,7 @@ namespace MyLovelyMail.MainProject.Diagnostics
     /// misinformation. Read the switch — every case carries the reason it exists.
     /// </para>
     /// </summary>
+    [UnsupportedOSPlatform("browser")]
     public static partial class DebugApi
     {
         public const string Prefix = "http://127.0.0.1:52539/";
