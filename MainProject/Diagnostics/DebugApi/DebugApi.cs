@@ -15,7 +15,7 @@ using MyLovelyMail.MainProject.Constants;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
-namespace MyLovelyMail.MainProject.ZTests
+namespace MyLovelyMail.MainProject.Diagnostics
 {
     /// <summary>
     /// DEBUG-ONLY localhost REST API so the running app can be driven and inspected from outside
@@ -206,7 +206,7 @@ namespace MyLovelyMail.MainProject.ZTests
                 "/trim" or "/store/check" or "/trim-rehearsal" or "/export" => await HandleStorageAsync(request, query),
                 "/compose/from" or "/reply-preview" or "/signature" or "/compose/preview" or "/forward-attach" or "/send" or "/flush-outbox" or "/send-check" or "/outbox" or "/outbox/hold/clear" or "/outbox/retry" or "/undo" or "/compose" => await HandleComposeAsync(request, query),
                 "/auth" or "/search-rescue" or "/threads/probe" or "/person" or "/person/open" or "/message" or "/select" or "/tag" or "/read" or "/messages" or "/threads" or "/open" or "/source" or "/list" or "/identity" or "/unsubscribe" or "/contacts" or "/move" => await HandleMessagesAsync(request, query),
-                "/rule-audit" or "/rule-audit/probe" or "/rule-preview" or "/mute" or "/muted" or "/mute/incoming-probe" or "/snooze" or "/snooze/wake" or "/snoozed" => await HandleRulesAsync(request, query),
+                "/rule-audit" or "/rule-audit/probe" or "/rule-preview" or "/mute" or "/muted" or "/mute/incoming-probe" or "/snooze" or "/snooze/wake" or "/snoozed" => HandleRules(request, query),
                 _ => throw new InvalidOperationException($"Unknown endpoint: {request.HttpMethod} {path}")
             };
         }

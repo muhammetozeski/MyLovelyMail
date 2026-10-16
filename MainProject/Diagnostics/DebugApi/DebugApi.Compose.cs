@@ -15,7 +15,7 @@ using MyLovelyMail.MainProject.Constants;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
-namespace MyLovelyMail.MainProject.ZTests;
+namespace MyLovelyMail.MainProject.Diagnostics;
 
 public static partial class DebugApi
 {

@@ -79,4 +79,4 @@ short, concrete, English, only where the code does not explain itself.
 ## Rules picked up mid-work
 - Editing tool JSON-decodes `\uXXXX` escapes: writing `'\u001F'` through it lands as a
   raw control char in source. Use PowerShell ReadAllText/Replace for such edits.
-- zTests\Logger.cs carries a [rule]: its Turkish comments must not be touched.
+- MainProject\Diagnostics\Logger.cs carries a [rule]: its Turkish comments must not be touched.

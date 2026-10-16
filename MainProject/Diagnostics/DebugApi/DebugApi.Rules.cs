@@ -15,7 +15,7 @@ using MyLovelyMail.MainProject.Constants;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
-namespace MyLovelyMail.MainProject.ZTests;
+namespace MyLovelyMail.MainProject.Diagnostics;
 
 public static partial class DebugApi
 {
@@ -23,7 +23,7 @@ public static partial class DebugApi
     /// <param name="request">The accepted local request, including its method and body.</param>
     /// <param name="query">Decoded query values shared with the route dispatcher.</param>
     /// <returns>The response object serialized by the listener.</returns>
-    static async Task<object?> HandleRulesAsync(HttpListenerRequest request, NameValueCollection query)
+    static object? HandleRules(HttpListenerRequest request, NameValueCollection query)
     {
         switch (request.HttpMethod, request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant())
         {
