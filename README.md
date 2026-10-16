@@ -1,5 +1,7 @@
 # My Lovely Mail
 
+[Developer documentation](docs/README.md)
+
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![C%23](https://img.shields.io/badge/C%23-14-239120)
 ![UI](https://img.shields.io/badge/UI-MAUI%20Blazor%20Hybrid-68217A)
