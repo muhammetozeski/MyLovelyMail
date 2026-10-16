@@ -1,5 +1,7 @@
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
 
+using MyLovelyMail.MainProject.Stores;
+
 namespace MyLovelyMail.MainProject.DataModels.Mail
 {
     /// <summary>Protocol used to receive mail for an account.</summary>

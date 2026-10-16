@@ -116,7 +116,7 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>
         /// Where an archive entry is allowed to land, or null when it is not allowed at all.
         /// <para>
-        /// A zip entry name is attacker-controlled text, and <see cref="Path.Combine"/> honours the
+        /// A zip entry name is attacker-controlled text, and <c>Path.Combine</c> honours the
         /// <c>..</c> segments in it: an entry called
         /// <c>../../../../AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/x.cmd</c>
         /// used to be written exactly there, which is code running at the next sign-in. The full

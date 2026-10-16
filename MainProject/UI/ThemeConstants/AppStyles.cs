@@ -112,7 +112,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         }
 
         /// <summary>
-        /// Stacks the active theme's <see cref="Theme.AuroraStop"/>s as overlapping radial gradients on top of
+        /// Stacks the active theme's <see cref="AuroraStop"/>s as overlapping radial gradients on top of
         /// a vertical base gradient. Three soft blooms give backdrop-filter blur the contrast it needs
         /// to read as real frosted glass instead of a flat color.
         /// </summary>
