@@ -1,4 +1,4 @@
-# Cuts a GitHub release: publishes both flavours, zips them and uploads them as the release assets.
+# Publishes the framework-dependent Windows package and Android APK to GitHub.
 # Version comes from the newest existing release tag, bumped by -Bump (patch|minor|major).
 # The release notes are the commit subjects since that tag, so they describe what actually changed.
 param(
@@ -61,12 +61,13 @@ if (-not $subjects) { throw "No commits since $lastTag - nothing to release." }
 $resumingDraft = @(gh release list --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' 2>$null) |
     Where-Object { $_ -eq $tag }
 if ($resumingDraft) { Write-Host "A draft for $tag is already open; its assets will be completed and it will be published." -ForegroundColor Yellow }
-$notesFile = Join-Path $env:TEMP "$ProjectName-$tag-notes.md"
+$notesFolder = (NewTemp MyLovelyMailRelease | Select-Object -Last 1).ToString().Trim()
+$notesFile = Join-Path $notesFolder "$ProjectName-$tag-notes.md"
 $signatureNote = @'
 
 ## Signature
 
-The executables are digitally signed. To let Windows verify the signature, run `Guven-Kur.cmd`
+The executables are digitally signed. To let Windows verify the signature, run `Install-Certificate.cmd`
 from `SignatureTrust.zip` once. The programs run without it; only the signature stays unverified.
 '@
 $androidNote = @"
@@ -111,7 +112,6 @@ $headBefore = git rev-parse HEAD
 # ── Publish both flavours ──
 New-Item -ItemType Directory -Force $PublishDir | Out-Null
 $stages = @(
-    @{ Name = 'PortableStage'; SelfContained = 'true'; Asset = "$ProjectName-$tag-$Rid-portable.zip" }
     @{ Name = 'FrameworkDependentStage'; SelfContained = 'false'; Asset = "$ProjectName-$tag-$Rid-framework-dependent-requires-net10.zip" }
 )
 $assets = @()
@@ -140,7 +140,13 @@ foreach ($stage in $stages) {
 
     $zip = Join-Path $PublishDir $stage.Asset
     if (Test-Path $zip) { Remove-Item -Force $zip }
-    Compress-Archive -Path "$stageRoot\*" -DestinationPath $zip
+    $packageRoot = Join-Path $PublishDir "PackageRoot\$ProjectName"
+    if (Test-Path $packageRoot) {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($packageRoot, 'OnlyErrorDialogs', 'SendToRecycleBin')
+    }
+    New-Item -ItemType Directory -Force $packageRoot | Out-Null
+    Copy-Item -Path "$stageRoot\*" -Destination $packageRoot -Recurse
+    Compress-Archive -LiteralPath $packageRoot -DestinationPath $zip
     $assets += $zip
     Write-Host "  -> $($stage.Asset) ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)" -ForegroundColor DarkGray
 }

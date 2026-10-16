@@ -13,8 +13,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$WorkDir = Join-Path $env:TEMP "MyLovelyMailLauncher_$(New-Guid)"
-New-Item -ItemType Directory -Force $WorkDir | Out-Null
+$WorkDir = (NewTemp MyLovelyMailLauncher | Select-Object -Last 1).ToString().Trim()
 
 Add-Type -AssemblyName System.Drawing
 $IconXml = ""
