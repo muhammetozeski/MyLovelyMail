@@ -191,4 +191,5 @@ MyLovelyMail\          MAUI head: window, tray, toasts, startup wiring; MauiProg
                        steps live in Platforms\Windows and Platforms\Android
 MyLovelyMail.Web\      ASP.NET Core head for browser preview during development
 Generators\            incremental source generator for navigation constants
+tools\ThemeStudio\    standalone theme editor, outside the application build
 ```
