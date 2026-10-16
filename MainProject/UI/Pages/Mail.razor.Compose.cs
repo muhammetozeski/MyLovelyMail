@@ -16,21 +16,21 @@ namespace MyLovelyMail.MainProject.UI.Pages
         const long MaxComposeAttachmentBytes = 50 * 1024 * 1024;
 
         /// <summary>Datalist element id shared by the To and Cc fields.</summary>
-        const string ContactListId = "mail-contacts";
+        internal const string ContactListId = "mail-contacts";
 
         /// <summary>Addresses offered while typing a recipient, harvested from the account's own mail.</summary>
-        List<Contact> KnownContacts =>
+        internal List<Contact> KnownContacts =>
             MailUiState.SelectedAccount is { } account ? ContactIndexService.Suggest(account.Id) : [];
 
-        string? SendError { get; set; }
+        internal string? SendError { get; set; }
         System.Timers.Timer? draftAutosaveTimer;
         System.Timers.Timer? undoCountdownTimer;
-        DateTime? DraftSavedAt { get; set; }
+        internal DateTime? DraftSavedAt { get; set; }
 
         /// <summary>Hands the draft to the outbox and closes the pane; the undo bar takes over.
         /// The draft is saved first so a failed submit still leaves it in Drafts.</summary>
         /// <summary>What the pre-send checks found; empty means nothing is worth stopping for.</summary>
-        IReadOnlyList<SendWarning> SendWarnings { get; set; } = [];
+        internal IReadOnlyList<SendWarning> SendWarnings { get; set; } = [];
 
         /// <summary>
         /// Rebuilds the quote at another style from the message the draft is answering, keeping
@@ -38,7 +38,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// safe direction: re-parsing the edited body would have to guess which of its lines the
         /// user wrote.
         /// </summary>
-        void RequoteDraft(ComposeDraft draft, QuoteStyle style)
+        internal void RequoteDraft(ComposeDraft draft, QuoteStyle style)
         {
             if (draft.Account is not { } account || draft.SourceUid == 0) return;
             if (MessageStore.GetSummary(account.Id, draft.SourceFolder, draft.SourceUid) is not { } source) return;
@@ -51,7 +51,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Sends this draft from another account; the service owns the signature swap and the stranded-copy cleanup.</summary>
-        void SwitchDraftAccount(ComposeDraft draft, MailAccountData sender)
+        internal void SwitchDraftAccount(ComposeDraft draft, MailAccountData sender)
         {
             ComposeService.SwitchSendingAccount(draft, sender);
             SendWarnings = [];
@@ -59,7 +59,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Starts a new draft addressed to this person and closes the sheet behind it.</summary>
-        void StartComposeTo(string address)
+        internal void StartComposeTo(string address)
         {
             if (MailUiState.SelectedAccount is not { } account) return;
             var draft = ComposeService.BuildNew(account);
@@ -68,7 +68,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OpenCompose(draft);
         }
 
-        void QueueActiveDraftSend()
+        internal void QueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
 
@@ -79,7 +79,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Sends past the pre-send warnings (or straight through when there were none).</summary>
-        void ForceQueueActiveDraftSend()
+        internal void ForceQueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
             SendWarnings = [];
@@ -89,21 +89,21 @@ namespace MyLovelyMail.MainProject.UI.Pages
             OutboxService.Enqueue(draft);
         }
 
-        static void UndoPendingSend()
+        internal static void UndoPendingSend()
         {
             if (OutboxService.Undo() is { } draft)
                 MailUiState.OpenCompose(draft);
         }
 
         /// <summary>Reopens the failed draft for editing and takes the failure bar down.</summary>
-        static void EditFailedSend()
+        internal static void EditFailedSend()
         {
             if (OutboxService.LastFailure is not { } failure) return;
             MailUiState.OpenCompose(failure.Draft);
             OutboxService.DismissFailed();
         }
 
-        static int UndoSecondsLeft(PendingSend pending) =>
+        internal static int UndoSecondsLeft(PendingSend pending) =>
             Math.Max(0, (int)Math.Ceiling((pending.DueUtc - DateTime.UtcNow).TotalSeconds));
 
         /// <summary>Ticks the undo bar's countdown once a second while a send is pending.</summary>
@@ -123,7 +123,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             InvokeAsync(StateHasChanged);
         }
 
-        async Task OnComposeFilesSelectedAsync(InputFileChangeEventArgs e)
+        internal async Task OnComposeFilesSelectedAsync(InputFileChangeEventArgs e)
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
             try
@@ -144,21 +144,21 @@ namespace MyLovelyMail.MainProject.UI.Pages
             StateHasChanged();
         }
 
-        void RemoveComposeAttachment(string path)
+        internal void RemoveComposeAttachment(string path)
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
             ComposeService.RemoveAttachment(draft, path);
             NoteComposeActivity();
         }
 
-        static void StartCompose()
+        internal static void StartCompose()
         {
             if (MailUiState.SelectedAccount is { } account)
                 MailUiState.OpenCompose(ComposeService.BuildNew(account));
         }
 
         /// <summary>Any keystroke in the compose fields re-arms a ~3s idle autosave.</summary>
-        void NoteComposeActivity()
+        internal void NoteComposeActivity()
         {
             draftAutosaveTimer?.Dispose();
             draftAutosaveTimer = new System.Timers.Timer(3000) { AutoReset = false };
@@ -175,7 +175,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             InvokeAsync(StateHasChanged);
         }
 
-        void SaveAndCloseCompose()
+        internal void SaveAndCloseCompose()
         {
             draftAutosaveTimer?.Dispose();
             SaveActiveDraft();
@@ -183,7 +183,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.CloseCompose();
         }
 
-        void DiscardCompose()
+        internal void DiscardCompose()
         {
             SendWarnings = [];
             draftAutosaveTimer?.Dispose();

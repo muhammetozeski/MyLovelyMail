@@ -1,0 +1,126 @@
+@namespace MyLovelyMail.MainProject.UI.Pages
+@inherits MailPageSection
+@inject NavigationManager Navigation
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
+@using System.IO
+
+    @* ---- Left: accounts + folders ---- *@
+    <aside class="mail-sidebar">
+        <div class="mail-logo">💌<span class="mail-logo-text">My Lovely Mail</span><SyncHeart /></div>
+
+        @if (MailUiState.SelectedAccount != null)
+        {
+            <PrimaryButton IsFullWidth="true" OnClick="@Mail.StartCompose" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
+        }
+
+        @if (Mail.SavedSearchList.Count > 0)
+        {
+            <div class="mail-saved-searches">
+                @foreach (var saved in Mail.SavedSearchList)
+                {
+                    <span class="mail-saved-chip">
+                        <button class="mail-saved-run" @onclick="() => View.RunSavedSearch(saved)">🔍 @saved</button>
+                        <button class="mail-saved-remove" @onclick="() => Mail.RemoveSavedSearch(saved)">✕</button>
+                    </span>
+                }
+            </div>
+        }
+
+        @if (AccountStore.Accounts.Count == 0)
+        {
+            <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
+                <div class="mail-welcome-icon">🌸</div>
+                <div class="mail-welcome-title">Welcome!</div>
+                <p class="mail-welcome-text">Add your first mail account and your inbox will bloom here.</p>
+                <PrimaryButton IsFullWidth="true" OnClick="@(() => Navigation.NavigateTo(AccountWizard.RoutePath))">
+                    ➕ Add account
+                </PrimaryButton>
+            </GlassCard>
+        }
+        else
+        {
+            @* A wrapper only the one-pane layout draws: there the accounts and folders scroll sideways
+               as one strip under the logo, while everything else in the sidebar keeps its full width. *@
+            <nav class="mail-sidebar-nav">
+            @foreach (var (account, accountIndex) in AccountStore.Accounts.Select(static (a, i) => (a, i)))
+            {
+                @* Side button 4 copies this account's address: the row shows a display name or a
+                   truncated address, so the payload is named rather than read off the screen. *@
+                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
+                        title="@Mail.SyncHealthTooltip(account)"
+                        data-mouse4="copy" data-mouse4-value="@account.EmailAddress"
+                        @onclick="() => View.SelectAccount(account)">
+                    <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                    @if (!account.Enabled)
+                    {
+                        @* Enabled has real consequences — sync, IDLE and the outbox all skip the
+                           account — but the rail drew it exactly like a live one. *@
+                        <span class="mail-account-paused" title="Paused — not syncing">⏸️</span>
+                    }
+                    @if (SyncHealthService.For(account.Id).IsFailing)
+                    {
+                        <span class="mail-account-failing" title="@Mail.SyncHealthTooltip(account)">⚠️</span>
+                    }
+                    @if (accountIndex < 9)
+                    {
+                        <span class="mail-account-ordinal">@(accountIndex + 1)</span>
+                    }
+                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? account.EmailAddress : account.DisplayName)</span>
+                    @if (GlobalSettings.ShowUnreadBadge.Value && Mail.AccountUnreadCount(account.Id) is > 0 and var accountUnread)
+                    {
+                        <span class="mail-account-unread" style="background:@account.ColorHex;color:@AppColors.InkOn(account.ColorHex).ToRgbaHex(true)">@accountUnread</span>
+                    }
+                </button>
+
+                @if (MailUiState.SelectedAccount?.Id == account.Id)
+                {
+                    @foreach (var node in View.Folders)
+                    {
+                        var folder = node.Folder;
+                        @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
+                           Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
+                        <div class="mail-folder-row" style="--folder-depth:@node.Depth">
+                            @* A \NoSelect folder is a branch, not a mailbox: it is shown so its
+                               children have a parent, and it cannot be opened. *@
+                            <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                    disabled="@(!folder.Selectable)"
+                                    title="@(folder.Selectable ? Mail.FolderFreshness(folder) : "This folder only holds other folders")"
+                                    @onclick="() => MailUiState.SelectFolder(folder)">
+                                <span class="mail-folder-icon">@Mail.FolderIcon(folder)</span>
+                                <span class="mail-folder-name">@Mail.FolderLabel(folder)</span>
+                                @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value)
+                                {
+                                    <CoreChip Text="@folder.UnreadCount.ToString()"
+                                              Background="@AppColors.Primary"
+                                              TextColor="@AppColors.TextOnAccent"
+                                              FontSize="@AppMeasures.Font.XSmall"
+                                              PaddingX="8" PaddingY="2" />
+                                }
+                            </button>
+                            @if (folder.UnreadCount > 0)
+                            {
+                                <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
+                                        @onclick="() => View.MarkFolderRead(folder)">📖</button>
+                            }
+                            <button class="mail-folder-action" title="Export this folder as one .mbox file"
+                                    @onclick="() => View.ExportFolderMailbox(folder)">📦</button>
+                            @if (!folder.IsLocal)
+                            {
+                                <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
+                                        @onclick="() => View.ResyncFolder(folder)">🔄</button>
+                            }
+                        </div>
+                    }
+                }
+            }
+            </nav>
+        }
+
+        @* Folder-level results need their own line: the reader's status sits inside the
+           open-message block, and a folder export happens with nothing open. *@
+        @if (View.FolderActionStatus != null)
+        {
+            <div class="mail-sidebar-status">@View.FolderActionStatus</div>
+        }
+    </aside>
+

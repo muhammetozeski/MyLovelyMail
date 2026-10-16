@@ -28,7 +28,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>The folder rows in display order, each carrying its depth in the server's tree.</summary>
-        List<FolderNode> Folders { get; set; } = [];
+        internal List<FolderNode> Folders { get; set; } = [];
 
         /// <summary>The open folder's summaries after the search box filter, newest first.</summary>
         List<MailMessageSummary> FilteredSummaries { get; set; } = [];
@@ -73,7 +73,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             InvokeAsync(StateHasChanged);
         }
 
-        void SelectAccount(MailAccountData account)
+        internal void SelectAccount(MailAccountData account)
         {
             MailUiState.SelectAccount(account);
             Folders = SortFolders(MessageStore.GetFolders(account.Id));
@@ -104,7 +104,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void HandleSyncStateChanged() => InvokeAsync(StateHasChanged);
 
         /// <summary>Hover text of an account row: the keyboard shortcut plus how its syncing is going.</summary>
-        static string SyncHealthTooltip(MailAccountData account)
+        internal static string SyncHealthTooltip(MailAccountData account)
         {
             var health = SyncHealthService.For(account.Id);
             if (health.IsFailing)
@@ -212,7 +212,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// unread badge current while the messages behind it can be weeks old, so the badge alone
         /// cannot tell the user that.
         /// </summary>
-        static string FolderFreshness(MailFolderData folder)
+        internal static string FolderFreshness(MailFolderData folder)
         {
             if (folder.IsLocal) return "Local folder — nothing to sync";
             if (folder.LastSyncedUtc is not { } synced) return "Messages not fetched yet";
@@ -228,7 +228,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
-        static int AccountUnreadCount(string accountId) =>
+        internal static int AccountUnreadCount(string accountId) =>
             MessageStore.GetFolders(accountId)
                 .Where(f => f.Role is not (FolderRole.Trash or FolderRole.Junk))
                 .Sum(f => f.UnreadCount);
@@ -246,7 +246,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             RefreshLists();
         }
 
-        void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
+        internal void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
         /// <summary>How many older messages one press of the footer button asks for.</summary>
         internal const int BackfillBatchSize = 300;
@@ -267,7 +267,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Drops the folder's cache and refills it — the way back from a truncated folder that incremental sync can never heal.</summary>
-        void ResyncFolder(MailFolderData folder)
+        internal void ResyncFolder(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
             MailUiState.SelectFolder(folder);
@@ -310,7 +310,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SearchText = string.Join(' ', parts);
         }
 
-        static List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
+        internal static List<string> SavedSearchList => [.. GlobalSettings.SavedSearches.Value.Split('\u001F', StringSplitOptions.RemoveEmptyEntries)];
 
         void SaveCurrentSearch()
         {
@@ -321,7 +321,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             PersistSavedSearches(saved);
         }
 
-        static void RemoveSavedSearch(string query)
+        internal static void RemoveSavedSearch(string query)
         {
             var saved = SavedSearchList;
             if (saved.Remove(query))
@@ -334,7 +334,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SettingsManager.SaveSettings();
         }
 
-        void RunSavedSearch(string query)
+        internal void RunSavedSearch(string query)
         {
             _searchText = query;
             SearchAllFolders = true;
@@ -370,14 +370,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// showing 📝 Drafts are indistinguishable — including in the move menu, where picking the
         /// wrong one files the message somewhere the user did not mean.
         /// </summary>
-        static string FolderIcon(MailFolderData folder) =>
+        internal static string FolderIcon(MailFolderData folder) =>
             folder.IsLocal ? LocalFolderIcon : FolderIcon(folder.Role);
 
         /// <summary>What the folder is called on screen; local folders say where they live.</summary>
-        static string FolderLabel(MailFolderData folder) =>
+        internal static string FolderLabel(MailFolderData folder) =>
             folder.IsLocal ? $"{folder.DisplayName} {LocalFolderSuffix}" : folder.DisplayName;
 
-        static string FolderIcon(FolderRole role) => role switch
+        internal static string FolderIcon(FolderRole role) => role switch
         {
             FolderRole.Inbox => "📥",
             FolderRole.Sent => "📤",

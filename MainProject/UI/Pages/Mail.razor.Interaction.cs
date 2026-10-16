@@ -126,21 +126,21 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Releases every hold and flushes now; the bar that offers this only appears when something is held.</summary>
-        void RetryHeldOutbox()
+        internal void RetryHeldOutbox()
         {
             OutboxAttemptStore.ReleaseHolds();
             _ = OutboxService.FlushAsync();
         }
 
         /// <summary>Result of the last folder-level action, shown under the folder list.</summary>
-        string? FolderActionStatus { get; set; }
+        internal string? FolderActionStatus { get; set; }
 
         /// <summary>
         /// Writes the folder as one mbox file. The count of bodies that were never downloaded is
         /// reported rather than swallowed — an export that claims to be complete and is not would
         /// be found out only by whoever imports it.
         /// </summary>
-        void ExportFolderMailbox(MailFolderData folder)
+        internal void ExportFolderMailbox(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
             try
@@ -157,7 +157,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Clears a whole folder's unread count from the sidebar, without checking rows by hand.</summary>
-        void MarkFolderRead(MailFolderData folder)
+        internal void MarkFolderRead(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
             MessageActions.SetFolderRead(account, folder.FullName);
@@ -178,7 +178,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             $"left:{10 + heartIndex * 18}%;animation-delay:{heartIndex * 0.7:0.0}s;font-size:{14 + heartIndex % 3 * 6}px;");
 
         /// <summary>The occupants that actually have state behind them, in the order they are offered.</summary>
-        List<(MailUiState.PaneOccupant Occupant, string Label)> PaneTabs
+        internal List<(MailUiState.PaneOccupant Occupant, string Label)> PaneTabs
         {
             get
             {
@@ -367,7 +367,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>1-2 initials for the avatar circle: from the display name's words, else the address.</summary>
-        static string AvatarInitials(MailMessageSummary message)
+        internal static string AvatarInitials(MailMessageSummary message)
         {
             string source = string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName;
             var words = source.Split([' ', '.', '@', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
@@ -380,7 +380,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Deterministic pastel gradient per sender: stable address hash into the theme's MonthGradients.</summary>
-        static string AvatarGradient(MailMessageSummary message)
+        internal static string AvatarGradient(MailMessageSummary message)
         {
             var gradients = AppColors.MonthGradients;
             var (start, end) = gradients[(int)(Pop3Service.Fnv1aHash(message.FromAddress.ToLowerInvariant()) % (uint)gradients.Length)];
