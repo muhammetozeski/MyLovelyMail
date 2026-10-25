@@ -13,6 +13,7 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 | Keyboard shortcuts and bulk actions | [Mail interaction](../MainProject/UI/Pages/Mail.razor.Interaction.cs) |
 | Colors, sizes or responsive layout | `UI/ThemeConstants`, then the relevant style component rendered by [MailCss](../MainProject/UI/Pages/MailCss.razor) |
 | Global or account settings | `Stores/Settings.cs`, `Stores/AccountSettings.cs`, and the corresponding Razor page; [SettingEditorRow](../MainProject/UI/Components/SettingEditorRow.razor) supplies the general editor |
+| Folder defaults, overrides and context menu | [FolderSettingsStore](../MainProject/Stores/FolderSettingsStore.cs), [FolderSettingsPanel](../MainProject/UI/Components/FolderSettingsPanel.razor), and the `Mail.razor.Folders.cs` / `MailFolderMenu.razor` presentation pair |
 | Mail synchronization | [ImapSyncService](../MainProject/Services/Mail/ImapSyncService.cs); its `Folders` partial discovers folders and its `OnDemand` partial schedules foreground operations |
 | Cached messages or local folders | [MessageStore](../MainProject/Storage/MessageStore.cs); the `Index`, `Folders` and `Moves` partials contain those operations |
 | Tor | [TorService](../MainProject/Services/Tor/TorService.cs), endpoint verification in its `Verification` partial, and executable discovery in `TorProcess.Discovery.cs` |
@@ -48,6 +49,32 @@ These calls share the per-folder busy guard, cancellation, error tracking and st
 Use `MessageStore.GetSummaries` for the displayed, date-sorted list. Use `CountSummaries` for counts; its optional predicate supports filtered counts without constructing and sorting the display list.
 
 Keep local-only messages in UserData and server-recoverable messages in UserCache. Storage names, account identifiers and serialized settings are existing data contracts; splitting source files does not change them. Read the storage lessons before changing a folder's owner or cache policy.
+
+## Folder notifications and unread badges
+
+`FolderSettingsStore` owns `UserData/folder-settings.json`, which the migration bundle includes.
+Each field resolves independently from an exact account/folder override, a standard-role default,
+then the shipped default. Global settings offer only the standard roles in `StandardRoles`;
+custom folders are edited in their account. Null fields inherit. An explicit minimum timestamp
+enables notifications, the maximum timestamp mutes indefinitely, and other timestamps expire in UTC.
+Expiry is read at the notification decision; it needs no background timer or message-flag changes.
+An expired explicit override stays unmuted, including Spam, until reset to inheritance.
+
+Mute controls only new-mail notifications in `NotificationService`. Unread-badge visibility is an
+independent preference. Trash always resolves to muted with badges disabled, even if saved overrides
+request otherwise; account counts use the same badge policy and continue excluding Spam. Incoming
+rules' muted destinations are filtered before moves can reassign message numbers, in both receive
+protocols. This filters notification candidates without modifying the rules or messages.
+
+Writes use the existing `AtomicFile` mechanism under a store lock and publish live state only after
+the write succeeds. Read failures use shipped defaults, log the full exception and prevent edits
+from overwriting the unreadable file; a later edit retries that read. Migration import invalidates
+the cached preferences. The menu dispatches existing folder operations through the owning `Mail`
+page, retaining the clicked folder rather than relying on the current selection.
+
+The store's inheritance, persistence, failure paths, notification presentation, counters and Razor
+menu/editor output were checked in an isolated temporary console/Blazor renderer harness. This is
+service and renderer verification, not a native-device interaction test.
 
 ## Building and checking changes
 

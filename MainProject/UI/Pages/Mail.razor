@@ -15,6 +15,10 @@
      style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     <MailSidebar View="this" />
+    @if (FolderMenuTarget != null)
+    {
+        <MailFolderMenu View="this" />
+    }
     @* ---- Middle: message list ---- *@
     <section class="mail-list">
         <div class="mail-search">

@@ -1,0 +1,15 @@
+@inherits ThemedComponentBase
+<style>
+    .folder-settings-entry {
+        padding: @(AppMeasures.Space.Px12)px 0;
+        border-bottom: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+    }
+    .folder-settings-entry > summary { cursor: pointer; color: @AppColors.TextPrimary.ToRgbaHex(true); }
+    .folder-settings-state {
+        margin-left: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+    }
+    .folder-settings-entry .settings-row { flex-wrap: wrap; gap: @(AppMeasures.Space.Px8)px; }
+    .folder-settings-entry select { max-width: 100%; }
+</style>

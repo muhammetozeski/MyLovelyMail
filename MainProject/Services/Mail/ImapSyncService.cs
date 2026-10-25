@@ -221,6 +221,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 MessageStore.UpsertSummaries(account.Id, folder.FullName, arrived);
             }
 
+            var notificationCandidates = ruleResult == null ? arrived
+                : NotificationService.ExcludeMutedRuleDestinations(account, arrived, ruleResult);
             if (ruleResult != null)
                 await ExecuteRuleMovesAsync(account, client, folder, ruleResult, cancellationToken);
 
@@ -241,7 +243,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             if (arrived.Count > 0 && !backgroundRefresh)
             {
-                NotificationService.NotifyNewMessages(account, folder.FullName, arrived);
+                NotificationService.NotifyNewMessages(account, folder.FullName, notificationCandidates);
                 await PrefetchAttachmentBodiesAsync(account, folder.FullName, arrived, cancellationToken);
             }
         }

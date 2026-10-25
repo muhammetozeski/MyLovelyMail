@@ -182,6 +182,8 @@
                              OnReset="@ResetAccountSignature" />
         </GlassCard>
 
+        <FolderSettingsPanel AccountId="@AccountId" SelectedFolder="@FolderFullName" />
+
         <GlassCard CustomClass="settings-section">
             <div class="settings-section-title">🧬 Account overrides</div>
             <p class="settings-empty-text">
@@ -209,6 +211,7 @@
     public const string RouteTemplate = "/Settings/Account/{AccountId}";
 
     [Parameter] public string AccountId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "folder")] public string? FolderFullName { get; set; }
 
     MailAccountData? Account => AccountStore.GetById(AccountId);
     AccountSettings AccountSettingsOf => AccountStore.GetSettings(AccountId);

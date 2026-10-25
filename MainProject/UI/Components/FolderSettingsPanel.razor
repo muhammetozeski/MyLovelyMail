@@ -1,0 +1,158 @@
+@* Both settings pages edit the same scopes that the folder menu and notifications read. *@
+<section id="folder-settings">
+<GlassCard CustomClass="settings-section">
+    <div class="settings-section-title">📂 Folder settings</div>
+    <p class="settings-empty-text">@(AccountId == null
+        ? "Defaults for standard folders across accounts. Custom folders are configured in their account."
+        : "Each folder follows its standard-folder defaults until overridden here. Mute only stops new-mail notifications.")</p>
+    @foreach (var folder in FolderRows)
+    {
+        var overrides = FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName);
+        var effective = FolderSettingsStore.Resolve(folder.Role, AccountId, folder.FullName);
+        <details class="folder-settings-entry" open="@(folder.FullName == SelectedFolder)" @key="folder.FullName">
+            <summary>@FolderLabel(folder) <span class="folder-settings-state">@MuteStatus(effective)</span></summary>
+            @if (folder.Role == FolderRole.Trash)
+            {
+                <p class="settings-empty-text">Trash never sends new-mail notifications or displays unread badges.</p>
+            }
+            else
+            {
+                <div class="settings-row">
+                    <div class="settings-row-text">
+                        <label class="settings-row-label" for="@($"mute-{folder.FullName}")">New-mail notifications</label>
+                        <span class="settings-row-hint">Sync and message read state stay unchanged.</span>
+                    </div>
+                    <select id="@($"mute-{folder.FullName}")" class="setting-editor-select" value="@MuteSelection(overrides)"
+                            @onchange="e => ChangeMute(folder, e.Value?.ToString())">
+                        <option value="inherit">@(AccountId == null ? "Use default" : "Inherit global default")</option>
+                        <option value="unmuted">Unmuted</option>
+                        @if (MuteSelection(overrides) == "current")
+                        {
+                            <option value="current">@MuteStatus(effective)</option>
+                        }
+                        @foreach (var (minutes, label) in MutePeriods)
+                        {
+                            <option value="@minutes">Mute for @label</option>
+                        }
+                        <option value="forever">Mute forever</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-row-text">
+                        <label class="settings-row-label" for="@($"badge-{folder.FullName}")">Unread badges</label>
+                        <span class="settings-row-hint">Independent of mute. The app-wide unread badge switch still applies.</span>
+                    </div>
+                    <select id="@($"badge-{folder.FullName}")" class="setting-editor-select"
+                            value="@(overrides.ShowUnreadBadge?.ToString() ?? "inherit")"
+                            @onchange="e => ChangeBadge(folder, e.Value?.ToString())">
+                        <option value="inherit">@(AccountId == null ? "Use default" : "Inherit global default") (@(effective.ShowUnreadBadge == true ? "shown" : "hidden"))</option>
+                        <option value="True">Show</option>
+                        <option value="False">Hide</option>
+                    </select>
+                </div>
+                <button class="setting-editor-reset" disabled="@(overrides == new FolderPreferences())"
+                        @onclick="() => Save(folder, null)">↩ @(AccountId == null ? "Reset to shipped defaults" : "Reset to global defaults")</button>
+            }
+        </details>
+    }
+    @if (!FolderRows.Any())
+    {
+        <p class="settings-empty-text">No folders have been discovered for this account yet.</p>
+    }
+    @if (Status != null)
+    {
+        <p class="settings-empty-text" role="status">@Status</p>
+    }
+</GlassCard>
+</section>
+<SettingEditorRowCss />
+<FolderSettingsCss />
+
+@code {
+    const bool IsLogEnabled = true;
+    /// <summary>Null edits global standard roles; otherwise edits this account's exact folder paths.</summary>
+    [Parameter] public string? AccountId { get; set; }
+    /// <summary>Expands the folder requested by the sidebar's Settings command.</summary>
+    [Parameter] public string? SelectedFolder { get; set; }
+
+    /// <summary>Shared duration labels for the settings editor and split mute menu.</summary>
+    public static readonly (int Minutes, string Label)[] MutePeriods =
+        [(15, "15 minutes"), (60, "1 hour"), (480, "8 hours"), (1440, "24 hours"), (10080, "7 days")];
+
+    string? Status;
+    IEnumerable<MailFolderData> FolderRows => AccountId == null
+        ? FolderSettingsStore.StandardRoles.Select(static role => new MailFolderData { Role = role, FullName = role.ToString() })
+        : MessageStore.GetFolders(AccountId).OrderBy(static folder => folder.FullName, StringComparer.Ordinal);
+
+    /// <summary>Friendly standard names without replacing custom folder labels.</summary>
+    /// <param name="folder">Folder represented in either settings scope.</param>
+    /// <returns>The account's display name, or the standard role label.</returns>
+    public static string FolderLabel(MailFolderData folder) => !string.IsNullOrWhiteSpace(folder.DisplayName)
+        ? folder.DisplayName : folder.Role switch
+        {
+            FolderRole.Junk => "Spam", FolderRole.AllMail => "All mail", FolderRole.Flagged => "Starred",
+            _ => folder.Role.ToString()
+        };
+
+    /// <summary>Shows the effective deadline in local time; expired overrides are unmuted.</summary>
+    /// <param name="preferences">Resolved preferences.</param>
+    /// <returns>Human-readable notification status.</returns>
+    public static string MuteStatus(FolderPreferences preferences) => preferences.MutedUntilUtc switch
+    {
+        { } until when until == DateTimeOffset.MaxValue => "Muted forever",
+        { } until when until > DateTimeOffset.UtcNow => $"Muted until {until.ToLocalTime():g}",
+        _ => "Unmuted"
+    };
+
+    /// <summary>Keeps a running or expired deadline selectable without restarting its duration on render.</summary>
+    /// <param name="preferences">Saved overrides.</param>
+    /// <returns>The selected editor option.</returns>
+    static string MuteSelection(FolderPreferences preferences) => preferences.MutedUntilUtc switch
+    {
+        null => "inherit",
+        { } until when until == DateTimeOffset.MaxValue => "forever",
+        { } until when until == DateTimeOffset.MinValue => "unmuted",
+        _ => "current"
+    };
+
+    /// <summary>Converts an explicit duration choice into a persisted deadline while retaining the badge override.</summary>
+    /// <param name="folder">Folder being edited.</param>
+    /// <param name="selection">Selected preset or inheritance option.</param>
+    void ChangeMute(MailFolderData folder, string? selection)
+    {
+        if (selection == "current") return;
+        if (selection is not ("inherit" or "unmuted" or "forever")
+            && !MutePeriods.Any(period => period.Minutes.ToString() == selection))
+        {
+            Status = "Choose one of the listed mute durations.";
+            Log($"Rejected unknown folder mute selection: '{selection}'.", LogLevel.Warning, Run: IsLogEnabled);
+            return;
+        }
+        DateTimeOffset? until = selection switch
+        {
+            "inherit" => null,
+            "unmuted" => DateTimeOffset.MinValue,
+            "forever" => DateTimeOffset.MaxValue,
+            _ when int.TryParse(selection, out int minutes) && MutePeriods.Any(period => period.Minutes == minutes)
+                => DateTimeOffset.UtcNow.AddMinutes(minutes),
+            _ => null
+        };
+        Save(folder, FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName) with { MutedUntilUtc = until });
+    }
+
+    /// <summary>Changes only the badge field; mute remains untouched.</summary>
+    /// <param name="folder">Folder being edited.</param>
+    /// <param name="selection">Show, hide, or inherit.</param>
+    void ChangeBadge(MailFolderData folder, string? selection) => Save(folder,
+        FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName) with
+        { ShowUnreadBadge = bool.TryParse(selection, out bool show) ? show : null });
+
+    /// <summary>Reports persistence failures without claiming the controls were saved.</summary>
+    /// <param name="folder">Edited scope.</param>
+    /// <param name="preferences">New overrides, or null to reset.</param>
+    void Save(MailFolderData folder, FolderPreferences? preferences)
+    {
+        Status = FolderSettingsStore.Save(folder.Role, preferences, AccountId, folder.FullName)
+            ? "Folder settings saved." : "Could not save folder settings. Your previous settings are unchanged; see the log for details.";
+    }
+}

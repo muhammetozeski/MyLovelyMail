@@ -79,7 +79,8 @@
                         var folder = node.Folder;
                         @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
                            Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
-                        <div class="mail-folder-row" style="--folder-depth:@node.Depth">
+                        <div class="mail-folder-row" style="--folder-depth:@node.Depth"
+                             @oncontextmenu="e => View.OpenFolderMenu(folder, e)" @oncontextmenu:preventDefault="true">
                             @* A \NoSelect folder is a branch, not a mailbox: it is shown so its
                                children have a parent, and it cannot be opened. *@
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
@@ -88,7 +89,11 @@
                                     @onclick="() => MailUiState.SelectFolder(folder)">
                                 <span class="mail-folder-icon">@Mail.FolderIcon(folder)</span>
                                 <span class="mail-folder-name">@Mail.FolderLabel(folder)</span>
-                                @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value)
+                                @if (FolderSettingsStore.IsMuted(folder))
+                                {
+                                    <span title="New-mail notifications muted" aria-label="New-mail notifications muted">🔕</span>
+                                }
+                                @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value && FolderSettingsStore.ShowsUnreadCount(folder))
                                 {
                                     <CoreChip Text="@folder.UnreadCount.ToString()"
                                               Background="@AppColors.Primary"
@@ -97,7 +102,7 @@
                                               PaddingX="8" PaddingY="2" />
                                 }
                             </button>
-                            @if (folder.UnreadCount > 0)
+                            @if (folder.UnreadCount > 0 && folder.Role != FolderRole.Trash)
                             {
                                 <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
                                         @onclick="() => View.MarkFolderRead(folder)">📖</button>
@@ -109,6 +114,8 @@
                                 <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
                                         @onclick="() => View.ResyncFolder(folder)">🔄</button>
                             }
+                            <button class="mail-folder-action mail-folder-menu-trigger" title="Folder actions" aria-label="Folder actions" aria-haspopup="menu"
+                                    @onclick="e => View.OpenFolderMenu(folder, e)">⋯</button>
                         </div>
                     }
                 }

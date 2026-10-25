@@ -31,13 +31,48 @@ namespace MyLovelyMail.MainProject.Services
     public static class NotificationService
     {
         public const string SilentSoundName = "none";
+        const bool IsLogEnabled = true;
 
         /// <summary>Set by the head project (Windows: AppNotification, Android: MailNotifications). Null = platform without toasts.</summary>
         public static Action<MailToast>? Presenter;
 
+        /// <summary>
+        /// Excludes mail routed by incoming rules into muted folders, including Trash. Call before
+        /// executing moves, because the destination can assign a different message number.
+        /// Only the notification candidates change; rule actions and message flags are untouched.
+        /// </summary>
+        /// <param name="account">Account receiving the messages.</param>
+        /// <param name="messages">Newly arrived messages after rule evaluation.</param>
+        /// <param name="rules">The rule pass's destination requests.</param>
+        /// <returns>Notification candidates retaining their original summary objects.</returns>
+        public static List<MailMessageSummary> ExcludeMutedRuleDestinations(MailAccountData account,
+            List<MailMessageSummary> messages, RuleProcessResult rules)
+        {
+            if (rules.LocalMoves.Count == 0 && (account.Protocol != IncomingProtocol.Imap || rules.RemoteMoves.Count == 0))
+                return messages;
+            var folders = MessageStore.GetFolders(account.Id);
+            var mutedUids = new HashSet<uint>();
+            var destinations = rules.LocalMoves.Select(static move => (move.Uid, FullName: MessageStore.LocalFolderPrefix + move.LocalFolder));
+            if (account.Protocol == IncomingProtocol.Imap)
+                destinations = destinations.Concat(rules.RemoteMoves.Select(static move => (move.Uid, FullName: move.TargetFolder)));
+            foreach (var (uid, fullName) in destinations)
+            {
+                var folder = folders.FirstOrDefault(folder => folder.FullName == fullName)
+                    ?? new MailFolderData { AccountId = account.Id, FullName = fullName };
+                if (FolderSettingsStore.IsMuted(folder)) mutedUids.Add(uid);
+            }
+            if (mutedUids.Count == 0) return messages;
+            Log($"Notification candidates suppressed by muted rule destinations: account={account.Id}; count={mutedUids.Count}.", Run: IsLogEnabled);
+            return messages.Where(message => !mutedUids.Contains(message.Uid)).ToList();
+        }
+
         /// <summary>Called by the sync services after the rule pass with genuinely NEW messages only.</summary>
         public static void NotifyNewMessages(MailAccountData account, string folderFullName, List<MailMessageSummary> newMessages)
         {
+            var folder = MessageStore.GetFolders(account.Id).FirstOrDefault(folder => folder.FullName == folderFullName)
+                ?? new MailFolderData { AccountId = account.Id, FullName = folderFullName,
+                    Role = folderFullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None };
+            if (FolderSettingsStore.IsMuted(folder)) { Log($"Notification skipped: folder '{folderFullName}' is muted."); return; }
             if (Presenter == null) { Log("Notification skipped: no platform presenter registered."); return; }
             if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) { Log($"Notification skipped: NotifyOnNewMail off for {account.EmailAddress}."); return; }
             if (IsInQuietHours(DateTime.Now.Hour)) { Log("Notification skipped: quiet hours."); return; }

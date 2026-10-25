@@ -1,0 +1,77 @@
+@inherits MailPageSection
+@using static MyLovelyMail.MainProject.UI.Pages.Mail
+
+@if (View.FolderMenuTarget is { } folder)
+{
+    bool remote = folder.Selectable && !folder.IsLocal
+        && AccountStore.GetById(folder.AccountId)?.Protocol == IncomingProtocol.Imap;
+    <div class="folder-menu-backdrop" @onclick="View.CloseFolderMenu"
+         @oncontextmenu="View.CloseFolderMenu" @oncontextmenu:preventDefault="true">
+        <div class="folder-menu" role="menu" aria-label="Folder actions" tabindex="-1" @ref="MenuElement"
+             style="@View.FolderMenuPosition" @onclick:stopPropagation="true" @oncontextmenu:stopPropagation="true"
+             @onkeydown="HandleMenuKey">
+            <div class="folder-menu-title">@FolderSettingsPanel.FolderLabel(folder)</div>
+            <button role="menuitem" disabled="@(!folder.Selectable)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Open)">📂 Open folder</button>
+            @if (folder.Role == FolderRole.Trash)
+            {
+                <div class="folder-menu-status">🔕 Trash notifications are always off</div>
+            }
+            else
+            {
+                bool muted = FolderSettingsStore.IsMuted(folder);
+                <div class="folder-menu-split">
+                    <button role="menuitem" @onclick="() => View.SetFolderMute(unmute: muted)">@(muted ? "🔔 Unmute" : "🔕 Mute")</button>
+                    <button role="menuitem" class="folder-menu-arrow" aria-label="Choose mute duration"
+                            aria-haspopup="menu" aria-expanded="@View.FolderMuteChoicesOpen"
+                            @onclick="() => View.FolderMuteChoicesOpen = !View.FolderMuteChoicesOpen">▾</button>
+                </div>
+                @if (View.FolderMuteChoicesOpen)
+                {
+                    <div class="folder-menu-durations" role="menu" aria-label="Mute duration">
+                        @foreach (var (minutes, label) in FolderSettingsPanel.MutePeriods)
+                        {
+                            <button role="menuitem" @onclick="() => View.SetFolderMute(minutes)">Mute for @label</button>
+                        }
+                        <button role="menuitem" @onclick="() => View.SetFolderMute()">Mute forever</button>
+                    </div>
+                }
+                <div class="folder-menu-status">@FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName))</div>
+                <button role="menuitem" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.ToggleUnreadBadge)">@(FolderSettingsStore.ShowsUnreadCount(folder) ? "Hide unread badges" : "Show unread badges")</button>
+            }
+            <hr />
+            <button role="menuitem" disabled="@(!remote)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Sync)">🔄 Check for new mail</button>
+            <button role="menuitem" disabled="@(!remote)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Backfill)">📜 Download older mail</button>
+            <button role="menuitem" disabled="@(!remote)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Resync)">↻ Redownload folder</button>
+            <button role="menuitem" disabled="@(!folder.Selectable)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.MarkRead)">📖 Mark all cached mail as read</button>
+            <button role="menuitem" disabled="@(!folder.Selectable)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.SearchUnread)">🔍 Find unread mail</button>
+            <button role="menuitem" disabled="@(!folder.Selectable)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Export)">📦 Export folder as .mbox</button>
+            <hr />
+            <button role="menuitem" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.Settings)">⚙️ Folder settings</button>
+            <button role="menuitem" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.AccountSettings)">👤 Account settings</button>
+            <button role="menuitem" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.GlobalSettings)">🌍 Global folder defaults</button>
+            <button role="menuitem" disabled="@(folder.Role == FolderRole.Trash)" @onclick="() => View.RunFolderMenuAction(FolderMenuAction.ResetPreferences)">↩ Reset folder to global defaults</button>
+        </div>
+    </div>
+}
+<MailFolderMenuCss />
+
+@code {
+    const bool IsLogEnabled = true;
+    ElementReference MenuElement;
+
+    /// <summary>Moves keyboard focus into a newly opened menu without touching native application focus.</summary>
+    /// <param name="firstRender">True when this menu component is first mounted.</param>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await MenuElement.FocusAsync(preventScroll: true); }
+        catch (Exception exception) { Log($"Could not focus the folder menu: {exception}", LogLevel.Warning, Run: IsLogEnabled); }
+    }
+
+    /// <summary>Escape dismisses the menu, including expanded duration choices.</summary>
+    /// <param name="key">Keyboard event inside the menu.</param>
+    void HandleMenuKey(KeyboardEventArgs key)
+    {
+        if (key.Key == "Escape") View.CloseFolderMenu();
+    }
+}

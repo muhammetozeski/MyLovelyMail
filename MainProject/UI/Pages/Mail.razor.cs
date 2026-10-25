@@ -230,7 +230,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
         internal static int AccountUnreadCount(string accountId) =>
             MessageStore.GetFolders(accountId)
-                .Where(f => f.Role is not (FolderRole.Trash or FolderRole.Junk))
+                .Where(f => f.Role != FolderRole.Junk && FolderSettingsStore.ShowsUnreadCount(f))
                 .Sum(f => f.UnreadCount);
 
         /// <summary>The folder a listed message actually lives in (differs from the selection in all-folders search).</summary>

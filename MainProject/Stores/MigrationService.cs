@@ -184,6 +184,7 @@ namespace MyLovelyMail.MainProject.Stores
 
             SettingsManager.LoadSettings();
             AccountStore.Load();
+            FolderSettingsStore.Reload();
             FilterRuleStore.Load();
             TagStore.Load();
             CredentialVault.Load();

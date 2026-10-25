@@ -65,9 +65,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ruleResult = RuleEngine.ProcessIncoming(account, InboxFullName, allNew);
                 // Rules mutate flags/tags in place, so re-persist everything they saw.
                 MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
+                var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
                 foreach (var (uid, localFolder) in ruleResult.LocalMoves)
                     MessageStore.MoveToLocalFolder(account.Id, InboxFullName, uid, localFolder);
-                NotificationService.NotifyNewMessages(account, InboxFullName, allNew);
+                NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
             }
 
             MessageStore.SaveFolder(new MailFolderData

@@ -152,6 +152,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
             catch (Exception ex)
             {
+                Log($"Folder export failed: account={folder.AccountId}; folder='{folder.FullName}'; {ex}", LogLevel.Error);
                 FolderActionStatus = $"❌ {ex.Message}";
             }
         }

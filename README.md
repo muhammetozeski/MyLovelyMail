@@ -55,6 +55,10 @@ and switching the theme re-skins the whole app at runtime.
 - Every account holds `InheritedSetting<T>` children: until a value is overridden for that
   account, it follows the global value live; only overridden keys are written to disk
 - A per-account settings page shows each value with an inherited/overridden badge and a reset button
+- Standard-folder notification and unread-badge defaults, with separate overrides for each account's
+  folders. Right-click a folder (or use its actions button) to mute indefinitely or for a chosen
+  duration, unmute, sync, fetch older mail, mark cached mail read, search, export or open settings.
+  Mute only suppresses new-mail notifications. Spam starts muted; Trash never notifies or shows unread badges.
 
 **Reading**
 - HTML bodies rendered in a sandboxed iframe after sanitization (scripts, event handlers,
