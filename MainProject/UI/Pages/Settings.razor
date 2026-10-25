@@ -414,7 +414,8 @@
         {
             @foreach (var account in AccountStore.Accounts)
             {
-                <div class="settings-row">
+                <div class="settings-row" data-context-menu="true" data-mouse4="menu" data-mouse5="@MouseActionService.AccountSyncAction" data-mouse5-value="@account.Id"
+                     @oncontextmenu="e => ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), e.ClientX, e.ClientY)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                     <div class="settings-row-text">
                         <span class="settings-row-label">
                             <span class="settings-account-dot" style="background:@account.ColorHex"></span>

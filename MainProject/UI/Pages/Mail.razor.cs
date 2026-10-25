@@ -9,7 +9,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
 {
     /// <summary>One rendered list row. <paramref name="ConversationCount"/> is 1 in flat mode, so the
     /// same markup serves both modes; the count pill appears only above 1.</summary>
-    public sealed record MailRow(MailMessageSummary Message, int ConversationCount, int UnreadCount, string SenderText);
+    public sealed record MailRow(MailMessageSummary Message, int ConversationCount, int UnreadCount, string SenderText)
+    {
+        /// <summary>Actual members behind a collapsed row; selection and triage affect the complete conversation.</summary>
+        public IReadOnlyList<MailMessageSummary> Messages { get; init; } = [Message];
+    }
 
     // Core of the mail screen: lifecycle/event wiring plus the folder list, message list and
     // search. The reader, compose and interaction members live in the sibling partials.
@@ -47,7 +51,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
             OutboxService.OnChanged += HandleOutboxChanged;
-            MouseActionService.OnStatus += HandleMouseStatus;
+            MouseActionService.MailMenuRequested = HandleNativeMailMenuAsync;
+            MessageActions.OnMoveStateChanged += HandleMoveStateChanged;
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -63,23 +68,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged -= HandleSyncStateChanged;
             OutboxService.OnChanged -= HandleOutboxChanged;
-            MouseActionService.OnStatus -= HandleMouseStatus;
-        }
-
-        /// <summary>A side-button action reports into the sidebar line — nothing the mouse does happens silently.</summary>
-        void HandleMouseStatus(string status)
-        {
-            FolderActionStatus = status;
-            InvokeAsync(StateHasChanged);
-        }
-
-        internal void SelectAccount(MailAccountData account)
-        {
-            MailUiState.SelectAccount(account);
-            Folders = FolderTreeService.Build(MessageStore.GetFolders(account.Id));
-
-            if (FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id), [.. Folders.Select(static n => n.Folder)]) is { } target)
-                MailUiState.SelectFolder(target);
+            MouseActionService.MailMenuRequested = null;
+            MessageActions.OnMoveStateChanged -= HandleMoveStateChanged;
+            ContextMenuService.Close();
         }
 
         /// <summary>Selects an account when none is selected yet — the one last used, else the first.</summary>
@@ -87,7 +78,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             if (MailUiState.SelectedAccount != null || AccountStore.Accounts.Count == 0) return false;
             var lastUsed = FolderMemoryStore.LastAccountId is { } accountId ? AccountStore.GetById(accountId) : null;
-            SelectAccount(lastUsed ?? AccountStore.Accounts[0]);
+            MailUiState.SelectAccount(lastUsed ?? AccountStore.Accounts[0], restoreFolder: true);
             return true;
         }
 
@@ -102,6 +93,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         void HandleSyncStateChanged() => InvokeAsync(StateHasChanged);
+
+        /// <summary>Refreshes queued-move visibility on the renderer; failures bring the retained source row back.</summary>
+        void HandleMoveStateChanged() => InvokeAsync(() => { RefreshLists(); StateHasChanged(); });
 
         /// <summary>Hover text of an account row: the keyboard shortcut plus how its syncing is going.</summary>
         internal static string SyncHealthTooltip(MailAccountData account)
@@ -121,7 +115,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (account != null && SearchAllFolders && !string.IsNullOrWhiteSpace(SearchText))
             {
-                var hits = SearchService.Search(account.Id, SearchText);
+                var hits = SearchService.Search(account.Id, SearchText)
+                    .Where(hit => !MessageActions.IsMoving(account.Id, hit.FolderFullName, hit.Summary.Uid)).ToList();
                 HitFolders = hits.ToDictionary(h => h.Summary, h => (h.FolderFullName, h.FolderDisplayName));
                 FilteredSummaries = [.. hits.Select(h => h.Summary)];
                 BuildRows();
@@ -139,7 +134,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             // The matcher runs even for an empty query: it is also what hides snoozed mail.
             FilteredSummaries = [.. MessageStore.GetSummaries(account.Id, folder.FullName)
-                .Where(SearchService.BuildMatcher(SearchText, account.Id))];
+                .Where(SearchService.BuildMatcher(SearchText, account.Id))
+                .Where(summary => !MessageActions.IsMoving(account.Id, folder.FullName, summary.Uid))];
             BuildRows();
         }
 
@@ -157,18 +153,24 @@ namespace MyLovelyMail.MainProject.UI.Pages
             && AccountStore.GetSettings(account.Id).ConversationView.Value
             && !SearchService.HasFreeText(SearchText);
 
-        void BuildRows() =>
+        Dictionary<MailMessageSummary, IReadOnlyList<MailMessageSummary>> RowMessages = [];
+
+        void BuildRows()
+        {
             Rows = ConversationMode
                 ? [.. ThreadingService.BuildThreads(FilteredSummaries).Select(static thread => new MailRow(
                     thread.Newest,
                     thread.Messages.Count,
                     thread.UnreadCount,
-                    string.Join(", ", thread.Messages.Select(static m => string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName).Distinct()) ))]
+                    string.Join(", ", thread.Messages.Select(static m => string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName).Distinct()) ) { Messages = thread.Messages })]
                 : [.. FilteredSummaries.Select(static summary => new MailRow(
                     summary,
                     1,
                     summary.IsUnread ? 1 : 0,
                     string.IsNullOrWhiteSpace(summary.FromName) ? summary.FromAddress : summary.FromName))];
+            RowMessages = Rows.SelectMany(static row => row.Messages.Select(message => (Message: message, Members: row.Messages)))
+                .ToDictionary(static pair => pair.Message, static pair => pair.Members);
+        }
 
         void ToggleConversationMode()
         {
@@ -235,7 +237,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         /// <summary>The folder a listed message actually lives in (differs from the selection in all-folders search).</summary>
         string? ResolveFolderOf(MailMessageSummary message) =>
-            HitFolders.TryGetValue(message, out var hit) ? hit.FullName : MailUiState.SelectedFolder?.FullName;
+            MessageIdentityOf(message)?.FolderFullName;
 
         string? HitFolderDisplay(MailMessageSummary message) =>
             HitFolders.TryGetValue(message, out var hit) ? hit.Display : null;

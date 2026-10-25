@@ -32,7 +32,7 @@
             @* allow-scripts WITHOUT allow-same-origin: the user's own script runs, in an opaque
                origin that can reach neither the app nor anything it stores. *@
             <iframe class="signature-editor-preview" sandbox="allow-scripts"
-                    srcdoc="@SignatureService.PreviewDocument(Text)"></iframe>
+                data-input-token="@InputToken" srcdoc="@SignatureService.PreviewDocument(Text, InputToken)"></iframe>
         }
     </div>
 
@@ -46,6 +46,7 @@
 </div>
 
 @code {
+    readonly string InputToken = Guid.NewGuid().ToString("N");
     /// <summary>The stored signature: HTML when the user wrote HTML, plain text otherwise.</summary>
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
 

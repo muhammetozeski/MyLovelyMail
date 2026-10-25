@@ -24,12 +24,14 @@
            three-column grid, and a fourth child pushed the message list into the reader's slot. *@
         @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person && MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
         {
-            <div class="mail-person-sheet">
+            <div class="mail-person-sheet" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@person.Address" data-mouse5="menu"
+                 @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                 <div class="mail-person-head">
                     <span class="mail-person-name">@(person.DisplayName.Length > 0 ? person.DisplayName : person.Address)</span>
                     <button class="mail-person-close" title="Close" @onclick="MailUiState.ClosePerson">✕</button>
                 </div>
-                <div class="mail-person-address">@person.Address</div>
+                <div class="mail-person-address" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@person.Address" data-mouse5="menu"
+                     @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@person.Address</div>
                 <div class="mail-person-stats">
                     <span>@person.MessageCount messages</span>
                     <span>@person.ReceivedCount received · @person.SentCount sent</span>
@@ -49,14 +51,16 @@
                     <div class="mail-person-tags">
                         @foreach (string tag in person.Tags)
                         {
-                            <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
+                            <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                  data-context-menu="true" data-mouse4="copy" data-mouse4-value="@tag" data-mouse5="menu"
+                                  @oncontextmenu="e => View.OpenTagMenu(tag, null, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@tag</span>
                         }
                     </div>
                 }
                 <div class="mail-person-actions">
                     <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("from:" + person.Address)'>🔍 From them</button>
                     <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
-                    <button class="mail-search-toggle" @onclick="() => View.StartComposeTo(person.Address)">✏️ Write</button>
+                    <button class="mail-search-toggle" @onclick="() => MouseActionService.RunAsync(MouseActionService.ComposeToAction, person.Address)">✏️ Write</button>
                 </div>
             </div>
         }
@@ -89,7 +93,7 @@
         }
         @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Compose && MailUiState.ActiveCompose is { } draft)
         {
-            <div class="mail-reader-header">
+            <div class="mail-reader-header" data-context-menu="true" @oncontextmenu="e => View.OpenComposeMenu(e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                 <BackButton OnClick="@View.SaveAndCloseCompose" />
                 <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
                 @if (View.DraftSavedAt != null)
@@ -142,7 +146,10 @@
                     <div class="mail-compose-attachments">
                         @foreach (var attachmentPath in draft.AttachmentPaths)
                         {
-                            <span class="mail-compose-attachment-chip">
+                            <span class="mail-compose-attachment-chip" data-context-menu="true"
+                                  data-mouse4="click" data-mouse4-selector=".mail-compose-attachment-remove"
+                                  data-mouse5="copy" data-mouse5-value="@Path.GetFileName(attachmentPath)"
+                                  @oncontextmenu="e => View.OpenComposeAttachmentMenu(attachmentPath, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                                 📎 @Path.GetFileName(attachmentPath)
                                 <button class="mail-compose-attachment-remove" title="Remove"
                                         @onclick="() => View.RemoveComposeAttachment(attachmentPath)">✕</button>
@@ -190,7 +197,13 @@
         else
         {
             @* @key remounts this subtree per message, so the open animation replays on every switch. *@
-            <div class="mail-reader-content" @key="open.Uid">
+            var readerTargets = View.MessageTargets(open);
+            var readerPayload = JsonSerializer.Serialize(readerTargets);
+            <div class="mail-reader-content" @key="View.MessageIdentityOf(open)" data-context-menu="true"
+                 data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@readerPayload"
+                 data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@readerPayload"
+                 @oncontextmenu="e => View.OpenMessageMenu(readerTargets, e.ClientX, e.ClientY, primary: View.MessageIdentityOf(open))"
+                 @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
             <div class="mail-reader-header">
                 <BackButton OnClick="@MailUiState.CloseMessage" />
                 @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
@@ -200,7 +213,8 @@
                 <div class="mail-reader-titles">
                     <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
                     <div class="mail-reader-meta">
-                        <span class="mail-reader-from">@open.FromName &lt;@open.FromAddress&gt;</span>
+                        <span class="mail-reader-from" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@open.FromAddress" data-mouse5="menu"
+                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@open.FromName &lt;@open.FromAddress&gt;</span>
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                     </div>
                     @if (View.HistoryOfOpenSender(open) is { } history)
@@ -302,6 +316,10 @@
                     @foreach (var step in thread)
                     {
                         <button class="mail-thread-line @(step.Uid == open.Uid ? "mail-thread-line--open" : "")"
+                                data-context-menu="true" data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@JsonSerializer.Serialize(View.MessageTargets(step))"
+                                data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@JsonSerializer.Serialize(View.MessageTargets(step))"
+                                @oncontextmenu="e => View.OpenMessageMenu(View.MessageTargets(step), e.ClientX, e.ClientY, primary: View.MessageIdentityOf(step))"
+                                @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                                 @onclick="() => View.OpenMessage(step)">
                             <span class="mail-thread-line-date">@step.DateUtc.ToLocalTime().ToString("dd MMM HH:mm")</span>
                             <span class="mail-thread-line-sender">@(string.IsNullOrWhiteSpace(step.FromName) ? step.FromAddress : step.FromName)</span>
@@ -315,6 +333,8 @@
             }
 
             <div class="mail-reader-actions">
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, readerTargets, includeSelection: true))">✅ Mark read</SecondaryButton>
+                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Unread, readerTargets, includeSelection: true))">📩 Mark unread</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartForward(open))">➡️ Forward</SecondaryButton>
@@ -330,7 +350,7 @@
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.OpenMessageSource(open))">🔍 Source</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ExportOpen(open, asHtml: false))">💾 .eml</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ExportOpen(open, asHtml: true))">🌐 .html</SecondaryButton>
-                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.DeleteOpen(open))">🗑️ Delete</DangerButton>
+                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: true))">🗑️ Trash</DangerButton>
             </div>
 
             @if (open.Tags.Count > 0 || View.ShowTagPicker)
@@ -339,6 +359,8 @@
                     @foreach (var tag in open.Tags)
                     {
                         <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                            data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
+                            @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                                 title="Search this tag" @onclick="() => View.SearchByTag(tag)">@tag</button>
                     }
                 </div>
@@ -350,6 +372,8 @@
                     @foreach (var tag in TagStore.AllTags)
                     {
                         <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
+                            data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
+                            @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                                 style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
                                 @onclick="() => View.ToggleTagOnOpen(open, tag)">
                             @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
@@ -366,6 +390,8 @@
                     @foreach (var attachment in View.OpenAttachments)
                     {
                         <button class="mail-attachment-chip" title="Save to Downloads"
+                                data-context-menu="true" data-mouse4="copy" data-mouse4-value="@attachment.FileName"
+                                @oncontextmenu="e => View.OpenAttachmentMenu(attachment, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                                 @onclick="() => View.SaveAttachmentAsync(attachment.Index)">
                             @AttachmentService.IconFor(attachment) @attachment.FileName
                             @if (attachment.HumanSize.Length > 0)
@@ -411,7 +437,8 @@
                 }
                 else if (View.OpenBodyHtml != null)
                 {
-                    <iframe class="mail-reader-frame" sandbox="allow-same-origin" srcdoc="@View.OpenBodyHtml"></iframe>
+                    <iframe class="mail-reader-frame" sandbox="allow-same-origin" srcdoc="@View.OpenBodyHtml"
+                            data-message-targets="@readerPayload" data-message-primary="@JsonSerializer.Serialize(View.MessageIdentityOf(open))"></iframe>
                 }
                 else
                 {

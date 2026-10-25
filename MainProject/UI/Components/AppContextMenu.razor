@@ -1,0 +1,172 @@
+@implements IDisposable
+@inject IJSRuntime Javascript
+@using MyLovelyMail.MainProject.UI.Pages
+
+@if (ContextMenuService.Current is { } menu)
+{
+    <div class="app-context-backdrop" data-context-menu="true" @onclick="ContextMenuService.Close"
+         @oncontextmenu="ContextMenuService.Close" @oncontextmenu:preventDefault="true">
+        <div class="app-context-menu" role="menu" aria-label="@menu.Title" tabindex="-1" @ref="MenuElement"
+             @onclick:stopPropagation="true" @oncontextmenu:stopPropagation="true" @onkeydown="HandleKeyDown">
+            <div class="app-context-title">@menu.Title</div>
+            @foreach (var item in menu.Items)
+            {
+                <div class="app-context-split">
+                    <button role="menuitem" disabled="@(!item.Enabled)" aria-haspopup="@(item.Children?.Count > 0 ? "menu" : null)"
+                            @onclick="() => Activate(item)">@item.Label</button>
+                    @if (item.Children?.Count > 0 && item.Run != null)
+                    {
+                        <button role="menuitem" class="app-context-arrow" aria-label="@($"Options for {item.Label}")"
+                                aria-expanded="@(Expanded == item)" disabled="@(!item.Enabled)"
+                                @onclick="() => Expanded = Expanded == item ? null : item">▾</button>
+                    }
+                </div>
+                @if (Expanded == item && item.Children is { } children)
+                {
+                    <div class="app-context-children" role="menu" aria-label="@item.Label">
+                        @foreach (var child in children)
+                        {
+                            <button role="menuitem" disabled="@(!child.Enabled)" @onclick="() => ContextMenuService.RunAsync(child)">@child.Label</button>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+@if (MouseActionService.LastStatus is { Length: > 0 } status)
+{
+    <div class="app-input-status" role="status">
+        <span>@status</span>
+        <button aria-label="Dismiss status" @onclick="() => MouseActionService.ReportStatus(null)">✕</button>
+    </div>
+}
+<AppContextMenuCss />
+
+@code {
+    const bool IsLogEnabled = true;
+    ElementReference MenuElement;
+    ContextMenuData? PositionedMenu;
+    ContextMenuItem? PositionedExpanded;
+    ContextMenuItem? Expanded;
+    Func<string, Task>? BrowserClipboard;
+
+    /// <summary>Attaches the global menu and status presentation without registering another mail state.</summary>
+    protected override void OnInitialized()
+    {
+        ContextMenuService.OnChanged += HandleChanged;
+        MouseActionService.OnStatus += HandleStatus;
+        MouseActionService.MenuRequested = ShowDefaultMenuAsync;
+        if (ClipboardService.Writer == null)
+        {
+            BrowserClipboard = text => Javascript.InvokeVoidAsync("navigator.clipboard.writeText", text).AsTask();
+            ClipboardService.Writer = BrowserClipboard;
+        }
+    }
+
+    /// <summary>Positions the measured menu inside the viewport, including the application's interface scale.</summary>
+    /// <param name="firstRender">Framework lifecycle flag.</param>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (ContextMenuService.Current is not { } menu || ReferenceEquals(menu, PositionedMenu) && Expanded == PositionedExpanded) return;
+        bool focus = !ReferenceEquals(menu, PositionedMenu);
+        PositionedMenu = menu;
+        PositionedExpanded = Expanded;
+        try
+        {
+            await Javascript.InvokeVoidAsync("lovelyMouse.positionMenu", MenuElement, menu.X, menu.Y, AppMeasures.Space.Px8);
+            if (focus) await MenuElement.FocusAsync(preventScroll: true);
+        }
+        catch (Exception exception)
+        {
+            Log($"Context menu positioning failed: {exception}", LogLevel.Warning, Run: IsLogEnabled);
+        }
+    }
+
+    /// <summary>Resets submenu state only when the actual menu changes.</summary>
+    void HandleChanged() => InvokeAsync(() => { Expanded = null; StateHasChanged(); });
+
+    /// <summary>Receives input results on the owning renderer.</summary>
+    /// <param name="status">Published result; the service owns its value.</param>
+    void HandleStatus(string status) => InvokeAsync(StateHasChanged);
+
+    /// <summary>Opens child options or executes the selected captured command.</summary>
+    /// <param name="item">Entry chosen with a normal click or Mouse 5.</param>
+    Task Activate(ContextMenuItem item)
+    {
+        if (item.Run != null) return ContextMenuService.RunAsync(item);
+        Expanded = Expanded == item ? null : item;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Escape closes a menu while Tab retains the browser's normal keyboard navigation.</summary>
+    /// <param name="key">Key pressed inside the menu.</param>
+    void HandleKeyDown(KeyboardEventArgs key)
+    {
+        if (key.Key == "Escape") ContextMenuService.Close();
+    }
+
+    /// <summary>Builds useful fallback commands for blank space, ordinary text, links and controls on every page.</summary>
+    /// <param name="request">Plain DOM context prepared by the shared input script.</param>
+    Task ShowDefaultMenuAsync(MouseMenuRequest request) => InvokeAsync(() =>
+    {
+        List<ContextMenuItem> items = [];
+        if (request.Selection.Length > 0)
+            items.Add(new("⧉ Copy selection", () => MouseActionService.RunAsync(MouseActionService.CopyAction, request.Selection)));
+        if (request.Text.Length > 0 && request.Text != request.Selection)
+            items.Add(new("⧉ Copy text", () => MouseActionService.RunAsync(MouseActionService.CopyAction, request.Text)));
+        if (request.Link.Length > 0)
+        {
+            items.Add(new("🔗 Copy link", () => MouseActionService.RunAsync(MouseActionService.CopyAction, request.Link)));
+            if (!request.IsMailContent || MailUiState.SelectedAccount is not { TorOnly: true })
+                items.Add(new("🌐 Open link", () =>
+                {
+                    if (!ExternalLinkService.TryOpen(request.Link, out string failure)) throw new InvalidOperationException(failure);
+                    return Task.CompletedTask;
+                }));
+        }
+        if (request.CanSelect) items.Add(NativeAction("☑ Select all text", "select"));
+        if (request.CanActivate) items.Add(NativeAction("▶ Activate this control", "activate"));
+        if (request.CanReset) items.Add(NativeAction("↩ Reset this setting", "reset"));
+        items.Add(new("✏️ New message", () => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty)));
+        items.Add(new("🔄 Check mail", () => MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty)));
+        items.Add(new("💌 Mail", () => NavigateAsync(NavigationConstants.Mail.Link)));
+        items.Add(new("⚙️ Settings", () => NavigateAsync(NavigationConstants.Settings.Link)));
+        items.Add(new("🧹 Mail filters", () => NavigateAsync(FilterRules.RoutePath)));
+        items.Add(new("🧾 Logs", () => NavigateAsync(Logs.RoutePath)));
+        items.Add(new("🖱️ Mouse buttons", () =>
+        {
+            MouseActionService.ReportStatus("Mouse 5 (front): mark mail read or activate a control. Mouse 4: move mail to Trash or open actions. Text fields: Mouse 5 selects all; Mouse 4 copies.");
+            return Task.CompletedTask;
+        }));
+        ContextMenuService.Open(this, "Actions", items, request.X, request.Y);
+    });
+
+    /// <summary>Uses the same DOM action helper as side buttons and reports when its original control disappeared.</summary>
+    /// <param name="label">Visible command.</param>
+    /// <param name="operation">Select, activate or reset.</param>
+    /// <returns>An entry bound to the captured DOM target.</returns>
+    ContextMenuItem NativeAction(string label, string operation) => new(label, async () =>
+    {
+        bool applied = await Javascript.InvokeAsync<bool>("lovelyMouse.useContext", operation);
+        MouseActionService.ReportStatus(applied ? label : "That control is no longer available.");
+    });
+
+    /// <summary>Reports unavailable navigation through the existing bridge instead of claiming success.</summary>
+    /// <param name="route">Existing application route.</param>
+    static Task NavigateAsync(string route)
+    {
+        if (!NavigationBridge.TryNavigate(route)) throw new InvalidOperationException("Navigation is not ready yet.");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Drops callbacks to a disposed layout and any owned browser clipboard delegate.</summary>
+    public void Dispose()
+    {
+        ContextMenuService.OnChanged -= HandleChanged;
+        MouseActionService.OnStatus -= HandleStatus;
+        MouseActionService.MenuRequested = null;
+        if (BrowserClipboard != null && ClipboardService.Writer == BrowserClipboard) ClipboardService.Writer = null;
+        ContextMenuService.Close();
+    }
+}

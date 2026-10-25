@@ -10,7 +10,7 @@
 
         @if (MailUiState.SelectedAccount != null)
         {
-            <PrimaryButton IsFullWidth="true" OnClick="@Mail.StartCompose" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
+            <PrimaryButton IsFullWidth="true" OnClick="@(() => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty))" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
         }
 
         @if (Mail.SavedSearchList.Count > 0)
@@ -18,7 +18,8 @@
             <div class="mail-saved-searches">
                 @foreach (var saved in Mail.SavedSearchList)
                 {
-                    <span class="mail-saved-chip">
+                    <span class="mail-saved-chip" data-context-menu="true" data-mouse4="click" data-mouse4-selector=".mail-saved-remove" data-mouse5="click" data-mouse5-selector=".mail-saved-run"
+                          @oncontextmenu="e => View.OpenSavedSearchMenu(saved, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                         <button class="mail-saved-run" @onclick="() => View.RunSavedSearch(saved)">🔍 @saved</button>
                         <button class="mail-saved-remove" @onclick="() => Mail.RemoveSavedSearch(saved)">✕</button>
                     </span>
@@ -48,8 +49,9 @@
                    truncated address, so the payload is named rather than read off the screen. *@
                 <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused")"
                         title="@Mail.SyncHealthTooltip(account)"
-                        data-mouse4="copy" data-mouse4-value="@account.EmailAddress"
-                        @onclick="() => View.SelectAccount(account)">
+                        data-context-menu="true" @oncontextmenu="e => View.OpenAccountMenu(account, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                        data-mouse4="menu" data-mouse5="@MouseActionService.AccountSyncAction" data-mouse5-value="@account.Id"
+                        @onclick="() => MailUiState.SelectAccount(account, restoreFolder: true)">
                     <span class="mail-account-dot" style="background:@account.ColorHex"></span>
                     @if (!account.Enabled)
                     {
@@ -79,11 +81,15 @@
                         var folder = node.Folder;
                         @* The row is itself a button, so its hover actions have to be SIBLINGS inside this wrapper.
                            Depth comes from the server path, so a nested mailbox stops looking like a top-level one. *@
-                        <div class="mail-folder-row" style="--folder-depth:@node.Depth"
-                             @oncontextmenu="e => View.OpenFolderMenu(folder, e)" @oncontextmenu:preventDefault="true">
+                        <div class="mail-folder-row" style="--folder-depth:@node.Depth" data-context-menu="true"
+                             data-mouse4="menu" data-mouse5="@MouseActionService.FolderReadAction"
+                             data-mouse5-value="@JsonSerializer.Serialize(new MailMessageIdentity(folder.AccountId, folder.FullName, 0))"
+                             @oncontextmenu="e => View.OpenFolderMenu(folder, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                             @* A \NoSelect folder is a branch, not a mailbox: it is shown so its
                                children have a parent, and it cannot be opened. *@
                             <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
+                                    data-mouse5="@MouseActionService.FolderReadAction"
+                                    data-mouse5-value="@JsonSerializer.Serialize(new MailMessageIdentity(folder.AccountId, folder.FullName, 0))"
                                     disabled="@(!folder.Selectable)"
                                     title="@(folder.Selectable ? Mail.FolderFreshness(folder) : "This folder only holds other folders")"
                                     @onclick="() => MailUiState.SelectFolder(folder)">
@@ -105,7 +111,7 @@
                             @if (folder.UnreadCount > 0 && folder.Role != FolderRole.Trash)
                             {
                                 <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
-                                        @onclick="() => View.MarkFolderRead(folder)">📖</button>
+                                        @onclick="() => MouseActionService.ReadFolderAsync(folder)">📖</button>
                             }
                             <button class="mail-folder-action" title="Export this folder as one .mbox file"
                                     @onclick="() => View.ExportFolderMailbox(folder)">📦</button>

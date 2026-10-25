@@ -37,8 +37,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ct => MailConnections.OpenPop3Async(account, ct), cancellationToken, account);
 
             var uids = await ResiliencePolicy.GuardStep(client.GetMessageUidsAsync(cancellationToken), cancellationToken, account);
-            var known = MessageStore.GetSummaries(account.Id, InboxFullName).Select(static s => s.Uid).ToHashSet();
-            bool isFirstSync = known.Count == 0;
+            // Local filing must not make the same server message look newly arrived again.
+            var folders = MessageStore.GetFolders(account.Id);
+            var known = folders.Where(static folder => folder.Role is not (FolderRole.Drafts or FolderRole.Sent or FolderRole.Outbox))
+                .SelectMany(folder => MessageStore.GetSummaries(account.Id, folder.FullName))
+                .Select(static summary => summary.Uid).ToHashSet();
+            bool isFirstSync = known.Count == 0 && folders.FirstOrDefault(static folder => folder.FullName == InboxFullName)?.LastSyncedUtc == null;
 
             bool newestAtEnd = await ProbeNewestAtEndAsync(account, client, uids.Count, cancellationToken);
 
@@ -67,7 +71,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
                 var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
                 foreach (var (uid, localFolder) in ruleResult.LocalMoves)
-                    MessageStore.MoveToLocalFolder(account.Id, InboxFullName, uid, localFolder);
+                    MessageStore.MoveCachedMessage(account.Id, InboxFullName, uid, MessageStore.LocalFolderPrefix + localFolder);
                 NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
             }
 
@@ -77,6 +81,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 FullName = InboxFullName,
                 DisplayName = "Inbox",
                 Role = FolderRole.Inbox,
+                LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = uids.Count,
                 UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
             });

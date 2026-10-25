@@ -20,6 +20,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class ComposeService
     {
+        const bool IsLogEnabled = true;
         const string LocalSentFolderName = "Sent";
         const string LocalDraftsFolderName = "Drafts";
         public const string LocalOutboxFolderName = "Outbox";
@@ -147,7 +148,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static void RemoveAttachment(ComposeDraft draft, string path)
         {
             draft.AttachmentPaths.Remove(path);
-            try { File.Delete(path); } catch { /* stage cleanup is best-effort */ }
+            try { File.Delete(path); }
+            catch (Exception exception) { Log($"Removed the attachment from the draft, but its staged copy could not be deleted: '{path}'; {exception}", LogLevel.Warning, Run: IsLogEnabled); }
         }
 
         /// <summary>The signature as stored for this account — HTML when the user wrote HTML.</summary>

@@ -7,22 +7,30 @@
 @using System.IO
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>My Lovely Mail</PageTitle>
+@{ var workspaceTargets = WorkspaceTargets; var workspacePayload = JsonSerializer.Serialize(workspaceTargets); }
 
 @* The narrow-window rule asked only about OpenMessage, so under the two-pane breakpoint the
    sidebar Compose button rendered its card inside a display:none column and the autosave timer
    wrote a draft nobody could see. It asks about the pane itself now. *@
 <div class="mail-screen @(MailUiState.ThirdPane != null ? "mail-screen--pane-open" : "")"
+     data-context-menu="true" @oncontextmenu="e => OpenWorkspaceMenu(e)" @oncontextmenu:preventDefault="true"
+     data-mouse4="@(workspaceTargets.Length > 0 ? MouseActionService.TrashAction : "menu")" data-mouse4-value="@workspacePayload"
+     data-mouse5="@(workspaceTargets.Length > 0 ? MouseActionService.ReadAction : MouseActionService.SyncAction)" data-mouse5-value="@workspacePayload"
      style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     <MailSidebar View="this" />
-    @if (FolderMenuTarget != null)
-    {
-        <MailFolderMenu View="this" />
-    }
     @* ---- Middle: message list ---- *@
     <section class="mail-list">
         <div class="mail-search">
             <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+            <div class="mail-selection-tools">
+                <button class="mail-search-toggle @(SelectionMode ? "mail-search-toggle--on" : "")" @onclick="() => SelectionMode = !SelectionMode">☑ Select</button>
+                <button class="mail-search-toggle" @onclick="SelectAllMessages" disabled="@(Rows.Count == 0)">Select all</button>
+                @if (MailUiState.SelectedMessages.Count > 0)
+                {
+                    <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">Clear selection</button>
+                }
+            </div>
             @if (SyncScheduler.IsSyncing)
             {
                 <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
@@ -126,17 +134,17 @@
         }
         else
         {
-            @if (MailUiState.SelectedUids.Count > 0)
+            @if (MailUiState.SelectedMessages.Count > 0)
             {
                 <div class="mail-bulk-bar">
-                    <span class="mail-bulk-count">@MailUiState.SelectedUids.Count selected</span>
-                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(true)">✅ Read</button>
-                    <button class="mail-search-toggle" @onclick="() => BulkSetRead(false)">📩 Unread</button>
-                    <button class="mail-search-toggle" @onclick="BulkToggleFlag">⭐ Star</button>
-                    <button class="mail-search-toggle" @onclick="BulkToggleImportant">❗ Important</button>
-                    <button class="mail-search-toggle" @onclick="BulkDelete">🗑️ Delete</button>
+                    <span class="mail-bulk-count">@MailUiState.SelectedMessages.Count messages selected</span>
+                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</button>
+                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</button>
+                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.ToggleStar)">⭐ Star</button>
+                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.ToggleImportant)">❗ Important</button>
+                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">🗑️ Trash</button>
                     @{
-                        var moveTargets = MoveTargets;
+                        var moveTargets = MoveTargets(MailUiState.SelectedMessages);
                     }
                     @if (moveTargets.Count > 0)
                     {
@@ -192,7 +200,7 @@
                             </div>
                         }
                     </span>
-                    <button class="mail-search-toggle" @onclick="() => MailUiState.SelectMany(Rows.Select(r => r.Message.Uid))">☑️ All</button>
+                    <button class="mail-search-toggle" @onclick="SelectAllMessages">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
             }
@@ -204,12 +212,19 @@
                     @{
                         var message = row.Message;
                         bool rowUnread = row.UnreadCount > 0;
+                        var targets = MessageTargets(message);
+                        string payload = JsonSerializer.Serialize(targets);
                     }
+                    <div class="mail-row-shell" @key="MessageIdentityOf(message)" data-context-menu="true"
+                         @oncontextmenu="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                     <button class="mail-row @(rowUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
+                            data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@payload"
+                            data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@payload"
+                            @onfocus="() => MailUiState.FocusMessage(message, MessageIdentityOf(message))"
                             @onclick="e => HandleRowClick(e, message)">
-                        <span class="mail-row-check @(MailUiState.SelectedUids.Contains(message.Uid) ? "mail-row-check--on" : "")"
-                              @onclick="() => MailUiState.ToggleSelected(message.Uid)" @onclick:stopPropagation="true">
-                            @(MailUiState.SelectedUids.Contains(message.Uid) ? "☑" : "☐")
+                        <span class="mail-row-check @(IsRowSelected(message) ? "mail-row-check--on" : "")" title="Select this conversation; Shift selects a range"
+                              @onclick="e => ToggleRowSelection(e, message)" @onclick:stopPropagation="true">
+                            @(IsRowSelected(message) ? "☑" : "☐")
                         </span>
                         <span class="mail-row-avatar @(rowUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
                         <span class="mail-row-dot"></span>
@@ -250,7 +265,9 @@
                                 }
                                 @foreach (var tag in message.Tags)
                                 {
-                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)">@tag</span>
+                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                          data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = targets, Argument = tag })" data-mouse5="menu"
+                                          @oncontextmenu="e => OpenTagMenu(tag, message, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@tag</span>
                                 }
                                 @if (message.HasAttachments)
                                 {
@@ -265,6 +282,12 @@
                             </span>
                         </span>
                     </button>
+                    <div class="mail-row-quick-actions">
+                        <button title="Mark read (Mouse 5)" aria-label="Mark read" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, targets, includeSelection: true)">✅</button>
+                        <button title="Move to Trash (Mouse 4)" aria-label="Move to Trash" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, targets, includeSelection: true)">🗑️</button>
+                        <button title="Message actions" aria-label="Message actions" aria-haspopup="menu" @onclick="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)">⋯</button>
+                    </div>
+                    </div>
                 </Virtualize>
 
                 @* The store knows the folder is truncated (TotalCount is the server's own number),

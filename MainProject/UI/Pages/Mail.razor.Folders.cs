@@ -1,96 +1,96 @@
-using System.Globalization;
 using Microsoft.AspNetCore.Components.Web;
-using MyLovelyMail.MainProject.Constants.ThemeConstants;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.UI.Components;
 
 namespace MyLovelyMail.MainProject.UI.Pages;
 
 public partial class Mail
 {
     const bool IsFolderLogEnabled = true;
-    internal MailFolderData? FolderMenuTarget;
-    internal bool FolderMuteChoicesOpen;
-    internal string FolderMenuPosition = string.Empty;
 
-    /// <summary>The menu reuses the existing mail operations instead of implementing a second folder workflow.</summary>
+    /// <summary>The folder menu reuses the existing mail operation owners.</summary>
     internal enum FolderMenuAction
     {
-        Open, Sync, Backfill, Resync, MarkRead, Export, SearchUnread,
+        Open, Sync, Backfill, Resync, Export, SearchUnread,
         Settings, AccountSettings, GlobalSettings, ToggleUnreadBadge, ResetPreferences
     }
 
-    /// <summary>Opens a menu for the clicked folder without changing the currently selected mailbox.</summary>
-    /// <param name="folder">Exact account/folder target, retained even when another folder is open.</param>
-    /// <param name="pointer">Pointer location in the viewport; CSS clamps the menu to its edges.</param>
+    /// <summary>Captures the right-clicked folder without changing the selected mailbox.</summary>
+    /// <param name="folder">Exact account/folder scope.</param>
+    /// <param name="pointer">Menu position.</param>
     internal void OpenFolderMenu(MailFolderData folder, MouseEventArgs pointer)
     {
-        FolderMenuTarget = folder;
-        FolderMuteChoicesOpen = false;
-        int margin = AppMeasures.Space.Px8;
-        int width = AppMeasures.Size.Px280;
-        int height = AppMeasures.Size.Px400;
-        FolderMenuPosition = string.Create(CultureInfo.InvariantCulture,
-            $"left:clamp({margin}px,{pointer.ClientX}px,max({margin}px,calc(100vw - {width + margin}px)));top:clamp({margin}px,{pointer.ClientY}px,max({margin}px,calc(100dvh - {height + margin}px))); ");
-        Log($"Folder menu opened: account={folder.AccountId}; folder='{folder.FullName}'.", Run: IsFolderLogEnabled);
+        bool remote = folder.Selectable && !folder.IsLocal
+            && AccountStore.GetById(folder.AccountId)?.Protocol == IncomingProtocol.Imap;
+        ContextMenuItem Action(string label, FolderMenuAction action, bool enabled = true) =>
+            new(label, () => RunFolderMenuAction(folder, action), enabled);
+        List<ContextMenuItem> items = [Action("📂 Open folder", FolderMenuAction.Open, folder.Selectable)];
+        if (folder.Role == FolderRole.Trash)
+            items.Add(new("🔕 Trash notifications are always off", Enabled: false));
+        else
+        {
+            bool muted = FolderSettingsStore.IsMuted(folder);
+            List<ContextMenuItem> durations = [.. FolderSettingsPanel.MutePeriods.Select(period =>
+                new ContextMenuItem($"Mute for {period.Label}", () => SetFolderMute(folder, period.Minutes)))];
+            durations.Add(new("Mute forever", () => SetFolderMute(folder)));
+            items.Add(new(muted ? "🔔 Unmute" : "🔕 Mute", () => SetFolderMute(folder, unmute: muted), children: durations));
+            items.Add(new(FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName)), Enabled: false));
+            items.Add(Action(FolderSettingsStore.ShowsUnreadCount(folder) ? "Hide unread badges" : "Show unread badges", FolderMenuAction.ToggleUnreadBadge));
+        }
+        items.AddRange([
+            Action("🔄 Check for new mail", FolderMenuAction.Sync, remote),
+            Action("📜 Download older mail", FolderMenuAction.Backfill, remote),
+            Action("↻ Redownload folder", FolderMenuAction.Resync, remote),
+            new("📖 Mark all cached mail read", () => MouseActionService.ReadFolderAsync(folder), folder.Selectable),
+            Action("🔍 Find unread mail", FolderMenuAction.SearchUnread, folder.Selectable),
+            Action("📦 Export folder as .mbox", FolderMenuAction.Export, folder.Selectable),
+            Action("⚙️ Folder settings", FolderMenuAction.Settings),
+            Action("👤 Account settings", FolderMenuAction.AccountSettings),
+            Action("🌍 Global folder defaults", FolderMenuAction.GlobalSettings),
+            Action("↩ Reset folder to global defaults", FolderMenuAction.ResetPreferences, folder.Role != FolderRole.Trash)
+        ]);
+        ContextMenuService.Open(this, FolderLabel(folder), items, pointer.ClientX, pointer.ClientY);
     }
 
-    /// <summary>Dismisses both the main menu and its duration choices.</summary>
-    internal void CloseFolderMenu()
+    /// <summary>Changes only a notification deadline; no message flags or sync state are touched.</summary>
+    /// <param name="folder">Captured folder.</param>
+    /// <param name="minutes">Preset duration; null mutes indefinitely.</param>
+    /// <param name="unmute">Explicitly enables notifications even when a default mutes Spam.</param>
+    internal void SetFolderMute(MailFolderData folder, int? minutes = null, bool unmute = false)
     {
-        FolderMenuTarget = null;
-        FolderMuteChoicesOpen = false;
-    }
-
-    /// <summary>Applies only a notification deadline; messages, unread flags and synchronization stay untouched.</summary>
-    /// <param name="minutes">A preset duration, or null for a permanent mute.</param>
-    /// <param name="unmute">Explicitly enables notifications even when Spam inherits a mute.</param>
-    internal void SetFolderMute(int? minutes = null, bool unmute = false)
-    {
-        if (FolderMenuTarget is not { } folder || folder.Role == FolderRole.Trash) return;
+        if (folder.Role == FolderRole.Trash) return;
         var preferences = FolderSettingsStore.GetOverrides(folder.Role, folder.AccountId, folder.FullName) with
         {
             MutedUntilUtc = unmute ? DateTimeOffset.MinValue
                 : minutes is { } duration ? DateTimeOffset.UtcNow.AddMinutes(duration) : DateTimeOffset.MaxValue
         };
-        bool saved = FolderSettingsStore.Save(folder.Role, preferences, folder.AccountId, folder.FullName);
-        FolderActionStatus = saved ? unmute ? "Folder unmuted." : "Folder muted."
-            : "Could not save folder settings. See the log for details.";
-        CloseFolderMenu();
+        FolderActionStatus = FolderSettingsStore.Save(folder.Role, preferences, folder.AccountId, folder.FullName)
+            ? unmute ? "Folder unmuted." : "Folder muted." : "Could not save folder settings. See the log for details.";
     }
 
-    /// <summary>Dispatches one folder command through its existing owner and reports any final failure.</summary>
-    /// <param name="action">Selected menu command.</param>
-    internal void RunFolderMenuAction(FolderMenuAction action)
+    /// <summary>Dispatches an existing folder operation and reports its final UI failure.</summary>
+    /// <param name="folder">Captured account/folder identity.</param>
+    /// <param name="action">Selected command.</param>
+    internal void RunFolderMenuAction(MailFolderData folder, FolderMenuAction action)
     {
-        if (FolderMenuTarget is not { } folder) return;
-        CloseFolderMenu();
         Log($"Folder action started: action={action}; account={folder.AccountId}; folder='{folder.FullName}'.", Run: IsFolderLogEnabled);
         try
         {
             FolderActionStatus = null;
             switch (action)
             {
-                case FolderMenuAction.Open:
-                    MailUiState.SelectFolder(folder);
-                    break;
+                case FolderMenuAction.Open: MailUiState.SelectFolder(folder); break;
                 case FolderMenuAction.Sync:
                 case FolderMenuAction.Backfill:
                     if (AccountStore.GetById(folder.AccountId) is { } account)
                         ImapSyncService.KickFolderSync(account, folder.FullName,
                             backfillCount: action == FolderMenuAction.Backfill ? BackfillBatchSize : null);
                     break;
-                case FolderMenuAction.Resync:
-                    ResyncFolder(folder);
-                    break;
-                case FolderMenuAction.MarkRead:
-                    MarkFolderRead(folder);
-                    break;
-                case FolderMenuAction.Export:
-                    ExportFolderMailbox(folder);
-                    break;
+                case FolderMenuAction.Resync: ResyncFolder(folder); break;
+                case FolderMenuAction.Export: ExportFolderMailbox(folder); break;
                 case FolderMenuAction.SearchUnread:
                     MailUiState.SelectFolder(folder);
                     SearchAllFolders = false;
@@ -99,19 +99,13 @@ public partial class Mail
                 case FolderMenuAction.Settings:
                     Navigation.NavigateTo($"{AccountSettingsPage.RouteFor(folder.AccountId)}?folder={Uri.EscapeDataString(folder.FullName)}#folder-settings");
                     break;
-                case FolderMenuAction.AccountSettings:
-                    Navigation.NavigateTo(AccountSettingsPage.RouteFor(folder.AccountId));
-                    break;
-                case FolderMenuAction.GlobalSettings:
-                    Navigation.NavigateTo($"{NavigationConstants.Settings.Link}#folder-settings");
-                    break;
+                case FolderMenuAction.AccountSettings: Navigation.NavigateTo(AccountSettingsPage.RouteFor(folder.AccountId)); break;
+                case FolderMenuAction.GlobalSettings: Navigation.NavigateTo($"{NavigationConstants.Settings.Link}#folder-settings"); break;
                 case FolderMenuAction.ToggleUnreadBadge:
                     SaveFolderMenuPreferences(folder, FolderSettingsStore.GetOverrides(folder.Role, folder.AccountId, folder.FullName)
                         with { ShowUnreadBadge = !FolderSettingsStore.ShowsUnreadCount(folder) });
                     break;
-                case FolderMenuAction.ResetPreferences:
-                    SaveFolderMenuPreferences(folder, null);
-                    break;
+                case FolderMenuAction.ResetPreferences: SaveFolderMenuPreferences(folder, null); break;
             }
             Log($"Folder action finished: action={action}; folder='{folder.FullName}'.", Run: IsFolderLogEnabled);
         }
@@ -122,9 +116,9 @@ public partial class Mail
         }
     }
 
-    /// <summary>Saves a menu edit and exposes persistence failure in the sidebar.</summary>
-    /// <param name="folder">Exact folder target.</param>
-    /// <param name="preferences">Overrides, or null to restore inheritance.</param>
+    /// <summary>Persists a menu preference and exposes failure beside the folders.</summary>
+    /// <param name="folder">Captured folder scope.</param>
+    /// <param name="preferences">New overrides, or null to inherit.</param>
     void SaveFolderMenuPreferences(MailFolderData folder, FolderPreferences? preferences)
     {
         FolderActionStatus = FolderSettingsStore.Save(folder.Role, preferences, folder.AccountId, folder.FullName)

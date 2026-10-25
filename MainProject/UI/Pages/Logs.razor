@@ -4,7 +4,8 @@
 @inject NavigationManager Navigation
 <PageTitle>Logs — My Lovely Mail</PageTitle>
 
-<div class="logs-screen">
+<div class="logs-screen" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle"
+     @oncontextmenu="OpenLogsMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
     <div class="logs-header">
         <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
         <h1 class="logs-title">🧾 Logs</h1>
@@ -84,12 +85,22 @@
             : null;
     }
 
-    void SaveToFile()
-    {
+    Task<string> SaveToFile() => MouseActionService.RunAsync("Export logs", () => {
         string path = Path.Combine(Storage.AppPaths.UserData, $"logs-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
         File.WriteAllText(path, Logger.GetAllLogsText());
         Log($"Logs exported to {path}");
-    }
+        return Task.FromResult($"Logs saved to {path}");
+    });
+
+    /// <summary>Uses the existing log viewer actions for its whole read-only surface.</summary>
+    /// <param name="pointer">Menu position.</param>
+    void OpenLogsMenu(MouseEventArgs pointer) => ContextMenuService.Open(this, "Logs", [
+        new("⧉ Copy visible logs", () => MouseActionService.RunAsync(MouseActionService.CopyAction, string.Join("\n", FilteredLines))),
+        new("💾 Save logs to file", SaveToFile),
+        new(AutoRefresh ? "Pause auto-refresh" : "Enable auto-refresh", () => SetAutoRefresh(!AutoRefresh)),
+        new("Clear filters", () => { FilterText = string.Empty; ActiveLevel = null; }),
+        new("🗑️ Clear logs", ClearLogs)
+    ], pointer.ClientX, pointer.ClientY);
 
     static void ClearLogs() => Logger.ClearAllLogs();
 

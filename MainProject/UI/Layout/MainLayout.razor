@@ -13,6 +13,7 @@
 </div>
 
 <VaultUnlockOverlay />
+<AppContextMenu />
 <MainLayoutCss />
 
 
@@ -24,6 +25,7 @@
         Events.MainEvents.OnDataChanged += HandleDataChanged;
         // The layout outlives every page, so it is the right owner of the app-wide navigator.
         Services.NavigationBridge.Navigator = route => InvokeAsync(() => NavManager.NavigateTo(route));
+        NavManager.LocationChanged += HandleLocationChanged;
     }
 
     void HandleDataChanged(string eventName, object? data)
@@ -36,7 +38,13 @@
 
     public void Dispose()
     {
+        NavManager.LocationChanged -= HandleLocationChanged;
         Events.MainEvents.OnDataChanged -= HandleDataChanged;
         Services.NavigationBridge.Navigator = null;
     }
+
+    /// <summary>Drops captured menu targets when navigating to a different page.</summary>
+    /// <param name="sender">Navigation source.</param>
+    /// <param name="args">New route.</param>
+    void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => ContextMenuService.Close();
 }

@@ -104,7 +104,7 @@ public static partial class DebugApi
                 {
                     var uids = (query["uids"] ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToList();
                     if (uids.Count == 0) MailUiState.ClearSelection(); else MailUiState.SelectMany(uids);
-                    return new { selected = MailUiState.SelectedUids.Count };
+                    return new { selected = MailUiState.SelectedMessages.Count };
                 }
 
                 case ("POST", "/tag"):

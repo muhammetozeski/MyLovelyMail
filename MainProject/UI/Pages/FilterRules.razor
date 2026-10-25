@@ -153,6 +153,8 @@
 
     @foreach (var existingRule in FilterRuleStore.Rules)
     {
+        <div class="filters-rule-surface" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle"
+             @oncontextmenu="e => OpenRuleMenu(existingRule, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         <GlassCard CustomClass="filters-card filters-card--row">
             <div class="filters-rule-main">
                 <span class="filters-rule-name">@existingRule.Name</span>
@@ -160,12 +162,13 @@
             </div>
             <div class="filters-rule-tools">
                 <CoreToggle Checked="@existingRule.Enabled" CheckedChanged="@(v => SetEnabled(existingRule, v))" />
-                <button class="filters-remove" title="Move up" @onclick="() => FilterRuleStore.MoveRule(existingRule.Id, up: true)">↑</button>
-                <button class="filters-remove" title="Move down" @onclick="() => FilterRuleStore.MoveRule(existingRule.Id, up: false)">↓</button>
-                <button class="filters-remove" title="Edit" @onclick="() => StartEdit(existingRule)">✏️</button>
-                <button class="filters-remove" title="Delete" @onclick="() => FilterRuleStore.Remove(existingRule.Id)">🗑️</button>
+                <button class="filters-remove" title="Move up" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Up)">↑</button>
+                <button class="filters-remove" title="Move down" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Down)">↓</button>
+                <button class="filters-remove" title="Edit" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Edit)">✏️</button>
+                <button class="filters-remove" title="Delete" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Delete)">🗑️</button>
             </div>
         </GlassCard>
+        </div>
     }
 </div>
 
@@ -206,10 +209,52 @@
         ClearEditor();
     }
 
-    static void SetEnabled(FilterRule rule, bool enabled)
-    {
+    static Task<string> SetEnabled(FilterRule rule, bool enabled) => MouseActionService.RunAsync("Change filter", () => {
         rule.Enabled = enabled;
         FilterRuleStore.Save(rule);
+        return Task.FromResult(enabled ? "Filter enabled." : "Filter disabled.");
+    });
+
+    /// <summary>Commands consumed by the same rule-row buttons and context menu.</summary>
+    enum RuleCommand { Edit, Duplicate, Toggle, Up, Down, Delete }
+
+    /// <summary>Captures a rule and routes operations to its existing editor and store.</summary>
+    /// <param name="rule">Clicked rule.</param>
+    /// <param name="pointer">Menu position.</param>
+    void OpenRuleMenu(FilterRule rule, MouseEventArgs pointer) => ContextMenuService.Open(this, rule.Name, [
+        new("✏️ Edit filter", () => RunRuleCommand(rule, RuleCommand.Edit)),
+        new("⧉ Duplicate into editor", () => RunRuleCommand(rule, RuleCommand.Duplicate)),
+        new(rule.Enabled ? "⏸ Disable filter" : "▶ Enable filter", () => RunRuleCommand(rule, RuleCommand.Toggle)),
+        new("↑ Move up", () => RunRuleCommand(rule, RuleCommand.Up), FilterRuleStore.Rules.FirstOrDefault()?.Id != rule.Id),
+        new("↓ Move down", () => RunRuleCommand(rule, RuleCommand.Down), FilterRuleStore.Rules.LastOrDefault()?.Id != rule.Id),
+        new("⧉ Copy name", () => MouseActionService.RunAsync(MouseActionService.CopyAction, rule.Name)),
+        new("🗑️ Delete filter", () => RunRuleCommand(rule, RuleCommand.Delete))
+    ], pointer.ClientX, pointer.ClientY);
+
+    /// <summary>Shares persistence, error logging and UI results for every rule input path.</summary>
+    /// <param name="rule">Captured rule.</param>
+    /// <param name="command">Editor/store command.</param>
+    /// <returns>Awaitable operation.</returns>
+    Task RunRuleCommand(FilterRule rule, RuleCommand command)
+    {
+        if (command == RuleCommand.Toggle) return SetEnabled(rule, !rule.Enabled);
+        return MouseActionService.RunAsync($"Filter {command}", () => {
+            switch (command)
+            {
+                case RuleCommand.Edit: StartEdit(rule); break;
+                case RuleCommand.Duplicate:
+                    StartEdit(rule);
+                    if (EditingRule is { } copy) { copy.Id = Guid.NewGuid().ToString("N"); copy.Name += " (copy)"; IsNewRule = true; }
+                    break;
+                case RuleCommand.Up: FilterRuleStore.MoveRule(rule.Id, true); break;
+                case RuleCommand.Down: FilterRuleStore.MoveRule(rule.Id, false); break;
+                case RuleCommand.Delete:
+                    FilterRuleStore.Remove(rule.Id);
+                    if (EditingRule?.Id == rule.Id) ClearEditor();
+                    break;
+            }
+            return Task.FromResult($"Filter {command} completed.");
+        });
     }
 
     static string ArgumentPlaceholder(FilterActionType type) => type switch

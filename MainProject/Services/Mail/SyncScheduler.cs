@@ -75,7 +75,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>Syncs every enabled account once. Safe to call while the loop runs.</summary>
-        public static async Task SyncNowAsync(CancellationToken cancellationToken = default)
+        public static async Task SyncNowAsync(CancellationToken cancellationToken = default, string? accountId = null)
         {
             if (passRunning) return;
             passRunning = true;
@@ -85,9 +85,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
                 // polling cycle even though nothing explicitly notifies this scheduler about them.
-                ImapIdleService.Refresh();
+                if (accountId == null) ImapIdleService.Refresh();
 
-                foreach (var account in AccountStore.Accounts.Where(a => a.Enabled))
+                foreach (var account in AccountStore.Accounts.Where(account => accountId == null ? account.Enabled : account.Id == accountId))
                 {
                     try
                     {
@@ -105,25 +105,24 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     catch (Exception ex)
                     {
                         SyncHealthService.MarkFailure(account.Id, ex.Message);
-                        Log($"Sync failed for '{account.EmailAddress}': {ex.Message}", LogLevel.Error);
+                        Log($"Sync failed for '{account.EmailAddress}': {ex}", LogLevel.Error);
                     }
                 }
 
-                // A completed pass is the online signal — retry anything parked in the Outboxes.
-                try
+                if (accountId == null)
                 {
-                    await OutboxService.FlushAsync(cancellationToken);
+                    // A completed global pass also retries Outboxes and maintains the local cache.
+                    try { await OutboxService.FlushAsync(cancellationToken); }
+                    catch (OperationCanceledException) { }
+                    SnoozeService.WakeDue();
+                    OfflineCacheTrimmer.TrimAll();
                 }
-                catch (OperationCanceledException) { }
-
-                SnoozeService.WakeDue();
-                OfflineCacheTrimmer.TrimAll();
             }
             finally
             {
                 passRunning = false;
             }
-            Log("Sync pass finished for all enabled accounts.");
+            Log(accountId == null ? "Sync pass finished for all enabled accounts." : $"Sync pass finished for account {accountId}.");
         }
     }
 }

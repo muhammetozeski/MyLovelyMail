@@ -15,20 +15,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal bool OpenBodyLoading { get; set; }
         internal bool OpenBodyBlockedImages { get; set; }
         internal string? BodyError { get; set; }
-        ReaderMessageIdentity? loadedBodyKey;
-        ReaderMessageIdentity? remoteImagesAllowedKey;
+        MailMessageIdentity? loadedBodyKey;
+        MailMessageIdentity? remoteImagesAllowedKey;
         int bodyLoadGeneration;
-
-        /// <summary>Message numbers are unique only inside an account's folder.</summary>
-        readonly record struct ReaderMessageIdentity(string AccountId, string FolderFullName, uint Uid);
 
         /// <summary>Resolves a reader message through the current account and search-hit folder map.</summary>
         /// <param name="message">The opened message, or null when the reader is closed.</param>
         /// <returns>The complete cache identity, or null when no account or folder is selected.</returns>
-        ReaderMessageIdentity? ReaderIdentityOf(MailMessageSummary? message) =>
-            message != null && MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folder
-                ? new(account.Id, folder, message.Uid)
-                : null;
+        internal MailMessageIdentity? MessageIdentityOf(MailMessageSummary? message)
+        {
+            if (message == null || MailUiState.SelectedAccount is not { } account) return null;
+            if (RowMessages.ContainsKey(message))
+            {
+                string? listedFolder = HitFolders.TryGetValue(message, out var hit) ? hit.FullName : MailUiState.SelectedFolder?.FullName;
+                return listedFolder == null ? null : new(account.Id, listedFolder, message.Uid);
+            }
+            if (ReferenceEquals(MailUiState.OpenMessage, message) && MailUiState.OpenMessageKey is { } opened) return opened;
+            if (ReferenceEquals(MailUiState.FocusedMessage, message) && MailUiState.FocusedMessageKey is { } focused) return focused;
+            if (openThreadKey is { } threadKey && openThread?.Contains(message) == true)
+                return new(threadKey.AccountId, threadKey.FolderFullName, message.Uid);
+            return MailUiState.SelectedFolder is { } folder ? new(account.Id, folder.FullName, message.Uid) : null;
+        }
 
         internal List<AttachmentInfo> OpenAttachments { get; set; } = [];
         internal string? SaveStatus { get; set; }
@@ -118,7 +125,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         PersonProfile? senderHistory;
-        ReaderMessageIdentity? senderHistoryKey;
+        MailMessageIdentity? senderHistoryKey;
 
         /// <summary>
         /// Everything the cache knows about this sender. The scan walks every cached summary, so
@@ -128,7 +135,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         internal PersonProfile? HistoryOfOpenSender(MailMessageSummary open)
         {
-            var key = ReaderIdentityOf(open);
+            var key = MessageIdentityOf(open);
             if (key != null && senderHistoryKey == key) return senderHistory;
             senderHistoryKey = key;
             senderHistory = null;
@@ -143,7 +150,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         List<MailMessageSummary>? openThread;
-        ReaderMessageIdentity? openThreadKey;
+        MailMessageIdentity? openThreadKey;
 
         /// <summary>
         /// The conversation the open message belongs to, oldest first, or null when it stands
@@ -156,7 +163,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// </summary>
         internal List<MailMessageSummary>? ThreadOfOpenMessage(MailMessageSummary open)
         {
-            var key = ReaderIdentityOf(open);
+            var key = MessageIdentityOf(open);
             if (key != null && openThreadKey == key) return openThread;
             openThreadKey = key;
             openThread = null;
@@ -212,7 +219,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal void AllowImagesOnce()
         {
             if (MailUiState.OpenMessage is not { } open) return;
-            remoteImagesAllowedKey = ReaderIdentityOf(open);
+            remoteImagesAllowedKey = MessageIdentityOf(open);
             loadedBodyKey = null;
             _ = LoadOpenBodyIfNeededAsync();
         }
@@ -233,7 +240,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 return;
             }
             if (ResolveFolderOf(open) is not { } folderName) return;
-            var key = new ReaderMessageIdentity(account.Id, folderName, open.Uid);
+            var key = new MailMessageIdentity(account.Id, folderName, open.Uid);
             if (loadedBodyKey == key && (OpenBodyHtml != null || OpenBodyLoading)) return;
 
             int generation = ++bodyLoadGeneration;
@@ -259,12 +266,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 }
                 catch (Exception ex)
                 {
-                    if (generation != bodyLoadGeneration || ReaderIdentityOf(MailUiState.OpenMessage) != key) return;
+                    if (generation != bodyLoadGeneration || MessageIdentityOf(MailUiState.OpenMessage) != key) return;
                     BodyError = ex.Message;
                 }
             }
 
-            if (generation != bodyLoadGeneration || ReaderIdentityOf(MailUiState.OpenMessage) != key) return;
+            if (generation != bodyLoadGeneration || MessageIdentityOf(MailUiState.OpenMessage) != key) return;
 
             OpenBodyHtml = rendered?.Html;
             OpenBodyBlockedImages = rendered?.RemoteImagesBlocked ?? false;
@@ -405,21 +412,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 ? MessageExportService.ExportHtml(account, folderName, message)
                 : MessageExportService.ExportEml(account, folderName, message)));
 
-        internal void DeleteOpen(MailMessageSummary message) =>
-            WithAccountAndFolder(message, (account, folderName) =>
-            {
-                MessageActions.Delete(account, folderName, message);
-                MailUiState.CloseMessage();
-            });
-
         internal void OpenMessage(MailMessageSummary message)
         {
             // A click while composing looked dead: the compose pane owns the right side, so the
             // reader never appeared. Autosave the draft and close compose, then open the message.
             if (MailUiState.ActiveCompose != null)
                 SaveAndCloseCompose();
-            MailUiState.FocusMessage(message);
-            MailUiState.OpenMessageInReader(message);
+            var identity = MessageIdentityOf(message);
+            MailUiState.FocusMessage(message, identity);
+            MailUiState.OpenMessageInReader(message, identity);
         }
 
         /// <summary>Rows in the local Drafts folder reopen in the compose pane instead of the reader.</summary>

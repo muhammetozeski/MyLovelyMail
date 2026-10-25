@@ -13,7 +13,8 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 | Keyboard shortcuts and bulk actions | [Mail interaction](../MainProject/UI/Pages/Mail.razor.Interaction.cs) |
 | Colors, sizes or responsive layout | `UI/ThemeConstants`, then the relevant style component rendered by [MailCss](../MainProject/UI/Pages/MailCss.razor) |
 | Global or account settings | `Stores/Settings.cs`, `Stores/AccountSettings.cs`, and the corresponding Razor page; [SettingEditorRow](../MainProject/UI/Components/SettingEditorRow.razor) supplies the general editor |
-| Folder defaults, overrides and context menu | [FolderSettingsStore](../MainProject/Stores/FolderSettingsStore.cs), [FolderSettingsPanel](../MainProject/UI/Components/FolderSettingsPanel.razor), and the `Mail.razor.Folders.cs` / `MailFolderMenu.razor` presentation pair |
+| Folder defaults, overrides and context menu | [FolderSettingsStore](../MainProject/Stores/FolderSettingsStore.cs), [FolderSettingsPanel](../MainProject/UI/Components/FolderSettingsPanel.razor), and `Mail.razor.Folders.cs` using the shared menu host |
+| Context menus, side buttons or selection | [ContextMenuService](../MainProject/Services/ContextMenuService.cs), [AppContextMenu](../MainProject/UI/Components/AppContextMenu.razor), [MouseActionService](../MainProject/Services/MouseActionService.cs), and `Mail.razor.Selection.cs` / `Mail.razor.ContextMenus.cs` |
 | Mail synchronization | [ImapSyncService](../MainProject/Services/Mail/ImapSyncService.cs); its `Folders` partial discovers folders and its `OnDemand` partial schedules foreground operations |
 | Cached messages or local folders | [MessageStore](../MainProject/Storage/MessageStore.cs); the `Index`, `Folders` and `Moves` partials contain those operations |
 | Tor | [TorService](../MainProject/Services/Tor/TorService.cs), endpoint verification in its `Verification` partial, and executable discovery in `TorProcess.Discovery.cs` |
@@ -75,6 +76,40 @@ page, retaining the clicked folder rather than relying on the current selection.
 The store's inheritance, persistence, failure paths, notification presentation, counters and Razor
 menu/editor output were checked in an isolated temporary console/Blazor renderer harness. This is
 service and renderer verification, not a native-device interaction test.
+
+## Shared input and message identity
+
+`ContextMenuService` owns one menu, rendered by `AppContextMenu` in the layout outside the animated
+page content. Entries capture their owner and targets. Execution passes through that owner's
+Blazor event receiver so changing a menu does not repaint only the popup. Route changes dismiss
+captured targets. Account menus use the same `MailMenuItems.ForAccount` factory in Mail and Settings.
+
+`MailMessageIdentity` is the common account/folder/message key for selection, reader caches and
+mouse payloads. `MailUiState.SelectMessages` owns selection updates; a conversation row expands
+the existing `ThreadingService` group's members. Shift selection uses visible row order. Right-click
+inside a selection preserves it; an outside row replaces it. Non-filing commands retain selection.
+`MouseActionService` provides the shared input failure boundary and status; `MessageActions.Execute`
+resolves complete keys and batches each folder using the existing storage and protocol operations.
+
+DOM button 4 means Mouse 5 (front/read); DOM button 3 means Mouse 4 (Trash). `mouse-buttons.js`
+uses declared bindings plus editing/control/global fallbacks. Editable fields retain native context
+menus, passwords are never copied, and Ctrl+A is intercepted only in the mail list. The existing
+reader-frame watcher attaches the same input router inside readable mail documents. The opaque
+signature preview retains its sandbox and forwards trusted input through a per-instance capability
+removed before user code runs; the parent verifies the owned frame and discards arbitrary commands.
+These dispatch paths and viewport/scale geometry were checked with an isolated JavaScript harness.
+
+Trash shortcuts explicitly request `MoveToTrash` and never inherit permanent deletion. A writable
+server move retains its source until confirmed, deduplicates queued requests and hides pending rows;
+failure releases the pending state and makes the retained row visible again. `MoveCachedMessage`
+handles local and confirmed server cache moves in one place. It copies metadata before changing the
+destination number, writes the destination body/index, then removes the source. Sharing the same
+mutable summary between both folders can make cross-folder search dictionaries fail during a change
+notification. Local number collisions and full-body preservation were checked in isolated storage tests.
+POP3's known incoming-mail numbers include filed local mail so Trash does not turn it into a new arrival.
+
+`SyncScheduler.SyncNowAsync(accountId: id)` reuses the existing protocol/health path for a manual
+account check; global IDLE refresh, Outbox flushing and maintenance remain in the global pass.
 
 ## Building and checking changes
 

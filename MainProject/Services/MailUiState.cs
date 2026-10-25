@@ -1,6 +1,7 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Services
 {
@@ -14,9 +15,13 @@ namespace MyLovelyMail.MainProject.Services
         public static MailAccountData? SelectedAccount { get; private set; }
         public static MailFolderData? SelectedFolder { get; private set; }
         public static MailMessageSummary? OpenMessage { get; private set; }
+        /// <summary>Reader identity survives a search change that removes the opened message from the visible hits.</summary>
+        public static MailMessageIdentity? OpenMessageKey { get; private set; }
 
         /// <summary>Row highlighted by keyboard navigation (independent of the opened message).</summary>
         public static MailMessageSummary? FocusedMessage { get; private set; }
+        /// <summary>Complete identity of the keyboard focus, independent of the current search result.</summary>
+        public static MailMessageIdentity? FocusedMessageKey { get; private set; }
 
         /// <summary>The draft open in the compose pane; null = compose pane closed.</summary>
         public static ComposeDraft? ActiveCompose { get; private set; }
@@ -46,6 +51,9 @@ namespace MyLovelyMail.MainProject.Services
 
         public static void OpenCompose(ComposeDraft draft)
         {
+            // Switching compose targets must preserve the unsent draft, including menu-driven replies.
+            if (ActiveCompose is { } previous && previous.DraftId != draft.DraftId)
+                ComposeService.SaveDraft(previous);
             ActiveCompose = draft;
             ThirdPane = PaneOccupant.Compose;
             OnSelectionChanged?.Invoke();
@@ -75,32 +83,45 @@ namespace MyLovelyMail.MainProject.Services
             OnSelectionChanged?.Invoke();
         }
 
-        public static void FocusMessage(MailMessageSummary? message)
+        public static void FocusMessage(MailMessageSummary? message, MailMessageIdentity? identity = null)
         {
             FocusedMessage = message;
+            FocusedMessageKey = identity ?? (message != null && SelectedAccount is { } account && SelectedFolder is { } folder
+                ? new MailMessageIdentity(account.Id, folder.FullName, message.Uid) : null);
             OnSelectionChanged?.Invoke();
         }
 
-        /// <summary>Uids checked for bulk actions in the CURRENT folder (cleared on any folder/account change).</summary>
-        public static readonly HashSet<uint> SelectedUids = [];
+        /// <summary>Checked mail retains its account and folder, including in cross-folder search results.</summary>
+        public static readonly HashSet<MailMessageIdentity> SelectedMessages = [];
 
-        public static void SelectAccount(MailAccountData? account)
+        /// <summary>Changes account and optionally restores its remembered folder through the same selection path.</summary>
+        /// <param name="account">Selected account, or null to clear it.</param>
+        /// <param name="restoreFolder">Uses folder memory, then the existing Inbox/first-folder fallback.</param>
+        public static void SelectAccount(MailAccountData? account, bool restoreFolder = false)
         {
             SelectedAccount = account;
             SelectedFolder = null;
             OpenMessage = null;
+            OpenMessageKey = null;
             // The pane must not keep pointing at a message that is no longer listed.
             ThirdPane = SurvivingOccupant();
-            SelectedUids.Clear();
+            FocusedMessage = null;
+            FocusedMessageKey = null;
+            SelectedMessages.Clear();
             OnSelectionChanged?.Invoke();
+            if (restoreFolder && account != null && FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(account.Id),
+                MessageStore.GetFolders(account.Id)) is { } target) SelectFolder(target);
         }
 
         public static void SelectFolder(MailFolderData? folder)
         {
             SelectedFolder = folder;
             OpenMessage = null;
+            OpenMessageKey = null;
             ThirdPane = SurvivingOccupant();
-            SelectedUids.Clear();
+            FocusedMessage = null;
+            FocusedMessageKey = null;
+            SelectedMessages.Clear();
             OnSelectionChanged?.Invoke();
 
             // Every folder change in the app comes through here, so this is the one place that
@@ -115,29 +136,38 @@ namespace MyLovelyMail.MainProject.Services
                 ImapSyncService.KickFolderSync(account, folder.FullName);
         }
 
-        public static void ToggleSelected(uint uid)
-        {
-            if (!SelectedUids.Remove(uid))
-                SelectedUids.Add(uid);
-            OnSelectionChanged?.Invoke();
-        }
-
+        /// <summary>Maps the existing development endpoint's folder-local numbers to complete identities.</summary>
+        /// <param name="uids">Message numbers in the currently selected folder.</param>
         public static void SelectMany(IEnumerable<uint> uids)
         {
-            SelectedUids.UnionWith(uids);
+            if (SelectedAccount is { } account && SelectedFolder is { } folder)
+                SelectMessages(uids.Select(uid => new MailMessageIdentity(account.Id, folder.FullName, uid)));
+        }
+
+        /// <summary>Applies checkbox, range and select-all changes through the same selection update.</summary>
+        /// <param name="messages">Complete identities, expanded by the caller for conversation rows.</param>
+        /// <param name="selected">Whether to add or remove them.</param>
+        /// <param name="replace">Clears the earlier selection before applying the change.</param>
+        public static void SelectMessages(IEnumerable<MailMessageIdentity> messages, bool selected = true, bool replace = false)
+        {
+            if (replace) SelectedMessages.Clear();
+            if (selected) SelectedMessages.UnionWith(messages);
+            else SelectedMessages.ExceptWith(messages);
             OnSelectionChanged?.Invoke();
         }
 
         public static void ClearSelection()
         {
-            if (SelectedUids.Count == 0) return;
-            SelectedUids.Clear();
+            if (SelectedMessages.Count == 0) return;
+            SelectedMessages.Clear();
             OnSelectionChanged?.Invoke();
         }
 
-        public static void OpenMessageInReader(MailMessageSummary message)
+        public static void OpenMessageInReader(MailMessageSummary message, MailMessageIdentity? identity = null)
         {
             OpenMessage = message;
+            OpenMessageKey = identity ?? (SelectedAccount is { } account && SelectedFolder is { } folder
+                ? new MailMessageIdentity(account.Id, folder.FullName, message.Uid) : null);
             ThirdPane = PaneOccupant.Reader;
             OnSelectionChanged?.Invoke();
         }
@@ -145,6 +175,7 @@ namespace MyLovelyMail.MainProject.Services
         public static void CloseMessage()
         {
             OpenMessage = null;
+            OpenMessageKey = null;
             ThirdPane = SurvivingOccupant();
             OnSelectionChanged?.Invoke();
         }

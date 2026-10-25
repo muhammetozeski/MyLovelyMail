@@ -252,7 +252,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static async Task ExecuteRuleMovesAsync(MailAccountData account, ImapClient client, IMailFolder folder, RuleProcessResult ruleResult, CancellationToken cancellationToken)
         {
             foreach (var (uid, localFolder) in ruleResult.LocalMoves)
-                MessageStore.MoveToLocalFolder(account.Id, folder.FullName, uid, localFolder);
+                MessageStore.MoveCachedMessage(account.Id, folder.FullName, uid, MessageStore.LocalFolderPrefix + localFolder);
 
             if (ruleResult.RemoteMoves.Count == 0) return;
 
@@ -276,7 +276,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         // it vanished from the app until the destination folder's own sync ran —
                         // and with the destination folder unlisted, that never happened at all.
                         if (moved.TryGetValue(source, out var destination))
-                            MessageStore.MoveToServerFolder(account.Id, folder.FullName, source.Id, targetFolder.FullName, destination.Id);
+                            MessageStore.MoveCachedMessage(account.Id, folder.FullName, source.Id, targetFolder.FullName, destination.Id);
                         else
                             // No UIDPLUS: the destination's uid is unknowable here, so the row is
                             // dropped and the destination folder's next sync brings it back.

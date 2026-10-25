@@ -74,7 +74,12 @@ and switching the theme re-skins the whole app at runtime.
 - Colored tags with a picker; tag chips on list rows; tag search
 - Cross-folder search with `from:` `to:` `tag:` `has:attachment` `is:unread` `is:starred`
   operators and saved-search chips
-- Multi-select (checkboxes, Ctrl+Click, Ctrl+A) with a bulk actions bar
+- Selection mode, checkboxes, Ctrl+Click, Shift ranges and Ctrl+A, with a bulk actions bar
+  and selection-aware right-click menus; conversation rows include all their member messages
+- Shared context menus for mail, reader content, accounts, folders, tags, attachments, saved
+  searches, drafts, filters, setting rows and logs, plus useful fallback actions elsewhere
+- Mouse 5 (front side button) marks mail read; Mouse 4 moves it to Trash. Controls, text fields
+  and non-mail surfaces use context-specific actions instead of browser Back/Forward
 - Keyboard triage: J/K navigation, Enter, U (read), S (star), I (important), Delete, `?` for help
 
 **Composing**

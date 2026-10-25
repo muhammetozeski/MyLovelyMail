@@ -57,15 +57,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Starts a new draft addressed to this person and closes the sheet behind it.</summary>
-        internal void StartComposeTo(string address)
-        {
-            if (MailUiState.SelectedAccount is not { } account) return;
-            var draft = ComposeService.BuildNew(account);
-            draft.To = address;
-            MailUiState.ClosePerson();
-            MailUiState.OpenCompose(draft);
-        }
-
         internal void QueueActiveDraftSend()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
@@ -147,12 +138,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (MailUiState.ActiveCompose is not { } draft) return;
             ComposeService.RemoveAttachment(draft, path);
             NoteComposeActivity();
-        }
-
-        internal static void StartCompose()
-        {
-            if (MailUiState.SelectedAccount is { } account)
-                MailUiState.OpenCompose(ComposeService.BuildNew(account));
         }
 
         /// <summary>Any keystroke in the compose fields re-arms a ~3s idle autosave.</summary>

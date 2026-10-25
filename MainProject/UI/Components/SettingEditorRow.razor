@@ -1,7 +1,8 @@
 @* One editable row for any ISetting, picking the control from the value's runtime type. Both the
    account overrides card and the Settings catch-all card render through this, so a setting type
    gains an editor in one place instead of two. *@
-<div class="settings-row">
+<div class="settings-row" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle,select,input"
+     @oncontextmenu="OpenMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
     <div class="settings-row-text">
         <span class="settings-row-label">
             @Setting.KeyHumanReadable
@@ -59,6 +60,22 @@
     [Parameter] public string? BadgeText { get; set; }
 
     [Parameter] public string ResetTitle { get; set; } = "Reset to default";
+
+    /// <summary>Reuses this row's existing commit/reset callbacks so inherited settings keep the same persistence owner.</summary>
+    /// <param name="pointer">Menu position.</param>
+    void OpenMenu(MouseEventArgs pointer)
+    {
+        List<ContextMenuItem> items = [
+            new("⧉ Copy current value", () => MouseActionService.RunAsync(MouseActionService.CopyAction, Setting.Value.ToString() ?? string.Empty)),
+            new("⧉ Copy setting name", () => MouseActionService.RunAsync(MouseActionService.CopyAction, Setting.Key)),
+            new(ResetTitle, Reset, !Setting.IsDefault)
+        ];
+        if (Setting.Value is bool value) items.Insert(0, new(value ? "Switch off" : "Switch on", () => Commit((!value).ToString())));
+        if (Setting.Value is Enum selected)
+            items.Insert(0, new("Choose value", Children: [.. Enum.GetValues(selected.GetType()).Cast<object>()
+                .Select(option => new ContextMenuItem(option.ToString() ?? string.Empty, () => Commit(option.ToString() ?? string.Empty)))]));
+        ContextMenuService.Open(this, Setting.KeyHumanReadable, items, pointer.ClientX, pointer.ClientY);
+    }
 
     /// <summary>Text that is not a value of the setting's type changes nothing and saves nothing.</summary>
     async Task Commit(string text)

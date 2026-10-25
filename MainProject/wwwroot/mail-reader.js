@@ -49,10 +49,12 @@
         frame.addEventListener("load", function () {
             fit(frame);
             followContent(frame);
+            if (window.lovelyMouse) window.lovelyMouse.attachFrame(frame);
         });
         // srcdoc may already have finished before the observer reached this element.
         fit(frame);
         followContent(frame);
+        if (window.lovelyMouse) window.lovelyMouse.attachFrame(frame);
     }
 
     function scan(node) {

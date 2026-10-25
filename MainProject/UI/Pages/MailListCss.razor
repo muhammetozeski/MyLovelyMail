@@ -20,6 +20,28 @@
 }
 
 <style>
+    .mail-selection-tools { display: flex; flex-wrap: wrap; gap: @(AppMeasures.Space.Px6)px; }
+    .mail-row-shell { position: relative; }
+    .mail-row-quick-actions {
+        position: absolute;
+        right: @(AppMeasures.Space.Px6)px;
+        bottom: @(AppMeasures.Space.Px4)px;
+        display: flex;
+        gap: @(AppMeasures.Space.Px4)px;
+        justify-content: flex-end;
+        padding: 0;
+    }
+    .mail-row-shell .mail-row-subject, .mail-row-shell .mail-row-preview { padding-right: @(AppMeasures.Size.Px100)px; }
+    .mail-row-quick-actions button {
+        border: 0;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textPrimary;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+    .mail-row-quick-actions button:hover, .mail-row-quick-actions button:focus-visible { background: @surfaceTint; }
     /* ---- Message list ---- */
 
     .mail-list {

@@ -1,0 +1,56 @@
+@inherits ThemedComponentBase
+<style>
+    .app-context-backdrop { position: fixed; inset: 0; z-index: @(AppMeasures.ZLayer.Popover); }
+    .app-context-menu {
+        position: fixed;
+        left: @(AppMeasures.Space.Px8)px;
+        top: @(AppMeasures.Space.Px8)px;
+        width: min(@(AppMeasures.Size.Px300)px, calc(100vw - @(AppMeasures.Space.Px16)px));
+        max-height: min(@(AppMeasures.Size.Px400)px, calc(100dvh - @(AppMeasures.Space.Px16)px));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        box-sizing: border-box;
+        padding: @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        @((MarkupString)AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong))
+        box-shadow: @AppStyles.ShadowHeavy;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+    .app-context-menu button {
+        display: block;
+        width: 100%;
+        padding: @(AppMeasures.Space.Px8)px;
+        border: 0;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+    }
+    .app-context-menu button:hover, .app-context-menu button:focus-visible { background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true); }
+    .app-context-menu button:disabled { color: @AppColors.TextMuted.ToRgbaHex(true); cursor: default; }
+    .app-context-title { padding: @(AppMeasures.Space.Px8)px; font-weight: @(AppMeasures.Weight.Bold); overflow-wrap: anywhere; }
+    .app-context-split { display: flex; }
+    .app-context-menu .app-context-arrow { flex: 0 0 @(AppMeasures.Size.Px40)px; text-align: center; border-left: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true); }
+    .app-context-children { margin-left: @(AppMeasures.Space.Px16)px; border-left: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true); }
+    .app-input-status {
+        position: fixed;
+        bottom: @(AppMeasures.Size.BottomNavHeight + AppMeasures.Space.Px8)px;
+        left: @(AppMeasures.Space.Px16)px;
+        right: @(AppMeasures.Space.Px16)px;
+        z-index: @(AppMeasures.ZLayer.Modal);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        overflow-wrap: anywhere;
+        box-shadow: @AppStyles.ShadowMedium;
+    }
+    .app-input-status button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+</style>
