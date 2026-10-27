@@ -1,4 +1,5 @@
 <Project>
+  <!-- C -->
   <!--
     .NET 10 SDK uses the portable RID graph for framework reference resolution.
     The portable graph only contains the modern RIDs (win-x64, win-x86, win-arm64,
