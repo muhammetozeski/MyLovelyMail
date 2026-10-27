@@ -103,11 +103,10 @@ public partial class Mail
         return message;
     }
 
-    /// <summary>Blank workspace space offers selection, compose and sync actions, or the selected mail's menu.</summary>
+    /// <summary>Blank workspace space offers list, compose and sync actions without selecting or targeting any mail.</summary>
     /// <param name="pointer">Pointer location.</param>
     void OpenWorkspaceMenu(MouseEventArgs pointer)
     {
-        if (WorkspaceTargets is { Length: > 0 } targets) { OpenMessageMenu(targets, pointer.ClientX, pointer.ClientY); return; }
         ContextMenuService.Open(this, "Mail", [
             new("☑ Select all listed messages", SelectAllMessages, Rows.Count > 0),
             new("☑ Toggle selection mode", () => SelectionMode = !SelectionMode),

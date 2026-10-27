@@ -88,6 +88,8 @@ captured targets. Account menus use the same `MailMenuItems.ForAccount` factory 
 mouse payloads. `MailUiState.SelectMessages` owns selection updates; a conversation row expands
 the existing `ThreadingService` group's members. Shift selection uses visible row order. Right-click
 inside a selection preserves it; an outside row replaces it. Non-filing commands retain selection.
+Blank workspace context menus never infer a message from focus, the reader or selection; they
+offer workspace actions and leave selection unchanged. `WorkspaceTargets` is only a side-button fallback.
 `MouseActionService` provides the shared input failure boundary and status; `MessageActions.Execute`
 resolves complete keys and batches each folder using the existing storage and protocol operations.
 
