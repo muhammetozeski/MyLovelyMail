@@ -437,7 +437,7 @@
                 }
                 else if (View.OpenBodyHtml != null)
                 {
-                    <iframe class="mail-reader-frame" sandbox="allow-same-origin" srcdoc="@View.OpenBodyHtml"
+                    <iframe class="mail-reader-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" srcdoc="@View.OpenBodyHtml"
                             data-message-targets="@readerPayload" data-message-primary="@JsonSerializer.Serialize(View.MessageIdentityOf(open))"></iframe>
                 }
                 else

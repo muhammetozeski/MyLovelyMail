@@ -29,6 +29,15 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 
 Reader cache keys include account, folder and message number. Message numbers alone are not unique across folders. Body loads also carry a generation number so a delayed result cannot replace a newer load. Remote-image permission uses the same complete message identity.
 
+The reader document supplies `<base target="_blank">` so ordinary anchors reach BlazorWebView's
+[built-in external navigation](https://learn.microsoft.com/en-us/aspnet/core/blazor/hybrid/routing?view=aspnetcore-10.0).
+The frame permits popups to escape its sandbox and user-activated top navigation, while scripts
+remain disabled. A frame with only `allow-same-origin` blocks links targeting a new or parent
+window. The generated target is outside sanitized message content; sender-provided base elements
+are still removed. This is document configuration, with no link click listener or custom URL dispatcher.
+Renderer checks cover retained hrefs, the generated target and actual frame permissions; the
+framework's browser launch behavior follows its documented default.
+
 ## Styles and themes
 
 Keep styles in `Css.razor` components and take their values from the existing C# theme constants. Each style component that emits theme-dependent markup inherits `ThemedComponentBase`, which listens for theme and density changes. See [the rendering lessons](LESSONS.md) before changing that inheritance.

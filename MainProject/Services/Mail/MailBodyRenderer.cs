@@ -230,7 +230,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             int scale = Math.Clamp(Settings.ReaderTextScalePercent.Value, MinScalePercent, MaxScalePercent);
             int fontPx = BaseFontPx * scale / 100;
-            return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<style>" +
+            // Ordinary hrefs use the host's built-in external navigation instead of replacing the reader frame.
+            return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<base target=\"_blank\"><style>" +
                 $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
                 $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
                 // plaintext direction: an Arabic or Hebrew paragraph inside an otherwise
