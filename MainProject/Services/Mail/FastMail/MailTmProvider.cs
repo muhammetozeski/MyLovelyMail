@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -19,6 +20,7 @@ namespace MyLovelyMail.MainProject.Services.Mail.FastMail;
 /// </summary>
 public sealed class MailTmProvider : IFastMailProvider
 {
+    const bool IsLogEnabled = true;
     const string BaseUrl = "https://api.mail.tm";
 
     sealed record TokenEntry(string Token, string AccountRemoteId, DateTime ObtainedUtc);
@@ -38,228 +40,278 @@ public sealed class MailTmProvider : IFastMailProvider
 
     public async Task<IReadOnlyList<string>> GetDomainsAsync(string isolationKey, CancellationToken cancellationToken)
     {
-        using var client = TorService.CreateIsolatedHttpClient(isolationKey);
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/domains");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
-
-        using var response = await client.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        string json = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(json);
-        var domains = new List<string>();
-
-        foreach (var item in EnumerateCollection(doc.RootElement))
+        var sw = Stopwatch.StartNew();
+        Log($"MailTm.GetDomainsAsync started: isolationKey='{isolationKey}'", Run: IsLogEnabled);
+        try
         {
-            bool isActive = !item.TryGetProperty("isActive", out var activeProp) || activeProp.ValueKind != JsonValueKind.False;
-            if (!isActive) continue;
+            using var client = TorService.CreateIsolatedHttpClient(isolationKey);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/domains");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
 
-            if (item.TryGetProperty("domain", out var domProp) && domProp.GetString() is { Length: > 0 } domain)
-                domains.Add(domain.Trim().ToLowerInvariant());
+            using var response = await client.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            string json = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(json);
+            var domains = new List<string>();
+
+            foreach (var item in EnumerateCollection(doc.RootElement))
+            {
+                bool isActive = !item.TryGetProperty("isActive", out var activeProp) || activeProp.ValueKind != JsonValueKind.False;
+                if (!isActive) continue;
+
+                if (item.TryGetProperty("domain", out var domProp) && domProp.GetString() is { Length: > 0 } domain)
+                    domains.Add(domain.Trim().ToLowerInvariant());
+            }
+
+            Log($"MailTm.GetDomainsAsync finished: isolationKey='{isolationKey}', domains=[{string.Join(", ", domains)}], elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return domains;
         }
-
-        return domains;
+        catch (Exception ex)
+        {
+            Log($"MailTm.GetDomainsAsync failed for isolationKey='{isolationKey}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public async Task<FastMailProvisionResult> ProvisionAccountAsync(FastMailProvisionRequest request, CancellationToken cancellationToken)
     {
-        string domain = request.DesiredDomain?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(domain))
+        var sw = Stopwatch.StartNew();
+        Log($"MailTm.ProvisionAccountAsync started: isolationKey='{request.IsolationKey}', useRandom={request.UseRandomUsername}, desiredUser='{request.DesiredUsername}', desiredDomain='{request.DesiredDomain}'", Run: IsLogEnabled);
+
+        try
         {
-            var domains = await GetDomainsAsync(request.IsolationKey, cancellationToken);
-            domain = domains.FirstOrDefault()
-                ?? throw new InvalidOperationException("Mail.tm returned no active domains.");
-        }
-
-        string username = !request.UseRandomUsername && !string.IsNullOrWhiteSpace(request.DesiredUsername)
-            ? SanitizeUsername(request.DesiredUsername)
-            : GenerateRandomUsername();
-
-        string password = !string.IsNullOrWhiteSpace(request.Password)
-            ? request.Password
-            : GenerateSecurePassword();
-
-        string email = $"{username}@{domain}";
-
-        using var client = TorService.CreateIsolatedHttpClient(request.IsolationKey);
-        string payload = JsonSerializer.Serialize(new { address = email, password });
-
-        using (var createReq = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/accounts")
-        {
-            Content = new StringContent(payload, Encoding.UTF8, "application/json")
-        })
-        {
-            createReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
-            using var createResp = await client.SendAsync(createReq, cancellationToken);
-
-            // 201 Created = new account created; 422 Unprocessable = address already exists (user may be logging into their existing Mail.tm account).
-            if (!createResp.IsSuccessStatusCode && createResp.StatusCode != HttpStatusCode.UnprocessableEntity)
+            string domain = request.DesiredDomain?.Trim().ToLowerInvariant() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(domain))
             {
-                string detail = await createResp.Content.ReadAsStringAsync(cancellationToken);
-                throw new InvalidOperationException($"Mail.tm rejected account creation ({(int)createResp.StatusCode}): {ExtractErrorMessage(detail)}");
+                var domains = await GetDomainsAsync(request.IsolationKey, cancellationToken);
+                domain = domains.FirstOrDefault()
+                    ?? throw new InvalidOperationException("Mail.tm returned no active domains.");
             }
+
+            string username = !request.UseRandomUsername && !string.IsNullOrWhiteSpace(request.DesiredUsername)
+                ? SanitizeUsername(request.DesiredUsername)
+                : GenerateRandomUsername();
+
+            string password = !string.IsNullOrWhiteSpace(request.Password)
+                ? request.Password
+                : GenerateSecurePassword();
+
+            string email = $"{username}@{domain}";
+
+            using var client = TorService.CreateIsolatedHttpClient(request.IsolationKey);
+            string payload = JsonSerializer.Serialize(new { address = email, password });
+
+            using (var createReq = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/accounts")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            })
+            {
+                createReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
+                using var createResp = await client.SendAsync(createReq, cancellationToken);
+
+                // 201 Created = new account created; 422 Unprocessable = address already exists (user may be logging into their existing Mail.tm account).
+                if (!createResp.IsSuccessStatusCode && createResp.StatusCode != HttpStatusCode.UnprocessableEntity)
+                {
+                    string detail = await createResp.Content.ReadAsStringAsync(cancellationToken);
+                    throw new InvalidOperationException($"Mail.tm rejected account creation ({(int)createResp.StatusCode}): {ExtractErrorMessage(detail)}");
+                }
+                Log($"MailTm.ProvisionAccountAsync: /accounts status={(int)createResp.StatusCode} for '{email}'", Run: IsLogEnabled);
+            }
+
+            var tokenEntry = await ObtainTokenAsync(client, email, password, cancellationToken);
+            tokensByKey[request.IsolationKey] = tokenEntry;
+
+            Log($"MailTm.ProvisionAccountAsync succeeded: email='{email}', remoteId='{tokenEntry.AccountRemoteId}', elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return new FastMailProvisionResult(
+                EmailAddress: email,
+                Username: email,
+                Domain: domain,
+                RemoteAccountId: tokenEntry.AccountRemoteId,
+                PasswordOrSecret: password);
         }
-
-        var tokenEntry = await ObtainTokenAsync(client, email, password, cancellationToken);
-        tokensByKey[request.IsolationKey] = tokenEntry;
-
-        return new FastMailProvisionResult(
-            EmailAddress: email,
-            Username: email,
-            Domain: domain,
-            RemoteAccountId: tokenEntry.AccountRemoteId,
-            PasswordOrSecret: password);
+        catch (Exception ex)
+        {
+            Log($"MailTm.ProvisionAccountAsync failed after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<FastMailMessageItem>> ListMessagesAsync(MailAccountData account, CancellationToken cancellationToken)
     {
-        using var client = TorService.CreateIsolatedHttpClient(account.Id);
-        string token = await EnsureBearerTokenAsync(client, account, forceRefresh: false, cancellationToken);
+        var sw = Stopwatch.StartNew();
+        Log($"MailTm.ListMessagesAsync started: account='{account.EmailAddress}' ({account.Id})", Run: IsLogEnabled);
 
-        using var response = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/messages?page=1", null, token, cancellationToken);
-        string json = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        using var doc = JsonDocument.Parse(json);
-        var result = new List<FastMailMessageItem>();
-
-        foreach (var item in EnumerateCollection(doc.RootElement))
+        try
         {
-            string id = ReadString(item, "id");
-            if (string.IsNullOrWhiteSpace(id)) continue;
+            using var client = TorService.CreateIsolatedHttpClient(account.Id);
+            string token = await EnsureBearerTokenAsync(client, account, forceRefresh: false, cancellationToken);
 
-            string msgId = ReadString(item, "msgid").Trim('<', '>', ' ');
-            if (string.IsNullOrWhiteSpace(msgId))
-                msgId = $"{id}@mail.tm";
+            using var response = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/messages?page=1", null, token, cancellationToken);
+            string json = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            string fromName = string.Empty;
-            string fromAddress = string.Empty;
-            if (item.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
+            using var doc = JsonDocument.Parse(json);
+            var result = new List<FastMailMessageItem>();
+
+            foreach (var item in EnumerateCollection(doc.RootElement))
             {
-                fromName = ReadString(fromObj, "name");
-                fromAddress = ReadString(fromObj, "address");
-            }
+                string id = ReadString(item, "id");
+                if (string.IsNullOrWhiteSpace(id)) continue;
 
-            var toList = new List<string>();
-            if (item.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var recipient in toArr.EnumerateArray())
+                string msgId = ReadString(item, "msgid").Trim('<', '>', ' ');
+                if (string.IsNullOrWhiteSpace(msgId))
+                    msgId = $"{id}@mail.tm";
+
+                string fromName = string.Empty;
+                string fromAddress = string.Empty;
+                if (item.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
                 {
-                    if (recipient.ValueKind == JsonValueKind.Object)
+                    fromName = ReadString(fromObj, "name");
+                    fromAddress = ReadString(fromObj, "address");
+                }
+
+                var toList = new List<string>();
+                if (item.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var recipient in toArr.EnumerateArray())
                     {
-                        string addr = ReadString(recipient, "address");
-                        if (!string.IsNullOrWhiteSpace(addr)) toList.Add(addr);
+                        if (recipient.ValueKind == JsonValueKind.Object)
+                        {
+                            string addr = ReadString(recipient, "address");
+                            if (!string.IsNullOrWhiteSpace(addr)) toList.Add(addr);
+                        }
                     }
                 }
+
+                string subject = ReadString(item, "subject");
+                string intro = ReadString(item, "intro");
+                bool seen = item.TryGetProperty("seen", out var seenProp) && seenProp.ValueKind == JsonValueKind.True;
+                bool hasAttachments = item.TryGetProperty("hasAttachments", out var attProp) && attProp.ValueKind == JsonValueKind.True;
+                long size = item.TryGetProperty("size", out var sizeProp) && sizeProp.TryGetInt64(out long s) ? s : 0;
+
+                DateTime dateUtc = DateTime.UtcNow;
+                if (DateTimeOffset.TryParse(ReadString(item, "createdAt"), out var parsedDate))
+                    dateUtc = parsedDate.UtcDateTime;
+
+                result.Add(new FastMailMessageItem(
+                    RemoteId: id,
+                    MessageIdHeader: msgId,
+                    FromName: fromName,
+                    FromAddress: fromAddress,
+                    ToAddresses: toList.Count > 0 ? string.Join(", ", toList) : account.EmailAddress,
+                    Subject: subject,
+                    PreviewText: intro,
+                    DateUtc: dateUtc,
+                    IsSeen: seen,
+                    HasAttachments: hasAttachments,
+                    SizeBytes: size));
             }
 
-            string subject = ReadString(item, "subject");
-            string intro = ReadString(item, "intro");
-            bool seen = item.TryGetProperty("seen", out var seenProp) && seenProp.ValueKind == JsonValueKind.True;
-            bool hasAttachments = item.TryGetProperty("hasAttachments", out var attProp) && attProp.ValueKind == JsonValueKind.True;
-            long size = item.TryGetProperty("size", out var sizeProp) && sizeProp.TryGetInt64(out long s) ? s : 0;
-
-            DateTime dateUtc = DateTime.UtcNow;
-            if (DateTimeOffset.TryParse(ReadString(item, "createdAt"), out var parsedDate))
-                dateUtc = parsedDate.UtcDateTime;
-
-            result.Add(new FastMailMessageItem(
-                RemoteId: id,
-                MessageIdHeader: msgId,
-                FromName: fromName,
-                FromAddress: fromAddress,
-                ToAddresses: toList.Count > 0 ? string.Join(", ", toList) : account.EmailAddress,
-                Subject: subject,
-                PreviewText: intro,
-                DateUtc: dateUtc,
-                IsSeen: seen,
-                HasAttachments: hasAttachments,
-                SizeBytes: size));
+            Log($"MailTm.ListMessagesAsync finished: account='{account.EmailAddress}', count={result.Count}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return result;
         }
-
-        return result;
+        catch (Exception ex)
+        {
+            Log($"MailTm.ListMessagesAsync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public async Task<MimeMessage> DownloadMessageAsync(MailAccountData account, string remoteId, CancellationToken cancellationToken)
     {
-        using var client = TorService.CreateIsolatedHttpClient(account.Id);
-        string token = await EnsureBearerTokenAsync(client, account, forceRefresh: false, cancellationToken);
+        var sw = Stopwatch.StartNew();
+        Log($"MailTm.DownloadMessageAsync started: account='{account.EmailAddress}', remoteId='{remoteId}'", Run: IsLogEnabled);
 
-        // First try /sources/{id}, which returns the full RFC 5322 raw MIME message.
         try
         {
-            using var sourceResp = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/sources/{Uri.EscapeDataString(remoteId)}", null, token, cancellationToken);
-            string sourceJson = await sourceResp.Content.ReadAsStringAsync(cancellationToken);
-            using var sourceDoc = JsonDocument.Parse(sourceJson);
-            string rawMime = ReadString(sourceDoc.RootElement, "data");
-            if (!string.IsNullOrWhiteSpace(rawMime))
+            using var client = TorService.CreateIsolatedHttpClient(account.Id);
+            string token = await EnsureBearerTokenAsync(client, account, forceRefresh: false, cancellationToken);
+
+            // First try /sources/{id}, which returns the full RFC 5322 raw MIME message.
+            try
             {
-                await using var rawStream = new MemoryStream(Encoding.UTF8.GetBytes(rawMime));
-                return await MimeMessage.LoadAsync(rawStream, cancellationToken);
+                using var sourceResp = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/sources/{Uri.EscapeDataString(remoteId)}", null, token, cancellationToken);
+                string sourceJson = await sourceResp.Content.ReadAsStringAsync(cancellationToken);
+                using var sourceDoc = JsonDocument.Parse(sourceJson);
+                string rawMime = ReadString(sourceDoc.RootElement, "data");
+                if (!string.IsNullOrWhiteSpace(rawMime))
+                {
+                    await using var rawStream = new MemoryStream(Encoding.UTF8.GetBytes(rawMime));
+                    var parsedMime = await MimeMessage.LoadAsync(rawStream, cancellationToken);
+                    Log($"MailTm.DownloadMessageAsync finished via /sources/{remoteId}: bytes={rawMime.Length}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+                    return parsedMime;
+                }
             }
+            catch (Exception ex)
+            {
+                Log($"Mail.tm /sources/{remoteId} fallback to /messages/{remoteId}: {ex.Message}", LogLevel.Warning, Run: IsLogEnabled);
+            }
+
+            // Fallback: build MimeMessage from /messages/{id} JSON fields.
+            using var msgResp = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/messages/{Uri.EscapeDataString(remoteId)}", null, token, cancellationToken);
+            string msgJson = await msgResp.Content.ReadAsStringAsync(cancellationToken);
+            using var msgDoc = JsonDocument.Parse(msgJson);
+            var root = msgDoc.RootElement;
+
+            var message = new MimeMessage();
+            string msgId = ReadString(root, "msgid").Trim('<', '>', ' ');
+            message.MessageId = string.IsNullOrWhiteSpace(msgId) ? $"{remoteId}@mail.tm" : msgId;
+            message.Subject = ReadString(root, "subject");
+
+            if (root.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
+            {
+                string name = ReadString(fromObj, "name");
+                string addr = ReadString(fromObj, "address");
+                if (!string.IsNullOrWhiteSpace(addr))
+                    message.From.Add(new MailboxAddress(name, addr));
+            }
+
+            if (root.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var r in toArr.EnumerateArray())
+                {
+                    if (r.ValueKind == JsonValueKind.Object && ReadString(r, "address") is { Length: > 0 } addr)
+                        message.To.Add(new MailboxAddress(ReadString(r, "name"), addr));
+                }
+            }
+
+            if (DateTimeOffset.TryParse(ReadString(root, "createdAt"), out var dt))
+                message.Date = dt;
+            else
+                message.Date = DateTimeOffset.UtcNow;
+
+            string textBody = ReadString(root, "text");
+            var htmlParts = new StringBuilder();
+            if (root.TryGetProperty("html", out var htmlProp))
+            {
+                if (htmlProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var part in htmlProp.EnumerateArray())
+                    {
+                        if (part.ValueKind == JsonValueKind.String)
+                            htmlParts.AppendLine(part.GetString());
+                    }
+                }
+                else if (htmlProp.ValueKind == JsonValueKind.String)
+                {
+                    htmlParts.Append(htmlProp.GetString());
+                }
+            }
+
+            var builder = new BodyBuilder
+            {
+                TextBody = textBody,
+                HtmlBody = htmlParts.Length > 0 ? htmlParts.ToString() : null
+            };
+            message.Body = builder.ToMessageBody();
+            Log($"MailTm.DownloadMessageAsync finished via /messages/{remoteId}: elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return message;
         }
         catch (Exception ex)
         {
-            Log($"Mail.tm /sources/{remoteId} fallback to /messages/{remoteId}: {ex.Message}", LogLevel.Warning);
+            Log($"MailTm.DownloadMessageAsync failed for '{account.EmailAddress}', remoteId='{remoteId}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
         }
-
-        // Fallback: build MimeMessage from /messages/{id} JSON fields.
-        using var msgResp = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/messages/{Uri.EscapeDataString(remoteId)}", null, token, cancellationToken);
-        string msgJson = await msgResp.Content.ReadAsStringAsync(cancellationToken);
-        using var msgDoc = JsonDocument.Parse(msgJson);
-        var root = msgDoc.RootElement;
-
-        var message = new MimeMessage();
-        string msgId = ReadString(root, "msgid").Trim('<', '>', ' ');
-        message.MessageId = string.IsNullOrWhiteSpace(msgId) ? $"{remoteId}@mail.tm" : msgId;
-        message.Subject = ReadString(root, "subject");
-
-        if (root.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
-        {
-            string name = ReadString(fromObj, "name");
-            string addr = ReadString(fromObj, "address");
-            if (!string.IsNullOrWhiteSpace(addr))
-                message.From.Add(new MailboxAddress(name, addr));
-        }
-
-        if (root.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var r in toArr.EnumerateArray())
-            {
-                if (r.ValueKind == JsonValueKind.Object && ReadString(r, "address") is { Length: > 0 } addr)
-                    message.To.Add(new MailboxAddress(ReadString(r, "name"), addr));
-            }
-        }
-
-        if (DateTimeOffset.TryParse(ReadString(root, "createdAt"), out var dt))
-            message.Date = dt;
-        else
-            message.Date = DateTimeOffset.UtcNow;
-
-        string textBody = ReadString(root, "text");
-        var htmlParts = new StringBuilder();
-        if (root.TryGetProperty("html", out var htmlProp))
-        {
-            if (htmlProp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var part in htmlProp.EnumerateArray())
-                {
-                    if (part.ValueKind == JsonValueKind.String)
-                        htmlParts.AppendLine(part.GetString());
-                }
-            }
-            else if (htmlProp.ValueKind == JsonValueKind.String)
-            {
-                htmlParts.Append(htmlProp.GetString());
-            }
-        }
-
-        var builder = new BodyBuilder
-        {
-            TextBody = textBody,
-            HtmlBody = htmlParts.Length > 0 ? htmlParts.ToString() : null
-        };
-        message.Body = builder.ToMessageBody();
-        return message;
     }
 
     public async Task MarkReadAsync(MailAccountData account, IReadOnlyList<string> remoteIds, bool seen, CancellationToken cancellationToken)
@@ -307,6 +359,7 @@ public sealed class MailTmProvider : IFastMailProvider
         if (resp.StatusCode == HttpStatusCode.Unauthorized)
         {
             resp.Dispose();
+            Log($"MailTm.SendAuthorizedAsync: 401 on '{url}', refreshing bearer token for '{account.EmailAddress}'", LogLevel.Warning, Run: IsLogEnabled);
             string refreshed = await EnsureBearerTokenAsync(client, account, forceRefresh: true, cancellationToken);
             using var retryReq = new HttpRequestMessage(method, url);
             if (content != null)

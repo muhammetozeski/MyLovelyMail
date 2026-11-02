@@ -75,16 +75,16 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 try
                 {
                     if (string.IsNullOrWhiteSpace(candidate) || !File.Exists(candidate)) continue;
-                    string resolved = ResolveScoopShim(candidate);
-                    Log($"Tor executable found via {foundBy}: {resolved}");
+                    string resolved = ResolveFinalExecutablePath(ResolveScoopShim(candidate));
+                    Log($"Tor executable found via {foundBy}: {resolved}", Run: IsLogEnabled);
                     return new TorExecutable(resolved, foundBy);
                 }
                 catch (Exception ex)
                 {
-                    Log($"Tor executable candidate '{candidate}' could not be checked: {ex.Message}", LogLevel.Warning);
+                    Log($"Tor executable candidate '{candidate}' could not be checked:\n{ex}", LogLevel.Warning, Run: IsLogEnabled);
                 }
             }
-            Log("No tor executable was found on this machine.", LogLevel.Warning);
+            Log("No tor executable was found on this machine.", LogLevel.Warning, Run: IsLogEnabled);
             return null;
         }
 
@@ -142,11 +142,61 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 string target = line[(separator + 1)..].Trim().Trim('"');
                 if (File.Exists(target))
                 {
-                    Log($"Followed the scoop shim '{shim}' to '{target}'.");
+                    Log($"Followed the scoop shim '{shim}' to '{target}'.", Run: IsLogEnabled);
                     return target;
                 }
             }
             return candidate;
+        }
+
+        /// <summary>
+        /// Resolves any file symlink or parent directory junction (such as Scoop's <c>current</c> junction)
+        /// so the launched process reports its real versioned path to OS process-based firewall/VPN rules.
+        /// </summary>
+        static string ResolveFinalExecutablePath(string candidate)
+        {
+            try
+            {
+                string full = Path.GetFullPath(candidate);
+                var fileInfo = new FileInfo(full);
+                if (fileInfo.LinkTarget != null && fileInfo.ResolveLinkTarget(returnFinalTarget: true) is { Exists: true } targetFile)
+                    full = targetFile.FullName;
+
+                var currentDir = new DirectoryInfo(Path.GetDirectoryName(full)!);
+                var relativeParts = new Stack<string>();
+                relativeParts.Push(Path.GetFileName(full));
+
+                while (currentDir != null)
+                {
+                    if (currentDir.LinkTarget != null)
+                    {
+                        string resolvedDir = (currentDir.ResolveLinkTarget(returnFinalTarget: true) as DirectoryInfo)?.FullName
+                            ?? (Path.IsPathRooted(currentDir.LinkTarget)
+                                ? currentDir.LinkTarget
+                                : Path.GetFullPath(Path.Combine(currentDir.Parent?.FullName ?? string.Empty, currentDir.LinkTarget)));
+
+                        string combined = resolvedDir;
+                        while (relativeParts.Count > 0)
+                            combined = Path.Combine(combined, relativeParts.Pop());
+
+                        if (File.Exists(combined))
+                        {
+                            Log($"Resolved directory link '{full}' -> '{combined}'.", Run: IsLogEnabled);
+                            return combined;
+                        }
+                        break;
+                    }
+                    relativeParts.Push(currentDir.Name);
+                    currentDir = currentDir.Parent;
+                }
+
+                return full;
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not resolve final link target for '{candidate}': {ex.Message}", LogLevel.Warning, Run: IsLogEnabled);
+                return candidate;
+            }
         }
 
         #endregion

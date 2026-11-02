@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Security;
@@ -9,6 +10,8 @@ namespace MyLovelyMail.MainProject.Services.Tor;
 
 public static partial class TorService
 {
+    const bool IsLogEnabled = true;
+
     public sealed record AccountExitLease(int Epoch, string ExitIp, DateTime VerifiedUtc);
 
     static readonly ConcurrentDictionary<string, AccountExitLease> accountExitIps =
@@ -25,6 +28,7 @@ public static partial class TorService
         if (string.IsNullOrWhiteSpace(isolationKey)) return;
         circuitEpochs.TryRemove(isolationKey, out _);
         accountExitIps.TryRemove(isolationKey, out _);
+        Log($"Released Tor circuit state for isolationKey='{isolationKey}'.", Run: IsLogEnabled);
     }
 
     static void InvalidateExitLease(string isolationKey)
@@ -54,6 +58,7 @@ public static partial class TorService
         await exitIpGate.WaitAsync(cancellationToken);
         try
         {
+            var sw = Stopwatch.StartNew();
             for (int attempt = 1; attempt <= 5; attempt++)
             {
                 int epoch = CircuitEpochOf(isolationKey);
@@ -72,11 +77,11 @@ public static partial class TorService
                 if (!IsExitIpUsedByAnotherAccount(isolationKey, exitIp))
                 {
                     accountExitIps[isolationKey] = new AccountExitLease(epoch, exitIp, DateTime.UtcNow);
-                    Log($"Tor circuit for '{isolationKey}' (epoch {epoch}) assigned unique exit IP {exitIp}.");
+                    Log($"Tor circuit for '{isolationKey}' (epoch {epoch}) assigned unique exit IP {exitIp} in {sw.ElapsedMilliseconds} ms.", Run: IsLogEnabled);
                     return exitIp;
                 }
 
-                Log($"Tor exit IP {exitIp} for '{isolationKey}' collides with another active account; rotating circuit (attempt {attempt}/5).", LogLevel.Warning);
+                Log($"Tor exit IP {exitIp} for '{isolationKey}' collides with another active account; rotating circuit (attempt {attempt}/5).", LogLevel.Warning, Run: IsLogEnabled);
                 RotateCircuit(isolationKey);
             }
 
@@ -134,7 +139,7 @@ public static partial class TorService
         }
         catch (Exception ex)
         {
-            Log($"Exit IP probe for '{isolationKey}' could not complete ({ex.Message}); proceeding on isolated SOCKS credentials.", LogLevel.Warning);
+            Log($"Exit IP probe for '{isolationKey}' could not complete ({ex.Message}); proceeding on isolated SOCKS credentials.", LogLevel.Warning, Run: IsLogEnabled);
         }
         return null;
     }
@@ -162,11 +167,14 @@ public static partial class TorService
             },
             ConnectCallback = async (context, token) =>
             {
+                var sw = Stopwatch.StartNew();
                 var endpoint = await RequireEndpointAsync(token);
                 await EnsureUniqueExitIpAsync(endpoint, isolationKey, token);
                 var credentials = IsolationCredentials(isolationKey);
                 var socks = new TorSocks5Client(endpoint.Host, endpoint.Port, credentials);
-                return await socks.ConnectAsync(context.DnsEndPoint.Host, context.DnsEndPoint.Port, token);
+                var stream = await socks.ConnectAsync(context.DnsEndPoint.Host, context.DnsEndPoint.Port, token);
+                Log($"Tor HTTP SOCKS5 connected: key='{isolationKey}', target={context.DnsEndPoint.Host}:{context.DnsEndPoint.Port}, endpoint={endpoint}, epoch={CircuitEpochOf(isolationKey)}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+                return stream;
             }
         };
 

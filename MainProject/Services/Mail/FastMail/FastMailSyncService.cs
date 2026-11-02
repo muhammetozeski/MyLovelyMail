@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using MimeKit;
 using MyLovelyMail.MainProject.DataModels.Mail;
@@ -14,6 +15,7 @@ namespace MyLovelyMail.MainProject.Services.Mail.FastMail;
 /// </summary>
 public static class FastMailSyncService
 {
+    const bool IsLogEnabled = true;
     const string InboxFullName = MessageStore.InboxFullName;
     const string UidMapFileName = "fastmail-uids.json";
 
@@ -31,109 +33,130 @@ public static class FastMailSyncService
 
     public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
         using var syncScope = SyncScheduler.EnterSyncScope();
         var provider = RequireProvider(account);
-        Log($"FastMail sync started: {account.EmailAddress} ({provider.DisplayName})");
+        Log($"FastMail sync started: {account.EmailAddress} ({provider.DisplayName})", Run: IsLogEnabled);
 
-        var remoteItems = await ResiliencePolicy.RunNetwork(
-            ct => provider.ListMessagesAsync(account, ct),
-            cancellationToken,
-            account);
-
-        RecordRoute(account, provider);
-
-        var folders = MessageStore.GetFolders(account.Id);
-        var known = folders
-            .Where(static folder => folder.Role is not (FolderRole.Drafts or FolderRole.Sent or FolderRole.Outbox))
-            .SelectMany(folder => MessageStore.GetSummaries(account.Id, folder.FullName))
-            .Select(static summary => summary.Uid)
-            .ToHashSet();
-
-        bool isFirstSync = known.Count == 0 &&
-            folders.FirstOrDefault(static folder => folder.FullName == InboxFullName)?.LastSyncedUtc == null;
-
-        var uidMap = LoadUidMap(account.Id);
-        bool mapChanged = false;
-        var allNew = new List<MailMessageSummary>();
-
-        foreach (var item in remoteItems)
+        try
         {
-            uint uid = StableHash.Fnv1a(item.RemoteId);
-            if (!uidMap.TryGetValue(uid, out string? existingRemote) || existingRemote != item.RemoteId)
+            var remoteItems = await ResiliencePolicy.RunNetwork(
+                ct => provider.ListMessagesAsync(account, ct),
+                cancellationToken,
+                account);
+
+            RecordRoute(account, provider);
+
+            var folders = MessageStore.GetFolders(account.Id);
+            var known = folders
+                .Where(static folder => folder.Role is not (FolderRole.Drafts or FolderRole.Sent or FolderRole.Outbox))
+                .SelectMany(folder => MessageStore.GetSummaries(account.Id, folder.FullName))
+                .Select(static summary => summary.Uid)
+                .ToHashSet();
+
+            bool isFirstSync = known.Count == 0 &&
+                folders.FirstOrDefault(static folder => folder.FullName == InboxFullName)?.LastSyncedUtc == null;
+
+            var uidMap = LoadUidMap(account.Id);
+            bool mapChanged = false;
+            var allNew = new List<MailMessageSummary>();
+
+            foreach (var item in remoteItems)
             {
-                uidMap[uid] = item.RemoteId;
-                mapChanged = true;
+                uint uid = StableHash.Fnv1a(item.RemoteId);
+                if (!uidMap.TryGetValue(uid, out string? existingRemote) || existingRemote != item.RemoteId)
+                {
+                    uidMap[uid] = item.RemoteId;
+                    mapChanged = true;
+                }
+
+                if (known.Contains(uid)) continue;
+
+                var flags = MailFlags.None;
+                if (item.IsSeen) flags |= MailFlags.Seen;
+
+                allNew.Add(new MailMessageSummary
+                {
+                    Uid = uid,
+                    MessageId = string.IsNullOrWhiteSpace(item.MessageIdHeader) ? item.RemoteId : item.MessageIdHeader,
+                    Subject = item.Subject,
+                    FromName = item.FromName,
+                    FromAddress = item.FromAddress,
+                    ToAddresses = item.ToAddresses,
+                    DateUtc = item.DateUtc,
+                    Flags = flags,
+                    HasAttachments = item.HasAttachments,
+                    SizeBytes = item.SizeBytes,
+                    PreviewText = item.PreviewText
+                });
             }
 
-            if (known.Contains(uid)) continue;
+            if (mapChanged)
+                SaveUidMap(account.Id, uidMap);
 
-            var flags = MailFlags.None;
-            if (item.IsSeen) flags |= MailFlags.Seen;
-
-            allNew.Add(new MailMessageSummary
+            if (allNew.Count > 0)
             {
-                Uid = uid,
-                MessageId = string.IsNullOrWhiteSpace(item.MessageIdHeader) ? item.RemoteId : item.MessageIdHeader,
-                Subject = item.Subject,
-                FromName = item.FromName,
-                FromAddress = item.FromAddress,
-                ToAddresses = item.ToAddresses,
-                DateUtc = item.DateUtc,
-                Flags = flags,
-                HasAttachments = item.HasAttachments,
-                SizeBytes = item.SizeBytes,
-                PreviewText = item.PreviewText
-            });
-        }
-
-        if (mapChanged)
-            SaveUidMap(account.Id, uidMap);
-
-        if (allNew.Count > 0)
-        {
-            MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
-
-            if (!isFirstSync)
-            {
-                MuteService.ApplyToIncoming(allNew);
-                var ruleResult = RuleEngine.ProcessIncoming(account, InboxFullName, allNew);
                 MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
-                var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
-                foreach (var (uid, localFolder) in ruleResult.LocalMoves)
-                    MessageStore.MoveCachedMessage(account.Id, InboxFullName, uid, MessageStore.LocalFolderPrefix + localFolder);
-                NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
+
+                if (!isFirstSync)
+                {
+                    MuteService.ApplyToIncoming(allNew);
+                    var ruleResult = RuleEngine.ProcessIncoming(account, InboxFullName, allNew);
+                    MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
+                    var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
+                    foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+                        MessageStore.MoveCachedMessage(account.Id, InboxFullName, uid, MessageStore.LocalFolderPrefix + localFolder);
+                    NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
+                }
             }
+
+            int totalInInbox = MessageStore.GetSummaries(account.Id, InboxFullName).Count;
+            MessageStore.SaveFolder(new MailFolderData
+            {
+                AccountId = account.Id,
+                FullName = InboxFullName,
+                DisplayName = "Inbox",
+                Role = FolderRole.Inbox,
+                LastSyncedUtc = DateTime.UtcNow,
+                TotalCount = Math.Max(totalInInbox, remoteItems.Count),
+                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
+            });
+
+            Log($"FastMail sync finished: {account.EmailAddress}, {allNew.Count} new of {remoteItems.Count} on server, elapsed={sw.ElapsedMilliseconds}ms.", Run: IsLogEnabled);
         }
-
-        int totalInInbox = MessageStore.GetSummaries(account.Id, InboxFullName).Count;
-        MessageStore.SaveFolder(new MailFolderData
+        catch (Exception ex)
         {
-            AccountId = account.Id,
-            FullName = InboxFullName,
-            DisplayName = "Inbox",
-            Role = FolderRole.Inbox,
-            LastSyncedUtc = DateTime.UtcNow,
-            TotalCount = Math.Max(totalInInbox, remoteItems.Count),
-            UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
-        });
-
-        Log($"FastMail sync finished: {account.EmailAddress}, {allNew.Count} new of {remoteItems.Count} on server.");
+            Log($"FastMail sync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public static async Task<MimeMessage> DownloadMessageAsync(MailAccountData account, uint uid, CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
         var provider = RequireProvider(account);
-        return await ResiliencePolicy.RunNetwork(async ct =>
-        {
-            string remoteId = await ResolveRemoteIdAsync(account, provider, uid, ct);
-            var message = await provider.DownloadMessageAsync(account, remoteId, ct);
-            RecordRoute(account, provider);
+        Log($"FastMail.DownloadMessageAsync started: account='{account.EmailAddress}', uid={uid}", Run: IsLogEnabled);
 
-            using var buffer = new MemoryStream();
-            await message.WriteToAsync(buffer, ct);
-            MessageStore.SaveFullMessage(account.Id, InboxFullName, uid, buffer.ToArray());
-            return message;
-        }, cancellationToken, account);
+        try
+        {
+            return await ResiliencePolicy.RunNetwork(async ct =>
+            {
+                string remoteId = await ResolveRemoteIdAsync(account, provider, uid, ct);
+                var message = await provider.DownloadMessageAsync(account, remoteId, ct);
+                RecordRoute(account, provider);
+
+                using var buffer = new MemoryStream();
+                await message.WriteToAsync(buffer, ct);
+                MessageStore.SaveFullMessage(account.Id, InboxFullName, uid, buffer.ToArray());
+                Log($"FastMail.DownloadMessageAsync finished: account='{account.EmailAddress}', uid={uid}, remoteId='{remoteId}', bytes={buffer.Length}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+                return message;
+            }, cancellationToken, account);
+        }
+        catch (Exception ex)
+        {
+            Log($"FastMail.DownloadMessageAsync failed for '{account.EmailAddress}', uid={uid} after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public static async Task SetSeenAsync(MailAccountData account, IReadOnlyList<uint> uids, bool seen, CancellationToken cancellationToken = default)
@@ -225,7 +248,7 @@ public static class FastMailSyncService
             }
             catch (Exception ex)
             {
-                Log($"Could not read fastmail-uids.json for '{id}': {ex.Message}", LogLevel.Warning);
+                Log($"Could not read fastmail-uids.json for '{id}':\n{ex}", LogLevel.Warning, Run: IsLogEnabled);
             }
             return dict;
         });
@@ -240,7 +263,7 @@ public static class FastMailSyncService
         }
         catch (Exception ex)
         {
-            Log($"Could not write fastmail-uids.json for '{accountId}': {ex.Message}", LogLevel.Warning);
+            Log($"Could not write fastmail-uids.json for '{accountId}':\n{ex}", LogLevel.Warning, Run: IsLogEnabled);
         }
     }
 }

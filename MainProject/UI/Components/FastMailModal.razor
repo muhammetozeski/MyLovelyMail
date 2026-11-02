@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @using MyLovelyMail.MainProject.DataModels.Mail
 @using MyLovelyMail.MainProject.Services
 @using MyLovelyMail.MainProject.Services.Mail
@@ -150,6 +151,8 @@
 <AccountWizardCss />
 
 @code {
+    const bool IsLogEnabled = true;
+
     [Parameter] public string? InitialFolderId { get; set; }
 
     IFastMailProvider? SelectedProvider { get; set; }
@@ -191,16 +194,20 @@
     async Task LoadDomainsAsync()
     {
         if (SelectedProvider == null) return;
+        var sw = Stopwatch.StartNew();
         LoadingDomains = true;
         StateHasChanged();
         try
         {
+            Log($"FastMailModal.LoadDomainsAsync started for provider='{SelectedProvider.Id}', draftAccountId='{draftAccountId}'", Run: IsLogEnabled);
             var fetched = await SelectedProvider.GetDomainsAsync(draftAccountId, CancellationToken.None);
             Domains = [.. fetched];
             SelectedDomain = Domains.FirstOrDefault() ?? string.Empty;
+            Log($"FastMailModal.LoadDomainsAsync succeeded for provider='{SelectedProvider.Id}' in {sw.ElapsedMilliseconds}ms: {Domains.Count} domains.", Run: IsLogEnabled);
         }
         catch (Exception ex)
         {
+            Log($"FastMailModal.LoadDomainsAsync failed for provider='{SelectedProvider.Id}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
             StatusSuccess = false;
             StatusMessage = $"⚠️ Could not fetch domains over Tor: {ex.Message}";
         }
@@ -226,6 +233,7 @@
             return;
         }
 
+        var sw = Stopwatch.StartNew();
         Busy = true;
         StatusMessage = "🛡️ Connecting through isolated Tor circuit and provisioning mailbox...";
         StatusSuccess = true;
@@ -233,6 +241,7 @@
 
         try
         {
+            Log($"FastMailModal.CreateFastMailAccountAsync started: provider='{SelectedProvider.Id}', draftAccountId='{draftAccountId}', domain='{SelectedDomain}', randomUser={UseRandomUsername}", Run: IsLogEnabled);
             var provision = await SelectedProvider.ProvisionAccountAsync(
                 new FastMailProvisionRequest(
                     IsolationKey: draftAccountId,
@@ -276,12 +285,14 @@
                 Role = FolderRole.Inbox
             });
 
+            Log($"FastMailModal.CreateFastMailAccountAsync succeeded: account='{account.EmailAddress}' ({account.Id}) in {sw.ElapsedMilliseconds}ms.", Run: IsLogEnabled);
             MailUiState.SelectAccount(account);
             _ = SyncScheduler.SyncNowAsync(accountId: account.Id);
             ModalService.CloseAll();
         }
         catch (Exception ex)
         {
+            Log($"FastMailModal.CreateFastMailAccountAsync failed for provider='{SelectedProvider.Id}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
             StatusSuccess = false;
             StatusMessage = $"❌ {ex.Message}";
         }

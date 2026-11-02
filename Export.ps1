@@ -37,8 +37,8 @@ function Test-DeployedAppRunning {
             return $true
         }
     }
-    $procs = @(Get-Process -Name 'MyLovelyMail' 2>$null |
-        Where-Object { $_.Path -and $_.Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) })
+    $procs = @(Get-Process |
+        Where-Object { $_.ProcessName -eq 'MyLovelyMail' -and $_.Path -and $_.Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) })
     return [bool]$procs
 }
 

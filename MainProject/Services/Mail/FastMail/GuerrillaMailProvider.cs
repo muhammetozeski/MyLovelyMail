@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
@@ -19,6 +20,7 @@ namespace MyLovelyMail.MainProject.Services.Mail.FastMail;
 /// </summary>
 public sealed class GuerrillaMailProvider : IFastMailProvider
 {
+    const bool IsLogEnabled = true;
     const string EndpointUrl = "https://api.guerrillamail.com/ajax.php";
 
     static readonly string[] KnownDomains =
@@ -52,142 +54,187 @@ public sealed class GuerrillaMailProvider : IFastMailProvider
     public bool SupportsDomainSelection => true;
     public bool SupportsPassword => false;
 
-    public Task<IReadOnlyList<string>> GetDomainsAsync(string isolationKey, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<string>>(KnownDomains);
+    public Task<IReadOnlyList<string>> GetDomainsAsync(string isolationKey, CancellationToken cancellationToken)
+    {
+        Log($"GuerrillaMail.GetDomainsAsync: isolationKey='{isolationKey}', returning {KnownDomains.Length} static domains.", Run: IsLogEnabled);
+        return Task.FromResult<IReadOnlyList<string>>(KnownDomains);
+    }
 
     public async Task<FastMailProvisionResult> ProvisionAccountAsync(FastMailProvisionRequest request, CancellationToken cancellationToken)
     {
+        var sw = Stopwatch.StartNew();
         string domain = !string.IsNullOrWhiteSpace(request.DesiredDomain)
             ? request.DesiredDomain.Trim().ToLowerInvariant()
             : KnownDomains[0];
 
-        using var client = TorService.CreateIsolatedHttpClient(request.IsolationKey);
+        Log($"GuerrillaMail.ProvisionAccountAsync started: isolationKey='{request.IsolationKey}', useRandom={request.UseRandomUsername}, desiredUser='{request.DesiredUsername}', domain='{domain}'", Run: IsLogEnabled);
 
-        string sidToken;
-        string emailUser;
-        if (!request.UseRandomUsername && !string.IsNullOrWhiteSpace(request.DesiredUsername))
+        try
         {
-            emailUser = SanitizeUsername(request.DesiredUsername);
-            sidToken = await ClaimUsernameAsync(client, emailUser, null, cancellationToken);
-        }
-        else
-        {
-            string url = $"{EndpointUrl}?f=get_email_address&lang=en";
-            string json = await client.GetStringAsync(url, cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            sidToken = root.TryGetProperty("sid_token", out var sidProp) ? sidProp.GetString() ?? string.Empty : string.Empty;
-            string addr = root.TryGetProperty("email_addr", out var addrProp) ? addrProp.GetString() ?? string.Empty : string.Empty;
-            int atIndex = addr.IndexOf('@');
-            emailUser = atIndex > 0 ? addr[..atIndex] : ("anon" + Random.Shared.Next(10000, 99999));
-            sidToken = await ClaimUsernameAsync(client, emailUser, sidToken, cancellationToken);
-        }
+            using var client = TorService.CreateIsolatedHttpClient(request.IsolationKey);
 
-        sessionsByKey[request.IsolationKey] = new SessionState(sidToken, emailUser, DateTime.UtcNow);
-        string fullEmail = $"{emailUser}@{domain}";
-        return new FastMailProvisionResult(fullEmail, emailUser, domain, sidToken, sidToken);
+            string sidToken;
+            string emailUser;
+            if (!request.UseRandomUsername && !string.IsNullOrWhiteSpace(request.DesiredUsername))
+            {
+                emailUser = SanitizeUsername(request.DesiredUsername);
+                Log($"GuerrillaMail.ProvisionAccountAsync: claiming custom username '{emailUser}'...", Run: IsLogEnabled);
+                sidToken = await ClaimUsernameAsync(client, emailUser, null, cancellationToken);
+            }
+            else
+            {
+                string url = $"{EndpointUrl}?f=get_email_address&lang=en";
+                Log($"GuerrillaMail.ProvisionAccountAsync: requesting random address via get_email_address...", Run: IsLogEnabled);
+                string json = await client.GetStringAsync(url, cancellationToken);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                sidToken = root.TryGetProperty("sid_token", out var sidProp) ? sidProp.GetString() ?? string.Empty : string.Empty;
+                string addr = root.TryGetProperty("email_addr", out var addrProp) ? addrProp.GetString() ?? string.Empty : string.Empty;
+                int atIndex = addr.IndexOf('@');
+                emailUser = atIndex > 0 ? addr[..atIndex] : ("anon" + Random.Shared.Next(10000, 99999));
+                Log($"GuerrillaMail.ProvisionAccountAsync: received random user '{emailUser}', confirming via set_email_user...", Run: IsLogEnabled);
+                sidToken = await ClaimUsernameAsync(client, emailUser, sidToken, cancellationToken);
+            }
+
+            sessionsByKey[request.IsolationKey] = new SessionState(sidToken, emailUser, DateTime.UtcNow);
+            string fullEmail = $"{emailUser}@{domain}";
+            Log($"GuerrillaMail.ProvisionAccountAsync succeeded: email='{fullEmail}', elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return new FastMailProvisionResult(fullEmail, emailUser, domain, sidToken, sidToken);
+        }
+        catch (Exception ex)
+        {
+            Log($"GuerrillaMail.ProvisionAccountAsync failed after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<FastMailMessageItem>> ListMessagesAsync(MailAccountData account, CancellationToken cancellationToken)
     {
-        using var client = TorService.CreateIsolatedHttpClient(account.Id);
-        string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
+        var sw = Stopwatch.StartNew();
+        Log($"GuerrillaMail.ListMessagesAsync started: account='{account.EmailAddress}' ({account.Id})", Run: IsLogEnabled);
 
-        string url = $"{EndpointUrl}?f=get_email_list&offset=0&sid_token={Uri.EscapeDataString(sidToken)}";
-        string json = await client.GetStringAsync(url, cancellationToken);
-
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        if (root.TryGetProperty("sid_token", out var updatedSid) && updatedSid.GetString() is { Length: > 0 } nextSid)
-            UpdateCachedSid(account, nextSid);
-
-        var items = new List<FastMailMessageItem>();
-        if (!root.TryGetProperty("list", out var listElement) || listElement.ValueKind != JsonValueKind.Array)
-            return items;
-
-        foreach (var entry in listElement.EnumerateArray())
+        try
         {
-            string mailId = ReadStringOrNumber(entry, "mail_id");
-            if (string.IsNullOrWhiteSpace(mailId)) continue;
+            using var client = TorService.CreateIsolatedHttpClient(account.Id);
+            string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
 
-            // Skip the automated Guerrilla Mail welcome placeholder (mail_id == "1") only if desired;
-            // keeping real messages and parsing fields cleanly:
-            string rawFrom = ReadString(entry, "mail_from");
-            string subject = WebUtility.HtmlDecode(ReadString(entry, "mail_subject"));
-            string excerpt = WebUtility.HtmlDecode(ReadString(entry, "mail_excerpt"));
-            string readStr = ReadStringOrNumber(entry, "mail_read");
-            string attStr = ReadStringOrNumber(entry, "att");
-            long timestamp = ReadLong(entry, "mail_timestamp");
+            // Use get_email_list&offset=0 to list all messages currently in the inbox (not just seq > 0).
+            string url = $"{EndpointUrl}?f=get_email_list&offset=0&sid_token={Uri.EscapeDataString(sidToken)}";
+            string json = await client.GetStringAsync(url, cancellationToken);
 
-            ParseFrom(rawFrom, out string fromName, out string fromAddress);
-            DateTime dateUtc = timestamp > 0
-                ? DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime
-                : DateTime.UtcNow;
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("sid_token", out var updatedSid) && updatedSid.GetString() is { Length: > 0 } nextSid)
+                UpdateCachedSid(account, nextSid);
 
-            items.Add(new FastMailMessageItem(
-                RemoteId: mailId,
-                MessageIdHeader: $"guerrilla-{mailId}@{ExtractDomain(account.EmailAddress)}",
-                FromName: fromName,
-                FromAddress: fromAddress,
-                ToAddresses: account.EmailAddress,
-                Subject: subject,
-                PreviewText: excerpt,
-                DateUtc: dateUtc,
-                IsSeen: readStr == "1",
-                HasAttachments: attStr != "0" && !string.IsNullOrEmpty(attStr),
-                SizeBytes: ReadLong(entry, "mail_size")));
+            var items = new List<FastMailMessageItem>();
+            if (!root.TryGetProperty("list", out var listElement) || listElement.ValueKind != JsonValueKind.Array)
+            {
+                Log($"GuerrillaMail.ListMessagesAsync: no 'list' array in response for '{account.EmailAddress}', elapsed={sw.ElapsedMilliseconds}ms", LogLevel.Warning, Run: IsLogEnabled);
+                return items;
+            }
+
+            foreach (var entry in listElement.EnumerateArray())
+            {
+                string mailId = ReadStringOrNumber(entry, "mail_id");
+                if (string.IsNullOrWhiteSpace(mailId)) continue;
+
+                string rawFrom = ReadString(entry, "mail_from");
+                string subject = WebUtility.HtmlDecode(ReadString(entry, "mail_subject"));
+                string excerpt = WebUtility.HtmlDecode(ReadString(entry, "mail_excerpt"));
+                string readStr = ReadStringOrNumber(entry, "mail_read");
+                string attStr = ReadStringOrNumber(entry, "att");
+                long timestamp = ReadLong(entry, "mail_timestamp");
+
+                ParseFrom(rawFrom, out string fromName, out string fromAddress);
+                DateTime dateUtc = timestamp > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime
+                    : DateTime.UtcNow;
+
+                items.Add(new FastMailMessageItem(
+                    RemoteId: mailId,
+                    MessageIdHeader: $"guerrilla-{mailId}@{ExtractDomain(account.EmailAddress)}",
+                    FromName: fromName,
+                    FromAddress: fromAddress,
+                    ToAddresses: account.EmailAddress,
+                    Subject: subject,
+                    PreviewText: excerpt,
+                    DateUtc: dateUtc,
+                    IsSeen: readStr == "1",
+                    HasAttachments: attStr != "0" && !string.IsNullOrEmpty(attStr),
+                    SizeBytes: ReadLong(entry, "mail_size")));
+            }
+
+            Log($"GuerrillaMail.ListMessagesAsync finished: account='{account.EmailAddress}', count={items.Count}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return items;
         }
-
-        return items;
+        catch (Exception ex)
+        {
+            Log($"GuerrillaMail.ListMessagesAsync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public async Task<MimeMessage> DownloadMessageAsync(MailAccountData account, string remoteId, CancellationToken cancellationToken)
     {
-        using var client = TorService.CreateIsolatedHttpClient(account.Id);
-        string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
+        var sw = Stopwatch.StartNew();
+        Log($"GuerrillaMail.DownloadMessageAsync started: account='{account.EmailAddress}', remoteId='{remoteId}'", Run: IsLogEnabled);
 
-        string url = $"{EndpointUrl}?f=fetch_email&email_id={Uri.EscapeDataString(remoteId)}&sid_token={Uri.EscapeDataString(sidToken)}";
-        string json = await client.GetStringAsync(url, cancellationToken);
-
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        if (root.ValueKind == JsonValueKind.False || !root.TryGetProperty("mail_id", out _))
+        try
         {
-            // Session may have expired; force reclaim and retry once.
-            sidToken = await EnsureSessionAsync(client, account, forceReclaim: true, cancellationToken);
-            url = $"{EndpointUrl}?f=fetch_email&email_id={Uri.EscapeDataString(remoteId)}&sid_token={Uri.EscapeDataString(sidToken)}";
-            json = await client.GetStringAsync(url, cancellationToken);
+            using var client = TorService.CreateIsolatedHttpClient(account.Id);
+            string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
+
+            string url = $"{EndpointUrl}?f=fetch_email&email_id={Uri.EscapeDataString(remoteId)}&sid_token={Uri.EscapeDataString(sidToken)}";
+            string json = await client.GetStringAsync(url, cancellationToken);
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.False || !root.TryGetProperty("mail_id", out _))
+            {
+                Log($"GuerrillaMail.DownloadMessageAsync: initial fetch_email for '{remoteId}' returned no mail_id; forcing session reclaim.", LogLevel.Warning, Run: IsLogEnabled);
+                sidToken = await EnsureSessionAsync(client, account, forceReclaim: true, cancellationToken);
+                url = $"{EndpointUrl}?f=fetch_email&email_id={Uri.EscapeDataString(remoteId)}&sid_token={Uri.EscapeDataString(sidToken)}";
+                json = await client.GetStringAsync(url, cancellationToken);
+            }
+
+            using var retryDoc = JsonDocument.Parse(json);
+            var mail = retryDoc.RootElement;
+
+            string rawFrom = ReadString(mail, "mail_from");
+            string subject = WebUtility.HtmlDecode(ReadString(mail, "mail_subject"));
+            string body = ReadString(mail, "mail_body");
+            string excerpt = WebUtility.HtmlDecode(ReadString(mail, "mail_excerpt"));
+            long timestamp = ReadLong(mail, "mail_timestamp");
+
+            ParseFrom(rawFrom, out string fromName, out string fromAddress);
+
+            var message = new MimeMessage();
+            message.MessageId = $"guerrilla-{remoteId}@{ExtractDomain(account.EmailAddress)}";
+            message.From.Add(new MailboxAddress(fromName, string.IsNullOrWhiteSpace(fromAddress) ? "unknown@guerrillamail.com" : fromAddress));
+            if (MailboxAddress.TryParse(account.EmailAddress, out var toMailbox))
+                message.To.Add(toMailbox);
+            message.Subject = subject;
+            message.Date = timestamp > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
+                : DateTimeOffset.UtcNow;
+
+            string unwrappedHtml = UnwrapBlockedImages(body);
+            var builder = new BodyBuilder
+            {
+                HtmlBody = string.IsNullOrWhiteSpace(unwrappedHtml) ? null : unwrappedHtml,
+                TextBody = StripHtmlToPlainText(string.IsNullOrWhiteSpace(unwrappedHtml) ? excerpt : unwrappedHtml)
+            };
+            message.Body = builder.ToMessageBody();
+
+            Log($"GuerrillaMail.DownloadMessageAsync finished: account='{account.EmailAddress}', remoteId='{remoteId}', subject='{subject}', bodyChars={body.Length}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+            return message;
         }
-
-        using var retryDoc = JsonDocument.Parse(json);
-        var mail = retryDoc.RootElement;
-
-        string rawFrom = ReadString(mail, "mail_from");
-        string subject = WebUtility.HtmlDecode(ReadString(mail, "mail_subject"));
-        string body = ReadString(mail, "mail_body");
-        string excerpt = WebUtility.HtmlDecode(ReadString(mail, "mail_excerpt"));
-        long timestamp = ReadLong(mail, "mail_timestamp");
-
-        ParseFrom(rawFrom, out string fromName, out string fromAddress);
-
-        var message = new MimeMessage();
-        message.MessageId = $"guerrilla-{remoteId}@{ExtractDomain(account.EmailAddress)}";
-        message.From.Add(new MailboxAddress(fromName, string.IsNullOrWhiteSpace(fromAddress) ? "unknown@guerrillamail.com" : fromAddress));
-        if (MailboxAddress.TryParse(account.EmailAddress, out var toMailbox))
-            message.To.Add(toMailbox);
-        message.Subject = subject;
-        message.Date = timestamp > 0
-            ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
-            : DateTimeOffset.UtcNow;
-
-        string unwrappedHtml = UnwrapBlockedImages(body);
-        var builder = new BodyBuilder
+        catch (Exception ex)
         {
-            HtmlBody = string.IsNullOrWhiteSpace(unwrappedHtml) ? null : unwrappedHtml,
-            TextBody = StripHtmlToPlainText(string.IsNullOrWhiteSpace(unwrappedHtml) ? excerpt : unwrappedHtml)
-        };
-        message.Body = builder.ToMessageBody();
-        return message;
+            Log($"GuerrillaMail.DownloadMessageAsync failed for '{account.EmailAddress}', remoteId='{remoteId}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     public Task MarkReadAsync(MailAccountData account, IReadOnlyList<string> remoteIds, bool seen, CancellationToken cancellationToken)
@@ -199,21 +246,32 @@ public sealed class GuerrillaMailProvider : IFastMailProvider
     public async Task DeleteMessagesAsync(MailAccountData account, IReadOnlyList<string> remoteIds, CancellationToken cancellationToken)
     {
         if (remoteIds.Count == 0) return;
+        var sw = Stopwatch.StartNew();
+        Log($"GuerrillaMail.DeleteMessagesAsync started: account='{account.EmailAddress}', count={remoteIds.Count}", Run: IsLogEnabled);
 
-        using var client = TorService.CreateIsolatedHttpClient(account.Id);
-        string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
-
-        var formPairs = new List<KeyValuePair<string, string>>
+        try
         {
-            new("f", "del_email"),
-            new("sid_token", sidToken)
-        };
-        foreach (string id in remoteIds)
-            formPairs.Add(new("email_ids[]", id));
+            using var client = TorService.CreateIsolatedHttpClient(account.Id);
+            string sidToken = await EnsureSessionAsync(client, account, forceReclaim: false, cancellationToken);
 
-        using var content = new FormUrlEncodedContent(formPairs);
-        using var response = await client.PostAsync(EndpointUrl, content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+            var formPairs = new List<KeyValuePair<string, string>>
+            {
+                new("f", "del_email"),
+                new("sid_token", sidToken)
+            };
+            foreach (string id in remoteIds)
+                formPairs.Add(new("email_ids[]", id));
+
+            using var content = new FormUrlEncodedContent(formPairs);
+            using var response = await client.PostAsync(EndpointUrl, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            Log($"GuerrillaMail.DeleteMessagesAsync finished: account='{account.EmailAddress}', elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
+        }
+        catch (Exception ex)
+        {
+            Log($"GuerrillaMail.DeleteMessagesAsync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            throw;
+        }
     }
 
     static async Task<string> EnsureSessionAsync(HttpClient client, MailAccountData account, bool forceReclaim, CancellationToken cancellationToken)
@@ -229,6 +287,7 @@ public sealed class GuerrillaMailProvider : IFastMailProvider
         }
 
         string? initialSid = sessionsByKey.TryGetValue(account.Id, out var prev) ? prev.SidToken : account.FastMailRemoteAccountId;
+        Log($"GuerrillaMail.EnsureSessionAsync: claiming/refreshing session for user='{emailUser}', forceReclaim={forceReclaim}", Run: IsLogEnabled);
         string sidToken = await ClaimUsernameAsync(client, emailUser, initialSid, cancellationToken);
         sessionsByKey[account.Id] = new SessionState(sidToken, emailUser, DateTime.UtcNow);
         return sidToken;
