@@ -31,6 +31,9 @@ and switching the theme re-skins the whole app at runtime.
 - Folder roles resolved from IMAP SPECIAL-USE, with name-based fallback for servers without it
 - All network calls go through one Polly pipeline (retry with backoff, per-attempt and total timeouts)
 - Per-account **Tor-only** mode: an account can be marked as reachable through Tor and nothing else
+- Nested account folders persisted in `UserData/account-folders.json` with drag-and-drop ordering, expand/collapse state memory, and an undeletable default `Main` folder (`00000000-0000-0000-0000-000000000000`)
+- Fast Mail accounts (`IFastMailProvider`: Guerrilla Mail and Mail.tm) added directly from the modal account wizard, communicating strictly over Tor, with optional per-account title and multi-line notes shown in sidebar hover tooltips and editable from the account context menu
+- Direct-to-MX anonymous SMTP delivery over Tor (`DirectMxSmtpService`): sends mail to any recipient domain without an SMTP relay account by resolving MX records via DNS-over-HTTPS over the account's isolated Tor circuit and delivering on port 25 (`StartTlsWhenAvailable` with plain-SMTP fallback)
 
 **Tor transport**
 - Any account can be switched to Tor-only. Its IMAP/POP3/SMTP sessions are carried by the Tor
@@ -45,7 +48,8 @@ and switching the theme re-skins the whole app at runtime.
   see `MainProject\Platforms\Android\Tor\README.md`) and starts it first; a running Orbot on 9050 is
   used only when that tor cannot start
 - Per-account circuit isolation through SOCKS username/password (`IsolateSOCKSAuth`), so accounts
-  never share a circuit and a failed connection can be retried on a fresh one
+- Per-account circuit isolation through SOCKS username/password (`IsolateSOCKSAuth`), so accounts
+  never share a circuit and a failed connection can be retried on a fresh one; `TorService.EnsureUniqueExitIpAsync` verifies each Tor-enabled account uses a distinct exit IP and rotates the circuit on collision
 - A connection climbs a six-rung ladder — known endpoint, fresh circuit, the app's own SOCKS5
   client, rediscovery, and finally a tor started by the app — under a Polly pipeline with its own
   patient budget. Every rung is a different route *through* Tor; none is a route around it

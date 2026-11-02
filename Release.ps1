@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName Microsoft.VisualBasic
 $SlnDir = $PSScriptRoot
 $ProjectName = Split-Path $PSScriptRoot -Leaf
 $MauiCsproj = Join-Path $SlnDir "$ProjectName\$ProjectName.csproj"
@@ -92,8 +93,13 @@ if ($propsText -notmatch '<Version>[^<]*</Version>') { throw "Directory.Build.pr
 $stamped = [regex]::Replace($propsText, '<Version>[^<]*</Version>', "<Version>$number</Version>")
 if ($stamped -ne $propsText) {
     Set-Content -Path $propsFile -Value $stamped -NoNewline -Encoding utf8
-    git add -- $propsFile
-    git commit -m "Version follows the $tag release"
+
+    Set-Content -Path $propsFile -Value $stamped -NoNewline -Encoding utf8
+    & (Join-Path $SlnDir 'UpdateBuildInfo.ps1')
+    $buildInfoText = Get-Content (Join-Path $SlnDir 'MainProject\Constants\BuildInfo.cs') -Raw
+    $relBuildNum = if ($buildInfoText -match 'BuildNumber\s*=\s*(\d+)') { $Matches[1] } else { 'unknown' }
+ 'MainProject\Constants\BuildInfo.cs' 'AGENTS.md'
+    git commit -m "Version follows the $tag release (Build $relBuildNum)"
     if ($LASTEXITCODE -ne 0) { throw "Could not commit the version stamp." }
     git push
     if ($LASTEXITCODE -ne 0) { throw "Could not push the version stamp; the tag would point at an unstamped commit." }
@@ -122,7 +128,7 @@ foreach ($stage in $stages) {
     $appData = Join-Path $stageRoot 'AppData'
     if (Test-Path $stageRoot) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($stageRoot, 'OnlyErrorDialogs', 'SendToRecycleBin') }
     Write-Host "Publishing $($stage.Name) (self-contained=$($stage.SelfContained))..." -ForegroundColor Cyan
-    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -p:SkipAndroidTargets=true -o $appData
+    dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained $stage.SelfContained -p:SkipAndroidTargets=true -p:FreezeBuildInfo=true -o $appData
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
     if (-not (Test-Path "$appData\$ProjectName.exe")) { throw "Published exe missing in $appData." }
 
@@ -158,9 +164,9 @@ foreach ($stage in $stages) {
 $androidStage = Join-Path $PublishDir 'AndroidStage'
 if (Test-Path $androidStage) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($androidStage, 'OnlyErrorDialogs', 'SendToRecycleBin') }
 Write-Host 'Publishing the Android APK...' -ForegroundColor Cyan
-dotnet publish $MauiCsproj -f $AndroidTfm -c Release -o $androidStage
+dotnet publish $MauiCsproj -f $AndroidTfm -c Release -p:FreezeBuildInfo=true -o $androidStage
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed for Android.' }
-$signedApk = Get-ChildItem $androidStage -Filter '*-Signed.apk' | Select-Object -First 1
+$signedApk = @(Get-ChildItem $androidStage -Filter '*-Signed.apk')[0]
 if (-not $signedApk) { throw "The signed APK is missing in $androidStage." }
 $apk = Join-Path $PublishDir "$ProjectName-$tag-android-arm64.apk"
 Copy-Item -LiteralPath $signedApk.FullName -Destination $apk -Force

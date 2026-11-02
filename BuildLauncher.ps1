@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName Microsoft.VisualBasic
 
 $WorkDir = (NewTemp MyLovelyMailLauncher | Select-Object -Last 1).ToString().Trim()
 
