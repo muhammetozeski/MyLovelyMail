@@ -1,5 +1,4 @@
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
-
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.DataModels.Mail
@@ -8,19 +7,29 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     public enum IncomingProtocol
     {
         Imap,
-        Pop3
+        Pop3,
+        FastMail
     }
 
     /// <summary>The single home of protocol display strings, so UI text always follows the selected enum value.</summary>
     public static class IncomingProtocolNames
     {
-        /// <summary>Human-facing name: "IMAP" / "POP3" (the enum members render as "Imap"/"Pop3").</summary>
-        public static string DisplayName(this IncomingProtocol protocol) =>
-            protocol == IncomingProtocol.Imap ? "IMAP" : "POP3";
+        /// <summary>Human-facing name: "IMAP" / "POP3" / "Fast Mail".</summary>
+        public static string DisplayName(this IncomingProtocol protocol) => protocol switch
+        {
+            IncomingProtocol.Imap => "IMAP",
+            IncomingProtocol.Pop3 => "POP3",
+            IncomingProtocol.FastMail => "Fast Mail",
+            _ => protocol.ToString()
+        };
 
-        /// <summary>Conventional incoming-host prefix: "imap" / "pop".</summary>
-        public static string HostPrefix(this IncomingProtocol protocol) =>
-            protocol == IncomingProtocol.Imap ? "imap" : "pop";
+        /// <summary>Conventional incoming-host prefix: "imap" / "pop" / "api".</summary>
+        public static string HostPrefix(this IncomingProtocol protocol) => protocol switch
+        {
+            IncomingProtocol.Imap => "imap",
+            IncomingProtocol.Pop3 => "pop",
+            _ => "api"
+        };
     }
 
     /// <summary>Socket security for a mail server connection.</summary>
@@ -51,6 +60,19 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public string DisplayName { get; set; } = string.Empty;
         public string EmailAddress { get; set; } = string.Empty;
 
+        /// <summary>
+        /// GUID of the folder containing this account in <see cref="AccountFolderStore"/>.
+        /// Empty or missing values normalize to <see cref="AccountFolderStore.DefaultFolderId"/>
+        /// (<c>00000000-0000-0000-0000-000000000000</c>), so no account can exist without a folder.
+        /// </summary>
+        public string FolderId { get; set; } = AccountFolderStore.DefaultFolderId;
+
+        /// <summary>Optional short label/title for this account, shown in hover tooltips and editable from the context menu.</summary>
+        public string Title { get; set; } = string.Empty;
+
+        /// <summary>Optional multi-line note for this account, shown in hover tooltips and editable from the context menu.</summary>
+        public string Note { get; set; } = string.Empty;
+
         public IncomingProtocol Protocol { get; set; } = IncomingProtocol.Imap;
         public string IncomingHost { get; set; } = string.Empty;
         public int IncomingPort { get; set; } = 993;
@@ -67,12 +89,19 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         public MailAuthMethod AuthMethod { get; set; } = MailAuthMethod.Password;
 
         /// <summary>
-        /// This mailbox is reachable ONLY through Tor. Every IMAP/POP3/SMTP connection is opened
-        /// through the Tor SOCKS proxy, the server name is resolved by Tor rather than by this
-        /// machine, and remote content in its mail is never fetched. When no Tor route exists the
-        /// account fails to connect — it is never downgraded to a direct connection, because the
-        /// whole point of the flag is that this address must not be seen leaving this machine.
-        /// The server itself stays an ordinary one; only the route to it changes.
+        /// When <see cref="Protocol"/> is <see cref="IncomingProtocol.FastMail"/>, identifies the
+        /// <see cref="Services.Mail.FastMail.IFastMailProvider"/> implementation (e.g. "guerrilla", "mailtm").
+        /// </summary>
+        public string FastMailProviderId { get; set; } = string.Empty;
+
+        /// <summary>Provider-side account identifier or session token if used by the Fast Mail API.</summary>
+        public string FastMailRemoteAccountId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// This mailbox is reachable ONLY through Tor. Every IMAP/POP3/SMTP/FastMail connection is opened
+        /// through the Tor SOCKS proxy on an isolated per-account circuit, the server name is resolved by
+        /// Tor rather than by this machine, and remote content in its mail is never fetched.
+        /// Fast Mail accounts permanently enforce <c>TorOnly = true</c>.
         /// </summary>
         public bool TorOnly { get; set; }
 

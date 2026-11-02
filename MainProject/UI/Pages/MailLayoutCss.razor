@@ -225,4 +225,63 @@
         white-space: nowrap;
     }
 
+    .mail-folder-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-account-folder-row {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        padding-left: calc(var(--acc-folder-depth, 0) * @(AppMeasures.Space.Px12)px);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .mail-account-folder-row:hover {
+            background: @surfaceTint;
+        }
+
+    .mail-account-folder-toggle {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        color: @textSecondary;
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        text-align: left;
+    }
+
+    .mail-account-folder-chevron {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @textMuted;
+        width: @(AppMeasures.Size.Px12)px;
+        text-align: center;
+    }
+
+    .mail-account-folder-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-account-folder-action {
+        opacity: @(AppMeasures.Opacity.Muted);
+    }
+
+    .mail-drop-target {
+        outline: @(AppMeasures.Border.Medium)px dashed @primary;
+        background: @surfaceTint;
+    }
+
 </style>

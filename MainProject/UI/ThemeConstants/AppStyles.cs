@@ -50,7 +50,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// glass that mixes the colors behind it, rather than a misty white wash. Kept moderate so the blurred,
         /// saturated page colors still show through as a dim glassy backdrop that makes the dark card pop.
         /// </summary>
-        const float BackdropScrimOpacity = 0.4f;
+        const float BackdropScrimOpacity = 0.65f;
 
         /// <summary>
         /// Builds the CSS for the full-screen layer that sits BEHIND a modal card: a normal backdrop blur plus a
@@ -67,7 +67,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// readable; stacking this deep film of the theme's background colour beneath the translucent tint makes
         /// the card read as dark glass (still translucent, never an opaque cover, never a coloured tint).
         /// </summary>
-        const float StrongFrostDarkOpacity = 0.82f;
+        const float StrongFrostDarkOpacity = 0.96f;
 
         /// <summary>
         /// Produces a full glass-morphism CSS declaration block: translucent background, blur, hairline

@@ -1,0 +1,54 @@
+@inherits ModalBase
+@implements IDisposable
+
+@if (ModalService.Current is { } current)
+{
+    @switch (current.Kind)
+    {
+        case AppModalKind.AddAccount:
+            <WorkspaceModal IsVisible="true" OnClose="@(() => ModalService.CloseAll())">
+                <AccountWizard IsModal="true" InitialFolderId="@current.FolderId" />
+            </WorkspaceModal>
+            break;
+
+        case AppModalKind.FastMail:
+            <WorkspaceModal IsVisible="true" OnClose="@(() => ModalService.CloseAll())">
+                <FastMailModal InitialFolderId="@current.FolderId" />
+            </WorkspaceModal>
+            break;
+
+        case AppModalKind.AccountNote:
+            <DialogModal IsVisible="true"
+                         Title="📝 Account Title & Note"
+                         OnClose="@(() => ModalService.CloseAll())">
+                <AccountNoteModal AccountId="@current.AccountId" />
+            </DialogModal>
+            break;
+
+        case AppModalKind.AccountFolder:
+            <DialogModal IsVisible="true"
+                         Title="@(current.IsRenameFolder ? "📁 Rename Account Folder" : "📁 New Account Folder")"
+                         OnClose="@(() => ModalService.CloseAll())">
+                <AccountFolderModal FolderId="@current.FolderId"
+                                    ParentFolderId="@current.ParentFolderId"
+                                    IsRename="@current.IsRenameFolder" />
+            </DialogModal>
+            break;
+    }
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ModalService.OnChanged += HandleModalChanged;
+    }
+
+    void HandleModalChanged() => InvokeAsync(StateHasChanged);
+
+    public new void Dispose()
+    {
+        ModalService.OnChanged -= HandleModalChanged;
+        base.Dispose();
+    }
+}

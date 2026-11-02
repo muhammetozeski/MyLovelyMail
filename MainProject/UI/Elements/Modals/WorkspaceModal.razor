@@ -1,0 +1,12 @@
+@inherits ModalBase
+
+<DialogModal IsVisible="@IsVisible"
+             MaxWidthPx="@(MaxWidthPx ?? AppMeasures.Size.ModalMedium)"
+             Title="@Title"
+             ShowBackButton="@ShowBackButton"
+             ShowCloseButton="@ShowCloseButton"
+             OnBack="@OnBack"
+             OnClose="@OnClose"
+             OnBackdropClick="@OnBackdropClick">
+    @ChildContent
+</DialogModal>

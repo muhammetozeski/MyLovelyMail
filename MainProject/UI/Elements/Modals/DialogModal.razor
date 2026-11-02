@@ -1,0 +1,25 @@
+@inherits ModalBase
+
+<CoreModal IsVisible="@IsVisible"
+           MaxWidthPx="@(MaxWidthPx ?? AppMeasures.Size.ModalCompact)"
+           TextAlignLeft="true"
+           OnBackdropClick="@TriggerCloseAsync">
+    @if (!string.IsNullOrWhiteSpace(Title) || CanNavigateBack)
+    {
+        <div class="core-modal-header">
+            @if (CanNavigateBack)
+            {
+                <BackButton OnClick="@TriggerBackAsync" />
+            }
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <h2 class="core-modal-title">@Title</h2>
+            }
+            @if (ShowCloseButton)
+            {
+                <SecondaryButton OnClick="@TriggerCloseAsync">✕</SecondaryButton>
+            }
+        </div>
+    }
+    @ChildContent
+</CoreModal>

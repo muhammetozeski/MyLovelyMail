@@ -90,6 +90,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// <summary>Moves one isolation key onto a fresh circuit; the next connection takes a different path.</summary>
         public static int RotateCircuit(string isolationKey)
         {
+            InvalidateExitLease(isolationKey);
             int epoch = circuitEpochs.AddOrUpdate(isolationKey, 2, static (_, current) => current + 1);
             Log($"Tor circuit rotated for '{isolationKey}' (epoch {epoch}).");
             return epoch;

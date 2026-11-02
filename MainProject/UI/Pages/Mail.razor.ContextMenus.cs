@@ -122,6 +122,9 @@ public partial class Mail
     internal void OpenAccountMenu(MailAccountData account, MouseEventArgs pointer) =>
         ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), pointer.ClientX, pointer.ClientY);
 
+    internal void OpenAccountFolderMenu(AccountFolderData folder, MouseEventArgs pointer) =>
+        ContextMenuService.Open(this, folder.Name, MailMenuItems.ForAccountFolder(folder), pointer.ClientX, pointer.ClientY);
+
     /// <summary>Attachment commands reuse the reader's existing save paths.</summary>
     /// <param name="attachment">Clicked attachment.</param>
     /// <param name="pointer">Menu location.</param>

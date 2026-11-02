@@ -1,12 +1,22 @@
 @attribute [Route(RoutePath)]
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
 @inject NavigationManager Navigation
-<PageTitle>Add account — My Lovely Mail</PageTitle>
+@if (!IsModal)
+{
+    <PageTitle>Add account — My Lovely Mail</PageTitle>
+}
 
-<div class="wizard-screen">
+<div class="wizard-screen @(IsModal ? "wizard-screen--modal" : "")">
     <div class="wizard-header">
-        <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
+        <BackButton OnClick="@HandleBack" />
         <h1 class="wizard-title">💌 Add your mail account</h1>
+        <div class="wizard-header-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+            <SecondaryButton OnClick="@OpenFastMailModal">⚡ Fast Mail</SecondaryButton>
+            @if (IsModal)
+            {
+                <SecondaryButton OnClick="@(() => Services.ModalService.CloseAll())">✕</SecondaryButton>
+            }
+        </div>
     </div>
 
     <GlassCard CustomClass="wizard-card">
@@ -28,7 +38,17 @@
     </GlassCard>
 
     <GlassCard CustomClass="wizard-card">
-        <div class="wizard-section-title">Identity</div>
+        <div class="wizard-section-title">Identity &amp; Folder</div>
+        <div class="wizard-field">
+            <span class="wizard-label">Account folder (empty places account in Main folder)</span>
+            <select class="wizard-select" @bind="SelectedFolderId">
+                <option value="">— Main folder (default) —</option>
+                @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
+                {
+                    <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
+                }
+            </select>
+        </div>
         <div class="wizard-field">
             <span class="wizard-label">Email address</span>
             <CoreInput Type="email" Placeholder="you@example.com" Icon="✉️" Value="@Email" ValueChanged="@OnEmailChanged" />
@@ -40,6 +60,16 @@
         <div class="wizard-field">
             <span class="wizard-label">Password / app password</span>
             <CoreInput Type="password" Placeholder="••••••••" Icon="🔑" @bind-Value="Password" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Title (optional — shown in tooltip)</span>
+            <CoreInput Placeholder="e.g. Shopping / GitHub / Forum" Icon="🏷️" @bind-Value="AccountTitle" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Note (optional — multi-line note shown in tooltip)</span>
+            <textarea class="wizard-select" rows="3" style="resize:vertical;font-family:inherit;"
+                      placeholder="Optional notes about where this account is used..."
+                      @bind="AccountNote"></textarea>
         </div>
         <div class="wizard-field">
             <span class="wizard-label">Account color (tints the workspace when this account is active)</span>
@@ -105,7 +135,7 @@
 
         <div class="wizard-grid">
             <div class="wizard-field">
-                <span class="wizard-label">SMTP host</span>
+                <span class="wizard-label">SMTP host @(WantsTorOnly ? "(leave empty for Direct-to-MX over Tor)" : "")</span>
                 <CoreInput Placeholder="smtp.example.com" @bind-Value="SmtpHost" />
             </div>
             <div class="wizard-field wizard-field--small">
@@ -133,15 +163,14 @@
         <div class="wizard-section-title">🛡️ Tor</div>
         <div class="wizard-field">
             <div class="wizard-toggle-row">
-                <span class="wizard-label">Reach this account only through Tor</span>
+                <span class="wizard-label">Reach this account only through Tor (isolated circuit &amp; unique exit IP)</span>
                 <CoreToggle @bind-Checked="TorOnly" />
             </div>
             <p class="wizard-hint">
                 The server stays an ordinary one — only the route changes. Mail is fetched and sent
-                through the Tor SOCKS proxy, the server name is looked up by Tor instead of by this
-                machine, and remote images in this account's mail are never loaded. When Tor is not
-                reachable the account does not connect at all; it never falls back to a direct
-                connection.
+                through the Tor SOCKS proxy on an isolated circuit with a unique exit IP per account,
+                the server name is looked up by Tor instead of by this machine, and remote images in
+                this account's mail are never loaded.
             </p>
             @if (TorOnly)
             {
@@ -154,8 +183,6 @@
     {
         <GlassCard CustomClass="wizard-card">
             <p class="wizard-test @(TestSucceeded ? "wizard-test--ok" : "wizard-test--fail")">@TestMessage</p>
-            @* Offered only when a connect-only probe actually got an answer on another pair —
-               the port/security pairing is the one thing a provider preset cannot guess. *@
             @if (Diagnosis is { SuggestedPort: not null } suggestion)
             {
                 <SecondaryButton OnClick="@(() => ApplySuggestion(suggestion))">

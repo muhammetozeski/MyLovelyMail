@@ -286,6 +286,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     break;
                 case "?":
                     ShowShortcutHelp = !ShowShortcutHelp;
+                    if (ShowShortcutHelp)
+                    {
+                        ShowMessageSource = false;
+                        ModalService.CloseAll();
+                    }
                     break;
                 case var digit when e.CtrlKey && digit.Length == 1 && digit[0] is >= '1' and <= '9':
                     int accountIndex = digit[0] - '1';

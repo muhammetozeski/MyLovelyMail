@@ -15,20 +15,21 @@ namespace MyLovelyMail.MainProject.Constants
         /// <summary>Launcher sitting at the deploy root; it applies pending updates and starts AppData's exe.</summary>
         public const string LauncherFileName = AppName + ".exe";
 
+        public static int BuildNumber => BuildInfo.BuildNumber;
+
+        public static string CommitHash => BuildInfo.CommitHash;
+
+        public static string SemVer { get; } = ReadSemVer();
+
         /// <summary>
         /// Shown at the foot of Settings and written into the run lock. Read from the assembly
         /// that is actually running, whose number comes from the single &lt;Version&gt; element in
-        /// Directory.Build.props that Release.ps1 rewrites while publishing.
-        /// <para>
-        /// It used to be a hand-typed literal, which made it true only until the next release: the
-        /// tag, the uploaded assets and this string had to be kept in agreement by memory, and the
-        /// screen kept answering "which build am I running" with the previous one. A bug report
-        /// then arrived against a version that was never installed.
-        /// </para>
+        /// Directory.Build.props that Release.ps1 rewrites while publishing, combined with the
+        /// monotonically increasing build number and commit hash updated on every build.
         /// </summary>
-        public static string AppVersion { get; } = ReadVersion();
+        public static string AppVersion { get; } = $"{SemVer} (Build {BuildInfo.BuildNumber} · {BuildInfo.CommitHash})";
 
-        static string ReadVersion()
+        static string ReadSemVer()
         {
             try
             {

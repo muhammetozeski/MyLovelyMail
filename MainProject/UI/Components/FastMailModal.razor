@@ -1,0 +1,294 @@
+@using MyLovelyMail.MainProject.DataModels.Mail
+@using MyLovelyMail.MainProject.Services
+@using MyLovelyMail.MainProject.Services.Mail
+@inherits ModalBase
+@using MyLovelyMail.MainProject.Services.Mail.FastMail
+@using MyLovelyMail.MainProject.Services.Tor
+@using MyLovelyMail.MainProject.Stores
+
+<div class="wizard-screen wizard-screen--modal">
+    <div class="wizard-header">
+        <BackButton OnClick="@(() => ModalService.GoBack())" />
+        <h1 class="wizard-title">⚡ Fast Mail (Tor-Only Anonymous Mail)</h1>
+        <div style="margin-left:auto;">
+            <SecondaryButton OnClick="@(() => ModalService.CloseAll())">✕</SecondaryButton>
+        </div>
+    </div>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Fast Mail Service</div>
+        <div class="wizard-presets">
+            @foreach (var provider in FastMailProviderRegistry.All)
+            {
+                <button class="wizard-preset @(SelectedProvider?.Id == provider.Id ? "wizard-preset--active" : "")"
+                        @onclick="() => SelectProviderAsync(provider)">
+                    <span class="wizard-preset-emoji">@provider.Emoji</span>
+                    <span>@provider.DisplayName</span>
+                </button>
+            }
+        </div>
+        @if (SelectedProvider != null)
+        {
+            <p class="wizard-hint">🛡️ @SelectedProvider.Description All API requests and Direct-to-MX sends run strictly over an isolated Tor circuit with a unique exit IP.</p>
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Address &amp; Credentials</div>
+
+        <div class="wizard-field">
+            <span class="wizard-label">Account folder (empty places account in Main folder)</span>
+            <select class="wizard-select" @bind="SelectedFolderId">
+                <option value="">— Main folder (default) —</option>
+                @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
+                {
+                    <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="wizard-field">
+            <div class="wizard-toggle-row">
+                <span class="wizard-label">Generate random username</span>
+                <CoreToggle @bind-Checked="UseRandomUsername" />
+            </div>
+        </div>
+
+        @if (!UseRandomUsername)
+        {
+            <div class="wizard-field">
+                <span class="wizard-label">Desired username (before @@)</span>
+                <CoreInput Placeholder="custom-alias" Icon="👤" @bind-Value="DesiredUsername" />
+            </div>
+        }
+
+        <div class="wizard-field">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span class="wizard-label">Domain</span>
+                <button class="sidebar-add" type="button" title="Reload domains over Tor" @onclick="LoadDomainsAsync" disabled="@LoadingDomains">
+                    @(LoadingDomains ? "⏳" : "🔄")
+                </button>
+            </div>
+            <select class="wizard-select" @bind="SelectedDomain" disabled="@LoadingDomains">
+                @if (Domains.Count == 0)
+                {
+                    <option value="">@(LoadingDomains ? "Loading domains over Tor..." : "Default provider domain")</option>
+                }
+                else
+                {
+                    @foreach (var domain in Domains)
+                    {
+                        <option value="@domain">@@@domain</option>
+                    }
+                }
+            </select>
+        </div>
+
+        @if (SelectedProvider?.SupportsPassword == true)
+        {
+            <div class="wizard-field">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <span class="wizard-label">Password (leave empty or click 🎲 for a random password)</span>
+                    <SecondaryButton OnClick="@GeneratePassword">🎲 Generate</SecondaryButton>
+                </div>
+                <CoreInput Type="text" Placeholder="Auto-generated strong password if left empty" Icon="🔑" @bind-Value="Password" />
+            </div>
+        }
+    </GlassCard>
+
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-section-title">Title, Note &amp; Appearance (Optional)</div>
+        <div class="wizard-field">
+            <span class="wizard-label">Title (optional — shown in hover tooltip)</span>
+            <CoreInput Placeholder="e.g. Service signup / Anonymous forum" Icon="🏷️" @bind-Value="AccountTitle" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Multi-line Note (optional — shown in hover tooltip)</span>
+            <textarea class="wizard-select" rows="3" style="resize:vertical;font-family:inherit;"
+                      placeholder="Write any notes, recovery details, or purpose for this Fast Mail account..."
+                      @bind="AccountNote"></textarea>
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Display name (optional — shown when sending mail)</span>
+            <CoreInput Placeholder="Anonymous" Icon="🙂" @bind-Value="DisplayName" />
+        </div>
+        <div class="wizard-field">
+            <span class="wizard-label">Account color</span>
+            <div class="wizard-colors">
+                @foreach (var colorHex in AppColors.IdentityPalette)
+                {
+                    <button class="wizard-color @(SelectedColorHex == colorHex ? "wizard-color--active" : "")"
+                            style="background:@colorHex"
+                            @onclick="() => SelectedColorHex = colorHex"></button>
+                }
+            </div>
+        </div>
+    </GlassCard>
+
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <GlassCard CustomClass="wizard-card">
+            <p class="wizard-test @(StatusSuccess ? "wizard-test--ok" : "wizard-test--fail")">@StatusMessage</p>
+        </GlassCard>
+    }
+
+    <div class="wizard-actions">
+        @if (ModalService.CanGoBack)
+        {
+            <SecondaryButton OnClick="@(() => ModalService.GoBack())" Disabled="@Busy">← Back</SecondaryButton>
+        }
+        <PrimaryButton OnClick="@CreateFastMailAccountAsync" Disabled="@Busy">
+            @if (Busy)
+            {
+                <CoreSpinner SizePx="18" BorderWidthPx="2" Color="@AppColors.TextOnAccent" />
+            }
+            ⚡ Create &amp; Save Fast Mail
+        </PrimaryButton>
+    </div>
+</div>
+
+<AccountWizardCss />
+
+@code {
+    [Parameter] public string? InitialFolderId { get; set; }
+
+    IFastMailProvider? SelectedProvider { get; set; }
+    string SelectedFolderId { get; set; } = string.Empty;
+    bool UseRandomUsername { get; set; }
+    string DesiredUsername { get; set; } = string.Empty;
+    string SelectedDomain { get; set; } = string.Empty;
+    string Password { get; set; } = string.Empty;
+    string AccountTitle { get; set; } = string.Empty;
+    string AccountNote { get; set; } = string.Empty;
+    string DisplayName { get; set; } = string.Empty;
+    string SelectedColorHex { get; set; } = AppColors.IdentityPalette[AccountStore.Accounts.Count % AppColors.IdentityPalette.Length];
+
+    List<string> Domains { get; set; } = [];
+    bool LoadingDomains { get; set; }
+    bool Busy { get; set; }
+    string? StatusMessage { get; set; }
+    bool StatusSuccess { get; set; }
+
+    readonly string draftAccountId = Guid.NewGuid().ToString("N");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(InitialFolderId))
+            SelectedFolderId = AccountFolderStore.NormalizeFolderId(InitialFolderId);
+
+        SelectedProvider = FastMailProviderRegistry.All.FirstOrDefault();
+        if (SelectedProvider != null)
+            await LoadDomainsAsync();
+    }
+
+    async Task SelectProviderAsync(IFastMailProvider provider)
+    {
+        SelectedProvider = provider;
+        StatusMessage = null;
+        await LoadDomainsAsync();
+    }
+
+    async Task LoadDomainsAsync()
+    {
+        if (SelectedProvider == null) return;
+        LoadingDomains = true;
+        StateHasChanged();
+        try
+        {
+            var fetched = await SelectedProvider.GetDomainsAsync(draftAccountId, CancellationToken.None);
+            Domains = [.. fetched];
+            SelectedDomain = Domains.FirstOrDefault() ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            StatusSuccess = false;
+            StatusMessage = $"⚠️ Could not fetch domains over Tor: {ex.Message}";
+        }
+        finally
+        {
+            LoadingDomains = false;
+            StateHasChanged();
+        }
+    }
+
+    void GeneratePassword()
+    {
+        Password = MailTmProvider.GenerateSecurePassword();
+    }
+
+    async Task CreateFastMailAccountAsync()
+    {
+        if (SelectedProvider == null) return;
+        if (!CredentialVault.IsUnlocked)
+        {
+            StatusSuccess = false;
+            StatusMessage = "❌ The credential vault is locked. Unlock it first.";
+            return;
+        }
+
+        Busy = true;
+        StatusMessage = "🛡️ Connecting through isolated Tor circuit and provisioning mailbox...";
+        StatusSuccess = true;
+        StateHasChanged();
+
+        try
+        {
+            var provision = await SelectedProvider.ProvisionAccountAsync(
+                new FastMailProvisionRequest(
+                    IsolationKey: draftAccountId,
+                    DesiredUsername: DesiredUsername,
+                    DesiredDomain: SelectedDomain,
+                    Password: Password,
+                    UseRandomUsername: UseRandomUsername || string.IsNullOrWhiteSpace(DesiredUsername)),
+                CancellationToken.None);
+
+            var account = new MailAccountData
+            {
+                Id = draftAccountId,
+                DisplayName = DisplayName.Trim(),
+                EmailAddress = provision.EmailAddress,
+                FolderId = AccountFolderStore.NormalizeFolderId(SelectedFolderId),
+                Title = AccountTitle.Trim(),
+                Note = AccountNote.Trim(),
+                Protocol = IncomingProtocol.FastMail,
+                FastMailProviderId = SelectedProvider.Id,
+                FastMailRemoteAccountId = provision.RemoteAccountId,
+                IncomingHost = SelectedProvider.ApiHost,
+                IncomingPort = 443,
+                IncomingSecurity = ConnectionSecurity.SslOnConnect,
+                IncomingUsername = provision.Username,
+                SmtpHost = string.Empty, // Uses anonymous Direct-to-MX over Tor
+                SmtpPort = 25,
+                SmtpSecurity = ConnectionSecurity.StartTls,
+                TorOnly = true, // Enforced permanently
+                ColorHex = SelectedColorHex
+            };
+
+            CredentialVault.SetPassword(account.Id, provision.PasswordOrSecret);
+            AccountStore.Save(account);
+
+            // Seed the local Inbox folder immediately so the user sees the mailbox right away.
+            Storage.MessageStore.SaveFolder(new MailFolderData
+            {
+                AccountId = account.Id,
+                FullName = Storage.MessageStore.InboxFullName,
+                DisplayName = "Inbox",
+                Role = FolderRole.Inbox
+            });
+
+            MailUiState.SelectAccount(account);
+            _ = SyncScheduler.SyncNowAsync(accountId: account.Id);
+            ModalService.CloseAll();
+        }
+        catch (Exception ex)
+        {
+            StatusSuccess = false;
+            StatusMessage = $"❌ {ex.Message}";
+        }
+        finally
+        {
+            Busy = false;
+            StateHasChanged();
+        }
+    }
+}

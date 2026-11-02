@@ -6,7 +6,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        @AppStyles.BuildBackdropFrost()
+        @AppStyles.BuildBackdropFrost(AppMeasures.Blur.Strong)
         display: flex;
         align-items: center;
         justify-content: center;
@@ -18,14 +18,33 @@
     }
 
     .core-modal-content {
-        width: @(AppMeasures.Percent.Most)%;
-        max-width: @(AppMeasures.Size.Px400)px;
-        max-height: @(AppMeasures.Viewport.Most)vh;
+        width: @(AppMeasures.Percent.Full)%;
+        max-width: @(AppMeasures.Size.ModalCompact)px;
+        max-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px40)px);
         overflow-y: auto;
         overscroll-behavior: contain;
         text-align: center;
         animation: scaleIn @(AppMeasures.Duration.Normal)s cubic-bezier(0.16, 1, 0.3, 1);
         box-sizing: border-box;
+    }
+
+    .core-modal-header {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px12)px;
+        margin-bottom: @(AppMeasures.Space.Px16)px;
+    }
+
+    .core-modal-title {
+        margin: 0;
+        font-size: @(AppMeasures.Font.Large)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .wobbling-animation {

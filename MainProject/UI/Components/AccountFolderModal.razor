@@ -1,0 +1,69 @@
+@inherits ModalBase
+
+<div class="wizard-screen wizard-screen--modal">
+    <GlassCard CustomClass="wizard-card">
+        <div class="wizard-field">
+            <span class="wizard-label">Folder name</span>
+            <CoreInput Placeholder="e.g. Work / Shopping / Anonymous" Icon="📁" @bind-Value="FolderName" />
+        </div>
+
+        @if (!IsRename)
+        {
+            <div class="wizard-field">
+                <span class="wizard-label">Parent folder (optional — for nested folders)</span>
+                <select class="wizard-select" @bind="SelectedParentId">
+                    <option value="">— Top level (Root) —</option>
+                    @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
+                    {
+                        <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
+                    }
+                </select>
+            </div>
+        }
+    </GlassCard>
+
+    <div class="wizard-actions">
+        <SecondaryButton OnClick="@(() => ModalService.CloseAll())">Cancel</SecondaryButton>
+        <PrimaryButton OnClick="@Save" Disabled="@string.IsNullOrWhiteSpace(FolderName)">💾 Save</PrimaryButton>
+    </div>
+</div>
+
+<AccountWizardCss />
+
+@code {
+    [Parameter] public string? FolderId { get; set; }
+    [Parameter] public string? ParentFolderId { get; set; }
+    [Parameter] public bool IsRename { get; set; }
+
+    string FolderName { get; set; } = string.Empty;
+    string SelectedParentId { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (IsRename && !string.IsNullOrWhiteSpace(FolderId))
+        {
+            var existing = AccountFolderStore.GetById(FolderId);
+            FolderName = existing?.Name ?? string.Empty;
+        }
+        else
+        {
+            FolderName = string.Empty;
+            SelectedParentId = ParentFolderId ?? string.Empty;
+        }
+    }
+
+    void Save()
+    {
+        if (string.IsNullOrWhiteSpace(FolderName)) return;
+
+        if (IsRename && !string.IsNullOrWhiteSpace(FolderId))
+        {
+            AccountFolderStore.RenameFolder(FolderId, FolderName);
+        }
+        else
+        {
+            AccountFolderStore.CreateFolder(FolderName, string.IsNullOrWhiteSpace(SelectedParentId) ? null : SelectedParentId);
+        }
+        ModalService.CloseAll();
+    }
+}

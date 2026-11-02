@@ -317,13 +317,12 @@
     <MailReaderPane View="this" />
 </div>
 
-<CoreModal IsVisible="ShowMessageSource" OnBackdropClick="@(() => ShowMessageSource = false)">
+<WideModal IsVisible="ShowMessageSource" Title="🔍 Message Source" OnClose="@(() => ShowMessageSource = false)">
     <div class="mail-source">
         <div class="mail-source-tabs">
             <button class="mail-search-toggle @(ShowRawSource ? "" : "mail-search-toggle--on")" @onclick="() => ShowRawSource = false">📋 Headers</button>
             <button class="mail-search-toggle @(ShowRawSource ? "mail-search-toggle--on" : "")" @onclick="() => ShowRawSource = true">📄 Raw MIME</button>
             <button class="mail-search-toggle" @onclick="CopySourceAsync">⧉ Copy</button>
-            <button class="mail-search-toggle" @onclick="() => ShowMessageSource = false">✕ Close</button>
         </div>
         @if (ShowRawSource)
         {
@@ -344,11 +343,10 @@
             </div>
         }
     </div>
-</CoreModal>
+</WideModal>
 
-<CoreModal IsVisible="ShowShortcutHelp" OnBackdropClick="@(() => ShowShortcutHelp = false)">
+<DialogModal IsVisible="ShowShortcutHelp" Title="⌨️ Keyboard shortcuts" OnClose="@(() => ShowShortcutHelp = false)">
     <div class="mail-shortcuts">
-        <div class="mail-shortcuts-title">⌨️ Keyboard shortcuts</div>
         @foreach (var (keys, action) in ShortcutHelpRows)
         {
             <div class="mail-shortcuts-row">
@@ -357,6 +355,6 @@
             </div>
         }
     </div>
-</CoreModal>
+</DialogModal>
 
 <MailCss />

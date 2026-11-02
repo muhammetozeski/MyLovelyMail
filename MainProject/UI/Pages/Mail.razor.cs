@@ -47,12 +47,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
             base.OnInitialized();
             MailUiState.OnSelectionChanged += HandleStateChanged;
             AccountStore.OnAccountsChanged += HandleStateChanged;
+            AccountFolderStore.OnFoldersChanged += HandleStateChanged;
             MessageStore.OnFolderChanged += HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged += HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged += HandleSyncStateChanged;
             OutboxService.OnChanged += HandleOutboxChanged;
             MouseActionService.MailMenuRequested = HandleNativeMailMenuAsync;
             MessageActions.OnMoveStateChanged += HandleMoveStateChanged;
+            ModalService.OnChanged += HandleModalServiceChanged;
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -64,16 +66,25 @@ namespace MyLovelyMail.MainProject.UI.Pages
             undoCountdownTimer?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
+            AccountFolderStore.OnFoldersChanged -= HandleStateChanged;
             MessageStore.OnFolderChanged -= HandleFolderChanged;
             SyncScheduler.OnSyncStateChanged -= HandleSyncStateChanged;
             ImapSyncService.OnFolderSyncStateChanged -= HandleSyncStateChanged;
             OutboxService.OnChanged -= HandleOutboxChanged;
             MouseActionService.MailMenuRequested = null;
             MessageActions.OnMoveStateChanged -= HandleMoveStateChanged;
+            ModalService.OnChanged -= HandleModalServiceChanged;
             ContextMenuService.Close();
         }
 
         /// <summary>Selects an account when none is selected yet — the one last used, else the first.</summary>
+        void HandleModalServiceChanged()
+        {
+            if (!ModalService.IsOpen || (!ShowMessageSource && !ShowShortcutHelp)) return;
+            ShowMessageSource = false;
+            ShowShortcutHelp = false;
+            InvokeAsync(StateHasChanged);
+        }
         bool TrySelectFirstAccount()
         {
             if (MailUiState.SelectedAccount != null || AccountStore.Accounts.Count == 0) return false;
@@ -101,6 +112,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal static string SyncHealthTooltip(MailAccountData account)
         {
             var health = SyncHealthService.For(account.Id);
+            if (!string.IsNullOrWhiteSpace(account.Title) || !string.IsNullOrWhiteSpace(account.Note))
+            {
+                string status = health.IsFailing
+                    ? $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}"
+                    : health.LastSuccessUtc is { } s ? $"Last synced {s.ToLocalTime():HH:mm}" : "Not synced yet";
+                var lines = new List<string>(4);
+                if (!string.IsNullOrWhiteSpace(account.Title)) lines.Add($"🏷️ {account.Title}");
+                if (!string.IsNullOrWhiteSpace(account.Note)) lines.Add(account.Note);
+                lines.Add(status);
+                return string.Join("\n", lines);
+            }
             if (health.IsFailing)
                 return $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
             return health.LastSuccessUtc is { } success

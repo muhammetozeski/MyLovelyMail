@@ -106,6 +106,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px360 = 360;
             public const int Px400 = 400;
             public const int Px420 = 420;
+            public const int ModalCompact = 480;
+            public const int ModalMedium = 740;
+            public const int ModalWide = 1100;
 
             /// <summary> How far the reader body may grow before it starts scrolling inside itself: the message opens whole, the page grows with it, and only a truly endless newsletter hits the ceiling. </summary>
             public const int ReaderBodyMax = 1500;

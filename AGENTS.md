@@ -1,3 +1,8 @@
+<!-- BUILD_INFO_START -->
+- **Latest Build Number**: 52 (Mandatory: increment by +1 on every build and include in every commit message)
+- **Latest Commit ID (at last build)**: `65a1cb4`
+<!-- BUILD_INFO_END -->
+
 # Project guidance
 
 Read [the documentation index](docs/README.md) and [documentation guidance](docs/DOCUMENTATION.md), then follow the documents relevant to the task. Keep reusable, verified project knowledge in the existing documents; distinguish source inspection from runtime verification.

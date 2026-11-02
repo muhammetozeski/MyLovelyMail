@@ -53,6 +53,13 @@
                 </div>
                 <CoreToggle Checked="@Account.Enabled" CheckedChanged="@SetEnabled" />
             </div>
+            <div class="settings-row">
+                <div class="settings-row-text">
+                    <span class="settings-row-label">Title, note &amp; folder</span>
+                    <span class="settings-row-hint">@(string.IsNullOrWhiteSpace(Account.Title) ? "No title set" : Account.Title)</span>
+                </div>
+                <SecondaryButton OnClick="@(() => Services.ModalService.OpenAccountNote(Account.Id))">📝 Edit title &amp; note</SecondaryButton>
+            </div>
         </GlassCard>
 
         <GlassCard CustomClass="settings-section">
@@ -277,6 +284,7 @@
     void SetTorOnly(bool torOnly)
     {
         if (Account is not { } account) return;
+        if (account.Protocol == IncomingProtocol.FastMail) return;
         account.TorOnly = torOnly;
         AccountStore.Save(account);
         TorCheckMessage = null;

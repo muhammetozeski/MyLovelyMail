@@ -8,7 +8,10 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 | --- | --- |
 | Application startup and native integration | [MauiProgram](../MyLovelyMail/MauiProgram.cs), then the matching `Platforms/Windows` or `Platforms/Android` implementation |
 | Message list, search or account selection | [Mail page](../MainProject/UI/Pages/Mail.razor) and [page logic](../MainProject/UI/Pages/Mail.razor.cs) |
-| Folder/account presentation | [MailSidebar](../MainProject/UI/Pages/MailSidebar.razor) |
+| Folder/account presentation | [MailSidebar](../MainProject/UI/Pages/MailSidebar.razor), [AccountFolderStore](../MainProject/Stores/AccountFolderStore.cs) |
+| Modals and modal navigation history | [ModalService](../MainProject/Services/ModalService.cs), [ModalBase](../MainProject/UI/Elements/Modals/ModalBase.cs), [CoreModal](../MainProject/UI/Elements/Core/CoreModal.razor), [DialogModal](../MainProject/UI/Elements/Modals/DialogModal.razor), [WorkspaceModal](../MainProject/UI/Elements/Modals/WorkspaceModal.razor), [WideModal](../MainProject/UI/Elements/Modals/WideModal.razor), and [AppModalHost](../MainProject/UI/Components/AppModalHost.razor) |
+| Fast Mail providers and sync | [IFastMailProvider](../MainProject/Services/Mail/FastMail/IFastMailProvider.cs), [GuerrillaMailProvider](../MainProject/Services/Mail/FastMail/GuerrillaMailProvider.cs), [MailTmProvider](../MainProject/Services/Mail/FastMail/MailTmProvider.cs), and [FastMailSyncService](../MainProject/Services/Mail/FastMail/FastMailSyncService.cs) |
+| Anonymous Direct-to-MX SMTP over Tor | [DirectMxSmtpService](../MainProject/Services/Mail/DirectMxSmtpService.cs) and [SmtpSendService](../MainProject/Services/Mail/SmtpSendService.cs) |
 | Reader or compose presentation | [MailReaderPane](../MainProject/UI/Pages/MailReaderPane.razor), with behavior in the `Mail.razor.Reader.cs` and `Mail.razor.Compose.cs` partials |
 | Keyboard shortcuts and bulk actions | [Mail interaction](../MainProject/UI/Pages/Mail.razor.Interaction.cs) |
 | Colors, sizes or responsive layout | `UI/ThemeConstants`, then the relevant style component rendered by [MailCss](../MainProject/UI/Pages/MailCss.razor) |

@@ -227,9 +227,9 @@
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px12)px;
-        width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px300)px;
-        max-width: @(AppMeasures.Percent.Most)vw;
-        max-height: @(AppMeasures.Viewport.Most)vh;
+        width: @(AppMeasures.Percent.Full)%;
+        max-width: @(AppMeasures.Percent.Full)%;
+        text-align: left;
     }
 
     .mail-source-tabs {
@@ -240,10 +240,15 @@
 
     .mail-source-headers {
         display: grid;
-        grid-template-columns: auto 1fr;
-        gap: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px12)px;
+        grid-template-columns: minmax(140px, auto) 1fr;
+        gap: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px16)px;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        background: @AppColors.SurfaceDarken.ToRgbaHex(true);
+        max-height: 68vh;
         overflow: auto;
         font-size: @(AppMeasures.Font.Small)px;
+        text-align: left;
     }
 
     .mail-source-header-name {
@@ -260,7 +265,7 @@
     .mail-source-raw {
         margin: 0;
         overflow: auto;
-        max-height: @(AppMeasures.Viewport.Most)vh;
+        max-height: 68vh;
         padding: @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         background: @AppColors.SurfaceDarken.ToRgbaHex(true);
@@ -268,6 +273,7 @@
         font-size: @(AppMeasures.Font.Small)px;
         white-space: pre-wrap;
         word-break: break-all;
+        text-align: left;
     }
 
     /* Inbox Zero: the reward state for an emptied inbox — hearts drift up behind the headline. */

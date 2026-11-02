@@ -54,7 +54,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (MessageStore.SetSeen(account.Id, folderFullName, changed, seen: read) == 0) return 0;
 
             uint[] uids = [.. changed.Select(static s => s.Uid)];
-            PushFlagsInBackground(account, folderFullName, uids, MessageFlags.Seen, read);
+            if (account.Protocol == IncomingProtocol.FastMail && !folderFullName.StartsWith(MessageStore.LocalFolderPrefix))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await FastMail.FastMailSyncService.SetSeenAsync(account, uids, read); }
+                    catch (Exception ex) { Log($"FastMail SetSeen failed: {ex.Message}", LogLevel.Warning); }
+                });
+            }
+            else
+            {
+                PushFlagsInBackground(account, folderFullName, uids, MessageFlags.Seen, read);
+            }
             Log($"Set read={read} on {changed.Count} message(s) in '{folderFullName}' with one push.", Run: IsLogEnabled);
             return changed.Count;
         }
@@ -145,6 +156,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     selectedBehavior == DeleteBehavior.ArchiveInstead ? FolderRole.Archive : FolderRole.Trash);
             uint[] uids = [.. summaries.Select(static summary => summary.Uid)];
             MessageStore.RemoveMessages(account.Id, folderFullName, uids);
+            if (account.Protocol == IncomingProtocol.FastMail && !folderFullName.StartsWith(MessageStore.LocalFolderPrefix))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await FastMail.FastMailSyncService.DeleteMessagesAsync(account, uids); }
+                    catch (Exception ex) { Log($"FastMail server delete failed: {ex.Message}", LogLevel.Warning); }
+                });
+                return uids.Length;
+            }
             RunServerActionInBackground(account, folderFullName, $"Server delete failed in '{folderFullName}'", LogLevel.Error,
                 async (client, folder, ct) =>
                 {

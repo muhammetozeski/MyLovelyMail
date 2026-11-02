@@ -51,4 +51,8 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Generators\Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
+
+  <Target Name="UpdateBuildInfo" BeforeTargets="PrepareForBuild;BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true' and '$(FreezeBuildInfo)' != 'true'">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\UpdateBuildInfo.ps1&quot;" />
+  </Target>
 </Project>

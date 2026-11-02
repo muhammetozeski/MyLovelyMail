@@ -260,6 +260,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 {
                     if (account.Protocol == IncomingProtocol.Imap && !folderName.StartsWith(MessageStore.LocalFolderPrefix))
                         await ImapSyncService.DownloadMessageAsync(account, folderName, open.Uid);
+                    else if (account.Protocol == IncomingProtocol.FastMail)
+                        await Services.Mail.FastMail.FastMailSyncService.DownloadMessageAsync(account, open.Uid);
                     else if (account.Protocol == IncomingProtocol.Pop3)
                         await Pop3Service.DownloadMessageAsync(account, open.Uid);
                     rendered = MailBodyRenderer.Render(account, folderName, open, allowRemote);
@@ -399,6 +401,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 ? raw[..MaxShownSourceChars] + $"\n\n… truncated at {MaxShownSourceChars / 1024} KB"
                 : raw;
 
+            ShowRawSource = false;
+            ModalService.CloseAll();
+            ShowShortcutHelp = false;
             ShowRawSource = false;
             ShowMessageSource = true;
         }

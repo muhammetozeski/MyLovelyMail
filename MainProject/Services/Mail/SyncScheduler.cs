@@ -94,6 +94,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         SyncHealthService.MarkAttempt(account.Id);
                         if (account.Protocol == IncomingProtocol.Imap)
                             await ImapSyncService.SyncAccountAsync(account, cancellationToken);
+                        else if (account.Protocol == IncomingProtocol.FastMail)
+                            await FastMail.FastMailSyncService.SyncAccountAsync(account, cancellationToken);
                         else
                             await Pop3Service.SyncAccountAsync(account, cancellationToken);
                         SyncHealthService.MarkSuccess(account.Id);

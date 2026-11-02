@@ -1,0 +1,69 @@
+@inherits ModalBase
+
+@if (Account != null)
+{
+    <div class="wizard-screen wizard-screen--modal">
+        <GlassCard CustomClass="wizard-card">
+            <div class="wizard-section-title">@Account.EmailAddress</div>
+
+            <div class="wizard-field">
+                <span class="wizard-label">Title (optional — shown in hover tooltip)</span>
+                <CoreInput Placeholder="Short title or purpose for this mailbox" Icon="🏷️" @bind-Value="TitleText" />
+            </div>
+
+            <div class="wizard-field">
+                <span class="wizard-label">Multi-line Note (optional — shown in hover tooltip)</span>
+                <textarea class="wizard-select" rows="5" style="resize:vertical;font-family:inherit;"
+                          placeholder="Write multi-line notes or description for this account..."
+                          @bind="NoteText"></textarea>
+            </div>
+
+            <div class="wizard-field">
+                <span class="wizard-label">Account folder</span>
+                <select class="wizard-select" @bind="FolderId">
+                    @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
+                    {
+                        <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
+                    }
+                </select>
+            </div>
+        </GlassCard>
+
+        <div class="wizard-actions">
+            <SecondaryButton OnClick="@(() => ModalService.CloseAll())">Cancel</SecondaryButton>
+            <PrimaryButton OnClick="@Save">💾 Save</PrimaryButton>
+        </div>
+    </div>
+
+    <AccountWizardCss />
+}
+
+@code {
+    [Parameter] public string? AccountId { get; set; }
+
+    MailAccountData? Account { get; set; }
+    string TitleText { get; set; } = string.Empty;
+    string NoteText { get; set; } = string.Empty;
+    string FolderId { get; set; } = AccountFolderStore.DefaultFolderId;
+
+    protected override void OnParametersSet()
+    {
+        Account = !string.IsNullOrWhiteSpace(AccountId) ? AccountStore.GetById(AccountId) : null;
+        if (Account != null)
+        {
+            TitleText = Account.Title;
+            NoteText = Account.Note;
+            FolderId = AccountFolderStore.NormalizeFolderId(Account.FolderId);
+        }
+    }
+
+    void Save()
+    {
+        if (Account == null) return;
+        Account.Title = TitleText.Trim();
+        Account.Note = NoteText.Trim();
+        Account.FolderId = AccountFolderStore.NormalizeFolderId(FolderId);
+        AccountStore.Save(Account);
+        ModalService.CloseAll();
+    }
+}

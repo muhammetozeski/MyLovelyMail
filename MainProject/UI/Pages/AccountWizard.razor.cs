@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Components;
 using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Services.Tor;
 using MyLovelyMail.MainProject.Stores;
@@ -12,6 +14,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
     {
         public const string RoutePath = "/Settings/AddAccount";
 
+        [Parameter] public bool IsModal { get; set; }
+        [Parameter] public string? InitialFolderId { get; set; }
+
         /// <summary>Swatches offered in the wizard; the preselected one rotates so each new account differs.</summary>
         internal static string[] AccountColors => AppColors.IdentityPalette;
 
@@ -20,10 +25,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
         ProviderPreset? SelectedPreset { get; set; }
         bool presetPickedManually;
 
+        string SelectedFolderId { get; set; } = string.Empty;
         string Email { get; set; } = string.Empty;
         string DisplayName { get; set; } = string.Empty;
         string Password { get; set; } = string.Empty;
         string Username { get; set; } = string.Empty;
+        string AccountTitle { get; set; } = string.Empty;
+        string AccountNote { get; set; } = string.Empty;
 
         IncomingProtocol Protocol { get; set; } = IncomingProtocol.Imap;
         string IncomingHost { get; set; } = string.Empty;
@@ -39,6 +47,30 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         /// <summary>Reach this mailbox only through Tor. Set before the first connection so the test itself is already tunnelled.</summary>
         bool TorOnly { get; set; }
+
+        protected override void OnParametersSet()
+        {
+            base.OnParametersSet();
+            if (!string.IsNullOrWhiteSpace(InitialFolderId) && string.IsNullOrWhiteSpace(SelectedFolderId))
+                SelectedFolderId = AccountFolderStore.NormalizeFolderId(InitialFolderId);
+        }
+
+        void HandleBack()
+        {
+            if (IsModal)
+                ModalService.GoBack();
+            else
+                Navigation.NavigateTo(NavigationConstants.Settings.Link);
+        }
+
+        void OpenFastMailModal()
+        {
+            string? folderToPass = string.IsNullOrWhiteSpace(SelectedFolderId) ? InitialFolderId : SelectedFolderId;
+            if (IsModal)
+                ModalService.PushFastMail(folderToPass);
+            else
+                ModalService.OpenFastMail(folderToPass);
+        }
 
         /// <summary>
         /// What this machine can offer right now, answered without touching the network: an open
@@ -58,7 +90,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         bool FormLooksComplete =>
             Email.Contains('@') && Password.Length > 0 &&
-            IncomingHost.Length > 0 && SmtpHost.Length > 0;
+            IncomingHost.Length > 0 && (SmtpHost.Length > 0 || WantsTorOnly);
 
         void OnEmailChanged(string value)
         {
@@ -113,6 +145,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             DisplayName = DisplayName.Trim(),
             EmailAddress = Email.Trim(),
+            FolderId = AccountFolderStore.NormalizeFolderId(SelectedFolderId),
+            Title = AccountTitle.Trim(),
+            Note = AccountNote.Trim(),
             Protocol = Protocol,
             IncomingHost = IncomingHost.Trim(),
             IncomingPort = int.TryParse(IncomingPortText, out int incomingPort) ? incomingPort : 993,
@@ -136,8 +171,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             Diagnosis = null;
             try
             {
-                // Two separate scopes so a failure is attributable: one shared try around both
-                // servers printed the same sentence whichever one refused.
                 await TestStageAsync(account, IncomingStage, async ct =>
                 {
                     if (account.Protocol == IncomingProtocol.Imap)
@@ -151,14 +184,19 @@ namespace MyLovelyMail.MainProject.UI.Pages
                         await pop3.DisconnectAsync(true, ct);
                     }
                 });
-                await TestStageAsync(account, SendingStage, async ct =>
+                if (!string.IsNullOrWhiteSpace(account.SmtpHost))
                 {
-                    using var smtp = await MailConnections.OpenSmtpAsync(account, ct, Password);
-                    await smtp.DisconnectAsync(true, ct);
-                });
+                    await TestStageAsync(account, SendingStage, async ct =>
+                    {
+                        using var smtp = await MailConnections.OpenSmtpAsync(account, ct, Password);
+                        await smtp.DisconnectAsync(true, ct);
+                    });
+                }
                 TestSucceeded = true;
                 TestMessage = account.TorOnly
-                    ? "✅ Connected through Tor! Both receiving and sending servers accepted the credentials."
+                    ? (string.IsNullOrWhiteSpace(account.SmtpHost)
+                        ? "✅ Connected through Tor! Incoming server accepted credentials; outgoing mail will use Direct-to-MX over Tor."
+                        : "✅ Connected through Tor! Both receiving and sending servers accepted the credentials.")
                     : "✅ Connected! Both receiving and sending servers accepted the credentials.";
             }
             catch (StageFailure failure)
@@ -258,7 +296,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ = SyncScheduler.SyncNowAsync();
 
             Busy = false;
-            Navigation.NavigateTo(NavigationConstants.Mail.Link);
+            if (IsModal)
+            {
+                MailUiState.SelectAccount(account);
+                ModalService.CloseAll();
+            }
+            else
+            {
+                Navigation.NavigateTo(NavigationConstants.Mail.Link);
+            }
             await Task.CompletedTask;
         }
     }

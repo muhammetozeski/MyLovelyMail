@@ -319,6 +319,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ? await TorService.StartAppManagedAsync(cancellationToken)
                 : await TorService.RequireEndpointAsync(cancellationToken, rung.Rediscover);
 
+            await TorService.EnsureUniqueExitIpAsync(endpoint, account.Id, cancellationToken);
+
             var client = createClient();
             try
             {
