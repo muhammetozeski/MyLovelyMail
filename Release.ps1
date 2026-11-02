@@ -98,7 +98,7 @@ if ($stamped -ne $propsText) {
     & (Join-Path $SlnDir 'UpdateBuildInfo.ps1')
     $buildInfoText = Get-Content (Join-Path $SlnDir 'MainProject\Constants\BuildInfo.cs') -Raw
     $relBuildNum = if ($buildInfoText -match 'BuildNumber\s*=\s*(\d+)') { $Matches[1] } else { 'unknown' }
- 'MainProject\Constants\BuildInfo.cs' 'AGENTS.md'
+    git add -- $propsFile 'MainProject\Constants\BuildInfo.cs' 'AGENTS.md'
     git commit -m "Version follows the $tag release (Build $relBuildNum)"
     if ($LASTEXITCODE -ne 0) { throw "Could not commit the version stamp." }
     git push
