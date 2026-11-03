@@ -11,7 +11,7 @@ public static class MailMenuItems
     /// <summary>Captures one account for all presentation surfaces without copying its commands into each page.</summary>
     /// <param name="account">Clicked account.</param>
     /// <returns>Existing account operations in menu order, starting with Title &amp; Note view/edit at the very top.</returns>
-    public static IReadOnlyList<ContextMenuItem> ForAccount(MailAccountData account)
+    public static IReadOnlyList<ContextMenuItem> ForAccount(MailAccountData account, Func<Task>? deleteFastMail = null)
     {
         string noteMenuLabel = !string.IsNullOrWhiteSpace(account.Title)
             ? $"📝 {account.Title} — View / edit title & note"
@@ -35,7 +35,10 @@ public static class MailMenuItems
             new(account.Enabled ? "⏸ Pause account" : "▶ Resume account", () => { account.Enabled = !account.Enabled; AccountStore.Save(account); }),
             new("↑ Move account up", () => AccountStore.Move(account.Id, -1)),
             new("↓ Move account down", () => AccountStore.Move(account.Id, 1)),
-            new("⚙️ Account settings", () => NavigationBridge.TryNavigate(AccountSettingsPage.RouteFor(account.Id)))
+            new("⚙️ Account settings", () => NavigationBridge.TryNavigate(AccountSettingsPage.RouteFor(account.Id))),
+            new("⚑ Filter rules for this account", () => NavigationBridge.TryNavigate(FilterRules.LinkFor(accountId: account.Id))),
+            .. (account.Protocol == IncomingProtocol.FastMail && deleteFastMail != null && OperatingSystem.IsWindows()
+                ? new[] { new ContextMenuItem("🗑 Delete Fast Mail account", deleteFastMail) } : Array.Empty<ContextMenuItem>())
         ];
     }
 
@@ -46,6 +49,7 @@ public static class MailMenuItems
         [
             new("➕ Add mail account here", () => ModalService.OpenAddAccount(folder.Id)),
             new("⚡ Add Fast Mail here", () => ModalService.OpenFastMail(folder.Id)),
+            new("⚑ Filter rules for this folder", () => NavigationBridge.TryNavigate(FilterRules.LinkFor(accountFolderId: folder.Id))),
             new("📁+ New subfolder", () => ModalService.OpenCreateFolder(folder.Id)),
             new("✏️ Rename folder", () => ModalService.OpenRenameFolder(folder.Id)),
             new("🗑️ Delete folder", () => { AccountFolderStore.DeleteFolder(folder.Id); }, enabled: !isDefault)

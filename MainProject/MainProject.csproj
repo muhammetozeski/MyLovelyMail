@@ -56,4 +56,7 @@
   <Target Name="UpdateBuildInfo" BeforeTargets="PrepareForBuild;BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true' and '$(FreezeBuildInfo)' != 'true'">
     <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\UpdateBuildInfo.ps1&quot;" />
   </Target>
+  <ItemGroup>
+    <EmbeddedResource Include="Services\Mail\FastMail\RestoreFastMail.ps1" />
+  </ItemGroup>
 </Project>
