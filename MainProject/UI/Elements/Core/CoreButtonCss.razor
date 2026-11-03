@@ -11,7 +11,12 @@
         text-align: center;
         cursor: pointer;
         transition: transform @(AppMeasures.Duration.Fast)s, box-shadow @(AppMeasures.Duration.Fast)s, opacity @(AppMeasures.Duration.Fast)s;
-        gap: @(AppMeasures.Space.Px8)px;
+        gap: @(AppMeasures.Space.Px6)px;
+        min-width: 0;
+        max-width: @(AppMeasures.Percent.Full)%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        flex-wrap: wrap;
     }
 
         /* Full-width variant: a block-level flex box filling 100% of the parent. inline-flex shrinks to content, so it must switch to flex to actually stretch. box-sizing above keeps it inside the parent. */
