@@ -252,7 +252,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static async Task ExecuteRuleMovesAsync(MailAccountData account, ImapClient client, IMailFolder folder, RuleProcessResult ruleResult, CancellationToken cancellationToken)
         {
             foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+            {
+                // A local-only destination must own the complete message before its recoverable
+                // server-backed source disappears from the cache.
+                if (MessageStore.GetSummary(account.Id, folder.FullName, uid) == null) continue;
+                if (!MessageStore.HasFullMessage(account.Id, folder.FullName, uid))
+                {
+                    var message = await folder.GetMessageAsync(new UniqueId(uid), cancellationToken);
+                    using var buffer = new MemoryStream();
+                    await message.WriteToAsync(buffer, cancellationToken);
+                    MessageStore.SaveFullMessage(account.Id, folder.FullName, uid, buffer.ToArray());
+                }
                 MessageStore.MoveCachedMessage(account.Id, folder.FullName, uid, MessageStore.LocalFolderPrefix + localFolder);
+            }
 
             if (ruleResult.RemoteMoves.Count == 0) return;
 

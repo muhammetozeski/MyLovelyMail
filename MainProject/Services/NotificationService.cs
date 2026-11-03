@@ -59,7 +59,8 @@ namespace MyLovelyMail.MainProject.Services
             {
                 var folder = folders.FirstOrDefault(folder => folder.FullName == fullName)
                     ?? new MailFolderData { AccountId = account.Id, FullName = fullName };
-                if (FolderSettingsStore.IsMuted(folder)) mutedUids.Add(uid);
+                foreach (var message in messages.Where(message => message.Uid == uid))
+                    if (!AllowsNotification(account, folder, message)) mutedUids.Add(uid);
             }
             if (mutedUids.Count == 0) return messages;
             Log($"Notification candidates suppressed by muted rule destinations: account={account.Id}; count={mutedUids.Count}.", Run: IsLogEnabled);
@@ -72,12 +73,9 @@ namespace MyLovelyMail.MainProject.Services
             var folder = MessageStore.GetFolders(account.Id).FirstOrDefault(folder => folder.FullName == folderFullName)
                 ?? new MailFolderData { AccountId = account.Id, FullName = folderFullName,
                     Role = folderFullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None };
-            if (FolderSettingsStore.IsMuted(folder)) { Log($"Notification skipped: folder '{folderFullName}' is muted."); return; }
             if (Presenter == null) { Log("Notification skipped: no platform presenter registered."); return; }
-            if (!AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value) { Log($"Notification skipped: NotifyOnNewMail off for {account.EmailAddress}."); return; }
-            if (IsInQuietHours(DateTime.Now.Hour)) { Log("Notification skipped: quiet hours."); return; }
 
-            var audible = newMessages.Where(RuleEngine.ShouldNotify).ToList();
+            var audible = newMessages.Where(message => AllowsNotification(account, folder, message)).ToList();
             if (audible.Count == 0) { Log("Notification skipped: all new messages muted by rules."); return; }
 
             string soundName = RuleEngine.GetNotificationSound(audible[0])
@@ -100,6 +98,34 @@ namespace MyLovelyMail.MainProject.Services
             };
 
             Present(toast);
+        }
+
+        /// <summary>Resolves each arrival independently: sender, account, folder, then application settings.</summary>
+        internal static bool AllowsNotification(MailAccountData account, MailFolderData folder, MailMessageSummary summary)
+        {
+            // Trash is never an arrival notification, including when a filing rule sends mail there.
+            if (folder.Role == FolderRole.Trash) return false;
+
+            var notify = AccountStore.GetSettings(account.Id).NotifyOnNewMail;
+            bool allowed = notify.Value && !IsInQuietHours(DateTime.Now.Hour);
+            int priority = 100;
+
+            var folderChoice = FolderSettingsStore.GetOverrides(folder.Role, account.Id, folder.FullName).MutedUntilUtc
+                ?? FolderSettingsStore.GetOverrides(folder.Role).MutedUntilUtc;
+            if (folderChoice != null || folder.Role == FolderRole.Junk)
+            {
+                allowed = !FolderSettingsStore.IsMuted(folder);
+                priority = 250;
+            }
+            if (notify.IsOverridden)
+            {
+                allowed = notify.Value;
+                priority = 300;
+            }
+            var ruleChoice = RuleEngine.GetNotificationOverride(summary);
+            if (ruleChoice is { } enabled && RuleEngine.GetNotificationPriority(summary) >= priority)
+                return enabled;
+            return allowed && (ruleChoice != null || RuleEngine.ShouldNotify(summary));
         }
 
         /// <summary>

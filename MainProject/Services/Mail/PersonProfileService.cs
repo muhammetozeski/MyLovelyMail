@@ -1,5 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -37,16 +38,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
             Dictionary<string, int> byFolder = [];
             HashSet<string> tags = new(StringComparer.OrdinalIgnoreCase);
             string displayName = string.Empty;
+            string ownAddress = AccountStore.GetById(accountId)?.EmailAddress ?? string.Empty;
 
             foreach (var folder in MessageStore.GetFolders(accountId))
             {
                 foreach (var summary in MessageStore.GetSummaries(accountId, folder.FullName))
                 {
-                    if (!Involves(summary, address)) continue;
+                    bool fromPerson = summary.FromAddress.Equals(address, StringComparison.OrdinalIgnoreCase);
+                    bool toPerson = summary.FromAddress.Equals(ownAddress, StringComparison.OrdinalIgnoreCase)
+                        && ContactIndexService.Recipients(summary.ToAddresses).Any(recipient => recipient.Address.Equals(address, StringComparison.OrdinalIgnoreCase));
+                    if (!fromPerson && !toPerson) continue;
 
-                    // Sent is the one folder where this address is the RECIPIENT, which is the same
-                    // signal ContactIndexService weights when it ranks who you actually write to.
-                    if (folder.Role == FolderRole.Sent) sent++; else received++;
+                    // A sent message can be archived or filed later; direction follows mailbox identities.
+                    if (fromPerson) received++; else sent++;
                     if (summary.IsUnread) unread++;
                     if (summary.HasAttachments) withAttachments++;
                     if (summary.DateUtc < oldest) oldest = summary.DateUtc;
@@ -65,10 +69,5 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 newest == DateTime.MinValue ? default : newest,
                 byFolder, [.. tags.OrderBy(static t => t, StringComparer.OrdinalIgnoreCase)]);
         }
-
-        /// <summary>True when this address is the sender or one of the recipients.</summary>
-        static bool Involves(MailMessageSummary summary, string address) =>
-            summary.FromAddress.Equals(address, StringComparison.OrdinalIgnoreCase)
-            || summary.ToAddresses.Contains(address, StringComparison.OrdinalIgnoreCase);
     }
 }

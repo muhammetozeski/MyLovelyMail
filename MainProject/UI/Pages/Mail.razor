@@ -26,6 +26,8 @@
             <div class="mail-selection-tools">
                 <button class="mail-search-toggle @(SelectionMode ? "mail-search-toggle--on" : "")" @onclick="() => SelectionMode = !SelectionMode">☑ Select</button>
                 <button class="mail-search-toggle" @onclick="SelectAllMessages" disabled="@(Rows.Count == 0)">Select all</button>
+                <button class="mail-search-toggle" title="Select by read state, stars, attachments or tags" @onclick="OpenSelectionMenu" disabled="@(Rows.Count == 0)">Select ▾</button>
+                <button class="mail-search-toggle" title="List navigation, selection and keyboard shortcuts" @onclick="OpenListActionsMenu">Actions ▾</button>
                 @if (MailUiState.SelectedMessages.Count > 0)
                 {
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">Clear selection</button>
@@ -138,6 +140,7 @@
             {
                 <div class="mail-bulk-bar">
                     <span class="mail-bulk-count">@MailUiState.SelectedMessages.Count messages selected</span>
+                    <button class="mail-search-toggle" @onclick="OpenBulkActionsMenu">More actions ▾</button>
                     <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</button>
                     <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</button>
                     <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.ToggleStar)">⭐ Star</button>

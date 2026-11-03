@@ -1,6 +1,7 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MimeKit;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -46,6 +47,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return [.. contacts.Take(take)];
         }
 
+        /// <summary>Parses complete mailbox identities instead of substring matches or comma-splitting display names.</summary>
+        internal static IEnumerable<MailboxAddress> Recipients(string addresses) =>
+            InternetAddressList.TryParse(addresses, out var parsed) ? parsed.Mailboxes : [];
+
         static List<Contact> GetOrBuild(string accountId)
         {
             lock (gate)
@@ -82,8 +87,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 foreach (var summary in MessageStore.GetSummaries(accountId, folder.FullName))
                 {
                     Record(summary.FromAddress, summary.FromName, weight, summary.DateUtc);
-                    foreach (string recipient in summary.ToAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        Record(recipient, string.Empty, weight, summary.DateUtc);
+                    foreach (var recipient in Recipients(summary.ToAddresses))
+                        Record(recipient.Address, recipient.Name ?? string.Empty, weight, summary.DateUtc);
                 }
             }
 

@@ -74,8 +74,8 @@ public partial class Mail
                 new("🔍 View message source", () => OpenMessageSource(ResolveMenuMessage(lead))),
                 new("⧉ Copy subject", () => MouseActionService.RunAsync(MouseActionService.CopyAction, ResolveMenuMessage(lead).Subject)),
                 new("⧉ Copy sender address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, ResolveMenuMessage(lead).FromAddress)),
-                new("👤 Sender details", () => MailUiState.OpenPerson(ResolveMenuMessage(lead).FromAddress)),
-                new("🔎 Find mail from this sender", () => RunSavedSearch("from:" + ResolveMenuMessage(lead).FromAddress))
+                new("👤 Sender actions", Children: SenderMenuItems(lead.AccountId,
+                    MessageStore.GetSummary(lead.AccountId, lead.FolderFullName, lead.Uid)?.FromAddress ?? string.Empty))
             ]);
         }
         if (native?.Selection is { Length: > 0 } selected)
@@ -83,9 +83,10 @@ public partial class Mail
         if (native?.Link is { Length: > 0 } link)
         {
             items.Add(new("🔗 Copy link", () => MouseActionService.RunAsync(MouseActionService.CopyAction, link)));
-            if (AccountStore.GetById(lead.AccountId) is not { TorOnly: true })
+            if (AccountStore.GetById(lead.AccountId) is { TorOnly: false, Protocol: not IncomingProtocol.FastMail })
                 items.Add(new("🌐 Open link", () => OpenUnsubscribePage(link)));
         }
+        AddGeneralMessageMenuItems(items, targets, lead);
         items.AddRange([new("☑ Select all listed messages", SelectAllMessages), new("✕ Clear selection", MailUiState.ClearSelection)]);
         ContextMenuService.Open(this, $"{targets.Length} message(s)", items, x, y);
     }
@@ -112,7 +113,8 @@ public partial class Mail
             new("☑ Toggle selection mode", () => SelectionMode = !SelectionMode),
             new("✏️ New message", () => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty)),
             new("🔄 Check mail", () => MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty)),
-            new("⚙️ Settings", () => Navigation.NavigateTo(NavigationConstants.Settings.Link))
+            new("⚙️ Settings", () => Navigation.NavigateTo(NavigationConstants.Settings.Link)),
+            .. GeneralWorkspaceMenuItems()
         ], pointer.ClientX, pointer.ClientY);
     }
 
@@ -120,7 +122,7 @@ public partial class Mail
     /// <param name="account">Clicked account.</param>
     /// <param name="pointer">Menu location.</param>
     internal void OpenAccountMenu(MailAccountData account, MouseEventArgs pointer) =>
-        ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), pointer.ClientX, pointer.ClientY);
+        ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account, () => DeleteFastMailAccountAsync(account)), pointer.ClientX, pointer.ClientY);
 
     internal void OpenAccountFolderMenu(AccountFolderData folder, MouseEventArgs pointer) =>
         ContextMenuService.Open(this, folder.Name, MailMenuItems.ForAccountFolder(folder), pointer.ClientX, pointer.ClientY);
@@ -149,17 +151,6 @@ public partial class Mail
         }
         ContextMenuService.Open(this, tag, items, pointer.ClientX, pointer.ClientY);
     }
-
-    /// <summary>Address actions are shared by the sender and person sheet.</summary>
-    /// <param name="address">Clicked address.</param>
-    /// <param name="pointer">Menu location.</param>
-    internal void OpenAddressMenu(string address, MouseEventArgs pointer) => ContextMenuService.Open(this, address, [
-        new("⧉ Copy address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, address)),
-        new("✏️ Write to this address", () => MouseActionService.RunAsync(MouseActionService.ComposeToAction, address)),
-        new("👤 Person details", () => MailUiState.OpenPerson(address)),
-        new("🔎 Mail from this address", () => RunSavedSearch("from:" + address)),
-        new("🔎 Mail to this address", () => RunSavedSearch("to:" + address))
-    ], pointer.ClientX, pointer.ClientY);
 
     /// <summary>Exposes existing draft save, validation and discard behavior without another composing workflow.</summary>
     /// <param name="pointer">Menu location.</param>

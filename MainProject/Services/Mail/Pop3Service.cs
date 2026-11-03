@@ -12,7 +12,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// UIDs are strings, so the summary's numeric Uid is a stable FNV-1a hash of that string
     /// (the original string is kept in the summary's MessageId when no Message-Id header exists).
     /// </summary>
-    public static class Pop3Service
+    public static partial class Pop3Service
     {
         const string InboxFullName = MessageStore.InboxFullName;
 
@@ -71,7 +71,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
                 var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
                 foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+                {
+                    if (MessageStore.GetSummary(account.Id, InboxFullName, uid) == null) continue;
+                    if (!MessageStore.HasFullMessage(account.Id, InboxFullName, uid))
+                    {
+                        int index = -1;
+                        for (int candidate = 0; candidate < uids.Count; candidate++)
+                            if (Fnv1aHash(uids[candidate]) == uid) { index = candidate; break; }
+                        if (index < 0) throw new InvalidOperationException("A message selected for local filing is no longer on the POP3 server.");
+                        var message = await ResiliencePolicy.GuardStep(client.GetMessageAsync(index, cancellationToken), cancellationToken, account);
+                        using var buffer = new MemoryStream();
+                        await message.WriteToAsync(buffer, cancellationToken);
+                        MessageStore.SaveFullMessage(account.Id, InboxFullName, uid, buffer.ToArray());
+                    }
                     MessageStore.MoveCachedMessage(account.Id, InboxFullName, uid, MessageStore.LocalFolderPrefix + localFolder);
+                }
                 NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
             }
 

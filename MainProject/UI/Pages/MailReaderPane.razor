@@ -58,6 +58,7 @@
                     </div>
                 }
                 <div class="mail-person-actions">
+                    <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(person.Address, e)">Actions ▾</button>
                     <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("from:" + person.Address)'>🔍 From them</button>
                     <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
                     <button class="mail-search-toggle" @onclick="() => MouseActionService.RunAsync(MouseActionService.ComposeToAction, person.Address)">✏️ Write</button>
@@ -209,12 +210,14 @@
                 @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
                 <button class="mail-reader-avatar" title="Everything known about this correspondent"
                         style="background:@Mail.AvatarGradient(open)"
+                        data-context-menu="true" @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)"
+                        @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                         @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@Mail.AvatarInitials(open)</button>
                 <div class="mail-reader-titles">
                     <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
                     <div class="mail-reader-meta">
                         <span class="mail-reader-from" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@open.FromAddress" data-mouse5="menu"
-                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@open.FromName &lt;@open.FromAddress&gt;</span>
+                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@open.FromName &lt;@open.FromAddress&gt;</span>
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                     </div>
                     @if (View.HistoryOfOpenSender(open) is { } history)
@@ -333,6 +336,8 @@
             }
 
             <div class="mail-reader-actions">
+                <button class="mail-search-toggle" @onclick="e => View.OpenReaderActionsMenu(open, e)">Message actions ▾</button>
+                <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">Sender actions ▾</button>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, readerTargets, includeSelection: true))">✅ Mark read</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Unread, readerTargets, includeSelection: true))">📩 Mark unread</SecondaryButton>
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
@@ -352,6 +357,12 @@
                 <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ExportOpen(open, asHtml: true))">🌐 .html</SecondaryButton>
                 <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: true))">🗑️ Trash</DangerButton>
             </div>
+
+            <nav class="mail-reader-list-nav" aria-label="Navigate listed messages">
+                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(-1) == null)" @onclick="() => View.OpenListedMessage(-1)">← Previous</button>
+                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(1) == null)" @onclick="() => View.OpenListedMessage(1)">Next →</button>
+                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" @onclick="() => View.OpenListedMessage(1, unreadOnly: true)">Next unread</button>
+            </nav>
 
             @if (open.Tags.Count > 0 || View.ShowTagPicker)
             {

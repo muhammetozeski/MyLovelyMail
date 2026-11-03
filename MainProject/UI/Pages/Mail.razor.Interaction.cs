@@ -27,6 +27,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("T", "Tag the selection (or the focused row)"),
             ("X", "Tick / untick the focused row"),
             ("Ctrl+A", "Tick every listed row"),
+            ("Ctrl+Shift+A", "Invert listed selection"),
+            ("Shift+↑ / Shift+↓", "Extend selection through the focused row"),
+            ("Home / End", "Focus first / last listed row"),
             ("Ctrl+- / Ctrl+= / Ctrl+0", "Reader text smaller / larger / reset"),
             ("N", "Next in the open conversation"),
             ("P", "Previous in the open conversation"),
@@ -221,11 +224,32 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             var account = MailUiState.SelectedAccount;
             if (account == null) return;
+            // Modified browser shortcuts must not accidentally trigger plain-letter triage.
+            if (e.AltKey || e.MetaKey) return;
+            if (e.CtrlKey && e.ShiftKey && e.Key is "a" or "A")
+            {
+                InvertListedSelection();
+                return;
+            }
+            if (e.CtrlKey && e.Key is not ("a" or "A" or "+" or "=" or "-" or "_" or "0")
+                && !(e.Key.Length == 1 && e.Key[0] is >= '1' and <= '9')) return;
 
             var focused = MailUiState.FocusedMessage;
             string? focusedFolder = focused == null ? null : ResolveFolderOf(focused);
             switch (e.Key)
             {
+                case "ArrowDown" when e.ShiftKey:
+                    ExtendFocusedSelection(1);
+                    break;
+                case "ArrowUp" when e.ShiftKey:
+                    ExtendFocusedSelection(-1);
+                    break;
+                case "Home":
+                    FocusListBoundary(false);
+                    break;
+                case "End":
+                    FocusListBoundary(true);
+                    break;
                 case "j" or "J" or "ArrowDown":
                     MoveFocus(1);
                     break;
@@ -267,6 +291,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     break;
                 case "Escape":
                     if (ShowBulkTagPicker) ShowBulkTagPicker = false;
+                    else if (ShowMovePicker) ShowMovePicker = false;
+                    else if (ShowSnoozePicker) ShowSnoozePicker = false;
                     else if (ShowShortcutHelp) ShowShortcutHelp = false;
                     else if (MailUiState.SelectedMessages.Count > 0) MailUiState.ClearSelection();
                     else MailUiState.CloseMessage();
@@ -285,12 +311,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     SelectAllMessages();
                     break;
                 case "?":
-                    ShowShortcutHelp = !ShowShortcutHelp;
-                    if (ShowShortcutHelp)
-                    {
-                        ShowMessageSource = false;
-                        ModalService.CloseAll();
-                    }
+                    if (ShowShortcutHelp) ShowShortcutHelp = false;
+                    else ShowKeyboardShortcuts();
                     break;
                 case var digit when e.CtrlKey && digit.Length == 1 && digit[0] is >= '1' and <= '9':
                     int accountIndex = digit[0] - '1';
@@ -305,7 +327,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             if (Rows.Count == 0) return;
             var focusable = Rows.Select(static r => r.Message).ToList();
-            int index = MailUiState.FocusedMessage == null ? -1 : focusable.IndexOf(MailUiState.FocusedMessage);
+            int index = FocusedRowIndex();
             int next = Math.Clamp(index + delta, 0, focusable.Count - 1);
             MailUiState.FocusMessage(focusable[next], MessageIdentityOf(focusable[next]));
         }
