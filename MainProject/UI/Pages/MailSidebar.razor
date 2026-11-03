@@ -15,6 +15,10 @@
                     @onclick="() => ModalService.OpenCreateFolder()">📁+</button>
             <SyncHeart />
         </div>
+        @if (quickMailError != null)
+        {
+            <p class="wizard-test wizard-test--fail" role="alert">@quickMailError</p>
+        }
 
         @if (MailUiState.SelectedAccount != null)
         {
@@ -61,6 +65,27 @@
     </aside>
 
 @code {
+    readonly HashSet<string> quickMailPending = [];
+    string? quickMailError;
+
+    async Task CreateQuickMailAsync(string folderId)
+    {
+        if (!quickMailPending.Add(folderId)) return;
+        quickMailError = null;
+        try
+        {
+            var account = await Services.Mail.FastMail.FastMailAccountService.CreateMailTmAsync(folderId);
+            MailUiState.SelectAccount(account);
+            _ = Services.Mail.SyncScheduler.SyncNowAsync(accountId: account.Id);
+        }
+        catch (Exception ex)
+        {
+            quickMailError = ex.Message;
+            Log($"One-click Mail.tm creation failed: {ex.GetType().Name}.", LogLevel.Error);
+        }
+        finally { quickMailPending.Remove(folderId); }
+    }
+
     string? draggedAccountId;
     string? draggedFolderId;
     string? dragOverFolderId;
@@ -162,6 +187,13 @@
             <button class="mail-folder-action mail-account-folder-action"
                     title="Add account to @accFolder.Name"
                     @onclick="() => ModalService.OpenAddAccount(accFolder.Id)">➕</button>
+
+            <button class="mail-folder-action mail-account-folder-action" type="button"
+                    title="@(quickMailError ?? "Create a Mail.tm account here")" aria-label="Create a Mail.tm account here"
+                    disabled="@quickMailPending.Contains(accFolder.Id)" @onclick="() => CreateQuickMailAsync(accFolder.Id)">
+                @if (quickMailPending.Contains(accFolder.Id)) { <CoreSpinner SizePx="16" BorderWidthPx="2" Color="@AppColors.TextPrimary" /> }
+                else { <FastMailAddIcon /> }
+            </button>
 
             <button class="mail-folder-action mail-account-folder-action"
                     title="Folder options"

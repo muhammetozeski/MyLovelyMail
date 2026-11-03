@@ -30,7 +30,7 @@
         </div>
         @if (SelectedProvider != null)
         {
-            <p class="wizard-hint">🛡️ @SelectedProvider.Description All API requests and Direct-to-MX sends run strictly over an isolated Tor circuit with a unique exit IP.</p>
+            <p class="wizard-hint">🛡️ @SelectedProvider.Description Every connection uses its own isolated Tor credentials.</p>
         }
     </GlassCard>
 
@@ -93,6 +93,14 @@
                     <SecondaryButton OnClick="@GeneratePassword">🎲 Generate</SecondaryButton>
                 </div>
                 <CoreInput Type="text" Placeholder="Auto-generated strong password if left empty" Icon="🔑" @bind-Value="Password" />
+                <div class="fast-password-options">
+                    <label><input type="checkbox" @bind="PasswordUppercase" /> Uppercase</label>
+                    <label><input type="checkbox" @bind="PasswordLowercase" /> Lowercase</label>
+                    <label><input type="checkbox" @bind="PasswordDigits" /> Digits</label>
+                    <label><input type="checkbox" @bind="PasswordSymbols" /> Special symbols</label>
+                    <label><input type="checkbox" @bind="PasswordExcludeAmbiguous" /> Exclude ambiguous</label>
+                    <label><input type="checkbox" @bind="PasswordSpaces" /> Spaces</label>
+                </div>
             </div>
         }
     </GlassCard>
@@ -161,6 +169,8 @@
     string DesiredUsername { get; set; } = string.Empty;
     string SelectedDomain { get; set; } = string.Empty;
     string Password { get; set; } = string.Empty;
+    bool PasswordUppercase = true, PasswordLowercase = true, PasswordDigits = true, PasswordSymbols = true, PasswordSpaces = true;
+    bool PasswordExcludeAmbiguous;
     string AccountTitle { get; set; } = string.Empty;
     string AccountNote { get; set; } = string.Empty;
     string DisplayName { get; set; } = string.Empty;
@@ -220,7 +230,20 @@
 
     void GeneratePassword()
     {
-        Password = MailTmProvider.GenerateSecurePassword();
+        try
+        {
+            Password = FastMailCredentials.GeneratePassword(new PasswordOptions
+            {
+                Length = 40, IncludeUppercase = PasswordUppercase, IncludeLowercase = PasswordLowercase,
+                IncludeDigits = PasswordDigits, IncludeSpecialSymbols = PasswordSymbols, IncludeExtendedSymbols = PasswordSymbols,
+                ExcludeAmbiguousCharacters = PasswordExcludeAmbiguous, IncludeSpaces = PasswordSpaces
+            });
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            StatusMessage = ex.Message;
+            StatusSuccess = false;
+        }
     }
 
     async Task CreateFastMailAccountAsync()
@@ -241,49 +264,13 @@
 
         try
         {
+            if (SelectedProvider.SupportsPassword && string.IsNullOrEmpty(Password)) GeneratePassword();
+            if (SelectedProvider.SupportsPassword && string.IsNullOrEmpty(Password)) return;
             Log($"FastMailModal.CreateFastMailAccountAsync started: provider='{SelectedProvider.Id}', draftAccountId='{draftAccountId}', domain='{SelectedDomain}', randomUser={UseRandomUsername}", Run: IsLogEnabled);
-            var provision = await SelectedProvider.ProvisionAccountAsync(
-                new FastMailProvisionRequest(
-                    IsolationKey: draftAccountId,
-                    DesiredUsername: DesiredUsername,
-                    DesiredDomain: SelectedDomain,
-                    Password: Password,
-                    UseRandomUsername: UseRandomUsername || string.IsNullOrWhiteSpace(DesiredUsername)),
-                CancellationToken.None);
-
-            var account = new MailAccountData
-            {
-                Id = draftAccountId,
-                DisplayName = DisplayName.Trim(),
-                EmailAddress = provision.EmailAddress,
-                FolderId = AccountFolderStore.NormalizeFolderId(SelectedFolderId),
-                Title = AccountTitle.Trim(),
-                Note = AccountNote.Trim(),
-                Protocol = IncomingProtocol.FastMail,
-                FastMailProviderId = SelectedProvider.Id,
-                FastMailRemoteAccountId = provision.RemoteAccountId,
-                IncomingHost = SelectedProvider.ApiHost,
-                IncomingPort = 443,
-                IncomingSecurity = ConnectionSecurity.SslOnConnect,
-                IncomingUsername = provision.Username,
-                SmtpHost = string.Empty, // Uses anonymous Direct-to-MX over Tor
-                SmtpPort = 25,
-                SmtpSecurity = ConnectionSecurity.StartTls,
-                TorOnly = true, // Enforced permanently
-                ColorHex = SelectedColorHex
-            };
-
-            CredentialVault.SetPassword(account.Id, provision.PasswordOrSecret);
-            AccountStore.Save(account);
-
-            // Seed the local Inbox folder immediately so the user sees the mailbox right away.
-            Storage.MessageStore.SaveFolder(new MailFolderData
-            {
-                AccountId = account.Id,
-                FullName = Storage.MessageStore.InboxFullName,
-                DisplayName = "Inbox",
-                Role = FolderRole.Inbox
-            });
+            var account = await FastMailAccountService.CreateAsync(SelectedProvider,
+                new FastMailProvisionRequest(draftAccountId, DesiredUsername, SelectedDomain, Password,
+                    UseRandomUsername || string.IsNullOrWhiteSpace(DesiredUsername)),
+                SelectedFolderId, AccountTitle, AccountNote, DisplayName, SelectedColorHex);
 
             Log($"FastMailModal.CreateFastMailAccountAsync succeeded: account='{account.EmailAddress}' ({account.Id}) in {sw.ElapsedMilliseconds}ms.", Run: IsLogEnabled);
             MailUiState.SelectAccount(account);

@@ -25,9 +25,6 @@ public sealed class MailTmProvider : IFastMailProvider
 
     sealed record TokenEntry(string Token, string AccountRemoteId, DateTime ObtainedUtc);
 
-    static readonly ConcurrentDictionary<string, TokenEntry> tokensByKey = new(StringComparer.OrdinalIgnoreCase);
-    static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(45);
-
     public string Id => "mailtm";
     public string DisplayName => "Mail.tm";
     public string Emoji => "⚡";
@@ -77,7 +74,7 @@ public sealed class MailTmProvider : IFastMailProvider
     public async Task<FastMailProvisionResult> ProvisionAccountAsync(FastMailProvisionRequest request, CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
-        Log($"MailTm.ProvisionAccountAsync started: isolationKey='{request.IsolationKey}', useRandom={request.UseRandomUsername}, desiredUser='{request.DesiredUsername}', desiredDomain='{request.DesiredDomain}'", Run: IsLogEnabled);
+        Log($"MailTm.ProvisionAccountAsync started: useRandom={request.UseRandomUsername}.", Run: IsLogEnabled);
 
         try
         {
@@ -120,7 +117,6 @@ public sealed class MailTmProvider : IFastMailProvider
             }
 
             var tokenEntry = await ObtainTokenAsync(client, email, password, cancellationToken);
-            tokensByKey[request.IsolationKey] = tokenEntry;
 
             Log($"MailTm.ProvisionAccountAsync succeeded: email='{email}', remoteId='{tokenEntry.AccountRemoteId}', elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
             return new FastMailProvisionResult(
@@ -147,64 +143,87 @@ public sealed class MailTmProvider : IFastMailProvider
             using var client = TorService.CreateIsolatedHttpClient(account.Id);
             string token = await EnsureBearerTokenAsync(client, account, forceRefresh: false, cancellationToken);
 
-            using var response = await SendAuthorizedAsync(client, account, HttpMethod.Get, $"{BaseUrl}/messages?page=1", null, token, cancellationToken);
-            string json = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            using var doc = JsonDocument.Parse(json);
             var result = new List<FastMailMessageItem>();
-
-            foreach (var item in EnumerateCollection(doc.RootElement))
+            var seenIds = new HashSet<string>(StringComparer.Ordinal);
+            var visitedPages = new HashSet<string>(StringComparer.Ordinal);
+            Uri? page = new($"{BaseUrl}/messages?page=1");
+            while (page != null)
             {
-                string id = ReadString(item, "id");
-                if (string.IsNullOrWhiteSpace(id)) continue;
-
-                string msgId = ReadString(item, "msgid").Trim('<', '>', ' ');
-                if (string.IsNullOrWhiteSpace(msgId))
-                    msgId = $"{id}@mail.tm";
-
-                string fromName = string.Empty;
-                string fromAddress = string.Empty;
-                if (item.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
+                cancellationToken.ThrowIfCancellationRequested();
+                ValidateMessagePageUri(page);
+                if (!visitedPages.Add(page.AbsoluteUri))
+                    throw new InvalidOperationException("Mail.tm returned a repeated message page.");
+                using var response = await SendAuthorizedAsync(client, account, HttpMethod.Get, page.AbsoluteUri, null, token, cancellationToken);
+                if (response.RequestMessage?.RequestUri is not { } responseUri)
+                    throw new InvalidOperationException("Mail.tm returned a message page without a response origin.");
+                ValidateMessagePageUri(responseUri);
+                string json = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(json);
+                int previousCount = result.Count;
+                foreach (var item in EnumerateCollection(doc.RootElement))
                 {
-                    fromName = ReadString(fromObj, "name");
-                    fromAddress = ReadString(fromObj, "address");
-                }
+                    string id = ReadString(item, "id");
+                    if (string.IsNullOrWhiteSpace(id) || !seenIds.Add(id)) continue;
 
-                var toList = new List<string>();
-                if (item.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var recipient in toArr.EnumerateArray())
+                    string msgId = ReadString(item, "msgid").Trim('<', '>', ' ');
+                    if (string.IsNullOrWhiteSpace(msgId))
+                        msgId = $"{id}@mail.tm";
+
+                    string fromName = string.Empty;
+                    string fromAddress = string.Empty;
+                    if (item.TryGetProperty("from", out var fromObj) && fromObj.ValueKind == JsonValueKind.Object)
                     {
-                        if (recipient.ValueKind == JsonValueKind.Object)
+                        fromName = ReadString(fromObj, "name");
+                        fromAddress = ReadString(fromObj, "address");
+                    }
+
+                    var toList = new List<string>();
+                    if (item.TryGetProperty("to", out var toArr) && toArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var recipient in toArr.EnumerateArray())
                         {
-                            string addr = ReadString(recipient, "address");
-                            if (!string.IsNullOrWhiteSpace(addr)) toList.Add(addr);
+                            if (recipient.ValueKind == JsonValueKind.Object)
+                            {
+                                string addr = ReadString(recipient, "address");
+                                if (!string.IsNullOrWhiteSpace(addr)) toList.Add(addr);
+                            }
                         }
                     }
+
+                    string subject = ReadString(item, "subject");
+                    string intro = ReadString(item, "intro");
+                    bool seen = item.TryGetProperty("seen", out var seenProp) && seenProp.ValueKind == JsonValueKind.True;
+                    bool hasAttachments = item.TryGetProperty("hasAttachments", out var attProp) && attProp.ValueKind == JsonValueKind.True;
+                    long size = item.TryGetProperty("size", out var sizeProp) && sizeProp.TryGetInt64(out long s) ? s : 0;
+
+                    DateTime dateUtc = DateTime.UtcNow;
+                    if (DateTimeOffset.TryParse(ReadString(item, "createdAt"), out var parsedDate))
+                        dateUtc = parsedDate.UtcDateTime;
+
+                    result.Add(new FastMailMessageItem(
+                        RemoteId: id,
+                        MessageIdHeader: msgId,
+                        FromName: fromName,
+                        FromAddress: fromAddress,
+                        ToAddresses: toList.Count > 0 ? string.Join(", ", toList) : account.EmailAddress,
+                        Subject: subject,
+                        PreviewText: intro,
+                        DateUtc: dateUtc,
+                        IsSeen: seen,
+                        HasAttachments: hasAttachments,
+                        SizeBytes: size));
                 }
-
-                string subject = ReadString(item, "subject");
-                string intro = ReadString(item, "intro");
-                bool seen = item.TryGetProperty("seen", out var seenProp) && seenProp.ValueKind == JsonValueKind.True;
-                bool hasAttachments = item.TryGetProperty("hasAttachments", out var attProp) && attProp.ValueKind == JsonValueKind.True;
-                long size = item.TryGetProperty("size", out var sizeProp) && sizeProp.TryGetInt64(out long s) ? s : 0;
-
-                DateTime dateUtc = DateTime.UtcNow;
-                if (DateTimeOffset.TryParse(ReadString(item, "createdAt"), out var parsedDate))
-                    dateUtc = parsedDate.UtcDateTime;
-
-                result.Add(new FastMailMessageItem(
-                    RemoteId: id,
-                    MessageIdHeader: msgId,
-                    FromName: fromName,
-                    FromAddress: fromAddress,
-                    ToAddresses: toList.Count > 0 ? string.Join(", ", toList) : account.EmailAddress,
-                    Subject: subject,
-                    PreviewText: intro,
-                    DateUtc: dateUtc,
-                    IsSeen: seen,
-                    HasAttachments: hasAttachments,
-                    SizeBytes: size));
+                page = null;
+                if (doc.RootElement.TryGetProperty("hydra:view", out var view)
+                    && view.ValueKind == JsonValueKind.Object
+                    && ReadString(view, "hydra:next") is { Length: > 0 } next)
+                {
+                    if (result.Count == previousCount)
+                        throw new InvalidOperationException("Mail.tm returned a message page without advancing.");
+                    if (!Uri.TryCreate(responseUri, next, out page))
+                        throw new InvalidOperationException("Mail.tm returned an invalid next-page link.");
+                    ValidateMessagePageUri(page);
+                }
             }
 
             Log($"MailTm.ListMessagesAsync finished: account='{account.EmailAddress}', count={result.Count}, elapsed={sw.ElapsedMilliseconds}ms", Run: IsLogEnabled);
@@ -215,6 +234,17 @@ public sealed class MailTmProvider : IFastMailProvider
             Log($"MailTm.ListMessagesAsync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
             throw;
         }
+    }
+
+    static void ValidateMessagePageUri(Uri page)
+    {
+        var origin = new Uri(BaseUrl);
+        if (!page.IsAbsoluteUri || page.Scheme != origin.Scheme
+            || !string.Equals(page.Host, origin.Host, StringComparison.OrdinalIgnoreCase)
+            || page.Port != origin.Port || page.UserInfo.Length != 0 || page.Fragment.Length != 0
+            || page.AbsolutePath != "/messages"
+            || !Regex.IsMatch(page.Query, @"^\?page=[1-9][0-9]*$", RegexOptions.CultureInvariant))
+            throw new InvalidOperationException("Mail.tm returned an unexpected message-page origin or path.");
     }
 
     public async Task<MimeMessage> DownloadMessageAsync(MailAccountData account, string remoteId, CancellationToken cancellationToken)
@@ -376,16 +406,9 @@ public sealed class MailTmProvider : IFastMailProvider
         return resp;
     }
 
+    /// <summary>A new bearer token for this one operation; tokens are never cached across operations.</summary>
     static async Task<string> EnsureBearerTokenAsync(HttpClient client, MailAccountData account, bool forceRefresh, CancellationToken cancellationToken)
     {
-        if (!forceRefresh &&
-            tokensByKey.TryGetValue(account.Id, out var cached) &&
-            DateTime.UtcNow - cached.ObtainedUtc < TokenLifetime &&
-            !string.IsNullOrWhiteSpace(cached.Token))
-        {
-            return cached.Token;
-        }
-
         string? password = CredentialVault.GetPassword(account.Id);
         if (string.IsNullOrWhiteSpace(password))
             throw new InvalidOperationException(CredentialVault.IsUnlocked
@@ -393,7 +416,6 @@ public sealed class MailTmProvider : IFastMailProvider
                 : "The credential vault is locked.");
 
         var entry = await ObtainTokenAsync(client, account.EmailAddress, password, cancellationToken);
-        tokensByKey[account.Id] = entry;
         return entry.Token;
     }
 
@@ -426,23 +448,9 @@ public sealed class MailTmProvider : IFastMailProvider
         return new TokenEntry(token, remoteId, DateTime.UtcNow);
     }
 
-    public static string GenerateSecurePassword(int length = 20)
-    {
-        const string alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*";
-        char[] chars = new char[length];
-        for (int i = 0; i < length; i++)
-            chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        return new string(chars);
-    }
+    public static string GenerateSecurePassword() => FastMailCredentials.GeneratePassword();
 
-    public static string GenerateRandomUsername()
-    {
-        const string chars = "abcdefghjkmnpqrstuvwxyz23456789";
-        char[] buf = new char[10];
-        for (int i = 0; i < buf.Length; i++)
-            buf[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
-        return new string(buf);
-    }
+    public static string GenerateRandomUsername() => FastMailCredentials.GenerateUsername();
 
     static string SanitizeUsername(string raw)
     {

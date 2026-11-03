@@ -62,6 +62,8 @@
             </div>
         </GlassCard>
 
+        @if (Account.Protocol != IncomingProtocol.FastMail)
+        {
         <GlassCard CustomClass="settings-section">
             <div class="settings-section-title">🖧 Servers</div>
             <p class="settings-empty-text">Changes apply immediately.</p>
@@ -145,6 +147,20 @@
             </div>
         </GlassCard>
 
+        }
+
+        @if (Account.Protocol == IncomingProtocol.FastMail && string.Equals(Account.FastMailProviderId, "mailtm", StringComparison.OrdinalIgnoreCase))
+        {
+            <GlassCard CustomClass="settings-section">
+                <div class="settings-section-title">🔑 Mail.tm password</div>
+                <SecondaryButton Disabled="@(!CredentialVault.IsUnlocked)" OnClick="@ToggleFastMailPassword">@(FastMailPasswordVisible ? "Hide password" : "Show password")</SecondaryButton>
+                @if (FastMailPasswordVisible)
+                {
+                    <input class="wizard-select" type="text" value="@CredentialVault.GetPassword(Account.Id)" readonly autocomplete="off" spellcheck="false" aria-label="Mail.tm account password" />
+                }
+            </GlassCard>
+        }
+
         <GlassCard CustomClass="settings-section">
             <div class="settings-section-title">🛡️ Tor</div>
             <div class="settings-row">
@@ -157,7 +173,7 @@
                         direct connection. The server itself stays an ordinary one; only the route changes.
                     </span>
                 </div>
-                <CoreToggle Checked="@Account.TorOnly" CheckedChanged="@SetTorOnly" />
+                <CoreToggle Checked="@Account.TorOnly" CheckedChanged="@SetTorOnly" Disabled="@(Account.Protocol == IncomingProtocol.FastMail)" />
             </div>
             @if (Account.TorOnly)
             {
@@ -181,10 +197,11 @@
         @* Inherits exactly like every other account setting, but it gets its own card: a
            signature is written, and a one-line override row cannot hold an editor and a preview. *@
         <GlassCard CustomClass="settings-section">
-            <SignatureEditor Value="@AccountSettingsOf.Signature.Value"
-                             BadgeText="@(AccountSettingsOf.Signature.IsOverridden ? "overridden" : "inherited")"
+            <SignatureEditor Value="@(AnonymousSignatureDisabled ? string.Empty : AccountSettingsOf.Signature.Value)"
+                             BlockRemoteContent="@Account.TorOnly"
+                             BadgeText="@(AccountSettingsOf.Signature.IsOverridden ? "overridden" : AnonymousSignatureDisabled ? "none" : "inherited")"
                              Inherited="@(!AccountSettingsOf.Signature.IsOverridden)"
-                             Hint="Follows the global signature until you write one here"
+                             Hint="@(Account.TorOnly ? "Only a signature written for this account is used" : "Follows the global signature until you write one here")"
                              ValueChanged="@SaveAccountSignature"
                              OnReset="@ResetAccountSignature" />
         </GlassCard>
@@ -222,6 +239,10 @@
 
     MailAccountData? Account => AccountStore.GetById(AccountId);
     AccountSettings AccountSettingsOf => AccountStore.GetSettings(AccountId);
+    bool AnonymousSignatureDisabled => Account is { TorOnly: true } && !AccountSettingsOf.Signature.IsOverridden;
+    string? revealedFastMailAccount;
+    bool FastMailPasswordVisible => CredentialVault.IsUnlocked && revealedFastMailAccount == AccountId;
+    void ToggleFastMailPassword() => revealedFastMailAccount = FastMailPasswordVisible ? null : AccountId;
 
     /// <summary>Written with nameof so renaming the field breaks the build instead of showing the signature twice.</summary>
     static bool SettingHasItsOwnCard(ISetting setting) =>
