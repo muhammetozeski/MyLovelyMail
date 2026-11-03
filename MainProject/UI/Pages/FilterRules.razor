@@ -3,7 +3,7 @@
 @inject NavigationManager Navigation
 <PageTitle>Filters — My Lovely Mail</PageTitle>
 
-<div class="filters-screen">
+<div class="filters-screen" @oninput="ClearPreview" @onchange="ClearPreview">
     <div class="filters-header">
         <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
         <h1 class="filters-title">🧹 Mail filters</h1>
@@ -22,15 +22,60 @@
 
             <div class="filters-grid">
                 <div class="filters-field">
-                    <span class="filters-label">Applies to</span>
-                    <select class="filters-select" @bind="rule.AccountId">
-                        <option value="">All accounts</option>
-                        @foreach (var account in AccountStore.Accounts)
+                    <span class="filters-label">Scope</span>
+                    <select class="filters-select" @bind="EditingScope">
+                        @foreach (string scope in ScopeNames)
                         {
-                            <option value="@account.Id">@account.EmailAddress</option>
+                            <option value="@scope">@scope</option>
                         }
                     </select>
                 </div>
+                @if (EditingScope is "Account" or "Mailbox folder" or "Sender")
+                {
+                    <div class="filters-field">
+                        <span class="filters-label">Account</span>
+                        <select class="filters-select" @bind="rule.AccountId">
+                            <option value="">@(EditingScope == "Sender" ? "All accounts" : "Choose account")</option>
+                            @foreach (var account in AccountStore.Accounts)
+                            {
+                                <option value="@account.Id">@account.EmailAddress</option>
+                            }
+                        </select>
+                    </div>
+                }
+                @if (EditingScope == "Account folder")
+                {
+                    <div class="filters-field">
+                        <span class="filters-label">Account folder and descendants</span>
+                        <select class="filters-select" @bind="rule.AccountFolderId">
+                            <option value="">Choose account folder</option>
+                            @foreach (var (container, depth) in AccountFolderStore.GetFlattenedTree())
+                            {
+                                <option value="@container.Id">@(new string('—', depth)) @container.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                @if (EditingScope == "Mailbox folder")
+                {
+                    <div class="filters-field">
+                        <span class="filters-label">Source mailbox folder</span>
+                        <select class="filters-select" @bind="rule.FolderFullName">
+                            <option value="">Choose mailbox folder</option>
+                            @foreach (var folder in MessageStore.GetFolders(rule.AccountId).Where(f => f.Selectable))
+                            {
+                                <option value="@folder.FullName">@folder.DisplayName (@folder.FullName)</option>
+                            }
+                        </select>
+                    </div>
+                }
+                @if (EditingScope == "Sender")
+                {
+                    <div class="filters-field">
+                        <span class="filters-label">Exact sender address</span>
+                        <input class="filters-input" placeholder="sender@example.com" @bind="rule.SenderAddress" />
+                    </div>
+                }
                 <div class="filters-field">
                     <span class="filters-label">Conditions must match</span>
                     <select class="filters-select" @bind="rule.MatchMode">
@@ -39,28 +84,37 @@
                     </select>
                 </div>
                 <div class="filters-field filters-field--toggle">
-                    <span class="filters-label">Stop after this rule</span>
+                    <span class="filters-label">Stop after this match</span>
                     <CoreToggle Checked="@rule.StopProcessing" CheckedChanged="@(v => rule.StopProcessing = v)" />
                 </div>
             </div>
 
+            <p class="filters-rule-summary">Priority: sender → account → mailbox folder → account folder (nearest first) → application. Within a priority, the first matching action wins. Stop also skips all lower priorities.</p>
             <div class="filters-section-title">Conditions</div>
+            <p class="filters-rule-summary">Scoped rules may have no conditions to match everything in their scope.</p>
             @foreach (var condition in rule.Conditions)
             {
                 <div class="filters-rowline">
-                    <select class="filters-select" @bind="condition.Field">
+                    <select class="filters-select" @bind="condition.Field" @bind:after="() => NormalizeCondition(condition)">
                         @foreach (var field in Enum.GetValues<FilterField>())
                         {
-                            <option value="@field">@field</option>
+                            <option value="@field">@FieldLabel(field)</option>
                         }
                     </select>
                     <select class="filters-select" @bind="condition.Operator">
-                        @foreach (var op in Enum.GetValues<FilterOperator>())
+                        @foreach (var op in OperatorsFor(condition.Field))
                         {
-                            <option value="@op">@op</option>
+                            <option value="@op">@OperatorLabel(op)</option>
                         }
                     </select>
-                    <input class="filters-input" placeholder="Value" @bind="condition.Value" />
+                    @if (condition.Field == FilterField.HasAttachment)
+                    {
+                        <select class="filters-select" @bind="condition.Value"><option value="true">Has attachment</option><option value="false">No attachment</option></select>
+                    }
+                    else
+                    {
+                        <input class="filters-input" placeholder="@(condition.Field == FilterField.SizeKb ? "Size in KB" : "Value")" @bind="condition.Value" />
+                    }
                     <button class="filters-remove" @onclick="() => rule.Conditions.Remove(condition)">✕</button>
                 </div>
             }
@@ -78,7 +132,7 @@
                     <select class="filters-select" @bind="action.Type">
                         @foreach (var type in Enum.GetValues<FilterActionType>())
                         {
-                            <option value="@type">@type</option>
+                            <option value="@type">@ActionLabel(type)</option>
                         }
                     </select>
                     @if (IsMove(action.Type))
@@ -118,6 +172,7 @@
                     <div class="filters-preview-headline">
                         Matches @preview.Matched.ToString("N0") of @preview.Scanned.ToString("N0") cached messages
                     </div>
+                    @if (preview.ScanLimitReached) { <p class="filters-preview-warning">Preview limit reached; additional cached messages were not scanned.</p> }
                     @foreach (var condition in preview.PerCondition)
                     {
                         <div class="filters-preview-condition @(condition.Hits == 0 ? "filters-preview-condition--dead" : "")">
@@ -135,10 +190,12 @@
                 </div>
             }
 
+            @foreach (string error in EditorErrors) { <p class="filters-preview-warning">@error</p> }
+            @if (SaveError != null) { <p class="filters-preview-warning" role="alert">@SaveError</p> }
             <div class="filters-actions">
                 <SecondaryButton OnClick="@(() => ClearEditor())">Cancel</SecondaryButton>
-                <SecondaryButton OnClick="@(() => Preview = RuleEngine.Preview(rule))" Disabled="@(rule.Conditions.Count == 0)">🔎 Try it</SecondaryButton>
-                <PrimaryButton OnClick="@SaveRule" Disabled="@(rule.Name.Trim().Length == 0 || rule.Conditions.Count == 0 || rule.Actions.Count == 0)">💾 Save rule</PrimaryButton>
+                <SecondaryButton OnClick="@(() => Preview = RuleEngine.Preview(rule))" Disabled="@(EditorErrors.Count > 0)">🔎 Try it</SecondaryButton>
+                <PrimaryButton OnClick="@SaveRule" Disabled="@(EditorErrors.Count > 0)">💾 Save rule</PrimaryButton>
             </div>
         </GlassCard>
     }
@@ -151,7 +208,13 @@
         </div>
     }
 
-    @foreach (var existingRule in FilterRuleStore.Rules)
+    <div class="filters-grid">
+        <input class="filters-input" aria-label="Find filters" placeholder="Find by name, scope or action" @bind="SearchText" @bind:event="oninput" />
+        <label><input type="checkbox" @bind="EnabledOnly" /> Enabled only</label>
+        @if (HasQueryScope) { <SecondaryButton OnClick="() => Navigation.NavigateTo(RoutePath)">Show all filters</SecondaryButton> }
+    </div>
+    <p class="filters-rule-summary">@ScopeCaption · @VisibleRules.Count() filter(s)</p>
+    @foreach (var existingRule in VisibleRules)
     {
         <div class="filters-rule-surface" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle"
              @oncontextmenu="e => OpenRuleMenu(existingRule, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
@@ -162,9 +225,10 @@
             </div>
             <div class="filters-rule-tools">
                 <CoreToggle Checked="@existingRule.Enabled" CheckedChanged="@(v => SetEnabled(existingRule, v))" />
-                <button class="filters-remove" title="Move up" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Up)">↑</button>
-                <button class="filters-remove" title="Move down" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Down)">↓</button>
+                <button class="filters-remove" title="Move up within priority" disabled="@(!FilterRuleStore.CanMoveRule(existingRule, true))" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Up)">↑</button>
+                <button class="filters-remove" title="Move down within priority" disabled="@(!FilterRuleStore.CanMoveRule(existingRule, false))" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Down)">↓</button>
                 <button class="filters-remove" title="Edit" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Edit)">✏️</button>
+                <button class="filters-remove" title="Filter actions" aria-label="Filter actions" @onclick="e => OpenRuleMenu(existingRule, e)">⋯</button>
                 <button class="filters-remove" title="Delete" @onclick="() => RunRuleCommand(existingRule, RuleCommand.Delete)">🗑️</button>
             </div>
         </GlassCard>
@@ -190,43 +254,52 @@
     void StartNewRule()
     {
         Preview = null;
-        EditingRule = new FilterRule { Conditions = [new FilterCondition()], Actions = [new FilterAction()] };
+        RequestedScope = null;
+        SaveError = null;
+        EditingRule = new FilterRule { AccountId = QueryAccount ?? "", FolderFullName = QueryFolder ?? "", AccountFolderId = QueryAccountFolder ?? "", SenderAddress = QuerySender ?? "", Conditions = HasQueryScope ? [] : [new FilterCondition()], Actions = [new FilterAction()] };
         IsNewRule = true;
     }
 
     void StartEdit(FilterRule rule)
     {
+        RequestedScope = null;
+        SaveError = null;
         // Edit a clone so Cancel never leaves half-typed changes in the store.
         EditingRule = System.Text.Json.JsonSerializer.Deserialize<FilterRule>(System.Text.Json.JsonSerializer.Serialize(rule));
         IsNewRule = false;
+        if (EditingRule != null) foreach (var condition in EditingRule.Conditions) NormalizeCondition(condition);
         Preview = null;
     }
 
     void SaveRule()
     {
         if (EditingRule == null) return;
-        FilterRuleStore.Save(EditingRule);
-        ClearEditor();
+        if (EditorErrors.Count > 0) return;
+        try { FilterRuleStore.Save(EditingRule); ClearEditor(); SaveError = null; }
+        catch (Exception ex) { SaveError = ex.Message; Log($"Could not save filter: {ex}", LogLevel.Error); }
     }
 
     static Task<string> SetEnabled(FilterRule rule, bool enabled) => MouseActionService.RunAsync("Change filter", () => {
-        rule.Enabled = enabled;
-        FilterRuleStore.Save(rule);
+        var updated = FilterRuleStore.Clone(rule);
+        updated.Enabled = enabled;
+        FilterRuleStore.Save(updated);
         return Task.FromResult(enabled ? "Filter enabled." : "Filter disabled.");
     });
 
     /// <summary>Commands consumed by the same rule-row buttons and context menu.</summary>
-    enum RuleCommand { Edit, Duplicate, Toggle, Up, Down, Delete }
+    enum RuleCommand { Edit, Duplicate, Preview, Toggle, Up, Down, Delete }
 
     /// <summary>Captures a rule and routes operations to its existing editor and store.</summary>
     /// <param name="rule">Clicked rule.</param>
     /// <param name="pointer">Menu position.</param>
     void OpenRuleMenu(FilterRule rule, MouseEventArgs pointer) => ContextMenuService.Open(this, rule.Name, [
         new("✏️ Edit filter", () => RunRuleCommand(rule, RuleCommand.Edit)),
+        new("🔎 Preview against cached mail", () => RunRuleCommand(rule, RuleCommand.Preview)),
+        new("⧉ Copy rule definition", () => MouseActionService.RunAsync(MouseActionService.CopyAction, System.Text.Json.JsonSerializer.Serialize(rule, JsonDefaults.Indented))),
         new("⧉ Duplicate into editor", () => RunRuleCommand(rule, RuleCommand.Duplicate)),
         new(rule.Enabled ? "⏸ Disable filter" : "▶ Enable filter", () => RunRuleCommand(rule, RuleCommand.Toggle)),
-        new("↑ Move up", () => RunRuleCommand(rule, RuleCommand.Up), FilterRuleStore.Rules.FirstOrDefault()?.Id != rule.Id),
-        new("↓ Move down", () => RunRuleCommand(rule, RuleCommand.Down), FilterRuleStore.Rules.LastOrDefault()?.Id != rule.Id),
+        new("↑ Move up within priority", () => RunRuleCommand(rule, RuleCommand.Up), FilterRuleStore.CanMoveRule(rule, true)),
+        new("↓ Move down within priority", () => RunRuleCommand(rule, RuleCommand.Down), FilterRuleStore.CanMoveRule(rule, false)),
         new("⧉ Copy name", () => MouseActionService.RunAsync(MouseActionService.CopyAction, rule.Name)),
         new("🗑️ Delete filter", () => RunRuleCommand(rule, RuleCommand.Delete))
     ], pointer.ClientX, pointer.ClientY);
@@ -242,6 +315,7 @@
             switch (command)
             {
                 case RuleCommand.Edit: StartEdit(rule); break;
+                case RuleCommand.Preview: StartEdit(rule); Preview = RuleEngine.Preview(rule); break;
                 case RuleCommand.Duplicate:
                     StartEdit(rule);
                     if (EditingRule is { } copy) { copy.Id = Guid.NewGuid().ToString("N"); copy.Name += " (copy)"; IsNewRule = true; }
@@ -262,12 +336,38 @@
         FilterActionType.MoveToRemoteFolder => "— pick a server folder —",
         FilterActionType.MoveToLocalFolder => "— pick a folder on this PC —",
         FilterActionType.SetNotificationSound => "Sound name or 'none'",
-        FilterActionType.AddTag => "Tag name",
+        FilterActionType.AddTag or FilterActionType.RemoveTag => "Tag name",
         _ => "(no argument needed)"
     };
 
     static bool IsMove(FilterActionType type) =>
         type is FilterActionType.MoveToRemoteFolder or FilterActionType.MoveToLocalFolder;
+
+    static string FieldLabel(FilterField field) => field switch
+    {
+        FilterField.From => "Sender name or address", FilterField.FromAddress => "Exact sender address",
+        FilterField.To => "Recipients", FilterField.Subject => "Subject", FilterField.BodyPreview => "Preview text",
+        FilterField.SenderDomain => "Sender domain", FilterField.SizeKb => "Size in kilobytes",
+        FilterField.HasAttachment => "Attachment", _ => field.ToString()
+    };
+
+    static string OperatorLabel(FilterOperator op) => op switch
+    {
+        FilterOperator.NotContains => "Does not contain", FilterOperator.StartsWith => "Starts with",
+        FilterOperator.EndsWith => "Ends with", FilterOperator.MatchesRegex => "Matches regular expression",
+        FilterOperator.GreaterThan => "Greater than", FilterOperator.LessThan => "Less than", _ => op.ToString()
+    };
+
+    static string ActionLabel(FilterActionType action) => action switch
+    {
+        FilterActionType.MoveToRemoteFolder => "Move to server folder", FilterActionType.MoveToLocalFolder => "Move to local folder",
+        FilterActionType.MarkRead => "Mark read", FilterActionType.MarkUnread => "Keep unread",
+        FilterActionType.MarkImportant => "Mark important", FilterActionType.ClearImportant => "Clear importance",
+        FilterActionType.Flag => "Star", FilterActionType.Unflag => "Remove star",
+        FilterActionType.Mute => "Mute notifications", FilterActionType.Unmute => "Allow notifications",
+        FilterActionType.AddTag => "Add tag", FilterActionType.RemoveTag => "Remove tag",
+        FilterActionType.SetNotificationSound => "Notification sound", _ => action.ToString()
+    };
 
     /// <summary>
     /// The folders this action may name. For a rule bound to one account: that account's folders.
@@ -280,10 +380,11 @@
 
         var accounts = rule.AccountId.Length > 0
             ? AccountStore.Accounts.Where(a => a.Id == rule.AccountId).ToList()
-            : [.. AccountStore.Accounts];
+            : [.. AccountStore.Accounts.Where(a => RuleEngine.AppliesToScope(rule, a, rule.FolderFullName))];
         if (accounts.Count == 0) return [];
 
         bool wantsLocal = type == FilterActionType.MoveToLocalFolder;
+        if (!wantsLocal && accounts.Any(a => a.Protocol != IncomingProtocol.Imap)) return [];
         List<HashSet<string>> perAccount = [.. accounts.Select(account =>
             MessageStore.GetFolders(account.Id)
                 .Where(f => IsLocalFolder(f) == wantsLocal && f.Selectable)
@@ -298,7 +399,96 @@
     static bool IsLocalFolder(MailFolderData folder) =>
         folder.IsLocal || folder.FullName.StartsWith(MessageStore.LocalFolderPrefix, StringComparison.Ordinal);
 
+    [SupplyParameterFromQuery(Name = "account")] public string? QueryAccount { get; set; }
+    [SupplyParameterFromQuery(Name = "folder")] public string? QueryFolder { get; set; }
+    [SupplyParameterFromQuery(Name = "accountFolder")] public string? QueryAccountFolder { get; set; }
+    [SupplyParameterFromQuery(Name = "sender")] public string? QuerySender { get; set; }
+    string SearchText = "";
+    bool EnabledOnly;
+    string? SaveError;
+    string? LastQuery;
+    static readonly string[] ScopeNames = ["Application", "Account folder", "Mailbox folder", "Account", "Sender"];
+    bool HasQueryScope => !string.IsNullOrEmpty(QueryAccount) || !string.IsNullOrEmpty(QueryFolder) || !string.IsNullOrEmpty(QueryAccountFolder) || !string.IsNullOrEmpty(QuerySender);
+    string ScopeCaption => QuerySender is { Length: > 0 } ? $"Sender: {QuerySender}"
+        : QueryFolder is { Length: > 0 } ? $"Mailbox: {QueryFolder}"
+        : QueryAccountFolder is { Length: > 0 } ? $"Account folder: {AccountFolderStore.Folders.FirstOrDefault(f => f.Id == QueryAccountFolder)?.Name ?? "Missing folder"}"
+        : QueryAccount is { Length: > 0 } ? $"Account: {AccountStore.GetById(QueryAccount)?.EmailAddress}" : "All scopes";
+
+    IEnumerable<FilterRule> VisibleRules => FilterRuleStore.Rules
+        .Where(r => (!EnabledOnly || r.Enabled)
+            && (string.IsNullOrEmpty(QueryAccount) || r.AccountId == QueryAccount)
+            && (string.IsNullOrEmpty(QueryFolder) || r.FolderFullName == QueryFolder)
+            && (string.IsNullOrEmpty(QueryAccountFolder) || r.AccountFolderId == QueryAccountFolder)
+            && (string.IsNullOrEmpty(QuerySender) || r.SenderAddress.Equals(QuerySender, StringComparison.OrdinalIgnoreCase))
+            && (SearchText.Length == 0 || ($"{r.Name} {Summarize(r)}").Contains(SearchText, StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(RuleEngine.Priority);
+
+    IReadOnlyList<string> EditorErrors
+    {
+        get
+        {
+            if (EditingRule == null) return [];
+            var errors = FilterRuleStore.Validate(EditingRule).ToList();
+            if (EditingScope == "Account" && EditingRule.AccountId.Length == 0) errors.Add("Choose an account.");
+            if (EditingScope == "Account folder" && EditingRule.AccountFolderId.Length == 0) errors.Add("Choose an account folder.");
+            if (EditingScope == "Mailbox folder" && EditingRule.FolderFullName.Length == 0) errors.Add("Choose a mailbox folder.");
+            if (EditingScope == "Sender" && EditingRule.SenderAddress.Length == 0) errors.Add("Enter a sender address.");
+            return errors;
+        }
+    }
+
+    string? RequestedScope;
+    string EditingScope
+    {
+        get => RequestedScope ?? (EditingRule is { } r ? ScopeName(r) : "Application");
+        set
+        {
+            RequestedScope = value;
+            if (EditingRule is not { } r) return;
+            r.SenderAddress = ""; r.FolderFullName = ""; r.AccountFolderId = "";
+            if (value is "Application" or "Account folder") r.AccountId = "";
+            Preview = null;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        string query = $"{QueryAccount}|{QueryFolder}|{QueryAccountFolder}|{QuerySender}";
+        if (LastQuery == query) return;
+        LastQuery = query;
+        ClearEditor();
+        RequestedScope = null;
+    }
+
+    void ClearPreview() => Preview = null;
+    static string ScopeName(FilterRule r) => r.SenderAddress.Length > 0 ? "Sender" : r.FolderFullName.Length > 0 ? "Mailbox folder"
+        : r.AccountFolderId.Length > 0 ? "Account folder" : r.AccountId.Length > 0 ? "Account" : "Application";
+
+    static IEnumerable<FilterOperator> OperatorsFor(FilterField field) => field switch
+    {
+        FilterField.HasAttachment => [FilterOperator.Equals],
+        FilterField.SizeKb => [FilterOperator.Equals, FilterOperator.GreaterThan, FilterOperator.LessThan],
+        _ => Enum.GetValues<FilterOperator>().Where(o => o is not (FilterOperator.GreaterThan or FilterOperator.LessThan))
+    };
+
+    static void NormalizeCondition(FilterCondition condition)
+    {
+        if (!OperatorsFor(condition.Field).Contains(condition.Operator)) condition.Operator = OperatorsFor(condition.Field).First();
+        if (condition.Field == FilterField.HasAttachment && !bool.TryParse(condition.Value, out _)) condition.Value = "true";
+    }
+
     static string Summarize(FilterRule rule) =>
-        $"{rule.Conditions.Count} condition(s) → {string.Join(", ", rule.Actions.Select(a => a.Type))}" +
-        (rule.AccountId.Length > 0 ? $" · {AccountStore.GetById(rule.AccountId)?.EmailAddress}" : " · all accounts");
+        $"{ScopeName(rule)} · {rule.SenderAddress}{(rule.SenderAddress.Length > 0 ? " · " : "")}" +
+        (rule.AccountId.Length > 0 ? $"{AccountStore.GetById(rule.AccountId)?.EmailAddress ?? "Missing account"} · " : "") +
+        (rule.FolderFullName.Length > 0 ? $"{rule.FolderFullName} · " : "") +
+        (rule.AccountFolderId.Length > 0 ? $"{AccountFolderStore.Folders.FirstOrDefault(f => f.Id == rule.AccountFolderId)?.Name ?? "Missing folder"} and descendants · " : "") +
+        $"{rule.Conditions.Count} condition(s) → {string.Join(", ", rule.Actions.Select(a => ActionLabel(a.Type)))}";
+
+    public static string LinkFor(string? accountId = null, string? folderFullName = null, string? accountFolderId = null, string? senderAddress = null)
+    {
+        List<string> values = [];
+        void Add(string key, string? value) { if (!string.IsNullOrEmpty(value)) values.Add($"{key}={Uri.EscapeDataString(value)}"); }
+        Add("account", accountId); Add("folder", folderFullName); Add("accountFolder", accountFolderId); Add("sender", senderAddress);
+        return RoutePath + (values.Count == 0 ? "" : "?" + string.Join("&", values));
+    }
 }

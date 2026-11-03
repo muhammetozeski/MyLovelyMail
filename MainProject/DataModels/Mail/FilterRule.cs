@@ -9,7 +9,8 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         BodyPreview,
         SenderDomain,
         SizeKb,
-        HasAttachment
+        HasAttachment,
+        FromAddress
     }
 
     /// <summary>How the condition compares its value. Numeric operators apply to SizeKb only.</summary>
@@ -47,7 +48,12 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         SetNotificationSound,
         /// <summary>Argument: tag name added to the message.</summary>
         AddTag,
-        Flag
+        Flag,
+        MarkUnread,
+        ClearImportant,
+        Unflag,
+        Unmute,
+        RemoveTag
     }
 
     /// <summary>
@@ -69,10 +75,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
     }
 
     /// <summary>
-    /// One user-defined mail rule: conditions combined by <see cref="MatchMode"/>, applied to
-    /// incoming mail of one account (or all accounts when <see cref="AccountId"/> is empty),
-    /// executing every action in order. <see cref="StopProcessing"/> ends the rule chain for a
-    /// message, mirroring classic mail-client rule semantics.
+    /// One scoped incoming-mail rule. Scope priority precedes saved order; the first matching
+    /// action in each conflicting family wins. <see cref="StopProcessing"/> ends remaining rules
+    /// at this and lower priorities. Conditions combine using <see cref="MatchMode"/>.
     /// </summary>
     public class FilterRule
     {
@@ -82,6 +87,15 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         /// <summary>Empty applies the rule to every account.</summary>
         public string AccountId { get; set; } = string.Empty;
+
+        /// <summary>Exact sender mailbox, matched without its display name. Empty inherits the broader scope.</summary>
+        public string SenderAddress { get; set; } = string.Empty;
+
+        /// <summary>Account-container folder ID; includes descendant containers. Deleted IDs match nothing.</summary>
+        public string AccountFolderId { get; set; } = string.Empty;
+
+        /// <summary>Exact source mailbox path. Requires AccountId and is evaluated before any move.</summary>
+        public string FolderFullName { get; set; } = string.Empty;
 
         public FilterMatchMode MatchMode { get; set; } = FilterMatchMode.All;
         public List<FilterCondition> Conditions { get; set; } = [];

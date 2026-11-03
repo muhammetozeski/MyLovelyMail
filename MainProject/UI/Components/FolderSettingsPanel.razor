@@ -1,4 +1,5 @@
 @* Both settings pages edit the same scopes that the folder menu and notifications read. *@
+@inject NavigationManager Navigation
 <section id="folder-settings">
 <GlassCard CustomClass="settings-section">
     <div class="settings-section-title">📂 Folder settings</div>
@@ -11,6 +12,10 @@
         var effective = FolderSettingsStore.Resolve(folder.Role, AccountId, folder.FullName);
         <details class="folder-settings-entry" open="@(folder.FullName == SelectedFolder)" @key="folder.FullName">
             <summary>@FolderLabel(folder) <span class="folder-settings-state">@MuteStatus(effective)</span></summary>
+            @if (AccountId != null && folder.Selectable)
+            {
+                <SecondaryButton OnClick="() => Navigation.NavigateTo(FilterRules.LinkFor(AccountId, folder.FullName))">🧹 Filters for this folder</SecondaryButton>
+            }
             @if (folder.Role == FolderRole.Trash)
             {
                 <p class="settings-empty-text">Trash never sends new-mail notifications or displays unread badges.</p>

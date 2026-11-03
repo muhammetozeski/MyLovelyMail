@@ -15,7 +15,7 @@ public partial class Mail
     internal enum FolderMenuAction
     {
         Open, Sync, Backfill, Resync, Export, SearchUnread,
-        Settings, AccountSettings, GlobalSettings, ToggleUnreadBadge, ResetPreferences
+        Settings, Filters, AccountSettings, GlobalSettings, ToggleUnreadBadge, ResetPreferences
     }
 
     /// <summary>Captures the right-clicked folder without changing the selected mailbox.</summary>
@@ -47,6 +47,7 @@ public partial class Mail
             new("📖 Mark all cached mail read", () => MouseActionService.ReadFolderAsync(folder), folder.Selectable),
             Action("🔍 Find unread mail", FolderMenuAction.SearchUnread, folder.Selectable),
             Action("📦 Export folder as .mbox", FolderMenuAction.Export, folder.Selectable),
+            Action("🧹 Filters for this folder", FolderMenuAction.Filters, folder.Selectable),
             Action("⚙️ Folder settings", FolderMenuAction.Settings),
             Action("👤 Account settings", FolderMenuAction.AccountSettings),
             Action("🌍 Global folder defaults", FolderMenuAction.GlobalSettings),
@@ -99,6 +100,7 @@ public partial class Mail
                 case FolderMenuAction.Settings:
                     Navigation.NavigateTo($"{AccountSettingsPage.RouteFor(folder.AccountId)}?folder={Uri.EscapeDataString(folder.FullName)}#folder-settings");
                     break;
+                case FolderMenuAction.Filters: Navigation.NavigateTo(FilterRules.LinkFor(folder.AccountId, folder.FullName)); break;
                 case FolderMenuAction.AccountSettings: Navigation.NavigateTo(AccountSettingsPage.RouteFor(folder.AccountId)); break;
                 case FolderMenuAction.GlobalSettings: Navigation.NavigateTo($"{NavigationConstants.Settings.Link}#folder-settings"); break;
                 case FolderMenuAction.ToggleUnreadBadge:
