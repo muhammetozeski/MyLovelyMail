@@ -56,9 +56,13 @@ $versionTag = "v{0:D3}" -f $versionNumber
 $staging = Join-Path $DeployRoot "PendingUpdate\AppData"
 Send-DirToRecycleBin $staging
 Write-Host "Publishing $Tfm / $Rid ($versionTag) into staging..." -ForegroundColor Cyan
-dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained true -p:SkipAndroidTargets=true -p:FreezeBuildInfo=true -o $staging
+dotnet publish $MauiCsproj -f $Tfm -r $Rid -c Release --self-contained true -p:SkipAndroidTargets=true -o $staging
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 if (-not (Test-Path "$staging\MyLovelyMail.exe")) { throw "Published exe not found in staging." }
+& 'C:\E\kp\aaBenimProgramlarim\Imza\Imzala.ps1' (Join-Path $staging 'MyLovelyMail.exe')
+if ($LASTEXITCODE -ne 0 -or (Get-AuthenticodeSignature -LiteralPath (Join-Path $staging 'MyLovelyMail.exe')).Status -ne 'Valid') {
+    throw 'The staged Windows executable must have a valid signature before deployment.'
+}
 
 # ── Archive copy for inspection/rollback ──
 $keptVersions = 2
@@ -101,6 +105,10 @@ if (Test-DeployedAppRunning $DeployRoot) {
 # ── Build the launcher (applies pending updates, migrates old vNNN user data once, starts the app) ──
 $iconSourceExe = if (Test-Path "$liveAppData\MyLovelyMail.exe") { "$liveAppData\MyLovelyMail.exe" } else { Join-Path $versionsDir "$versionTag\AppData\MyLovelyMail.exe" }
 & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $DeployRoot -IconSourceExe $iconSourceExe -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
+& 'C:\E\kp\aaBenimProgramlarim\Imza\Imzala.ps1' (Join-Path $DeployRoot 'MyLovelyMail.exe')
+if ($LASTEXITCODE -ne 0 -or (Get-AuthenticodeSignature -LiteralPath (Join-Path $DeployRoot 'MyLovelyMail.exe')).Status -ne 'Valid') {
+    throw 'The Windows launcher signature is invalid.'
+}
 
 Write-Host "Export ready: $DeployRoot ($versionTag)" -ForegroundColor Green
 $DeployRoot

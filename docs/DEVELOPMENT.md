@@ -32,7 +32,7 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 
 Reader cache keys include account, folder and message number. Message numbers alone are not unique across folders. Body loads also carry a generation number so a delayed result cannot replace a newer load. Remote-image permission uses the same complete message identity.
 
-The reader document supplies `<base target="_blank">` so ordinary anchors reach BlazorWebView's
+For ordinary accounts, the reader document supplies `<base target="_blank">` so ordinary anchors reach BlazorWebView's
 [built-in external navigation](https://learn.microsoft.com/en-us/aspnet/core/blazor/hybrid/routing?view=aspnetcore-10.0).
 The frame permits popups to escape its sandbox and user-activated top navigation, while scripts
 remain disabled. A frame with only `allow-same-origin` blocks links targeting a new or parent
