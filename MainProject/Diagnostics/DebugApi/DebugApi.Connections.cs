@@ -422,7 +422,7 @@ public static partial class DebugApi
                     Subject = gToMSubject,
                     Body = gToMBody
                 };
-                var outcome = await ComposeService.SendAsync(draft);
+                var outcome = await ComposeService.SendAsync(draft, cancellationToken);
                 if (outcome != SendOutcome.Sent)
                     throw new InvalidOperationException($"ComposeService.SendAsync returned {outcome} (LastFailure: {OutboxService.LastFailure?.Reason})");
                 return (outcome, $"Sent '{gToMSubject}' from '{guerrillaAccount.EmailAddress}' to '{mailTmAccount.EmailAddress}', route='{SyncHealthService.For(guerrillaAccount.Id).LastRoute}'");
@@ -465,7 +465,7 @@ public static partial class DebugApi
                     Subject = mToGSubject,
                     Body = mToGBody
                 };
-                var outcome = await ComposeService.SendAsync(draft);
+                var outcome = await ComposeService.SendAsync(draft, cancellationToken);
                 if (outcome != SendOutcome.Sent)
                     throw new InvalidOperationException($"ComposeService.SendAsync returned {outcome} (LastFailure: {OutboxService.LastFailure?.Reason})");
                 return (outcome, $"Sent '{mToGSubject}' from '{mailTmAccount.EmailAddress}' to '{guerrillaAccount.EmailAddress}', route='{SyncHealthService.For(mailTmAccount.Id).LastRoute}'");
