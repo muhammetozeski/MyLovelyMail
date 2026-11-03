@@ -90,18 +90,24 @@ namespace MyLovelyMail.MainProject.Services.Tor
         /// <summary>Moves one isolation key onto a fresh circuit; the next connection takes a different path.</summary>
         public static int RotateCircuit(string isolationKey)
         {
-            InvalidateExitLease(isolationKey);
             int epoch = circuitEpochs.AddOrUpdate(isolationKey, 2, static (_, current) => current + 1);
             Log($"Tor circuit rotated for '{isolationKey}' (epoch {epoch}).");
             return epoch;
         }
 
         /// <summary>
-        /// The SOCKS login that pins this key to its own circuit. Tor never checks these; the pair
-        /// is an isolation token, which is why the "password" is just the epoch counter.
+        /// A fresh, never-reused SOCKS login for exactly one TCP stream. Tor puts streams with
+        /// different username/password pairs on different circuits (IsolateSOCKSAuth is on by
+        /// default on every SocksPort, external tor and Tor Browser included), so every connection
+        /// gets its own circuit. A per-account login made all connections of one account share a
+        /// circuit and an exit IP, tying the inbox poll, the DNS lookup and the outgoing delivery
+        /// of the same mailbox together. The values are random and carry no account id.
+        /// Circuit isolation does not require or imply distinct exit IP addresses.
         /// </summary>
-        public static NetworkCredential IsolationCredentials(string isolationKey) =>
-            new($"mlm-{isolationKey}", CircuitEpochOf(isolationKey).ToString());
+        public static NetworkCredential NewStreamCredentials() =>
+            new(System.Security.Cryptography.RandomNumberGenerator.GetHexString(32, lowercase: true),
+                System.Security.Cryptography.RandomNumberGenerator.GetHexString(32, lowercase: true));
+
 
         #endregion
 
@@ -379,17 +385,13 @@ namespace MyLovelyMail.MainProject.Services.Tor
         #region Proxy clients
 
         /// <summary>
-        /// The proxy MailKit connects through. Two implementations answer the same endpoint:
-        /// MailKit's own (used first — it is the one with the miles on it) and
-        /// <see cref="TorSocks5Client"/>. Both send the host name to Tor as DOMAINNAME, so neither
-        /// resolves the mail server on this machine.
+        /// The proxy MailKit connects through. The app's SOCKS client requires authenticated
+        /// isolation and sends host names to Tor as DOMAINNAME without local name resolution.
         /// </summary>
-        public static IProxyClient CreateProxy(TorEndpoint endpoint, string isolationKey, bool useOwnClient)
+        public static IProxyClient CreateProxy(TorEndpoint endpoint, NetworkCredential credentials)
         {
-            var credentials = IsolationCredentials(isolationKey);
-            return useOwnClient
-                ? new TorSocks5Client(endpoint.Host, endpoint.Port, credentials)
-                : new Socks5Client(endpoint.Host, endpoint.Port, credentials);
+            // This client requires SOCKS authentication instead of accepting no-auth fallback.
+            return new TorSocks5Client(endpoint.Host, endpoint.Port, credentials);
         }
 
         #endregion

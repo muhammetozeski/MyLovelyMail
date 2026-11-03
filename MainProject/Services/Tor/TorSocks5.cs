@@ -79,7 +79,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         {
             byte[] greeting = credentials == null
                 ? [Version, 1, MethodNoAuth]
-                : [Version, 2, MethodUsernamePassword, MethodNoAuth];
+                : [Version, 1, MethodUsernamePassword];
 
             await stream.WriteAsync(greeting, cancellationToken);
             await stream.FlushAsync(cancellationToken);
@@ -92,7 +92,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
             switch (selection[1])
             {
-                case MethodNoAuth:
+                case MethodNoAuth when credentials == null:
                     return;
 
                 case MethodUsernamePassword when credentials != null:
@@ -111,7 +111,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
         {
             byte[] user = Encoding.UTF8.GetBytes(credentials.UserName ?? string.Empty);
             byte[] password = Encoding.UTF8.GetBytes(credentials.Password ?? string.Empty);
-            if (user.Length > 255 || password.Length > 255)
+            if (user.Length is 0 or > 255 || password.Length is 0 or > 255)
                 throw new SocksProtocolException("SOCKS5 username/password authentication allows at most 255 bytes each.");
 
             var request = new List<byte>(3 + user.Length + password.Length) { UsernamePasswordVersion, (byte)user.Length };
@@ -124,7 +124,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
             byte[] reply = new byte[2];
             await stream.ReadExactlyAsync(reply, cancellationToken);
-            if (reply[1] != 0x00)
+            if (reply[0] != UsernamePasswordVersion || reply[1] != 0x00)
                 throw new SocksProtocolException($"The proxy rejected the SOCKS5 username/password login (status 0x{reply[1]:X2}).");
         }
 
@@ -145,7 +145,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
             }
             else
             {
-                byte[] name = Encoding.ASCII.GetBytes(host);
+                byte[] name = Encoding.ASCII.GetBytes(new System.Globalization.IdnMapping().GetAscii(host));
                 if (name.Length is 0 or > MaxDomainLength)
                     throw new SocksProtocolException($"'{host}' does not fit in a SOCKS5 DOMAINNAME field.");
                 request.Add(AddressTypeDomain);
@@ -164,6 +164,8 @@ namespace MyLovelyMail.MainProject.Services.Tor
 
             if (head[0] != Version)
                 throw new SocksProtocolException($"The proxy answered with SOCKS version 0x{head[0]:X2}, not SOCKS5.");
+            if (head[2] != 0)
+                throw new SocksProtocolException("The proxy returned a non-zero SOCKS5 reserved byte.");
             if (head[1] != ReplySucceeded)
                 throw new SocksReplyException(head[1], $"The proxy refused: {DescribeReply(head[1])}.");
 

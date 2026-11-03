@@ -39,7 +39,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 await socket.ConnectAsync(endpoint.Host, endpoint.Port, budget.Token);
                 await using var stream = new NetworkStream(socket, ownsSocket: false);
 
-                await TorSocks5.HandshakeAsync(stream, IsolationCredentials("verify"), budget.Token);
+                await TorSocks5.HandshakeAsync(stream, NewStreamCredentials(), budget.Token);
                 var address = await TorSocks5.SendRequestAsync(stream, TorSocks5.CommandTorResolve, probeHost, 0, budget.Token);
 
                 return LastVerification = new TorVerification(true,

@@ -109,7 +109,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
                     WorkingDirectory = Path.GetDirectoryName(executable.Path) ?? activeDataDirectory
                 };
 
-                // IsolateSOCKSAuth is tor's default and is what makes the per-account SOCKS credentials
+                // IsolateSOCKSAuth is tor's default and is what makes the per-connection SOCKS credentials
                 // land on separate circuits; it is spelled out so a machine-wide torrc cannot turn the
                 // isolation off underneath us.
                 startInfo.ArgumentList.Add("--SocksPort");

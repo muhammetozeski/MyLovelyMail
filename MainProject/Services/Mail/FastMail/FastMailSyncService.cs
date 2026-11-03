@@ -188,12 +188,9 @@ public static class FastMailSyncService
     static void RecordRoute(MailAccountData account, IFastMailProvider provider)
     {
         var endpoint = TorService.Current;
-        string exitInfo = TorService.ActiveExitLeases.TryGetValue(account.Id, out var lease)
-            ? $", exit {lease.ExitIp}"
-            : string.Empty;
         SyncHealthService.MarkRoute(
             account.Id,
-            $"{endpoint?.ToString() ?? "Tor SOCKS5"} via {provider.DisplayName} HTTPS (circuit {TorService.CircuitEpochOf(account.Id)}{exitInfo})");
+            $"{endpoint?.ToString() ?? "Tor SOCKS5"} via {provider.DisplayName} HTTPS (isolated connections)");
     }
 
     static async Task<string> ResolveRemoteIdAsync(MailAccountData account, IFastMailProvider provider, uint uid, CancellationToken cancellationToken)

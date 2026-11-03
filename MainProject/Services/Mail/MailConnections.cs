@@ -158,6 +158,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     throw;
                 }
 
+                if (client.ProxyClient is TorSocks5Client)
+                {
+                    client.AuthenticationMechanisms.Remove("NTLM");
+                    client.AuthenticationMechanisms.Remove("GSSAPI");
+                }
                 await client.AuthenticateAsync(username, password, cancellationToken);
                 Log($"{protocolName} connected: {host}:{port}");
                 return client;
@@ -187,9 +192,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <param name="Description">What is being tried, for the log line the user reads afterwards.</param>
         /// <param name="Rediscover">Re-run endpoint discovery instead of reusing the known SOCKS port.</param>
         /// <param name="StartOwnTor">Skip discovery and start a tor belonging to this app.</param>
-        /// <param name="OwnSocksClient">Use the app's SOCKS5 client instead of MailKit's.</param>
         /// <param name="FreshCircuit">Move this account onto a new Tor circuit first.</param>
-        sealed record TorRung(string Description, bool Rediscover, bool StartOwnTor, bool OwnSocksClient, bool FreshCircuit);
+        sealed record TorRung(string Description, bool Rediscover, bool StartOwnTor, bool FreshCircuit);
 
         /// <summary>
         /// Ordered cheapest-and-likeliest first. Each rung changes exactly one thing about the
@@ -198,12 +202,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         static readonly TorRung[] TorLadder =
         [
-            new("the known Tor endpoint", Rediscover: false, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: false),
-            new("a fresh Tor circuit", Rediscover: false, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: true),
-            new("the app's own SOCKS5 client on a fresh circuit", Rediscover: false, StartOwnTor: false, OwnSocksClient: true, FreshCircuit: true),
-            new("a rediscovered Tor endpoint", Rediscover: true, StartOwnTor: false, OwnSocksClient: false, FreshCircuit: true),
-            new("a rediscovered endpoint with the app's own SOCKS5 client", Rediscover: true, StartOwnTor: false, OwnSocksClient: true, FreshCircuit: true),
-            new("a tor started by this app", Rediscover: false, StartOwnTor: true, OwnSocksClient: false, FreshCircuit: true)
+            new("the known Tor endpoint", Rediscover: false, StartOwnTor: false, FreshCircuit: false),
+            new("a fresh Tor circuit", Rediscover: false, StartOwnTor: false, FreshCircuit: true),
+            new("a rediscovered Tor endpoint", Rediscover: true, StartOwnTor: false, FreshCircuit: true),
+            new("a tor started by this app", Rediscover: false, StartOwnTor: true, FreshCircuit: true)
         ];
 
         /// <summary>
@@ -319,12 +321,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 ? await TorService.StartAppManagedAsync(cancellationToken)
                 : await TorService.RequireEndpointAsync(cancellationToken, rung.Rediscover);
 
-            await TorService.EnsureUniqueExitIpAsync(endpoint, account.Id, cancellationToken);
+            // Fresh SOCKS credentials for this one connection: its own circuit, never shared with
+            // another connection of this account (or any other). No third-party exit-IP probe.
+            var streamCredentials = TorService.NewStreamCredentials();
 
             var client = createClient();
             try
             {
-                client.ProxyClient = TorService.CreateProxy(endpoint, account.Id, rung.OwnSocksClient);
+                client.ProxyClient = TorService.CreateProxy(endpoint, streamCredentials);
                 client.Timeout = TorClientTimeoutMs;
                 client.CheckCertificateRevocation = TorRevocationCheck;
                 RequireTunnel(client, account);
@@ -368,15 +372,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         public static Task<ImapClient> OpenImapAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(static () => new ImapClient(), "IMAP", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+            OpenAsync(() => account.TorOnly ? new TorImapClient() : new ImapClient(), "IMAP", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
                 account.IncomingUsername, account, passwordOverride, cancellationToken);
 
         public static Task<Pop3Client> OpenPop3Async(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(static () => new Pop3Client(), "POP3", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
+            OpenAsync(() => account.TorOnly ? new TorPop3Client() : new Pop3Client(), "POP3", account.IncomingHost, account.IncomingPort, account.IncomingSecurity,
                 account.IncomingUsername, account, passwordOverride, cancellationToken);
 
         public static Task<SmtpClient> OpenSmtpAsync(MailAccountData account, CancellationToken cancellationToken, string? passwordOverride = null) =>
-            OpenAsync(static () => new SmtpClient(), "SMTP", account.SmtpHost, account.SmtpPort, account.SmtpSecurity,
+            // EHLO is sent inside ConnectAsync, so the name must be set before it: left null, MailKit
+            // announces this computer's host name to the server — through Tor, but by name.
+            OpenAsync(() => account.TorOnly ? new TorSmtpClient { LocalDomain = TorSmtpClient.EhloDomainFor(account.EmailAddress) } : new SmtpClient(),
+                "SMTP", account.SmtpHost, account.SmtpPort, account.SmtpSecurity,
                 string.IsNullOrWhiteSpace(account.SmtpUsername) ? account.IncomingUsername : account.SmtpUsername,
                 account, passwordOverride, cancellationToken);
     }

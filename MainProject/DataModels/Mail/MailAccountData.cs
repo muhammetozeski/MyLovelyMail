@@ -103,7 +103,12 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// Tor rather than by this machine, and remote content in its mail is never fetched.
         /// Fast Mail accounts permanently enforce <c>TorOnly = true</c>.
         /// </summary>
-        public bool TorOnly { get; set; }
+        bool torOnly;
+        public bool TorOnly
+        {
+            get => torOnly || Protocol == IncomingProtocol.FastMail;
+            set => torOnly = value;
+        }
 
         /// <summary>Accent color of this account in the UI (folder dot, avatar ring).</summary>
         public string ColorHex { get; set; } = AppColors.IdentityPalette[0];

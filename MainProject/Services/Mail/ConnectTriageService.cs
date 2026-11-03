@@ -131,6 +131,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             if (diagnosis.Kind is DiagnosisKind.AuthenticationRejected or DiagnosisKind.HostNotFound or DiagnosisKind.Ok)
                 return diagnosis;
+            if (MailConnections.IsOnionHost(host) && account is not { TorOnly: true })
+                return diagnosis;
 
             TorEndpoint? torEndpoint = null;
             if (account is { TorOnly: true })
@@ -148,7 +150,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             foreach (var (port, security) in CandidatesFor(protocol, account, host))
             {
-                if (!await AnswersAsync(protocol, host, port, security, torEndpoint, IsolationKeyFor(account, host), cancellationToken)) continue;
+                if (!await AnswersAsync(protocol, host, port, security, torEndpoint, IsolationKeyFor(account, host), TorSmtpClient.EhloDomainFor(account?.EmailAddress), cancellationToken)) continue;
 
                 Log($"Connect probe: {host} answers on {port} ({security}).");
                 return diagnosis with
@@ -162,7 +164,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         static async Task<bool> AnswersAsync(MailProtocol protocol, string host, int port, ConnectionSecurity security,
-            TorEndpoint? torEndpoint, string isolationKey, CancellationToken cancellationToken)
+            TorEndpoint? torEndpoint, string isolationKey, string ehloDomain, CancellationToken cancellationToken)
         {
             var options = security switch
             {
@@ -181,20 +183,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 {
                     case MailProtocol.Imap:
                     {
-                        using var client = new ImapClient();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
+                        using var client = torEndpoint != null ? new TorImapClient() : new ImapClient();
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, ehloDomain, budget.Token);
                         return true;
                     }
                     case MailProtocol.Pop3:
                     {
-                        using var client = new Pop3Client();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
+                        using var client = torEndpoint != null ? new TorPop3Client() : new Pop3Client();
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, ehloDomain, budget.Token);
                         return true;
                     }
                     default:
                     {
-                        using var client = new SmtpClient();
-                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, budget.Token);
+                        // EHLO goes out inside ConnectAsync; a null LocalDomain would announce this computer's name.
+                        using var client = torEndpoint != null ? new TorSmtpClient { LocalDomain = ehloDomain } : new SmtpClient();
+                        await ProbeWithAsync(client, host, port, options, torEndpoint, isolationKey, ehloDomain, budget.Token);
                         return true;
                     }
                 }
@@ -208,11 +211,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         /// <summary>Connect, disconnect — through Tor when an endpoint was handed in, and never any other way.</summary>
         static async Task ProbeWithAsync(MailService client, string host, int port, SecureSocketOptions options,
-            TorEndpoint? torEndpoint, string isolationKey, CancellationToken cancellationToken)
+            TorEndpoint? torEndpoint, string isolationKey, string ehloDomain, CancellationToken cancellationToken)
         {
             if (torEndpoint != null)
             {
-                client.ProxyClient = TorService.CreateProxy(torEndpoint, isolationKey, useOwnClient: false);
+                client.ProxyClient = TorService.CreateProxy(torEndpoint, TorService.NewStreamCredentials());
                 // Same reason as the connection path: online revocation is fetched by the OS,
                 // outside the proxy, so leaving it on would send the server's certificate serial
                 // to the CA in the clear from a probe run on the account's behalf.
