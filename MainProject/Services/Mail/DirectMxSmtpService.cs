@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text.Json;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -18,8 +19,7 @@ namespace MyLovelyMail.MainProject.Services.Mail;
 /// the message is delivered directly to the recipient's MX server on port 25 over Tor.
 /// </para>
 /// <para>
-/// Supports both STARTTLS-capable and plain-SMTP MX servers (<see cref="SecureSocketOptions.StartTlsWhenAvailable"/>
-/// with fallback to <see cref="SecureSocketOptions.None"/> if a server advertises a broken TLS stack),
+/// Requires STARTTLS and a valid server certificate; there is no cleartext or invalid-certificate fallback.
 /// scrubs local machine hostnames and local timezone offsets from headers and <c>EHLO</c>, and
 /// automatically rotates the account's Tor circuit when an exit relay blocks port 25.
 /// </para>
@@ -37,28 +37,72 @@ public static class DirectMxSmtpService
     ];
 
     /// <summary>
-    /// Scrubs identifying metadata (local machine name in <c>Message-Id</c>, local timezone offset
-    /// in <c>Date</c>, and client headers) and returns the sender's domain for <c>EHLO</c>.
+    /// Scrubs identifying metadata and returns the sender's domain for <c>EHLO</c>:
+    /// <list type="bullet">
+    /// <item><c>Message-Id</c>: 128 random bits at the sender's domain (no host name, process id, counter or clock).</item>
+    /// <item><c>Date</c>: UTC (+0000), without the computer's local timezone offset.</item>
+    /// <item>Client headers (X-Mailer, User-Agent, X-Originating-IP, X-MimeOLE, Thread-Index, X-MS-*) removed.</item>
+    /// <item>Every MIME part: Content-Disposition creation/modification/read dates (local file times in the local offset) removed;
+    /// every multipart boundary replaced by a random one without the library's recognisable prefix.</item>
+    /// </list>
+    /// Applied right before every anonymous send, so a message retried from the Outbox gets fresh values too.
     /// </summary>
     public static string SanitizeMessageForAnonymity(MailAccountData account, MimeMessage message)
     {
-        if (message.From.Count == 0)
-            message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
+        message.From.Clear();
+        message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
+        message.Sender = null;
 
         string senderEmail = message.From.Mailboxes.FirstOrDefault()?.Address ?? account.EmailAddress;
         string senderDomain = ExtractDomain(senderEmail, "mail.tm");
 
-        // Always use UTC (+00:00) so the local system timezone is never disclosed in the Date header.
-        message.Date = new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero);
+        message.Date = DateTimeOffset.UtcNow;
 
-        // Always generate a Message-Id scoped to the sender domain so Environment.MachineName never leaks.
-        message.MessageId = $"{Guid.NewGuid():N}@{senderDomain}";
+        message.MessageId = $"{RandomNumberGenerator.GetHexString(32, lowercase: true)}@{senderDomain}";
 
         message.Headers.RemoveAll(HeaderId.XMailer);
         message.Headers.RemoveAll(HeaderId.UserAgent);
         message.Headers.RemoveAll("X-Originating-IP");
+        message.Headers.RemoveAll("X-MimeOLE");
+        message.Headers.RemoveAll("Thread-Index");
+        message.Headers.RemoveAll("Thread-Topic");
+        foreach (var header in message.Headers.Where(static h => h.Field.StartsWith("X-", StringComparison.OrdinalIgnoreCase)
+            || h.Field.StartsWith("Resent-", StringComparison.OrdinalIgnoreCase)
+            || h.Field.StartsWith("ARC-", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("Received", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("Return-Path", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("Authentication-Results", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("DKIM-Signature", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("Disposition-Notification-To", StringComparison.OrdinalIgnoreCase)
+            || h.Field.Equals("Return-Receipt-To", StringComparison.OrdinalIgnoreCase)).ToList())
+            message.Headers.Remove(header);
+
+        if (message.Body != null)
+            ScrubEntity(message.Body);
 
         return senderDomain;
+    }
+
+    static void ScrubEntity(MimeEntity entity)
+    {
+        if (entity.ContentDisposition is { } disposition)
+        {
+            disposition.CreationDate = null;
+            disposition.ModificationDate = null;
+            disposition.ReadDate = null;
+            disposition.Size = null;
+        }
+
+        switch (entity)
+        {
+            case Multipart multipart:
+                multipart.Boundary = $"----=_Part_{RandomNumberGenerator.GetHexString(24, lowercase: true)}";
+                foreach (var child in multipart)
+                    ScrubEntity(child);
+                break;
+            // A forwarded message is user content; changing its body would break its original
+            // cryptographic authentication. Only its outer attachment disposition is normalized.
+        }
     }
 
     public static async Task SendAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken = default)
@@ -78,7 +122,7 @@ public static class DirectMxSmtpService
         if (allRecipients.Count == 0)
             throw new InvalidOperationException("No recipient addresses specified on the outgoing message.");
 
-        Log($"DirectMxSmtpService.SendAsync started: from='{senderMailbox.Address}' (EHLO '{senderDomain}'), recipients=[{string.Join(", ", allRecipients.Select(r => r.Address))}], subject='{message.Subject}'", Run: IsLogEnabled);
+        Log($"DirectMxSmtpService.SendAsync started: recipientCount={allRecipients.Count}.", Run: IsLogEnabled);
 
         var byDomain = allRecipients
             .GroupBy(static m => ExtractDomain(m.Address, string.Empty), StringComparer.OrdinalIgnoreCase)
@@ -96,7 +140,7 @@ public static class DirectMxSmtpService
             await DeliverToDomainOverTorAsync(account, senderDomain, senderMailbox, domainRecipients, mxHosts, message, cancellationToken);
         }
 
-        Log($"DirectMxSmtpService.SendAsync finished in {sw.ElapsedMilliseconds}ms for subject='{message.Subject}'.", Run: IsLogEnabled);
+        Log($"DirectMxSmtpService.SendAsync finished in {sw.ElapsedMilliseconds}ms.", Run: IsLogEnabled);
     }
 
     /// <summary>
@@ -124,44 +168,11 @@ public static class DirectMxSmtpService
                 }
 
                 string json = await resp.Content.ReadAsStringAsync(cancellationToken);
-                using var doc = JsonDocument.Parse(json);
-                if (!doc.RootElement.TryGetProperty("Answer", out var answers) || answers.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                var parsed = new List<(int Preference, string Host)>();
-                foreach (var ans in answers.EnumerateArray())
-                {
-                    if (ans.TryGetProperty("type", out var typeProp) && typeProp.TryGetInt32(out int rrType) && rrType != 15)
-                        continue;
-
-                    string? data = ans.TryGetProperty("data", out var dataProp) ? dataProp.GetString() : null;
-                    if (string.IsNullOrWhiteSpace(data)) continue;
-
-                    string[] parts = data.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2 && int.TryParse(parts[0], out int pref))
-                    {
-                        string host = parts[1].TrimEnd('.');
-                        if (!string.IsNullOrWhiteSpace(host) && host != ".")
-                            parsed.Add((pref, host));
-                    }
-                    else if (parts.Length == 1)
-                    {
-                        string host = parts[0].TrimEnd('.');
-                        if (!string.IsNullOrWhiteSpace(host) && host != ".")
-                            parsed.Add((10, host));
-                    }
-                }
-
-                if (parsed.Count > 0)
-                {
-                    var hosts = parsed
-                        .OrderBy(static x => x.Preference)
-                        .Select(static x => x.Host)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    Log($"DoH MX lookup via '{endpoint}' for '{domain}' succeeded in {sw.ElapsedMilliseconds}ms: [{string.Join(", ", hosts)}]", Run: IsLogEnabled);
-                    return hosts;
-                }
+                return ParseMxResponse(domain, json);
+            }
+            catch (MxDeliveryRefusedException)
+            {
+                throw;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -173,8 +184,39 @@ public static class DirectMxSmtpService
             }
         }
 
-        Log($"DoH MX lookup for '{domain}' found no MX records; falling back to A/AAAA host '{domain}'.", LogLevel.Warning, Run: IsLogEnabled);
-        return [domain];
+        Log("MX lookup failed through all Tor DNS-over-HTTPS routes.", LogLevel.Warning, Run: IsLogEnabled);
+        throw new IOException("No DNS-over-HTTPS resolver returned a successful MX response.");
+    }
+
+    sealed class MxDeliveryRefusedException(string message) : InvalidOperationException(message);
+
+    /// <summary>Distinguishes a successful implicit MX answer from a DNS failure or explicit null MX.</summary>
+    internal static IReadOnlyList<string> ParseMxResponse(string domain, string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("Status", out var status) || !status.TryGetInt32(out int code))
+            throw new JsonException("The DNS resolver returned no status.");
+        if (code == 3) throw new MxDeliveryRefusedException("The recipient domain does not exist.");
+        if (code != 0) throw new IOException($"The DNS resolver returned status {code}.");
+        if (!root.TryGetProperty("Answer", out var answers)) return [domain];
+        if (answers.ValueKind != JsonValueKind.Array) throw new JsonException("Invalid DNS answer list.");
+        var hosts = new List<(int Preference, string Host)>();
+        foreach (var answer in answers.EnumerateArray())
+        {
+            if (!answer.TryGetProperty("type", out var type) || !type.TryGetInt32(out int rrType))
+                throw new JsonException("A DNS answer has no record type.");
+            if (rrType != 15) continue;
+            string[] parts = (answer.GetProperty("data").GetString() ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || !ushort.TryParse(parts[0], out ushort preference))
+                throw new JsonException("Invalid MX record.");
+            if (parts[1] == ".") throw new MxDeliveryRefusedException("The recipient domain explicitly does not accept mail (null MX).");
+            string host = parts[1].TrimEnd('.');
+            if (Uri.CheckHostName(host) != UriHostNameType.Dns) throw new JsonException("Invalid MX hostname.");
+            hosts.Add((preference, host));
+        }
+        return hosts.Count == 0 ? [domain] : hosts.OrderBy(static h => h.Preference).Select(static h => h.Host)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     static async Task DeliverToDomainOverTorAsync(
@@ -200,21 +242,22 @@ public static class DirectMxSmtpService
             {
                 bool exitNodeBlockedPort25 = false;
 
-                // Try StartTlsWhenAvailable first; if the server has a broken TLS implementation, also try plain port 25.
-                foreach (var tlsMode in new[] { SecureSocketOptions.StartTlsWhenAvailable, SecureSocketOptions.None })
+                // Require authenticated TLS: a Tor exit must not read or modify the message.
+                foreach (var tlsMode in new[] { SecureSocketOptions.StartTls })
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var attemptSw = Stopwatch.StartNew();
 
-                    using var smtp = new SmtpClient
+                    // Every attempt — each MX host, each TLS mode, each rotation — on its own fresh
+                    // circuit: never the circuit of the inbox poll, the DoH lookup or another domain.
+                    var streamCredentials = TorService.NewStreamCredentials();
+
+                    using var smtp = new TorSmtpClient
                     {
                         Timeout = 35_000,
                         CheckCertificateRevocation = false,
-                        // Opportunistic TLS on port 25 (RFC 7435): many MX servers present self-signed or
-                        // umbrella host certificates; accept them rather than dropping to cleartext or failing.
-                        ServerCertificateValidationCallback = static (_, _, _, _) => true,
                         LocalDomain = senderDomain,
-                        ProxyClient = TorService.CreateProxy(endpoint, account.Id, useOwnClient: true)
+                        ProxyClient = TorService.CreateProxy(endpoint, streamCredentials)
                     };
 
                     using var stepBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -227,12 +270,9 @@ public static class DirectMxSmtpService
                         await smtp.SendAsync(message, senderMailbox, recipients, stepBudget.Token);
                         await smtp.DisconnectAsync(true, stepBudget.Token);
 
-                        string exitInfo = TorService.ActiveExitLeases.TryGetValue(account.Id, out var lease)
-                            ? $", exit {lease.ExitIp}"
-                            : string.Empty;
                         SyncHealthService.MarkRoute(
                             account.Id,
-                            $"{endpoint} Direct-to-MX ({mxHost}:25, {tlsMode}, circuit {epoch}{exitInfo})");
+                            $"{endpoint} Direct-to-MX ({mxHost}:25, {tlsMode}, isolated connection)");
                         Log($"Direct-to-MX delivered to {mxHost}:25 over Tor ({tlsMode}, circuit {epoch}) in {attemptSw.ElapsedMilliseconds}ms for [{string.Join(", ", recipients.Select(r => r.Address))}].", Run: IsLogEnabled);
                         return;
                     }
@@ -247,13 +287,6 @@ public static class DirectMxSmtpService
                         Log($"Direct-to-MX: Tor circuit {epoch} exit policy blocked port 25 on {mxHost} ({socksEx.Message}); rotating circuit.", LogLevel.Warning, Run: IsLogEnabled);
                         exitNodeBlockedPort25 = true;
                         break;
-                    }
-                    catch (Exception ex) when (tlsMode == SecureSocketOptions.StartTlsWhenAvailable &&
-                                               ex is not (SocksReplyException or SocksProtocolException or SocketException or TimeoutException or OperationCanceledException))
-                    {
-                        attemptErrors.Add($"{mxHost} (STARTTLS, circuit {epoch}): {ex.Message}");
-                        Log($"Direct-to-MX: STARTTLS negotiation failed on {mxHost}:25 (circuit {epoch}), falling back to plain SMTP on same host:\n{ex}", LogLevel.Warning, Run: IsLogEnabled);
-                        // Fall through to SecureSocketOptions.None on the same MX host.
                     }
                     catch (Exception ex)
                     {

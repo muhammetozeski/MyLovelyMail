@@ -22,21 +22,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>1x1 transparent GIF replacing blocked remote images (keeps layout, loads nothing).</summary>
         const string BlockedImagePlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-        [GeneratedRegex(@"<script[\s\S]*?</script\s*>|<script[^>]*/>", RegexOptions.IgnoreCase)]
-        private static partial Regex ScriptBlocks();
-
-        [GeneratedRegex(@"<(object|embed|base|iframe|form|applet|meta)\b[^>]*>|</(object|embed|base|iframe|form|applet|meta)\s*>", RegexOptions.IgnoreCase)]
-        private static partial Regex ForbiddenTags();
-
-        [GeneratedRegex(@"\son\w+\s*=\s*(""[^""]*""|'[^']*'|[^\s>]+)", RegexOptions.IgnoreCase)]
-        private static partial Regex EventAttributes();
-
-        [GeneratedRegex(@"(href|src|action)\s*=\s*([""']?)\s*javascript:[^""'>\s]*\2", RegexOptions.IgnoreCase)]
-        private static partial Regex JavascriptUrls();
-
-        [GeneratedRegex(@"(<img\b[^>]*?\ssrc\s*=\s*)([""']?)(https?://[^""'>\s]+)\2", RegexOptions.IgnoreCase)]
-        private static partial Regex RemoteImageSources();
-
         /// <summary>
         /// The sanitized HTML document for the message, or null when the full body is not cached
         /// yet (caller downloads it first). Never throws — a broken MIME falls back to the preview.
@@ -56,7 +41,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 string body;
                 if (!string.IsNullOrWhiteSpace(message.HtmlBody))
                 {
-                    body = Sanitize(message.HtmlBody, message, blockRemote, ref blocked);
+                    body = SanitizeHtml(message.HtmlBody, message, blockRemote, account.TorOnly, ref blocked);
                     if (fold) body = FoldHtmlQuotes(body, ref folded);
                 }
                 else
@@ -64,7 +49,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     body = BuildPlainBody(message.TextBody ?? summary.PreviewText, fold, ref folded);
                 }
 
-                return new RenderedBody(WrapDocument(body, blockRemote), blocked, folded);
+                return new RenderedBody(WrapDocument(body, blockRemote, account.TorOnly), blocked, folded);
             }
             catch (Exception ex)
             {
@@ -81,7 +66,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Log($"Dropped the unreadable cached body of uid {summary.Uid}; it will be downloaded again.");
                     return null;
                 }
-                return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>", BlocksRemoteImages(account, allowRemoteImages)), false);
+                return new RenderedBody(WrapDocument($"<pre>{WebUtility.HtmlEncode(summary.PreviewText)}</pre>", BlocksRemoteImages(account, allowRemoteImages), account.TorOnly), false);
             }
         }
 
@@ -95,23 +80,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         static bool BlocksRemoteImages(MailAccountData account, bool allowRemoteImages) =>
             account.TorOnly || (!allowRemoteImages && Settings.ExternalImages.Value == ExternalImagesPolicy.Block);
-
-        static string Sanitize(string html, MimeMessage message, bool blockRemoteImages, ref bool blockedRemoteImages)
-        {
-            html = ScriptBlocks().Replace(html, string.Empty);
-            html = ForbiddenTags().Replace(html, string.Empty);
-            html = EventAttributes().Replace(html, string.Empty);
-            html = JavascriptUrls().Replace(html, "$1=$2about:blank$2");
-            html = InlineCidImages(html, message);
-
-            if (blockRemoteImages && RemoteImageSources().IsMatch(html))
-            {
-                blockedRemoteImages = true;
-                html = RemoteImageSources().Replace(html, $"$1$2{BlockedImagePlaceholder}$2");
-            }
-
-            return html;
-        }
 
         #region Quoted-history folding
 
@@ -170,23 +138,6 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         #endregion
 
-        /// <summary>Replaces cid: image references with data: URIs built from the message's own inline parts.</summary>
-        static string InlineCidImages(string html, MimeMessage message)
-        {
-            foreach (var part in message.BodyParts.OfType<MimePart>())
-            {
-                if (string.IsNullOrEmpty(part.ContentId)) continue;
-
-                using var buffer = new MemoryStream();
-                part.Content?.DecodeTo(buffer);
-                string dataUri = $"data:{part.ContentType.MimeType};base64,{Convert.ToBase64String(buffer.ToArray())}";
-                html = html
-                    .Replace($"cid:{part.ContentId}", dataUri, StringComparison.OrdinalIgnoreCase)
-                    .Replace($"cid:<{part.ContentId}>", dataUri, StringComparison.OrdinalIgnoreCase);
-            }
-            return html;
-        }
-
         /// <summary>Wraps the sanitized body in a minimal document whose colors come from <see cref="AppColors.MailCanvas"/>, the same source the iframe element uses.</summary>
         /// <summary>Design text size inside the reader, before <see cref="Settings.ReaderTextScalePercent"/>.</summary>
         const int BaseFontPx = 14;
@@ -217,7 +168,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             "<meta http-equiv=\"Content-Security-Policy\" content=\""
             // 'none' by default, so script, frame, object and connect are refused in every case —
             // the sanitizer already strips them, and this is the belt to that pair of braces.
-            + "default-src 'none'; "
+            + "default-src 'none'; base-uri 'none'; form-action 'none'; "
             + (blockRemoteContent
                 // data: only: the cid: parts are inlined as data URIs before this point, and the
                 // blocked-image placeholder is one too, so nothing legitimate needs the network.
@@ -226,12 +177,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 : "img-src data: https: http:; style-src 'unsafe-inline' https: http:; font-src data: https: http:; media-src data: https: http:")
             + "\">";
 
-        static string WrapDocument(string body, bool blockRemoteContent)
+        static string WrapDocument(string body, bool blockRemoteContent, bool anonymous)
         {
             int scale = Math.Clamp(Settings.ReaderTextScalePercent.Value, MinScalePercent, MaxScalePercent);
             int fontPx = BaseFontPx * scale / 100;
             // Ordinary hrefs use the host's built-in external navigation instead of replacing the reader frame.
-            return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<base target=\"_blank\"><style>" +
+            // No DNS prefetch of link hosts and no Referer: both would leave the machine outside Tor.
+            return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta name=\"referrer\" content=\"no-referrer\">" + (anonymous ? string.Empty : "<base target=\"_blank\">") + "<style>" +
                 $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
                 $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
                 // plaintext direction: an Arabic or Hebrew paragraph inside an otherwise

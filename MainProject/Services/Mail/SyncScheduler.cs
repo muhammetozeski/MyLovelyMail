@@ -1,5 +1,6 @@
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Stores;
+using System.Security.Cryptography;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -65,7 +66,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 int minutes = Math.Max(1, Settings.SyncIntervalMinutes.Value);
                 try
                 {
-                    await WaitBetweenPasses(TimeSpan.FromMinutes(minutes), cancellationToken);
+                    double factor = AccountStore.Accounts.Any(static a => a.Enabled && a.TorOnly)
+                        ? RandomNumberGenerator.GetInt32(700, 1301) / 1000.0 : 1;
+                    await WaitBetweenPasses(TimeSpan.FromMinutes(minutes * factor), cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -87,10 +90,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 // polling cycle even though nothing explicitly notifies this scheduler about them.
                 if (accountId == null) ImapIdleService.Refresh();
 
-                foreach (var account in AccountStore.Accounts.Where(account => accountId == null ? account.Enabled : account.Id == accountId))
+                var accounts = AccountStore.Accounts.Where(account => accountId == null ? account.Enabled : account.Id == accountId).ToArray();
+                if (accountId == null)
+                {
+                    var anonymous = accounts.Where(static a => a.TorOnly).ToArray();
+                    RandomNumberGenerator.Shuffle(anonymous.AsSpan());
+                    int index = 0;
+                    for (int i = 0; i < accounts.Length; i++)
+                        if (accounts[i].TorOnly) accounts[i] = anonymous[index++];
+                }
+                foreach (var account in accounts)
                 {
                     try
                     {
+                        if (accountId == null && account.TorOnly)
+                            await Task.Delay(RandomNumberGenerator.GetInt32(1000, 5001), cancellationToken);
                         SyncHealthService.MarkAttempt(account.Id);
                         if (account.Protocol == IncomingProtocol.Imap)
                             await ImapSyncService.SyncAccountAsync(account, cancellationToken);

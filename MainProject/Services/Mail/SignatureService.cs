@@ -122,7 +122,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// user's own code so its script and style run, but it runs in an opaque origin where it
         /// can reach neither the app nor any of their data.
         /// </summary>
-        public static string PreviewDocument(string signature, string? inputToken = null) =>
+        public static string PreviewDocument(string signature, string? inputToken = null, bool blockRemoteContent = false) =>
+            blockRemoteContent ? MailBodyRenderer.RenderAnonymousHtml(ToHtml(signature)) :
             "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
             + $"html,body{{margin:0;padding:12px;background:{AppColors.MailCanvas.Background};color:{AppColors.MailCanvas.Text};"
             + "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;}"

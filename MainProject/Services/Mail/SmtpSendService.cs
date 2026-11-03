@@ -12,6 +12,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
     {
         public static async Task SendAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken = default)
         {
+            using var operation = account.Protocol == IncomingProtocol.FastMail
+                ? await FastMail.FastMailAccountOperations.EnterAsync(account, cancellationToken) : null;
+            if (operation != null) cancellationToken = operation.Token;
+            await SendCoreAsync(account, message, cancellationToken);
+        }
+
+        internal static async Task SendCoreAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)
+        {
             if (message.From.Count == 0)
                 message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
 
@@ -19,7 +27,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             {
                 Log($"Direct-to-MX over Tor send started: {account.EmailAddress} -> {string.Join(", ", message.To.Mailboxes.Select(m => m.Address))}");
                 await DirectMxSmtpService.SendAsync(account, message, cancellationToken);
-                Log($"Direct-to-MX over Tor send finished: '{message.Subject}'");
+                Log("Direct-to-MX over Tor send finished.");
                 return;
             }
 
@@ -36,7 +44,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await client.SendAsync(message, ct);
                 await client.DisconnectAsync(true, ct);
             }, cancellationToken, account);
-            Log($"SMTP send finished: '{message.Subject}'");
+            Log(account.TorOnly ? "Anonymous SMTP send finished." : $"SMTP send finished: '{message.Subject}'");
         }
     }
 }

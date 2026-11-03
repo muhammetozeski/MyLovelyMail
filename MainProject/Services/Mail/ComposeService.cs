@@ -69,8 +69,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static void SaveDraft(ComposeDraft draft)
         {
             if (draft.Account is not { } account) return;
+            ProtectAnonymousDraft(draft, account);
 
-            var message = new MimeMessage();
+            var message = new MimeMessage { Date = DateTimeOffset.UtcNow, MessageId = BuildMessageId(account) };
             message.From.Add(new MailboxAddress(account.DisplayName, account.EmailAddress));
             message.Subject = draft.Subject;
             message.Headers.Add(DraftToHeader, draft.To);
@@ -153,7 +154,15 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>The signature as stored for this account — HTML when the user wrote HTML.</summary>
-        static string SignatureOf(MailAccountData account) => AccountStore.GetSettings(account.Id).Signature.Value;
+        static string SignatureOf(MailAccountData account)
+        {
+            // An anonymous account (Tor-only or Fast Mail) never inherits the global signature —
+            // that one usually carries the user's real name. Only its own override is used.
+            var signature = AccountStore.GetSettings(account.Id).Signature;
+            return IsAnonymous(account) && !signature.IsOverridden ? string.Empty : signature.Value;
+        }
+
+        static bool IsAnonymous(MailAccountData account) => account.TorOnly || account.Protocol == IncomingProtocol.FastMail;
 
         /// <summary>
         /// The readable signature block the compose box shows. The box is a textarea, so what goes
@@ -183,6 +192,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (draft.Account is not { } previous || previous.Id == next.Id) return;
 
             draft.Body = SignatureBlock(next) + StripSignature(draft, previous);
+            if (IsAnonymous(next)) draft.Body = NormalizeQuoteTimes(draft.Body);
             MessageStore.RemoveMessages(previous.Id, LocalDraftsFullName, [DraftUid(draft)]);
             draft.Account = next;
             SaveDraft(draft);
@@ -197,6 +207,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         static string StripSignature(ComposeDraft draft, MailAccountData previous)
         {
             string block = SignatureBlock(previous);
+            if (block.Length == 0 && IsAnonymous(previous)) block = SignatureService.PlainBlock(Settings.Signature.Value);
             if (block.Length == 0 || !draft.Body.StartsWith(block, StringComparison.Ordinal)) return draft.Body;
             return draft.Body[block.Length..];
         }
@@ -284,7 +295,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             var settings = AccountStore.GetSettings(account.Id);
             var style = styleOverride ?? settings.ReplyQuoteStyle.Value;
-            string attribution = $"\n\nOn {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}, {summary.FromName} <{summary.FromAddress}> wrote:";
+            // Anonymous accounts quote the time in UTC with fixed formatting: the local time would
+            // reveal the user's time zone to anyone comparing it with the original Date header.
+            string when = IsAnonymous(account)
+                ? summary.DateUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)
+                : summary.DateUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+            string attribution = $"\n\nOn {when}, {summary.FromName} <{summary.FromAddress}> wrote:";
             if (style == QuoteStyle.None) return attribution;
 
             string[] lines = LoadPlainBody(account, folderFullName, summary).Split('\n');
@@ -343,6 +359,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static async Task<SendOutcome> SendAsync(ComposeDraft draft, CancellationToken cancellationToken = default)
         {
             var account = draft.Account ?? throw new InvalidOperationException("The draft has no sending account.");
+            using var operation = account.Protocol == IncomingProtocol.FastMail
+                ? await FastMail.FastMailAccountOperations.EnterAsync(account, cancellationToken) : null;
+            if (operation != null) cancellationToken = operation.Token;
+            ProtectAnonymousDraft(draft, account);
 
             // Date in UTC, for the same reason the Message-Id no longer carries the machine name —
             // and applied to every account for the same reason too, since a header shaped
@@ -371,21 +391,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 await builder.Attachments.AddAsync(path, cancellationToken);
             message.Body = builder.ToMessageBody();
 
-            Log($"Compose send started: '{draft.Subject}' -> {draft.To}");
+            Log(account.TorOnly ? "Anonymous compose send started." : $"Compose send started: '{draft.Subject}' -> {draft.To}");
             try
             {
-                await SmtpSendService.SendAsync(account, message, cancellationToken);
+                await SmtpSendService.SendCoreAsync(account, message, cancellationToken);
             }
             catch (Exception ex) when (IsConnectionFailure(ex))
             {
                 await StoreAsMessageInLocalFolderAsync(account, message, LocalOutboxFolderName, FolderRole.Outbox, cancellationToken);
                 DeleteDraft(draft);
-                Log($"Offline: '{draft.Subject}' queued to Outbox ({ex.Message}).", LogLevel.Warning);
+                Log(account.TorOnly ? "Anonymous message queued to Outbox after a connection failure." : $"Offline: '{draft.Subject}' queued to Outbox ({ex.Message}).", LogLevel.Warning);
                 return SendOutcome.QueuedOffline;
             }
             await ArchiveToSentAsync(account, message, cancellationToken);
             DeleteDraft(draft);
-            Log($"Compose send finished: '{draft.Subject}'");
+            Log(account.TorOnly ? "Anonymous compose send finished." : $"Compose send finished: '{draft.Subject}'");
             return SendOutcome.Sent;
         }
 
@@ -397,6 +417,27 @@ namespace MyLovelyMail.MainProject.Services.Mail
             ex is SocketException or IOException or TimeoutException
                 or ServiceNotConnectedException or TimeoutRejectedException
             || ex.InnerException is SocketException;
+
+        /// <summary>Normalizes generated legacy attributions when a draft changes to an anonymous sender.</summary>
+        static string NormalizeQuoteTimes(string body) => Regex.Replace(body,
+            @"(?m)^(?<prefix>On )(?<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?<suffix>, [^\r\n]* wrote:)\r?$",
+            static match => DateTime.TryParseExact(match.Groups["date"].Value, "yyyy-MM-dd HH:mm",
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+                ? match.Groups["prefix"].Value + DateTime.SpecifyKind(date, DateTimeKind.Local).ToUniversalTime()
+                    .ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture) + match.Groups["suffix"].Value
+                : match.Value);
+
+        static void ProtectAnonymousDraft(ComposeDraft draft, MailAccountData account)
+        {
+            if (!IsAnonymous(account)) return;
+            if (!AccountStore.GetSettings(account.Id).Signature.IsOverridden)
+            {
+                string inherited = SignatureService.PlainBlock(Settings.Signature.Value);
+                if (inherited.Length > 0 && draft.Body.StartsWith(inherited, StringComparison.Ordinal))
+                    draft.Body = draft.Body[inherited.Length..];
+            }
+            draft.Body = NormalizeQuoteTimes(draft.Body);
+        }
 
         /// <summary>Also used by the outbox flush, which re-sends a stored MimeMessage without a draft.</summary>
         internal static async Task ArchiveToSentAsync(MailAccountData account, MimeMessage message, CancellationToken cancellationToken)

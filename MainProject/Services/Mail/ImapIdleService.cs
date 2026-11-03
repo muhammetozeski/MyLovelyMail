@@ -107,6 +107,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     }
 
                     backoff = ReconnectDelayMin;
+                    var connectedAt = System.Diagnostics.Stopwatch.StartNew();
+                    var connectionLifetime = account.TorOnly
+                        ? TimeSpan.FromSeconds(System.Security.Cryptography.RandomNumberGenerator.GetInt32(360, 601))
+                        : TimeSpan.MaxValue;
                     bool arrived = false;
                     CancellationTokenSource? activeIdleDone = null;
                     void OnCountChanged(object? sender, EventArgs e)
@@ -123,9 +127,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     {
                         while (!cancellationToken.IsCancellationRequested && !arrived)
                         {
+                            var remaining = connectionLifetime - connectedAt.Elapsed;
+                            if (remaining <= TimeSpan.Zero) break;
                             using var doneSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                             activeIdleDone = doneSource;
-                            doneSource.CancelAfter(IdleReissueInterval);
+                            doneSource.CancelAfter(remaining < IdleReissueInterval ? remaining : IdleReissueInterval);
                             await client.IdleAsync(doneSource.Token, cancellationToken);
                         }
                     }

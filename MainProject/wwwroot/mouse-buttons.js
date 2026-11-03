@@ -33,14 +33,14 @@
     function describe(event, doc, frame) {
         const target = event.target;
         const field = editable(target);
-        const link = closest(target, "a[href]");
+        const link = closest(target, "a[href],area[href],a[data-mlm-link]");
         const rect = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
         const control = closest(target, "button,[role='button'],label");
         const row = closest(target, ".settings-row");
         return {
             x: rect.left + event.clientX, y: rect.top + event.clientY,
             text: sensitive(field) ? "" : field && typeof field.value === "string" ? field.value : (target.textContent || "").trim(),
-            selection: selectionOf(doc, field || target), link: link ? link.href : "",
+            selection: selectionOf(doc, field || target), link: link ? link.getAttribute("data-mlm-link") || link.href : "",
             messagePayload: frame ? frame.getAttribute("data-message-targets") || "" : "",
             primaryPayload: frame ? frame.getAttribute("data-message-primary") || "" : "",
             isMailContent: !!frame && frame.matches(".mail-reader-frame"),
@@ -135,6 +135,15 @@
     function attachDocument(doc, frame) {
         if (!doc || boundDocuments.has(doc)) return;
         boundDocuments.add(doc);
+        function blockAnonymousNavigation(event) {
+            if (frame && frame.getAttribute("data-anonymous") === "true"
+                && closest(event.target, "a,area")) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }
+        doc.addEventListener("click", blockAnonymousNavigation, true);
+        doc.addEventListener("auxclick", blockAnonymousNavigation, true);
         function swallow(event) {
             if (!sideButton(event)) return;
             event.preventDefault();

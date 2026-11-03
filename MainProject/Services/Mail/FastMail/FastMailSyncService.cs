@@ -13,7 +13,7 @@ namespace MyLovelyMail.MainProject.Services.Mail.FastMail;
 /// Synchronizes, downloads, marks read, and deletes messages for <see cref="IncomingProtocol.FastMail"/>
 /// accounts through their <see cref="IFastMailProvider"/> strictly over Tor.
 /// </summary>
-public static class FastMailSyncService
+public static partial class FastMailSyncService
 {
     const bool IsLogEnabled = true;
     const string InboxFullName = MessageStore.InboxFullName;
@@ -33,6 +33,8 @@ public static class FastMailSyncService
 
     public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
     {
+        using var operation = await FastMailAccountOperations.EnterAsync(account, cancellationToken);
+        cancellationToken = operation.Token;
         var sw = Stopwatch.StartNew();
         using var syncScope = SyncScheduler.EnterSyncScope();
         var provider = RequireProvider(account);
@@ -105,7 +107,17 @@ public static class FastMailSyncService
                     MessageStore.UpsertSummaries(account.Id, InboxFullName, allNew);
                     var notificationCandidates = NotificationService.ExcludeMutedRuleDestinations(account, allNew, ruleResult);
                     foreach (var (uid, localFolder) in ruleResult.LocalMoves)
+                    {
+                        if (!MessageStore.HasFullMessage(account.Id, InboxFullName, uid))
+                        {
+                            if (!uidMap.TryGetValue(uid, out string? remoteId)) throw new IOException("The message identifier is missing; local filing was stopped.");
+                            using var mime = await provider.DownloadMessageAsync(account, remoteId, cancellationToken);
+                            using var bytes = new MemoryStream();
+                            await mime.WriteToAsync(bytes, cancellationToken);
+                            MessageStore.SaveFullMessage(account.Id, InboxFullName, uid, bytes.ToArray());
+                        }
                         MessageStore.MoveCachedMessage(account.Id, InboxFullName, uid, MessageStore.LocalFolderPrefix + localFolder);
+                    }
                     NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
                 }
             }
@@ -133,6 +145,8 @@ public static class FastMailSyncService
 
     public static async Task<MimeMessage> DownloadMessageAsync(MailAccountData account, uint uid, CancellationToken cancellationToken = default)
     {
+        using var operation = await FastMailAccountOperations.EnterAsync(account, cancellationToken);
+        cancellationToken = operation.Token;
         var sw = Stopwatch.StartNew();
         var provider = RequireProvider(account);
         Log($"FastMail.DownloadMessageAsync started: account='{account.EmailAddress}', uid={uid}", Run: IsLogEnabled);
@@ -161,6 +175,8 @@ public static class FastMailSyncService
 
     public static async Task SetSeenAsync(MailAccountData account, IReadOnlyList<uint> uids, bool seen, CancellationToken cancellationToken = default)
     {
+        using var operation = await FastMailAccountOperations.EnterAsync(account, cancellationToken);
+        cancellationToken = operation.Token;
         if (uids.Count == 0) return;
         var provider = RequireProvider(account);
         var remoteIds = ResolveKnownRemoteIds(account.Id, uids);
@@ -174,6 +190,8 @@ public static class FastMailSyncService
 
     public static async Task DeleteMessagesAsync(MailAccountData account, IReadOnlyList<uint> uids, CancellationToken cancellationToken = default)
     {
+        using var operation = await FastMailAccountOperations.EnterAsync(account, cancellationToken);
+        cancellationToken = operation.Token;
         if (uids.Count == 0) return;
         var provider = RequireProvider(account);
         var remoteIds = ResolveKnownRemoteIds(account.Id, uids);

@@ -170,7 +170,7 @@ public static class Logger
         try
         {
 
-            if (MessageObject is IEnumerable numerable)
+            if (MessageObject is IEnumerable numerable && MessageObject is not string)
             {
                 foreach (var item in numerable)
                 {
@@ -209,6 +209,8 @@ public static class Logger
         }
 
         Message += suffix;
+        Message = MailLogPrivacy.Redact(Message)!;
+        returnValue = MailLogPrivacy.Redact(returnValue);
         if (PrintToConsole)
         {
 
@@ -220,8 +222,8 @@ public static class Logger
             }
             else
             {
-                if (UseNewLine) WriteLine(MessageObject);
-                else Write(MessageObject);
+                if (UseNewLine) WriteLine(returnValue);
+                else Write(returnValue);
             }
 #pragma warning restore CS0162 // Ulaşılamayan kod algılandı
 

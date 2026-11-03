@@ -23,6 +23,48 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class MailConnections
     {
+        static readonly Lock directClientGate = new();
+        static readonly Dictionary<string, List<WeakReference<MailService>>> directClients = [];
+        static readonly HashSet<string> torRequiredAccounts = [];
+
+        /// <summary>Closes existing direct sessions when an account's saved policy starts requiring Tor.</summary>
+        internal static void EnforceAccountRoute(MailAccountData account)
+        {
+            List<WeakReference<MailService>>? clients;
+            lock (directClientGate)
+            {
+                if (!account.TorOnly)
+                {
+                    torRequiredAccounts.Remove(account.Id);
+                    return;
+                }
+                torRequiredAccounts.Add(account.Id);
+                if (!directClients.Remove(account.Id, out clients)) return;
+            }
+            foreach (var reference in clients)
+                if (reference.TryGetTarget(out var client)) client.Dispose();
+        }
+
+        static void TrackDirectClient(MailAccountData account, MailService client)
+        {
+            lock (directClientGate)
+            {
+                // Re-check after client creation: a saved policy can change during an open.
+                if (account.TorOnly || torRequiredAccounts.Contains(account.Id))
+                {
+                    client.Dispose();
+                    throw new TorUnavailableException("The account now requires Tor; its direct connection was canceled.");
+                }
+                foreach (string key in directClients.Keys.ToArray())
+                {
+                    directClients[key].RemoveAll(static r => !r.TryGetTarget(out _));
+                    if (directClients[key].Count == 0) directClients.Remove(key);
+                }
+                if (!directClients.TryGetValue(account.Id, out var clients)) directClients[account.Id] = clients = [];
+                clients.Add(new WeakReference<MailService>(client));
+            }
+        }
+
         /// <summary>How long MailKit waits on one Tor round-trip. Three relays are not one hop, and its 2-minute default is measured for one.</summary>
         const int TorClientTimeoutMs = 240_000;
 
@@ -239,6 +281,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 var direct = createClient();
                 try
                 {
+                    TrackDirectClient(account, direct);
                     var opened = await ConnectAndAuthenticateAsync(direct, protocolName, host, port, socketOptions, username, password, cancellationToken);
                     SyncHealthService.MarkRoute(account.Id, "direct");
                     return opened;

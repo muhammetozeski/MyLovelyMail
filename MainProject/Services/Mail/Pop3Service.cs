@@ -119,7 +119,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             try
             {
                 // One extra connection is pointless for a handful of messages.
-                int wantedExtras = Math.Min(ParallelConnections - 1, candidates.Count / 20);
+                int wantedExtras = account.TorOnly ? 0 : Math.Min(ParallelConnections - 1, candidates.Count / 20);
                 for (int i = 0; i < wantedExtras; i++)
                 {
                     try

@@ -42,6 +42,7 @@ namespace MyLovelyMail.MainProject.Stores
                     if (account != null)
                     {
                         NormalizeAccount(account, out bool changed);
+                        Services.Mail.MailConnections.EnforceAccountRoute(account);
                         if (changed) WriteAccountFile(account);
                         accounts.Add(account);
                     }
@@ -76,6 +77,18 @@ namespace MyLovelyMail.MainProject.Stores
             {
                 account.TorOnly = true;
                 changed = true;
+            }
+            // A Fast Mail account stays a Fast Mail account (never IMAP/POP3, never an SMTP relay).
+            if (!string.IsNullOrWhiteSpace(account.FastMailProviderId))
+            {
+                if (account.Protocol != IncomingProtocol.FastMail) { account.Protocol = IncomingProtocol.FastMail; changed = true; }
+                if (!string.IsNullOrEmpty(account.SmtpHost)) { account.SmtpHost = string.Empty; changed = true; }
+                // Older builds persisted Guerrilla Mail's sid_token here; it linked every session of the inbox.
+                if (string.Equals(account.FastMailProviderId, "guerrilla", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(account.FastMailRemoteAccountId))
+                {
+                    account.FastMailRemoteAccountId = string.Empty;
+                    changed = true;
+                }
             }
         }
 
@@ -173,6 +186,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static void Save(MailAccountData account)
         {
             NormalizeAccount(account, out _);
+            Services.Mail.MailConnections.EnforceAccountRoute(account);
 
             int existingIndex = accounts.FindIndex(a => a.Id == account.Id);
             if (existingIndex < 0)

@@ -109,6 +109,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
         internal void OpenUnsubscribePage(string url)
         {
+            if (MailUiState.SelectedAccount is not { TorOnly: false }) return;
             SaveStatus = ExternalLinkService.TryOpen(url, out string failureReason)
                 ? "🌐 Unsubscribe page opened in your browser"
                 : $"❌ {failureReason}";

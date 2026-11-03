@@ -31,8 +31,8 @@
         {
             @* allow-scripts WITHOUT allow-same-origin: the user's own script runs, in an opaque
                origin that can reach neither the app nor anything it stores. *@
-            <iframe class="signature-editor-preview" sandbox="allow-scripts"
-                data-input-token="@InputToken" srcdoc="@SignatureService.PreviewDocument(Text, InputToken)"></iframe>
+            <iframe class="signature-editor-preview" sandbox="@(BlockRemoteContent ? string.Empty : "allow-scripts")"
+                data-input-token="@InputToken" srcdoc="@SignatureService.PreviewDocument(Text, InputToken, BlockRemoteContent)"></iframe>
         }
     </div>
 
@@ -57,6 +57,7 @@
     [Parameter] public string BadgeText { get; set; } = string.Empty;
 
     [Parameter] public bool Inherited { get; set; }
+    [Parameter] public bool BlockRemoteContent { get; set; }
 
     /// <summary>Present only where an override can be dropped back to the global value.</summary>
     [Parameter] public EventCallback OnReset { get; set; }

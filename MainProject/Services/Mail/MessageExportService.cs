@@ -37,12 +37,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 $"<div style=\"font-family:sans-serif;border-bottom:1px solid #ccc;padding:8px 0;margin-bottom:12px\">" +
                 $"<div><b>From:</b> {WebUtility.HtmlEncode($"{summary.FromName} <{summary.FromAddress}>")}</div>" +
                 $"<div><b>To:</b> {WebUtility.HtmlEncode(summary.ToAddresses)}</div>" +
-                $"<div><b>Date:</b> {summary.DateUtc.ToLocalTime():yyyy-MM-dd HH:mm}</div>" +
+                $"<div><b>Date:</b> {(account.TorOnly ? summary.DateUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture) : summary.DateUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))}</div>" +
                 $"<div><b>Subject:</b> {WebUtility.HtmlEncode(summary.Subject)}</div></div>";
 
             string written = AttachmentService.UniquePath(UserDownloads.WriteFolder,
                 AttachmentService.SafeFileStem(summary.Subject, $"message-{summary.Uid}") + ".html");
-            File.WriteAllText(written, headerBlock + rendered.Html);
+            // Keep the policy in the document head; a preceding div would make browsers parse
+            // the generated head as body content and ignore its Content-Security-Policy meta.
+            int bodyStart = rendered.Html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
+            int contentStart = bodyStart < 0 ? -1 : rendered.Html.IndexOf('>', bodyStart) + 1;
+            if (contentStart <= 0) throw new InvalidOperationException("The rendered message has no document body.");
+            File.WriteAllText(written, rendered.Html.Insert(contentStart, headerBlock));
             string path = UserDownloads.Publish(written);
             Log($"Exported uid {summary.Uid} as html: {path}");
             return path;

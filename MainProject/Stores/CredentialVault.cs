@@ -79,6 +79,7 @@ namespace MyLovelyMail.MainProject.Stores
                     byte[] plain = DeviceProtection.Unprotect(Convert.FromBase64String(file.Payload));
                     secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? [];
                     IsUnlocked = true;
+                    RemoveObsoleteFastMailSessions();
                 }
                 else
                 {
@@ -108,6 +109,7 @@ namespace MyLovelyMail.MainProject.Stores
                 masterKey = key;
                 IsUnlocked = true;
                 NeedsMasterPassword = false;
+                RemoveObsoleteFastMailSessions();
                 OnVaultStateChanged?.Invoke();
                 return true;
             }
@@ -145,6 +147,11 @@ namespace MyLovelyMail.MainProject.Stores
 
         public static void SetPassword(string accountId, string password)
         {
+            if (IsObsoleteFastMailSession(accountId))
+            {
+                RemovePassword(accountId);
+                return;
+            }
             secrets[accountId] = password;
             Log($"Vault: password stored for account {accountId}.");
             Save();
@@ -154,6 +161,18 @@ namespace MyLovelyMail.MainProject.Stores
         {
             if (secrets.Remove(accountId))
                 Save();
+        }
+
+        static bool IsObsoleteFastMailSession(string accountId) => AccountStore.GetById(accountId) is
+            { Protocol: DataModels.Mail.IncomingProtocol.FastMail } account
+            && string.Equals(account.FastMailProviderId, "guerrilla", StringComparison.OrdinalIgnoreCase);
+
+        static void RemoveObsoleteFastMailSessions()
+        {
+            bool changed = false;
+            foreach (string id in secrets.Keys.Where(IsObsoleteFastMailSession).ToArray())
+                changed |= secrets.Remove(id);
+            if (changed) Save();
         }
 
         #endregion
@@ -264,7 +283,7 @@ namespace MyLovelyMail.MainProject.Stores
                 byte[] plain = DecryptAesGcm(Convert.FromBase64String(file.Payload), key);
                 var imported = JsonSerializer.Deserialize<Dictionary<string, string>>(plain) ?? [];
                 foreach (var (accountId, password) in imported)
-                    secrets[accountId] = password;
+                    if (!IsObsoleteFastMailSession(accountId)) secrets[accountId] = password;
                 Save();
                 return true;
             }

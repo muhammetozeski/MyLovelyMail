@@ -103,7 +103,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             pending.Cancellation.Cancel();
             Current = null;
             OnChanged?.Invoke();
-            Log($"Undo send: '{pending.Draft.Subject}' pulled back.");
+            Log(pending.Draft.Account is { TorOnly: true } ? "Anonymous send canceled." : $"Undo send: '{pending.Draft.Subject}' pulled back.");
             return pending.Draft;
         }
 
@@ -123,6 +123,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     return;
                 }
                 SoundService.Play("success");
+            }
+            catch (OperationCanceledException) when (draft.Account is { Protocol: IncomingProtocol.FastMail } account
+                && FastMail.FastMailAccountOperations.IsDeleting(account.Id))
+            {
+                // Account deletion canceled the whole send transaction before its backup snapshot.
+                return;
             }
             catch (Exception ex)
             {
@@ -156,24 +162,27 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     if (OutboxAttemptStore.IsHeld(account.Id, queued.Uid)) continue;
                     try
                     {
+                        using var operation = account.Protocol == IncomingProtocol.FastMail
+                            ? await FastMail.FastMailAccountOperations.EnterAsync(account, cancellationToken) : null;
+                        var operationToken = operation?.Token ?? cancellationToken;
                         if (MessageStore.TryLoadMimeMessage(account.Id, outboxFullName, queued.Uid) is not { } message)
                         {
                             MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
                             // An attempt entry must never outlive the message it describes.
                             OutboxAttemptStore.Clear(account.Id, queued.Uid);
-                            Log($"Outbox flush: dropped '{queued.Subject}' — its MIME file is gone.", LogLevel.Warning);
+                            Log(account.TorOnly ? "Anonymous Outbox entry has no MIME file." : $"Outbox flush: dropped '{queued.Subject}' — its MIME file is gone.", LogLevel.Warning);
                             continue;
                         }
-                        await SmtpSendService.SendAsync(account, message, cancellationToken);
+                        await SmtpSendService.SendCoreAsync(account, message, operationToken);
                         MessageStore.RemoveMessages(account.Id, outboxFullName, [queued.Uid]);
                         OutboxAttemptStore.Clear(account.Id, queued.Uid);
-                        await ComposeService.ArchiveToSentAsync(account, message, cancellationToken);
-                        Log($"Outbox flush: sent '{queued.Subject}'.");
+                        await ComposeService.ArchiveToSentAsync(account, message, operationToken);
+                        Log(account.TorOnly ? "Anonymous Outbox message sent." : $"Outbox flush: sent '{queued.Subject}'.");
                     }
                     catch (Exception ex)
                     {
                         OutboxAttemptStore.RecordFailure(account.Id, queued.Uid, ex.Message);
-                        Log($"Outbox flush: '{queued.Subject}' still failing, stays queued: {ex.Message}", LogLevel.Warning);
+                        Log(account.TorOnly ? $"Anonymous Outbox delivery failed: {ex.GetType().Name}." : $"Outbox flush: '{queued.Subject}' still failing, stays queued: {ex.Message}", LogLevel.Warning);
                     }
                 }
             }

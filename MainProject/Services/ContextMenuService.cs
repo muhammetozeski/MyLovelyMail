@@ -43,7 +43,7 @@ public static class ContextMenuService
     public static void Open(object owner, string title, IReadOnlyList<ContextMenuItem> items, double x = 0, double y = 0)
     {
         Current = new(owner, title, items, x, y);
-        Log($"Context menu opened: title='{title}'; items={items.Count}.", Run: IsLogEnabled);
+        Log($"Context menu opened: items={items.Count}.", Run: IsLogEnabled);
         OnChanged?.Invoke();
     }
 
