@@ -9,6 +9,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MyLovelyMail.MainProject</RootNamespace>
+    <!-- Static web asset compression is not used by Blazor Hybrid (loads directly from disk) -->
+    <EnableDefaultCompressionFormats>false</EnableDefaultCompressionFormats>
+    <PublishCompressionFormats></PublishCompressionFormats>
+    <DisableBuildCompression>true</DisableBuildCompression>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
@@ -35,6 +39,11 @@
   <ItemGroup>
     <SupportedPlatform Include="android" />
     <SupportedPlatform Include="windows" />
+  </ItemGroup>
+
+  <!-- Remove duplicate ghost js/ folder; index.html only loads root wwwroot scripts -->
+  <ItemGroup>
+    <Content Remove="wwwroot\js\**" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">

@@ -35,6 +35,10 @@
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win-x64</RuntimeIdentifier>
     <SatelliteResourceLanguages>none</SatelliteResourceLanguages>
+    <!-- Static web asset compression is not used by Blazor Hybrid (loads directly from disk) -->
+    <EnableDefaultCompressionFormats>false</EnableDefaultCompressionFormats>
+    <PublishCompressionFormats></PublishCompressionFormats>
+    <DisableBuildCompression>true</DisableBuildCompression>
   </PropertyGroup>
 
   <!-- The exe/taskbar/window icon on Windows reuses the same lovely-mail icon as the tray, instead
@@ -80,7 +84,7 @@
        - Sorunun kesin olarak buradan kaynaklandığından şüphelenilmiyorsa AI ajanı bu kuralları
          KESİNLİKLE kaldırmamalıdır.
        - Bir kural devre dışı bırakılacaksa kuralı SİLMEK YASAKTIR; silmek yerine XML yorum
-         satırına (<!-- ... -->) alınmalıdır.
+         etiketi içine alınmalıdır.
        ========================================================================================= -->
   <Target Name="FilterUnwantedPublishFiles" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
@@ -101,7 +105,7 @@
       <!-- 3. Kullanılmayan Windows Copilot+ / Windows AI Kütüphaneleri ve İş Yükleri -->
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.AI.'))" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.Workloads'))" />
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.json' and $([System.String]::Copy('%(FileName)').StartsWith('workloads.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.json' and $([System.String]::Copy('%(FileName)').StartsWith('workloads'))" />
 
       <!-- 4. Kullanılmayan Windows App SDK / WinUI Bileşenleri -->
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'WinUIEdit.dll'" />
