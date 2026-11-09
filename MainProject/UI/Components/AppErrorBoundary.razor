@@ -1,0 +1,70 @@
+@inherits ErrorBoundary
+@inject NavigationManager Navigation
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else if (ErrorContent is not null)
+{
+    @ErrorContent(CurrentException)
+}
+else
+{
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;padding:@(AppMeasures.Space.Medium)px;box-sizing:border-box;">
+        <GlassCard Padding="@AppMeasures.Space.Large" Level="AcrylicLevel.Strong">
+            <div style="display:flex;flex-direction:column;gap:@(AppMeasures.Space.Small)px;align-items:center;text-align:center;max-width:@(AppMeasures.Size.Px420)px;">
+                <div style="font-size:@(AppMeasures.Font.Hero)px;line-height:1;">⚠️</div>
+                <div style="font-weight:@AppMeasures.Weight.Bold;font-size:@(AppMeasures.Font.Large)px;color:@AppColors.TextPrimary.ToRgbaHex(true);">
+                    @Title
+                </div>
+                <div style="font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextMuted.ToRgbaHex(true);word-break:break-word;">
+                    @CurrentException.Message
+                </div>
+                <div style="display:flex;gap:@(AppMeasures.Space.Small)px;margin-top:@(AppMeasures.Space.Small)px;">
+                    <PrimaryButton OnClick="HandleRecover">
+                        <span>🔄 @RetryText</span>
+                    </PrimaryButton>
+                    @if (ShowReload)
+                    {
+                        <SecondaryButton OnClick="HandleReload">
+                            <span>⚡ Reload App</span>
+                        </SecondaryButton>
+                    }
+                </div>
+            </div>
+        </GlassCard>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "An unexpected error occurred in this view";
+    [Parameter] public string RetryText { get; set; } = "Try Again";
+    [Parameter] public bool ShowReload { get; set; } = true;
+    [Parameter] public EventCallback<Exception> OnException { get; set; }
+    [Parameter] public EventCallback OnRecover { get; set; }
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Log($"UI Exception caught by AppErrorBoundary: {exception.GetType().FullName}: {exception.Message}\n{exception.StackTrace}", LogLevel.Error);
+        if (OnException.HasDelegate)
+        {
+            return OnException.InvokeAsync(exception);
+        }
+        return Task.CompletedTask;
+    }
+
+    async Task HandleRecover()
+    {
+        Recover();
+        if (OnRecover.HasDelegate)
+        {
+            await OnRecover.InvokeAsync();
+        }
+    }
+
+    void HandleReload()
+    {
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+}

@@ -5,7 +5,9 @@
 <div class="app-page has-bottom-nav">
     <main>
         <article class="content">
-            @Body
+            <AppErrorBoundary @ref="mainErrorBoundary" Title="An unexpected error occurred in this view" RetryText="Try Again" ShowReload="true">
+                @Body
+            </AppErrorBoundary>
         </article>
     </main>
 
@@ -41,8 +43,14 @@
         Services.NavigationBridge.Navigator = null;
     }
 
+    AppErrorBoundary? mainErrorBoundary;
+
     /// <summary>Drops captured menu targets when navigating to a different page.</summary>
     /// <param name="sender">Navigation source.</param>
     /// <param name="args">New route.</param>
-    void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => ContextMenuService.Close();
+    void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        ContextMenuService.Close();
+        mainErrorBoundary?.Recover();
+    }
 }

@@ -383,7 +383,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ModalService.Open<MessageMoveModal>(new Dictionary<string, object?>
             {
                 [nameof(MessageMoveModal.Targets)] = targets,
-                [nameof(MessageMoveModal.Destinations)] = MoveTargets(targets)
+                [nameof(MessageMoveModal.Destinations)] = FolderTreeService.Build(MoveTargets(targets))
             }, ModalSize.Compact);
         }
 
@@ -394,7 +394,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ModalService.Open<MessageMoveModal>(new Dictionary<string, object?>
             {
                 [nameof(MessageMoveModal.Targets)] = targets,
-                [nameof(MessageMoveModal.Destinations)] = MoveTargets(targets)
+                [nameof(MessageMoveModal.Destinations)] = FolderTreeService.Build(MoveTargets(targets))
             }, ModalSize.Compact);
         }
 

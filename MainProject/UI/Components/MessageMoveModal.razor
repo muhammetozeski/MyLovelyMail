@@ -29,15 +29,26 @@
 
 @code {
     [Parameter] public MailMessageIdentity[] Targets { get; set; } = [];
-    [Parameter] public List<FolderNode> Destinations { get; set; } = [];
+    [Parameter] public object? Destinations { get; set; }
     [Parameter] public Action? OnMoved { get; set; }
 
     string FilterText { get; set; } = string.Empty;
 
+    List<FolderNode> ResolvedDestinations
+    {
+        get
+        {
+            if (Destinations is List<FolderNode> list) return list;
+            if (Destinations is IEnumerable<FolderNode> nodes) return [.. nodes];
+            if (Destinations is IEnumerable<MailFolderData> folders) return FolderTreeService.Build([.. folders]);
+            return [];
+        }
+    }
+
     List<FolderNode> FilteredFolders =>
         string.IsNullOrWhiteSpace(FilterText)
-            ? Destinations
-            : [.. Destinations.Where(n => n.Folder.DisplayName.Contains(FilterText.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? ResolvedDestinations
+            : [.. ResolvedDestinations.Where(n => n.Folder.DisplayName.Contains(FilterText.Trim(), StringComparison.OrdinalIgnoreCase)
                 || n.Folder.FullName.Contains(FilterText.Trim(), StringComparison.OrdinalIgnoreCase))];
 
     static string FolderIcon(MailFolderData folder) => folder.IsLocal ? "🗂️" : folder.Role switch
