@@ -34,7 +34,7 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win-x64</RuntimeIdentifier>
-    <SatelliteResourceLanguages>en-US;tr-TR;en;tr</SatelliteResourceLanguages>
+    <SatelliteResourceLanguages>none</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <!-- The exe/taskbar/window icon on Windows reuses the same lovely-mail icon as the tray, instead
@@ -67,13 +67,12 @@
     <ProjectReference Include="..\MainProject\MainProject.csproj" />
   </ItemGroup>
 
-  <!-- Strip out 80+ unused satellite language folders (MUI and resource DLLs) from build and publish output -->
+  <!-- Strip out all satellite language folders (MUI and resource DLLs) from build and publish output -->
   <Target Name="FilterUnwantedSatelliteAndMuiFiles" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(Extension)' == '.mui' and !($([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('en-us')) or $([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('tr')))" />
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(FileName)' == 'Microsoft.Maui.Controls.resources' and !($([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('en')) or $([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('tr')))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.mui'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)' == 'Microsoft.Maui.Controls.resources'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').EndsWith('.resources'))" />
     </ItemGroup>
   </Target>
 
