@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.UI.Components;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages
@@ -19,9 +23,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
     // search. The reader, compose and interaction members live in the sibling partials.
     public partial class Mail
     {
+        [Inject] IJSRuntime JS { get; set; } = default!;
+        DotNetObjectReference<Mail>? splitterDotNetRef;
+
         string _searchText = string.Empty;
 
-        string SearchText
+        internal string SearchText
         {
             get => _searchText;
             set
@@ -31,16 +38,93 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
         }
 
+        internal string? FolderActionStatus { get; set; }
+
         /// <summary>The folder rows in display order, each carrying its depth in the server's tree.</summary>
         internal List<FolderNode> Folders { get; set; } = [];
 
         /// <summary>The open folder's summaries after the search box filter, newest first.</summary>
-        List<MailMessageSummary> FilteredSummaries { get; set; } = [];
+        internal List<MailMessageSummary> FilteredSummaries { get; set; } = [];
 
-        bool SearchAllFolders { get; set; }
+        internal bool SearchAllFolders { get; set; }
 
-        /// <summary>Search-hit summary → (folder full name, display name), filled only in all-folders mode.</summary>
+        /// <summary>Search-hit summary -> (folder full name, display name), filled only in all-folders mode.</summary>
         Dictionary<MailMessageSummary, (string FullName, string Display)> HitFolders { get; set; } = [];
+
+        /// <summary>Messages currently being dragged from the middle column onto a sidebar folder.</summary>
+        internal MailMessageIdentity[] DraggedMessages { get; private set; } = [];
+
+        internal void StartMessageDrag(MailMessageIdentity[] rowTargets)
+        {
+            DraggedMessages = rowTargets.Any(MailUiState.SelectedMessages.Contains)
+                ? [.. MailUiState.SelectedMessages]
+                : rowTargets;
+        }
+
+        internal void EndMessageDrag() => DraggedMessages = [];
+
+        internal void ToggleMailFolderExpanded(MailFolderData folder)
+        {
+            MessageStore.ToggleFolderExpanded(folder.AccountId, folder.FullName);
+            RefreshSidebarFolders();
+        }
+
+        internal void RefreshSidebarFolders()
+        {
+            var account = MailUiState.SelectedAccount;
+            Folders = account == null ? [] : FolderTreeService.Build(MessageStore.GetFolders(account.Id));
+            StateHasChanged();
+        }
+
+        internal async Task StartColumnSplitterDragAsync(int splitterIndex, PointerEventArgs e)
+        {
+            try
+            {
+                splitterDotNetRef ??= DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync(
+                    "myLovelyMailSplitters.startDrag",
+                    splitterDotNetRef,
+                    splitterIndex,
+                    e.ClientX,
+                    GlobalSettings.SidebarColumnPercent.Value,
+                    GlobalSettings.ListColumnPercent.Value);
+            }
+            catch
+            {
+                // Ignore JS disconnect on teardown.
+            }
+        }
+
+        internal void ResetColumnSplitter(int splitterIndex)
+        {
+            if (splitterIndex == 1)
+            {
+                GlobalSettings.SidebarColumnPercent.Set(GlobalSettings.DefaultSidebarColumnPercent);
+                MouseActionService.ReportStatus("Sidebar width reset to 20.0%.");
+            }
+            else
+            {
+                GlobalSettings.ListColumnPercent.Set(GlobalSettings.DefaultListColumnPercent);
+                GlobalSettings.ReaderColumnPercent.Set(GlobalSettings.DefaultReaderColumnPercent);
+                MouseActionService.ReportStatus("Message list width reset to 32.0%.");
+            }
+            SettingsManager.SaveSettings();
+            Events.MainEvents.Trigger("OnStyleChanged");
+        }
+
+        [JSInvokable]
+        public void UpdateColumnSplitFromJs(double sidebarPct, double listPct, bool saveToDisk)
+        {
+            double sb = Math.Round(sidebarPct, 2);
+            double ls = Math.Round(listPct, 2);
+            double rd = Math.Round(Math.Max(22.0, 100.0 - sb - ls), 2);
+            GlobalSettings.SidebarColumnPercent.Set(sb);
+            GlobalSettings.ListColumnPercent.Set(ls);
+            GlobalSettings.ReaderColumnPercent.Set(rd);
+            if (saveToDisk)
+                SettingsManager.SaveSettings();
+            Events.MainEvents.Trigger("OnStyleChanged");
+        }
 
         protected override void OnInitialized()
         {
@@ -55,6 +139,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MouseActionService.MailMenuRequested = HandleNativeMailMenuAsync;
             MessageActions.OnMoveStateChanged += HandleMoveStateChanged;
             ModalService.OnChanged += HandleModalServiceChanged;
+            MailMenuItems.OnPinnedActionsChanged += HandleSyncStateChanged;
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -64,6 +149,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             draftAutosaveTimer?.Dispose();
             undoCountdownTimer?.Dispose();
+            splitterDotNetRef?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             AccountFolderStore.OnFoldersChanged -= HandleStateChanged;
@@ -74,17 +160,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MouseActionService.MailMenuRequested = null;
             MessageActions.OnMoveStateChanged -= HandleMoveStateChanged;
             ModalService.OnChanged -= HandleModalServiceChanged;
+            MailMenuItems.OnPinnedActionsChanged -= HandleSyncStateChanged;
             ContextMenuService.Close();
         }
 
-        /// <summary>Selects an account when none is selected yet — the one last used, else the first.</summary>
-        void HandleModalServiceChanged()
-        {
-            if (!ModalService.IsOpen || (!ShowMessageSource && !ShowShortcutHelp)) return;
-            ShowMessageSource = false;
-            ShowShortcutHelp = false;
-            InvokeAsync(StateHasChanged);
-        }
+        void HandleModalServiceChanged() => InvokeAsync(StateHasChanged);
+
         bool TrySelectFirstAccount()
         {
             if (MailUiState.SelectedAccount != null || AccountStore.Accounts.Count == 0) return false;
@@ -95,8 +176,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleStateChanged()
         {
-            // An account added while the page is open (wizard save, debug API) selects itself,
-            // so folders and the compose button appear without re-entering the page.
             if (TrySelectFirstAccount()) return;
             RefreshLists();
             _ = LoadOpenBodyIfNeededAsync();
@@ -166,7 +245,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
         /// row per thread; flat mode maps them one-to-one. Both feed the SAME row markup, so the
         /// two modes can never drift apart visually.
         /// </summary>
-        List<MailRow> Rows { get; set; } = [];
+        internal List<MailRow> Rows { get; set; } = [];
 
         /// <summary>Grouping is on when the ConversationView setting says so and no free-text search
         /// is narrowing the list; a pure-token query (is:unread) keeps conversations grouped.</summary>
@@ -184,7 +263,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     thread.Newest,
                     thread.Messages.Count,
                     thread.UnreadCount,
-                    string.Join(", ", thread.Messages.Select(static m => string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName).Distinct()) ) { Messages = thread.Messages })]
+                    string.Join(", ", thread.Messages.Select(static m => string.IsNullOrWhiteSpace(m.FromName) ? m.FromAddress : m.FromName).Distinct())) { Messages = thread.Messages })]
                 : [.. FilteredSummaries.Select(static summary => new MailRow(
                     summary,
                     1,
@@ -203,11 +282,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             RefreshLists();
         }
 
-        /// <summary>
-        /// Ways to get results back, computed only on the empty-result screen — the scan runs the
-        /// real matcher several times over the folder, which is nothing next to a wall of "no
-        /// results" but is not something to do on every render of a list that has rows.
-        /// </summary>
         List<SearchRescue> SearchRescues =>
             MailUiState.SelectedAccount is { } account && MailUiState.SelectedFolder is { } folder
             && !string.IsNullOrWhiteSpace(SearchText)
@@ -220,22 +294,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             SearchText = rescue.Query;
         }
 
-        /// <summary>
-        /// Runs the one action the empty-folder panel offers. The kicks are fire-and-forget, so the
-        /// repaint comes from OnFolderSyncStateChanged like every other sync; this only has to put
-        /// the spinner branch on screen for the click that started it.
-        /// </summary>
         void RunEmptyFolderAction(MailFolderData folder, EmptyFolderAction action)
         {
             FolderEmptyReason.RunAction(folder, action);
             StateHasChanged();
         }
 
-        /// <summary>
-        /// Hover text answering "how old is what I am looking at". The folder-list pass keeps every
-        /// unread badge current while the messages behind it can be weeks old, so the badge alone
-        /// cannot tell the user that.
-        /// </summary>
         internal static string FolderFreshness(MailFolderData folder)
         {
             if (folder.IsLocal) return "Local folder — nothing to sync";
@@ -258,7 +322,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 .Sum(f => f.UnreadCount);
 
         /// <summary>The folder a listed message actually lives in (differs from the selection in all-folders search).</summary>
-        string? ResolveFolderOf(MailMessageSummary message) =>
+        internal string? ResolveFolderOf(MailMessageSummary message) =>
             MessageIdentityOf(message)?.FolderFullName;
 
         string? HitFolderDisplay(MailMessageSummary message) =>
@@ -272,15 +336,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         internal void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
-        /// <summary>How many older messages one press of the footer button asks for.</summary>
         internal const int BackfillBatchSize = 300;
 
-        /// <summary>Messages cached for the open folder — the honest half of "showing X of Y".</summary>
         int CachedCount => MailUiState.SelectedFolder is { } folder
             ? MessageStore.CountSummaries(folder.AccountId, folder.FullName)
             : 0;
 
-        /// <summary>The open folder when the server holds more than the cache does, else null.</summary>
         MailFolderData? TruncatedFolder =>
             MailUiState.SelectedFolder is { IsLocal: false } folder && CachedCount < folder.TotalCount ? folder : null;
 
@@ -290,7 +351,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ImapSyncService.KickFolderSync(account, folder.FullName, backfillCount: BackfillBatchSize);
         }
 
-        /// <summary>Drops the folder's cache and refills it — the way back from a truncated folder that incremental sync can never heal.</summary>
         internal void ResyncFolder(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
@@ -298,7 +358,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ImapSyncService.KickFolderSync(account, folder.FullName, resetCache: true);
         }
 
-        /// <summary>One-click filters; each just adds or removes its own token in the search box, so they compose with each other and with typed text.</summary>
         static readonly (string Label, string Token)[] QuickFilters =
         [
             ("📩 Unread", "is:unread"),
@@ -306,17 +365,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             ("❗ Important", "is:important"),
             ("📎 Attachments", "has:attachment"),
             ("💤 Snoozed", "is:snoozed"),
-            ("🕒 Last 7 days", "newer_than:7d"),
-            ("🔕 Muted", "is:muted")
+            ("📅 Last 7 days", "newer_than:7d"),
+            ("🔇 Muted", "is:muted")
         ];
 
-        /// <summary>
-        /// Whether the quick-filter pill row is unfolded. Deliberately not persisted: every start
-        /// gives the list its full height back, and one click brings the pills straight back.
-        /// </summary>
         bool ShowSearchTools { get; set; }
 
-        /// <summary>How many filters are actually narrowing the list right now - what the folded handle reports.</summary>
         int ActiveFilterCount =>
             QuickFilters.Count(filter => HasSearchToken(filter.Token))
             + (ConversationMode ? 1 : 0)
@@ -365,22 +419,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             RefreshLists();
         }
 
-        /// <summary>Glyph for a folder that exists only on this machine.</summary>
-        const string LocalFolderIcon = "💾";
-
-        /// <summary>Appended to a local folder's name, because a server folder can carry the same one.</summary>
+        const string LocalFolderIcon = "💻";
         const string LocalFolderSuffix = "(this PC)";
 
-        /// <summary>
-        /// The folder's icon. Local folders get their own glyph rather than their role's: rules and
-        /// the draft autosave create "Local/Drafts" beside the server's "Drafts", and two rows
-        /// showing 📝 Drafts are indistinguishable — including in the move menu, where picking the
-        /// wrong one files the message somewhere the user did not mean.
-        /// </summary>
         internal static string FolderIcon(MailFolderData folder) =>
             folder.IsLocal ? LocalFolderIcon : FolderIcon(folder.Role);
 
-        /// <summary>What the folder is called on screen; local folders say where they live.</summary>
         internal static string FolderLabel(MailFolderData folder) =>
             folder.IsLocal ? $"{folder.DisplayName} {LocalFolderSuffix}" : folder.DisplayName;
 
@@ -394,7 +438,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             FolderRole.Archive => "📦",
             FolderRole.Outbox => "⏳",
             FolderRole.Flagged => "⭐",
-            FolderRole.AllMail => "📚",
+            FolderRole.AllMail => "🗂️",
             _ => "📁"
         };
     }

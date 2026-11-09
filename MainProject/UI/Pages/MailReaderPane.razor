@@ -6,10 +6,6 @@
 
     @* ---- Right: compose pane or reading pane ---- *@
     <section class="mail-reader">
-        @* Exactly one occupant at a time, with a strip listing the ones that exist. The sheet used
-           to render above the reader body in the same scrolling column, pushing the message below
-           the fold; switching here only moves ThirdPane, so the draft and the open message keep
-           their state. *@
         @if (View.PaneTabs.Count > 1)
         {
             <div class="mail-pane-tabs">
@@ -20,8 +16,6 @@
                 }
             </div>
         }
-        @* The sheet lives INSIDE the reader pane rather than beside it: .mail-screen is a
-           three-column grid, and a fourth child pushed the message list into the reader's slot. *@
         @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person && MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
         {
             <div class="mail-person-sheet" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@person.Address" data-mouse5="menu"
@@ -66,8 +60,6 @@
             </div>
         }
 
-        @* One bar for the whole held queue, not one per message: Outbox is a folder the user
-           has no reason to open, so the count has to come to them. *@
         @if (OutboxAttemptStore.HeldCount is > 0 and var heldCount)
         {
             <div class="mail-undo-bar mail-undo-bar--failed">
@@ -94,15 +86,13 @@
         }
         @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Compose && MailUiState.ActiveCompose is { } draft)
         {
-            <div class="mail-reader-header" data-context-menu="true" @oncontextmenu="e => View.OpenComposeMenu(e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            <div class="mail-reader-top-row" data-context-menu="true" @oncontextmenu="e => View.OpenComposeMenu(e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                 <BackButton OnClick="@View.SaveAndCloseCompose" />
                 <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
                 @if (View.DraftSavedAt != null)
                 {
                     <span class="mail-compose-saved">💾 @View.DraftSavedAt?.ToString("HH:mm:ss")</span>
                 }
-                @* Only on a draft that quotes something; the quote is rebuilt from the source
-                   message, never re-parsed out of the body the user has been editing. *@
                 @if (draft.SourceUid > 0)
                 {
                     <span class="mail-quote-picker">
@@ -125,7 +115,6 @@
                                 @onclick="() => View.SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
                     }
                 </div>
-                @* Native datalist: the browser owns the dropdown, so autosave and typing stay untouched. *@
                 <datalist id="@Mail.ContactListId">
                     @foreach (var contact in View.KnownContacts)
                     {
@@ -197,96 +186,117 @@
         }
         else
         {
-            @* @key remounts this subtree per message, so the open animation replays on every switch. *@
             var readerTargets = View.MessageTargets(open);
             var readerPayload = JsonSerializer.Serialize(readerTargets);
+            bool isInTrash = View.ResolveFolderRole(open) == FolderRole.Trash;
+            string starIcon = open.Flags.HasFlag(MailFlags.Flagged) ? "⭐" : "☆";
+            string impIcon = open.Flags.HasFlag(MailFlags.Important) ? "❗" : "";
+            string tagCountBadge = open.Tags.Count > 0 ? $" · {open.Tags.Count}" : "";
+
             <div class="mail-reader-content" @key="View.MessageIdentityOf(open)" data-context-menu="true"
                  data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@readerPayload"
                  data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@readerPayload"
                  @oncontextmenu="e => View.OpenMessageMenu(readerTargets, e.ClientX, e.ClientY, primary: View.MessageIdentityOf(open))"
                  @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-            <div class="mail-reader-header">
-                <BackButton OnClick="@MailUiState.CloseMessage" />
-                @* Same gradient circle the list rows use, so a sender looks the same everywhere. *@
-                <button class="mail-reader-avatar" title="Everything known about this correspondent"
-                        style="background:@Mail.AvatarGradient(open)"
-                        data-context-menu="true" @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)"
-                        @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
-                        @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@Mail.AvatarInitials(open)</button>
-                <div class="mail-reader-titles">
-                    <div class="mail-reader-subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
-                    <div class="mail-reader-meta">
+
+            @* Full-width stacked header: Back + Avatar + Subject sit inline on the top row, so every
+               line below (From/Date/To, history, badges, toolbar, body) utilizes the full column width
+               with zero empty space beneath Back or the avatar. *@
+            <div class="mail-reader-header-card">
+                <div class="mail-reader-top-row">
+                    <BackButton OnClick="@MailUiState.CloseMessage" />
+                    <button class="mail-reader-avatar" title="Everything known about this correspondent"
+                            style="background:@Mail.AvatarGradient(open)"
+                            data-context-menu="true" @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)"
+                            @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                            @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@Mail.AvatarInitials(open)</button>
+                    <div class="mail-reader-subject" title="@open.Subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
+                    <nav class="mail-reader-list-nav" aria-label="Navigate listed messages">
+                        <button class="mail-search-toggle mail-search-toggle--compact" title="Previous listed message" disabled="@(View.ListedNavigationTarget(-1) == null)" @onclick="() => View.OpenListedMessage(-1)">←</button>
+                        <button class="mail-search-toggle mail-search-toggle--compact" title="Next listed message" disabled="@(View.ListedNavigationTarget(1) == null)" @onclick="() => View.OpenListedMessage(1)">→</button>
+                        <button class="mail-search-toggle mail-search-toggle--compact" title="Next unread conversation" disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" @onclick="() => View.OpenListedMessage(1, unreadOnly: true)">📩→</button>
+                    </nav>
+                </div>
+
+                <div class="mail-reader-meta-row">
+                    <div class="mail-reader-meta-left">
                         <span class="mail-reader-from" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@open.FromAddress" data-mouse5="menu"
-                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@open.FromName &lt;@open.FromAddress&gt;</span>
+                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                            @(string.IsNullOrWhiteSpace(open.FromName) ? open.FromAddress : $"{open.FromName} <{open.FromAddress}>")
+                        </span>
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
-                    </div>
-                    @if (View.HistoryOfOpenSender(open) is { } history)
-                    {
-                        <button class="mail-reader-history" title="Show everything from this sender"
-                                @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
-                            💌 @history.MessageCount from this sender@(history.UnreadCount > 0 ? $" · {history.UnreadCount} unread" : "") · since @history.OldestUtc.ToLocalTime().ToString("dd MMM yyyy")
-                        </button>
-                    }
-                    @* Only ever what is WRONG. A dkim=pass line can be prepended by anyone, so a
-                       reassuring green badge would launder a forged header. *@
-                    @foreach (var finding in View.authFindings)
-                    {
-                        <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
-                    }
-                    @* A rule that works leaves no other trace: mail simply arrives already-read,
-                       tagged, or missing from the folder it was addressed to. Folded to one line
-                       because the strip is a footnote — a rule that fired sixteen times is sixteen
-                       on a counter, not sixteen chips pushing the message off the screen. *@
-                    @if (View.ruleTraceLines.Count > 0)
-                    {
-                        <div class="mail-rule-strip">
-                            <button class="mail-rule-trace mail-rule-summary" title="What the filter rules did to this message"
-                                    @onclick="() => View.ruleTraceExpanded = !View.ruleTraceExpanded">
-                                <span>🧭</span>
-                                <span class="mail-rule-lead">@Mail.RuleTraceLabel(View.ruleTraceLines[0])</span>
-                                @if (View.ruleTraceLines.Count > 1)
-                                {
-                                    <span class="mail-rule-count">+@(View.ruleTraceLines.Count - 1)</span>
-                                }
-                                <span class="mail-rule-name">@View.ruleTraceLines[0].RuleName</span>
-                                <span class="mail-rule-caret">@(View.ruleTraceExpanded ? "▴" : "▾")</span>
+                        @if (View.HistoryOfOpenSender(open) is { } history)
+                        {
+                            <button class="mail-reader-history" title="Show everything from this sender"
+                                    @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
+                                💌 @history.MessageCount@(history.UnreadCount > 0 ? $" ({history.UnreadCount} unread)" : "")
                             </button>
-                            @if (View.ruleTraceExpanded)
-                            {
-                                <div class="mail-rule-rows">
-                                    @foreach (var line in View.ruleTraceLines)
-                                    {
-                                        <button class="mail-rule-trace mail-rule-row" title="Open the filter rules"
-                                                @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>
-                                            <span class="mail-rule-lead">@Mail.RuleTraceLabel(line)</span>
-                                            <span class="mail-rule-name">@line.RuleName</span>
-                                            @if (line.Count > 1)
-                                            {
-                                                <span class="mail-rule-count">×@line.Count</span>
-                                            }
-                                        </button>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    }
-                    @if (View.unsubscribeTargets is { } unsubscribe)
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
-                        <div class="mail-unsubscribe">
-                            @* A List-Unsubscribe URL carries a per-recipient token by design, and
-                               this chip hands it to the SYSTEM browser. One click on a Tor-only
-                               account would deliver "this token, this real address, this moment"
-                               to the sender in the clear — the pairing the account exists to
-                               prevent. The mailto form below goes out over its own tunnelled SMTP. *@
+                        <div class="mail-reader-to" title="to @open.ToAddresses">to @open.ToAddresses</div>
+                    }
+                </div>
+
+                @if (open.Tags.Count > 0 || View.authFindings.Count > 0 || View.ruleTraceLines.Count > 0 || View.unsubscribeTargets != null)
+                {
+                    <div class="mail-reader-badges-row">
+                        @foreach (var tag in open.Tags)
+                        {
+                            <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                    data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
+                                    @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                                    title="Search this tag" @onclick="() => View.SearchByTag(tag)">@tag</button>
+                        }
+                        @foreach (var finding in View.authFindings)
+                        {
+                            <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
+                        }
+                        @if (View.ruleTraceLines.Count > 0)
+                        {
+                            <div class="mail-rule-strip">
+                                <button class="mail-rule-trace mail-rule-summary" title="What the filter rules did to this message"
+                                        @onclick="() => View.ruleTraceExpanded = !View.ruleTraceExpanded">
+                                    <span>🧭</span>
+                                    <span class="mail-rule-lead">@Mail.RuleTraceLabel(View.ruleTraceLines[0])</span>
+                                    @if (View.ruleTraceLines.Count > 1)
+                                    {
+                                        <span class="mail-rule-count">+@(View.ruleTraceLines.Count - 1)</span>
+                                    }
+                                    <span class="mail-rule-name">@View.ruleTraceLines[0].RuleName</span>
+                                    <span class="mail-rule-caret">@(View.ruleTraceExpanded ? "▴" : "▾")</span>
+                                </button>
+                                @if (View.ruleTraceExpanded)
+                                {
+                                    <div class="mail-rule-rows">
+                                        @foreach (var line in View.ruleTraceLines)
+                                        {
+                                            <button class="mail-rule-trace mail-rule-row" title="Open the filter rules"
+                                                    @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>
+                                                <span class="mail-rule-lead">@Mail.RuleTraceLabel(line)</span>
+                                                <span class="mail-rule-name">@line.RuleName</span>
+                                                @if (line.Count > 1)
+                                                {
+                                                    <span class="mail-rule-count">×@line.Count</span>
+                                                }
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        @if (View.unsubscribeTargets is { } unsubscribe)
+                        {
                             @if (unsubscribe.HttpUrl is { } unsubscribeUrl && MailUiState.SelectedAccount is not { TorOnly: true })
                             {
                                 <button class="mail-unsubscribe-chip" title="@unsubscribeUrl"
-                                        @onclick="() => View.OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on the web</button>
+                                        @onclick="() => View.OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on web</button>
                             }
                             else if (unsubscribe.HttpUrl != null)
                             {
                                 <span class="mail-unsubscribe-chip mail-unsubscribe-chip--blocked" title="@unsubscribe.HttpUrl">
-                                    🛡️ Web unsubscribe would leave Tor
+                                    🛡️ Web unsubscribe blocked (Tor)
                                 </span>
                             }
                             @if (unsubscribe.MailtoAddress != null)
@@ -294,18 +304,11 @@
                                 <button class="mail-unsubscribe-chip" title="Prepares the mail; you still press Send"
                                         @onclick="() => View.ComposeUnsubscribeMail(unsubscribe)">✉️ Unsubscribe by mail</button>
                             }
-                        </div>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
-                    {
-                        <div class="mail-reader-to">to @open.ToAddresses</div>
-                    }
-                </div>
+                        }
+                    </div>
+                }
             </div>
 
-            @* Conversation grouping maps a thread to its newest message alone, so the other
-               replies have no row at all while the count pill advertises that they exist. This is
-               the way to them, and it is shown in flat mode too — the thread is there either way. *@
             @if (View.ThreadOfOpenMessage(open) is { } thread)
             {
                 <div class="mail-reader-thread">
@@ -335,65 +338,50 @@
                 </div>
             }
 
+            @* Unified Reader Action Bar:
+               - Single Read/Unread toggle
+               - Reply ▾ menu (Reply, Reply all, Forward, Forward as attachment)
+               - Labels modal button (Star, Important, Tags)
+               - Save modal button (.eml / .html with Save As + folder reveal)
+               - Message actions ▾ + Pinned Favorite Actions (middle-click or right-click to pin/unpin)
+               - Trash / Delete forever
+               - Text zoom scale *@
             <div class="mail-reader-actions">
-                <button class="mail-search-toggle" @onclick="e => View.OpenReaderActionsMenu(open, e)">Message actions ▾</button>
-                <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">Sender actions ▾</button>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, readerTargets, includeSelection: true))">✅ Mark read</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Unread, readerTargets, includeSelection: true))">📩 Mark unread</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartReply(open, replyAll: false))">↩️ Reply</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartReply(open, replyAll: true))">👥 Reply all</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartForward(open))">➡️ Forward</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.StartForwardAsAttachment(open))">📎 Forward as attachment</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ToggleOpenFlagged(open))">@(open.Flags.HasFlag(MailFlags.Flagged) ? "⭐ Starred" : "☆ Star")</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ToggleOpenImportant(open))">@(open.Flags.HasFlag(MailFlags.Important) ? "❗ Important" : "❕ Mark important")</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ShowTagPicker = !View.ShowTagPicker)">🏷️ Tags</SecondaryButton>
+                <button class="mail-search-toggle"
+                        @onclick="@(() => MouseActionService.RunMessagesAsync(open.IsUnread ? MailMessageCommand.Read : MailMessageCommand.Unread, readerTargets, includeSelection: false))">
+                    @(open.IsUnread ? "✅ Mark read" : "📩 Mark unread")
+                </button>
+                <button class="mail-search-toggle" @onclick="e => View.OpenReplyMenu(open, e)">↩️ Reply ▾</button>
+                <button class="mail-search-toggle" title="Star, Importance & Tags" @onclick="() => View.OpenMarkersModal(open)">
+                    @starIcon@(impIcon) Labels@(tagCountBadge)
+                </button>
+                <button class="mail-search-toggle" title="Save as .eml or .html" @onclick="() => View.OpenSaveModal(open)">💾 Save</button>
+                <button class="mail-search-toggle" title="All message actions (middle-click or right-click any item to pin/unpin)" @onclick="e => View.OpenReaderActionsMenu(open, e)">⚡ Message actions ▾</button>
+
+                @foreach (var pinned in View.GetPinnedReaderActions(open))
+                {
+                    <button class="mail-search-toggle mail-search-toggle--pinned"
+                            title="@pinned.Label — middle-click or right-click to unpin from toolbar"
+                            @onclick="pinned.Execute"
+                            @onmouseup="e => { if (e.Button == 1) View.ToggleReaderPinnedAction(pinned.PinId); }"
+                            @oncontextmenu="() => View.ToggleReaderPinnedAction(pinned.PinId)"
+                            @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                        @pinned.ToolbarLabel
+                    </button>
+                }
+
+                <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">👤 Sender ▾</button>
+                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px4 + "px " + AppMeasures.Space.Px10 + "px")"
+                              OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: false))">
+                    @(isInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
+                </DangerButton>
+
                 <span class="mail-text-scale">
                     <button class="mail-folder-action mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => View.StepReaderTextScale(-1)">A-</button>
                     <button class="mail-folder-action mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => View.StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
                     <button class="mail-folder-action mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => View.StepReaderTextScale(1)">A+</button>
                 </span>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.OpenMessageSource(open))">🔍 Source</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ExportOpen(open, asHtml: false))">💾 .eml</SecondaryButton>
-                <SecondaryButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => View.ExportOpen(open, asHtml: true))">🌐 .html</SecondaryButton>
-                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px6 + "px " + AppMeasures.Space.Px10 + "px")" OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: true))">🗑️ Trash</DangerButton>
             </div>
-
-            <nav class="mail-reader-list-nav" aria-label="Navigate listed messages">
-                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(-1) == null)" @onclick="() => View.OpenListedMessage(-1)">← Previous</button>
-                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(1) == null)" @onclick="() => View.OpenListedMessage(1)">Next →</button>
-                <button class="mail-search-toggle" disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" @onclick="() => View.OpenListedMessage(1, unreadOnly: true)">Next unread</button>
-            </nav>
-
-            @if (open.Tags.Count > 0 || View.ShowTagPicker)
-            {
-                <div class="mail-attachments">
-                    @foreach (var tag in open.Tags)
-                    {
-                        <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
-                            data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
-                            @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
-                                title="Search this tag" @onclick="() => View.SearchByTag(tag)">@tag</button>
-                    }
-                </div>
-            }
-
-            @if (View.ShowTagPicker)
-            {
-                <div class="mail-tag-picker">
-                    @foreach (var tag in TagStore.AllTags)
-                    {
-                        <button class="mail-tag-chip mail-tag-chip--action @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "" : "mail-tag-chip--off")"
-                            data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
-                            @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
-                                style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
-                                @onclick="() => View.ToggleTagOnOpen(open, tag)">
-                            @(open.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) ? "✓ " : "")@tag
-                        </button>
-                    }
-                    <input class="mail-tag-input" placeholder="New tag..." @bind="View.NewTagName" @bind:event="oninput" />
-                    <button class="mail-search-toggle" @onclick="() => View.AddNewTag(open)" disabled="@(View.NewTagName.Trim().Length == 0)">➕ Add</button>
-                </div>
-            }
 
             @if (View.OpenAttachments.Count > 0)
             {
@@ -417,16 +405,10 @@
                     }
                 </div>
             }
-            @if (View.SaveStatus != null)
-            {
-                <div class="mail-save-status">@View.SaveStatus</div>
-            }
 
             @if (View.OpenBodyBlockedImages)
             {
                 <div class="mail-image-banner">
-                    @* No "show once" on a Tor-only account: the WebView would fetch those images
-                       over the ordinary network, which is precisely what the account forbids. *@
                     @if (MailUiState.SelectedAccount is { TorOnly: true })
                     {
                         <span>🛡️ Remote images stay blocked — this account only talks through Tor.</span>
@@ -448,7 +430,7 @@
                 }
                 else if (View.OpenBodyHtml != null)
                 {
-                    <iframe class="mail-reader-frame" data-anonymous="@(MailUiState.SelectedAccount is { TorOnly: true } ? "true" : "false")" sandbox="@(MailUiState.SelectedAccount is { TorOnly: true } ? "allow-same-origin" : "allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation")" srcdoc="@View.OpenBodyHtml"
+                    <iframe class="mail-reader-frame" scrolling="no" data-anonymous="@(MailUiState.SelectedAccount is { TorOnly: true } ? "true" : "false")" sandbox="@(MailUiState.SelectedAccount is { TorOnly: true } ? "allow-same-origin" : "allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation")" srcdoc="@View.OpenBodyHtml"
                             data-message-targets="@readerPayload" data-message-primary="@JsonSerializer.Serialize(View.MessageIdentityOf(open))"></iframe>
                 }
                 else

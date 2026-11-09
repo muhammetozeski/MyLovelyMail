@@ -1,0 +1,131 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">💾 Save Message</span>
+    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:@(AppMeasures.Space.Px10)px;">
+    <div>
+        <div style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);margin-bottom:4px;">
+            FORMAT
+        </div>
+        <div style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
+            <button class="mail-action-btn @(Format == "eml" ? "mail-action-btn--active" : "")"
+                    style="flex:1;justify-content:center;" type="button"
+                    @onclick="@(() => SelectFormat("eml"))">
+                📄 Raw (.eml)
+            </button>
+            <button class="mail-action-btn @(Format == "html" ? "mail-action-btn--active" : "")"
+                    style="flex:1;justify-content:center;" type="button"
+                    @onclick="@(() => SelectFormat("html"))">
+                🌐 Web Page (.html)
+            </button>
+        </div>
+    </div>
+
+    <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);">
+                DESTINATION PATH
+            </span>
+            @if (OperatingSystem.IsWindows())
+            {
+                <button class="mail-action-btn" type="button" title="Choose location in Windows Explorer" @onclick="BrowseLocation">
+                    📂 Browse…
+                </button>
+            }
+        </div>
+        <input class="mail-move-filter" style="width:100%;box-sizing:border-box;"
+               @bind="TargetPath" @bind:event="oninput" />
+    </div>
+
+    <label style="display:flex;align-items:center;gap:8px;font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextSecondary.ToRgbaHex(true);cursor:pointer;">
+        <input type="checkbox" @bind="OpenFolderAfterSave" />
+        <span>Open saved folder in Explorer after saving</span>
+    </label>
+
+    <div style="display:flex;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;margin-top:4px;">
+        <SecondaryButton OnClick="@Close">Cancel</SecondaryButton>
+        <PrimaryButton OnClick="@SaveNow" Disabled="@string.IsNullOrWhiteSpace(TargetPath)">💾 Save</PrimaryButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public MailAccountData? Account { get; set; }
+    [Parameter] public string FolderFullName { get; set; } = string.Empty;
+    [Parameter] public MailMessageSummary? Message { get; set; }
+    [Parameter] public string InitialFormat { get; set; } = "eml";
+
+    string Format { get; set; } = "eml";
+    string TargetPath { get; set; } = string.Empty;
+    bool OpenFolderAfterSave { get; set; } = true;
+
+    protected override void OnParametersSet()
+    {
+        Format = string.Equals(InitialFormat, "html", StringComparison.OrdinalIgnoreCase) ? "html" : "eml";
+        UpdateDefaultPath();
+    }
+
+    void SelectFormat(string format)
+    {
+        Format = format;
+        if (!string.IsNullOrWhiteSpace(TargetPath))
+        {
+            string dir = Path.GetDirectoryName(TargetPath) ?? UserDownloads.WriteFolder;
+            string stem = Path.GetFileNameWithoutExtension(TargetPath);
+            TargetPath = Path.Combine(dir, $"{stem}.{Format}");
+        }
+        else
+        {
+            UpdateDefaultPath();
+        }
+    }
+
+    void UpdateDefaultPath()
+    {
+        if (Message == null) return;
+        string fileName = MessageExportService.DefaultFileName(Message, Format);
+        TargetPath = Path.Combine(UserDownloads.WriteFolder, fileName);
+    }
+
+    void BrowseLocation()
+    {
+        if (Message == null) return;
+        string currentDir = Path.GetDirectoryName(TargetPath) is { Length: > 0 } dir && Directory.Exists(dir)
+            ? dir
+            : UserDownloads.WriteFolder;
+        string currentFile = Path.GetFileName(TargetPath) is { Length: > 0 } name
+            ? name
+            : MessageExportService.DefaultFileName(Message, Format);
+
+        if (FileSaveHelper.PickSaveFilePath(currentDir, currentFile, Format) is { Length: > 0 } chosen)
+        {
+            TargetPath = chosen;
+            if (chosen.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) Format = "html";
+            else if (chosen.EndsWith(".eml", StringComparison.OrdinalIgnoreCase)) Format = "eml";
+        }
+    }
+
+    void SaveNow()
+    {
+        if (Account == null || Message == null || string.IsNullOrWhiteSpace(TargetPath)) return;
+        try
+        {
+            string? saved = Format == "html"
+                ? MessageExportService.SaveAsHtmlToPath(Account, FolderFullName, Message, TargetPath.Trim(), OpenFolderAfterSave)
+                : MessageExportService.SaveAsEmlToPath(Account, FolderFullName, Message, TargetPath.Trim(), OpenFolderAfterSave);
+
+            ModalService.CloseAll();
+            MouseActionService.ReportStatus(saved != null
+                ? $"💾 Saved to {saved}"
+                : "Message body is not downloaded yet — open it online once first.");
+        }
+        catch (Exception ex)
+        {
+            MouseActionService.ReportStatus($"Could not save message: {ex.Message}");
+        }
+    }
+
+    static void Close() => ModalService.GoBack();
+}

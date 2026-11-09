@@ -73,6 +73,8 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
 
         /// <inheritdoc cref="AppTheme.PrimaryDark"/>
         public static Color PrimaryDark => ThemeManager.Current.PrimaryDark;
+        public static Color PrimarySoftBorder => Primary.WithAlpha(0.28f);
+        public static Color PrimaryBadgeTint => Primary.WithAlpha(0.14f);
 
         /// <inheritdoc cref="AppTheme.Secondary"/>
         public static Color Secondary => ThemeManager.Current.Secondary;

@@ -1,9 +1,20 @@
-@inherits MyLovelyMail.MainProject.UI.Elements.Modals.ModalBase
+@namespace MyLovelyMail.MainProject.UI.Elements.Core
 
-@if (IsVisible)
+@if (IsOpen)
 {
-    <div class="core-modal-backdrop" @onclick="HandleBackdropClick">
-        <div class="core-modal-content @(IsWobbling ? "wobbling-animation" : "")" style="@_computedStyle" @onclick:stopPropagation>
+    <div class="core-modal-backdrop" style="@_backdropStyle" tabindex="-1"
+         @onclick="HandleBackdropClick" @onkeydown="HandleKeyDown">
+        <div class="core-modal-sheet @CustomClass" style="@_sheetStyle" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrWhiteSpace(Title) || ShowCloseButton)
+            {
+                <div class="core-modal-header">
+                    <span class="core-modal-title">@Title</span>
+                    @if (ShowCloseButton)
+                    {
+                        <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="CloseAsync">✕</button>
+                    }
+                </div>
+            }
             @ChildContent
         </div>
     </div>
@@ -12,40 +23,49 @@
 <CoreModalCss />
 
 @code {
-    const bool ActivateModalLogs = false;
+    const bool ActivateCoreModalLogs = false;
 
-    [Parameter] public bool IsWobbling { get; set; }
-    [Parameter] public bool IsAcrylic { get; set; }
-    [Parameter] public bool TextAlignLeft { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool DismissOnBackdropTap { get; set; } = true;
+    [Parameter] public int MaxWidthPx { get; set; } = AppMeasures.Size.Px420;
+    [Parameter] public int PaddingPx { get; set; } = AppMeasures.Space.Large;
+    [Parameter] public int RadiusPx { get; set; } = AppMeasures.Radius.XXLarge;
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ShowCloseButton { get; set; }
 
-    // bu magic string değer'leri yerel nesnelere al. orneğin background bir Color nesnesine işaret etsin. public yap arkaplan gibi önemli şeyleri.
-    /// <summary> Opaque elevated card surface of the modal so background text never bleeds through. </summary>
-    public static Color Background => AppColors.TooltipBackground;
+    string _backdropStyle => AppStyles.BuildBackdropFrost();
 
-    /// <summary> Hairline border color of the modal card. </summary>
-    public static Color BorderColor => AppColors.GlassBorderDefault;
+    string _sheetStyle =>
+        $"max-width:{MaxWidthPx}px;" +
+        $"padding:{PaddingPx}px;" +
+        $"border-radius:{RadiusPx}px;";
 
-    /// <summary> Foreground text color shared by all modal variants. </summary>
-    public static Color TextColor => AppColors.TextPrimary;
-
-    string _layoutOverrides =>
-        (MaxWidthPx is { } maxW ? $"max-width:{maxW}px;" : string.Empty) +
-        (TextAlignLeft ? "text-align:left;" : string.Empty);
-
-    string _computedStyle => (IsAcrylic
-        ? AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong, AppMeasures.Blur.Heavy)
-          + $"border-radius:{AppMeasures.Radius.XLarge}px;padding:{AppMeasures.Space.Large}px;"
-          + $"color:{TextColor.ToRgbaHex(true)};"
-        : $"background:{Background.ToRgbaHex(true)};"
-          + $"border:{AppMeasures.Border.Thin}px solid {BorderColor.ToRgbaHex(true)};"
-          + $"border-radius:{AppMeasures.Radius.XLarge}px;padding:{AppMeasures.Space.Large}px;"
-          + $"box-shadow:{AppStyles.ShadowHeavy};"
-          + $"color:{TextColor.ToRgbaHex(true)};") + _layoutOverrides;
-
-    void HandleBackdropClick()
+    async Task HandleBackdropClick()
     {
-        Log("CoreModal backdrop tapped, closing modal", Run: ActivateModalLogs);
-        if (OnBackdropClick.HasDelegate) OnBackdropClick.InvokeAsync();
-        else if (OnClose.HasDelegate) OnClose.InvokeAsync();
+        if (!DismissOnBackdropTap)
+        {
+            Log("CoreModal backdrop tap ignored (DismissOnBackdropTap=false)", Run: ActivateCoreModalLogs);
+            return;
+        }
+        await CloseAsync();
+    }
+
+    async Task HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && DismissOnBackdropTap)
+        {
+            await CloseAsync();
+        }
+    }
+
+    async Task CloseAsync()
+    {
+        Log("CoreModal dismissed", Run: ActivateCoreModalLogs);
+        await IsOpenChanged.InvokeAsync(false);
+        await OnClose.InvokeAsync();
     }
 }

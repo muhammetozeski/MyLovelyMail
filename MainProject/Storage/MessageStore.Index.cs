@@ -15,6 +15,14 @@ namespace MyLovelyMail.MainProject.Storage
             public readonly ConcurrentDictionary<uint, MailMessageSummary> Summaries = [];
             public readonly Lock SaveLock = new();
             public bool Loaded;
+            public List<MailMessageSummary>? SortedCache;
+            public Dictionary<string, int>? SenderCounts;
+
+            public void InvalidateDerivedCaches()
+            {
+                SortedCache = null;
+                SenderCounts = null;
+            }
         }
 
         #region Summaries (the RAM mapping)
@@ -54,11 +62,22 @@ namespace MyLovelyMail.MainProject.Storage
                     Log($"Corrupt index line in '{path}': {ex.Message}", LogLevel.Warning);
                 }
             }
+            index.InvalidateDerivedCaches();
         }
 
-        /// <summary>All summaries of a folder, newest first. Loads the index from disk on first access.</summary>
-        public static List<MailMessageSummary> GetSummaries(string accountId, string folderFullName) =>
-            [.. GetIndex(accountId, folderFullName).Summaries.Values.OrderByDescending(s => s.DateUtc)];
+        /// <summary>All summaries of a folder, newest first. Uses an in-memory sorted cache so repeated reads on large folders are O(1).</summary>
+        public static List<MailMessageSummary> GetSummaries(string accountId, string folderFullName)
+        {
+            var index = GetIndex(accountId, folderFullName);
+            var cached = index.SortedCache;
+            if (cached != null) return [.. cached];
+
+            lock (index.SaveLock)
+            {
+                cached = index.SortedCache ??= [.. index.Summaries.Values.OrderByDescending(static s => s.DateUtc)];
+                return [.. cached];
+            }
+        }
 
         /// <summary>Counts cached summaries without sorting or building the displayed message list.</summary>
         /// <param name="accountId">Account owning the folder.</param>
@@ -70,6 +89,41 @@ namespace MyLovelyMail.MainProject.Storage
         {
             var summaries = GetIndex(accountId, folderFullName).Summaries;
             return predicate == null ? summaries.Count : summaries.Values.Count(predicate);
+        }
+
+        /// <summary>
+        /// Returns the total cached message count from <paramref name="senderAddress"/> across all folders of
+        /// <paramref name="accountId"/> using a pre-aggregated O(1) dictionary per folder instead of scanning every message row.
+        /// </summary>
+        public static int GetSenderMessageCount(string accountId, string senderAddress)
+        {
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(senderAddress)) return 0;
+            int total = 0;
+            foreach (var folder in GetFolders(accountId))
+            {
+                var index = GetIndex(accountId, folder.FullName);
+                var counts = index.SenderCounts;
+                if (counts == null)
+                {
+                    lock (index.SaveLock)
+                    {
+                        if (index.SenderCounts == null)
+                        {
+                            Dictionary<string, int> built = new(StringComparer.OrdinalIgnoreCase);
+                            foreach (var summary in index.Summaries.Values)
+                            {
+                                if (string.IsNullOrEmpty(summary.FromAddress)) continue;
+                                built[summary.FromAddress] = built.GetValueOrDefault(summary.FromAddress) + 1;
+                            }
+                            index.SenderCounts = built;
+                        }
+                        counts = index.SenderCounts;
+                    }
+                }
+                if (counts.TryGetValue(senderAddress, out int folderCount))
+                    total += folderCount;
+            }
+            return total;
         }
 
         public static MailMessageSummary? GetSummary(string accountId, string folderFullName, uint uid) =>
@@ -109,14 +163,12 @@ namespace MyLovelyMail.MainProject.Storage
                 if (index.Summaries.TryGetValue(summary.Uid, out var stored) && !ReferenceEquals(stored, summary))
                 {
                     CarryOverLocalState(stored, summary);
-                    // A read/star the user just made, whose push has not landed: the server is
-                    // reporting the state from BEFORE the change, so letting its answer win would
-                    // flip the message back in front of the user who just changed it.
                     if (pendingFlagPushes.ContainsKey(PendingKey(accountId, folderFullName, summary.Uid)))
                         summary.Flags = summary.Flags & ~ServerOwnedFlags | stored.Flags & ServerOwnedFlags;
                 }
                 index.Summaries[summary.Uid] = summary;
             }
+            lock (index.SaveLock) index.InvalidateDerivedCaches();
             SaveIndex(accountId, folderFullName, index);
             RefreshUnreadCount(accountId, folderFullName, index);
             OnFolderChanged?.Invoke(accountId, folderFullName);
@@ -125,10 +177,7 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>
         /// Tags, the Important/Muted markers and the snooze time exist ONLY here — no server knows
         /// them. A sync rebuilds summaries from the server and would silently wipe all of it, so a
-        /// freshly built summary inherits the app-local state of the row it replaces. Server-owned
-        /// fields (Seen, Flagged, subject, dates) keep coming from the incoming copy.
-        /// The app's own edits mutate the stored instance itself, and that case is skipped by the
-        /// caller's reference check — otherwise clearing a marker would immediately undo itself.
+        /// freshly built summary inherits the app-local state of the row it replaces.
         /// </summary>
         static void CarryOverLocalState(MailMessageSummary stored, MailMessageSummary incoming)
         {
@@ -140,13 +189,6 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>
         /// Recomputes the folder badge from the cached summaries — correct ONLY while the cache
         /// holds the whole folder.
-        /// <para>
-        /// The badge is the server's unread number for the entire folder, but the cache may hold a
-        /// slice of it (313 of 9,624 after a first fill). Recomputing from that slice dropped the
-        /// Inbox badge from 8,607 to 149 the moment anything touched a flag, and the next sync put
-        /// it back — a badge that meant two different things depending on what ran last.
-        /// Truncated folders take a delta from <see cref="SetSeen"/> instead.
-        /// </para>
         /// </summary>
         static void RefreshUnreadCount(string accountId, string folderFullName, FolderIndex index)
         {
@@ -160,9 +202,7 @@ namespace MyLovelyMail.MainProject.Storage
 
         /// <summary>
         /// Flips the Seen flag on the given summaries and moves the folder badge by exactly the
-        /// number that changed. The store owns this because it owns the badge: callers that
-        /// mutated <c>Flags</c> themselves and then upserted left no way to tell what changed,
-        /// which is why the count had to be guessed from the cache. Returns how many changed.
+        /// number that changed. Returns how many changed.
         /// </summary>
         public static int SetSeen(string accountId, string folderFullName, IEnumerable<MailMessageSummary> summaries, bool seen)
         {
@@ -175,6 +215,7 @@ namespace MyLovelyMail.MainProject.Storage
                 summary.Flags = seen ? summary.Flags | MailFlags.Seen : summary.Flags & ~MailFlags.Seen;
                 index.Summaries[summary.Uid] = summary;
             }
+            lock (index.SaveLock) index.InvalidateDerivedCaches();
             SaveIndex(accountId, folderFullName, index);
 
             if (GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName) is { } info)
@@ -198,9 +239,8 @@ namespace MyLovelyMail.MainProject.Storage
                 try { if (File.Exists(path)) File.Delete(path); }
                 catch (Exception ex) { Log($"Could not delete cached message '{path}': {ex.Message}", LogLevel.Warning); }
             }
+            lock (index.SaveLock) index.InvalidateDerivedCaches();
             SaveIndex(accountId, folderFullName, index);
-            // Same reason as SetSeen: a truncated folder's badge cannot be recomputed from the
-            // slice in the cache, so it moves by exactly what left.
             if (removedUnread > 0 && GetFolders(accountId).FirstOrDefault(f => f.FullName == folderFullName) is { } info)
             {
                 info.UnreadCount = Math.Max(0, info.UnreadCount - removedUnread);

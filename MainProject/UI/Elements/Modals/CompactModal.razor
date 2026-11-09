@@ -1,0 +1,27 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Modals
+
+<CoreModal IsOpen="@IsOpen"
+           IsOpenChanged="@IsOpenChanged"
+           OnClose="@OnClose"
+           DismissOnBackdropTap="@DismissOnBackdropTap"
+           MaxWidthPx="@MaxWidthPx"
+           PaddingPx="@PaddingPx"
+           RadiusPx="@AppMeasures.Radius.Large"
+           Title="@Title"
+           ShowCloseButton="@ShowCloseButton"
+           CustomClass="@($"compact-modal {CustomClass}".Trim())">
+    @ChildContent
+</CoreModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool DismissOnBackdropTap { get; set; } = true;
+    [Parameter] public int MaxWidthPx { get; set; } = AppMeasures.Size.Px320 + AppMeasures.Size.Px20;
+    [Parameter] public int PaddingPx { get; set; } = AppMeasures.Space.Px16;
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ShowCloseButton { get; set; }
+}

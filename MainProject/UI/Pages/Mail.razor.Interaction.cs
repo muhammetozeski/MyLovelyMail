@@ -13,35 +13,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
     // tracking and the small per-row visual helpers.
     public partial class Mail
     {
-        bool ShowShortcutHelp { get; set; }
-
-        static readonly (string Keys, string Action)[] ShortcutHelpRows =
-        [
-            ("J / ↓", "Focus next message"),
-            ("K / ↑", "Focus previous message"),
-            ("Enter", "Open focused message"),
-            ("U", "Toggle read / unread"),
-            ("S", "Toggle star (flag)"),
-            ("I", "Toggle important"),
-            ("M", "Mute / unmute the conversation"),
-            ("T", "Tag the selection (or the focused row)"),
-            ("X", "Tick / untick the focused row"),
-            ("Ctrl+A", "Tick every listed row"),
-            ("Ctrl+Shift+A", "Invert listed selection"),
-            ("Shift+↑ / Shift+↓", "Extend selection through the focused row"),
-            ("Home / End", "Focus first / last listed row"),
-            ("Ctrl+- / Ctrl+= / Ctrl+0", "Reader text smaller / larger / reset"),
-            ("N", "Next in the open conversation"),
-            ("P", "Previous in the open conversation"),
-            ("Delete", "Delete message"),
-            ("Escape", "Close reader / dialog"),
-            ("Ctrl+1..9", "Switch account"),
-            ("?", "Show this help"),
-            ("Search", "from: tag: has:attachment is:unread is:starred is:important is:snoozed"),
-            ("Search", "to:name@host — mail YOU sent to that address"),
-            ("Search by date", "after:2026-08-01 before: on: newer_than:7d older_than:3m")
-        ];
-
         /// <summary>Uids that arrived in the open folder since the previous refresh — they bloom once, then join the seen set.</summary>
         readonly HashSet<uint> bloomingUids = [];
         readonly HashSet<uint> seenUids = [];
@@ -107,9 +78,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ = OutboxService.FlushAsync();
         }
 
-        /// <summary>Result of the last folder-level action, shown under the folder list.</summary>
-        internal string? FolderActionStatus { get; set; }
-
         /// <summary>
         /// Writes the folder as one mbox file. The count of bodies that were never downloaded is
         /// reported rather than swallowed — an export that claims to be complete and is not would
@@ -121,14 +89,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
             try
             {
                 var result = MailboxExportService.ExportFolder(account, folder.FullName);
-                FolderActionStatus = result.SkippedUncached > 0
+                string status = result.SkippedUncached > 0
                     ? $"📦 {result.Written} of {result.Written + result.SkippedUncached} saved to {result.Path} — {result.SkippedUncached} bodies were never downloaded"
                     : $"📦 {result.Written} saved to {result.Path}";
+                MouseActionService.ReportStatus(status);
+                FileSaveHelper.RevealInFileExplorer(result.Path);
             }
             catch (Exception ex)
             {
                 Log($"Folder export failed: account={folder.AccountId}; folder='{folder.FullName}'; {ex}", LogLevel.Error);
-                FolderActionStatus = $"❌ {ex.Message}";
+                MouseActionService.ReportStatus($"❌ {ex.Message}");
             }
         }
 
@@ -153,71 +123,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
             }
         }
 
-        bool ShowBulkTagPicker { get; set; }
-
-        /// <summary>Its own field: the reader's tag input is bound to the OPEN message, not to a selection.</summary>
-        string BulkTagName { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Tags the checked rows, or the focused row when nothing is checked, so the 't' key
-        /// works the same way the other single-row keys do. One index write per folder.
-        /// </summary>
-        async Task BulkTag(string tagName, bool add)
-        {
-            ShowBulkTagPicker = false;
-            if (MailUiState.SelectedAccount is not { } account || tagName.Trim().Length == 0) return;
-
-            var targets = MailUiState.SelectedMessages.Count > 0 ? MailUiState.SelectedMessages.ToArray()
-                : MailUiState.FocusedMessage is { } focused ? MessageTargets(focused) : [];
-            await MouseActionService.RunMessagesAsync(add ? MailMessageCommand.AddTag : MailMessageCommand.RemoveTag, targets, tagName.Trim());
-
-            BulkTagName = string.Empty;
-            RefreshLists();
-        }
-
-        bool ShowSnoozePicker { get; set; }
-
-        /// <summary>Hides every checked row until the chosen moment; they come back unread.</summary>
-        async Task BulkSnooze(Func<DateTime> dueUtc)
-        {
-            ShowSnoozePicker = false;
-            await RunSelectionCommandAsync(MailMessageCommand.Snooze, dueUtc: dueUtc());
-        }
-
         /// <summary>Pulls a snoozed message back into the list right away.</summary>
-        Task WakeMessage(MailMessageSummary summary)
-        {
-            return MouseActionService.RunMessagesAsync(MailMessageCommand.Wake, MessageTargets(summary));
-        }
+        Task WakeMessage(MailMessageSummary summary) =>
+            MouseActionService.RunMessagesAsync(MailMessageCommand.Wake, MessageTargets(summary));
 
         /// <summary>Row chip text: when this message is due back.</summary>
         static string SnoozeLabel(DateTime dueUtc)
         {
             var due = dueUtc.ToLocalTime();
             return due.Date == DateTime.Today ? $"💤 {due:HH:mm}" : $"💤 {due:dd MMM HH:mm}";
-        }
-
-        bool ShowMovePicker { get; set; }
-
-        /// <summary>
-        /// Where the selection may go: from an IMAP server folder anywhere else (server or local),
-        /// from a local folder or a POP3 account only into other local folders — nothing can be
-        /// pushed UP to a server, since no upload path exists.
-        /// </summary>
-        List<MailFolderData> MoveTargets(IEnumerable<MailMessageIdentity> messages)
-        {
-            if (MailUiState.SelectedAccount is not { } account) return [];
-            var sources = messages.Select(static key => key.FolderFullName).ToHashSet(StringComparer.Ordinal);
-            bool serverSource = account.Protocol == IncomingProtocol.Imap && sources.All(folder =>
-                !MessageStore.IsLocalFolder(folder) && FolderSyncPolicy.PushesToServer(account.Id, folder));
-            return [.. Folders.Select(static node => node.Folder).Where(folder => folder.Selectable
-                && (sources.Count != 1 || !sources.Contains(folder.FullName)) && (serverSource || folder.IsLocal))];
-        }
-
-        async Task BulkMoveTo(MailFolderData targetFolder)
-        {
-            ShowMovePicker = false;
-            await RunSelectionCommandAsync(MailMessageCommand.Move, targetFolder.FullName);
         }
 
         void HandleListKeyDown(KeyboardEventArgs e)
@@ -268,13 +182,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 case "i" or "I" when focusedFolder != null:
                     MessageActions.ToggleImportant(account, focusedFolder, focused!);
                     break;
-                // The row checkbox is a span with @onclick, so ticking one row had no keyboard
-                // route at all — only Ctrl+A for the whole list.
                 case "m" or "M" when focusedFolder != null:
                     MessageActions.ToggleMuted(account, focusedFolder, focused!);
                     break;
-                case "t" or "T" when focused != null:
-                    ShowBulkTagPicker = !ShowBulkTagPicker;
+                case "t" or "T":
+                    if (MailUiState.SelectedMessages.Count > 0) OpenBulkMarkersModal();
+                    else if (focused != null) OpenMarkersModal(focused);
                     break;
                 case "x" or "X" when focused != null:
                     ToggleRowSelection(new MouseEventArgs(), focused);
@@ -290,14 +203,10 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     MailUiState.FocusMessage(null);
                     break;
                 case "Escape":
-                    if (ShowBulkTagPicker) ShowBulkTagPicker = false;
-                    else if (ShowMovePicker) ShowMovePicker = false;
-                    else if (ShowSnoozePicker) ShowSnoozePicker = false;
-                    else if (ShowShortcutHelp) ShowShortcutHelp = false;
+                    if (ModalService.Active != null) ModalService.Close();
                     else if (MailUiState.SelectedMessages.Count > 0) MailUiState.ClearSelection();
                     else MailUiState.CloseMessage();
                     break;
-                // Ctrl with the zoom keys, the shape every reader uses.
                 case "+" or "=" when e.CtrlKey:
                     StepReaderTextScale(1);
                     break;
@@ -311,8 +220,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     SelectAllMessages();
                     break;
                 case "?":
-                    if (ShowShortcutHelp) ShowShortcutHelp = false;
-                    else ShowKeyboardShortcuts();
+                    OpenShortcutHelpModal();
                     break;
                 case var digit when e.CtrlKey && digit.Length == 1 && digit[0] is >= '1' and <= '9':
                     int accountIndex = digit[0] - '1';

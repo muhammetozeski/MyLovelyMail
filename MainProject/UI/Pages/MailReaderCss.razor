@@ -15,36 +15,65 @@
     .mail-reader {
         display: flex;
         flex-direction: column;
-        gap: @(AppMeasures.Space.Medium)px;
-        /* No inner scrollport. The column is as tall as the message needs and the page carries
-           it; a short message still fills the window because of the floor. */
+        gap: @(AppMeasures.Space.Small)px;
         min-height: @paneHeight;
     }
 
-    .mail-reader-header {
+    .mail-reader-header-card {
         display: flex;
-        align-items: flex-start;
-        gap: @(AppMeasures.Space.Px12)px;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding-bottom: @(AppMeasures.Space.Px6)px;
+        border-image: linear-gradient(90deg, var(--account-accent, @primary), @AppColors.Accent.ToRgbaHex(true)) 1;
+        border-bottom: @(AppMeasures.Border.Medium)px solid;
+    }
+
+    .mail-reader-top-row {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+        min-width: 0;
     }
 
     .mail-reader-list-nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: @(AppMeasures.Space.Px6)px;
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        margin-left: auto;
+        flex-shrink: 0;
     }
 
-    .mail-reader-titles {
+    .mail-reader-meta-row {
         display: flex;
-        flex-direction: column;
-        gap: @(AppMeasures.Space.Px4)px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textSecondary;
         min-width: 0;
+    }
+
+    .mail-reader-meta-left {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        min-width: 0;
+    }
+
+    .mail-reader-badges-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
     }
 
     /* Remounted per message via @@key, so the open animation replays on every switch. */
     .mail-reader-content {
         display: flex;
         flex-direction: column;
-        gap: @(AppMeasures.Space.Medium)px;
+        gap: @(AppMeasures.Space.Small)px;
         min-height: 0;
         flex: 1;
         animation: reader-open @(AppMeasures.Duration.Medium)s cubic-bezier(0.16, 1, 0.3, 1);
@@ -62,29 +91,32 @@
         }
     }
 
-    /* No gradient-clipped ink here: background-clip:text crushes color emoji in subjects into
-       tinted silhouettes. Solid text + a gradient underline carries the accent instead. */
     .mail-reader-subject {
-        padding-bottom: @(AppMeasures.Space.Px4)px;
-        font-size: @(AppMeasures.Font.Title)px;
+        flex: 1;
+        min-width: 0;
+        font-size: @(AppMeasures.Font.Large)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @textPrimary;
         line-height: @(AppMeasures.LineHeight.Tight);
-        border-image: linear-gradient(90deg, var(--account-accent, @primary), @AppColors.Accent.ToRgbaHex(true)) 1;
-        border-bottom: @(AppMeasures.Border.Medium)px solid;
-    }
-
-    .mail-reader-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: @(AppMeasures.Space.Px8)px;
-        font-size: @(AppMeasures.Font.Small)px;
-        color: @textSecondary;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .mail-reader-to {
+        margin-left: auto;
         font-size: @(AppMeasures.Font.Small)px;
         color: @textMuted;
+        text-align: right;
+        max-width: 48%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mail-search-toggle--pinned {
+        border-color: @AppColors.PrimarySoftBorder.ToRgbaHex(true);
+        background: @AppColors.PrimaryBadgeTint.ToRgbaHex(true);
     }
 
     /* Grows to fill the window when the message is short, never shrinks below it when it is not. */
@@ -95,15 +127,12 @@
     .mail-reader-frame {
         width: @(AppMeasures.Percent.Full)%;
         flex: 1 0 auto;
-        /* mail-reader.js replaces this with the message's own rendered height, so the mail opens
-           whole rather than scrolling inside a window-sized box. The bounds below hold either
-           way, and this stays the height wherever that script has not run. */
         height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Size.Px320)px);
         min-height: @(AppMeasures.Size.Px300)px;
-        max-height: @(AppMeasures.Size.ReaderBodyMax)px;
         border: none;
         border-radius: @(AppMeasures.Radius.Medium)px;
         background: @AppColors.MailCanvas.Background;
+        overflow-y: hidden;
     }
 
     .mail-body-loading {

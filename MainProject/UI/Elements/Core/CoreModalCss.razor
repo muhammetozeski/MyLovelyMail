@@ -1,99 +1,85 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Core
 @inherits ThemedComponentBase
+
 <style>
     .core-modal-backdrop {
         position: fixed;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        @AppStyles.BuildBackdropFrost(AppMeasures.Blur.Strong)
+        width: @(AppMeasures.Viewport.Full)vw;
+        height: @(AppMeasures.Viewport.Full)vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: @(AppMeasures.Space.Px24)px;
+        padding: @(AppMeasures.Space.Medium)px;
         box-sizing: border-box;
-        overscroll-behavior: contain;
         z-index: @(AppMeasures.ZLayer.Modal);
-        animation: fadeIn @(AppMeasures.Duration.Normal)s ease-out;
+        animation: core-modal-fade-in @(AppMeasures.Duration.Fast)s ease-out;
+        outline: none;
     }
 
-    .core-modal-content {
+    .core-modal-sheet {
         width: @(AppMeasures.Percent.Full)%;
-        max-width: @(AppMeasures.Size.ModalCompact)px;
-        max-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px40)px);
+        max-height: 90vh;
         overflow-y: auto;
-        overscroll-behavior: contain;
-        text-align: center;
-        animation: scaleIn @(AppMeasures.Duration.Normal)s cubic-bezier(0.16, 1, 0.3, 1);
+        text-align: left;
         box-sizing: border-box;
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        box-shadow: inset 0 @(AppMeasures.Border.Thin)px 0 @AppColors.GlassBorderTop.ToRgbaHex(true), @AppStyles.ShadowHeavy;
+        animation: core-modal-pop-in @(AppMeasures.Duration.Normal)s cubic-bezier(0.16, 1, 0.3, 1);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
     }
 
     .core-modal-header {
         display: flex;
         align-items: center;
-        gap: @(AppMeasures.Space.Px12)px;
-        margin-bottom: @(AppMeasures.Space.Px16)px;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+        margin-bottom: @(AppMeasures.Space.Px12)px;
+        padding-bottom: @(AppMeasures.Space.Px8)px;
+        border-bottom: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
     }
 
     .core-modal-title {
-        margin: 0;
-        font-size: @(AppMeasures.Font.Large)px;
+        font-size: @(AppMeasures.Font.Medium)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @AppColors.TextPrimary.ToRgbaHex(true);
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
-    .wobbling-animation {
-        animation: wobble @(AppMeasures.Duration.Slow)s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    .core-modal-close {
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        width: @(AppMeasures.Size.Px28)px;
+        height: @(AppMeasures.Size.Px28)px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-    @@keyframes fadeIn {
+        .core-modal-close:hover {
+            color: @AppColors.Primary.ToRgbaHex(true);
+            border-color: @AppColors.Primary.ToRgbaHex(true);
+        }
+
+    @@keyframes core-modal-fade-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    @@keyframes core-modal-pop-in {
         from {
             opacity: 0;
+            transform: scale(0.94) translateY(@(AppMeasures.Space.Px8)px);
         }
-
         to {
             opacity: 1;
-        }
-    }
-
-    @@keyframes scaleIn {
-        from {
-            transform: scale(0.9);
-            opacity: 0;
-        }
-
-        to {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-
-    @@keyframes wobble {
-        0% {
-            transform: scale(0) rotate(-15deg);
-            opacity: 0;
-        }
-
-        40% {
-            transform: scale(1.1) rotate(10deg);
-            opacity: 1;
-        }
-
-        60% {
-            transform: scale(0.9) rotate(-5deg);
-        }
-
-        80% {
-            transform: scale(1.05) rotate(2deg);
-        }
-
-        100% {
-            transform: scale(1) rotate(0deg);
+            transform: scale(1) translateY(0);
         }
     }
 </style>

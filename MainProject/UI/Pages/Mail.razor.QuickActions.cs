@@ -114,18 +114,11 @@ public partial class Mail
             OpenMessageOrDraft(message);
     }
 
-    void ShowKeyboardShortcuts()
-    {
-        ShowMessageSource = false;
-        ModalService.CloseAll();
-        ShowShortcutHelp = true;
-    }
-
     internal ContextMenuItem[] GeneralWorkspaceMenuItems() =>
     [
         new("☑ Select", Children: SelectionMenuItems()),
         new("🧭 Navigate list", Children: ListNavigationMenuItems()),
-        new("⌨️ Keyboard shortcuts", ShowKeyboardShortcuts)
+        new("⌨️ Keyboard shortcuts", OpenShortcutHelpModal)
     ];
 
     IReadOnlyList<ContextMenuItem> ListNavigationMenuItems() =>

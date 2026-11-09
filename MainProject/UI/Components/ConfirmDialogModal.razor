@@ -1,0 +1,38 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">@Title</span>
+    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Cancel">✕</button>
+</div>
+
+<div style="font-size:@(AppMeasures.Font.Normal)px;color:@AppColors.TextSecondary.ToRgbaHex(true);line-height:@(AppMeasures.LineHeight.Relaxed);margin-bottom:@(AppMeasures.Space.Px16)px;white-space:pre-wrap;">
+    @Message
+</div>
+
+<div style="display:flex;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;">
+    @if (!IsAlertOnly)
+    {
+        <SecondaryButton OnClick="@Cancel">@CancelLabel</SecondaryButton>
+    }
+    @if (IsDanger)
+    {
+        <DangerButton OnClick="@Confirm">@ConfirmLabel</DangerButton>
+    }
+    else
+    {
+        <PrimaryButton OnClick="@Confirm">@ConfirmLabel</PrimaryButton>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = string.Empty;
+    [Parameter] public string ConfirmLabel { get; set; } = "Confirm";
+    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+    [Parameter] public bool IsDanger { get; set; }
+    [Parameter] public bool IsAlertOnly { get; set; }
+    [Parameter] public Action<bool>? OnDecision { get; set; }
+
+    void Confirm() => OnDecision?.Invoke(true);
+    void Cancel() => OnDecision?.Invoke(false);
+}

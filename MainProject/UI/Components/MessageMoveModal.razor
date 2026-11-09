@@ -1,0 +1,65 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">📂 Move to Folder</span>
+    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<input class="mail-move-filter" style="width:100%;box-sizing:border-box;margin-bottom:@(AppMeasures.Space.Px8)px;"
+       placeholder="Filter folders…"
+       @bind="FilterText" @bind:event="oninput" />
+
+<div style="display:flex;flex-direction:column;gap:2px;max-height:260px;overflow-y:auto;">
+    @foreach (var node in FilteredFolders)
+    {
+        <button class="mail-move-option"
+                style="padding-left:@(8 + node.Depth * 12)px"
+                type="button"
+                @onclick="() => MoveToAsync(node.Folder.FullName)">
+            @FolderIcon(node.Folder) @node.Folder.DisplayName
+        </button>
+    }
+    @if (FilteredFolders.Count == 0)
+    {
+        <span style="font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextMuted.ToRgbaHex(true);padding:8px;">
+            No matching destination folders.
+        </span>
+    }
+</div>
+
+@code {
+    [Parameter] public MailMessageIdentity[] Targets { get; set; } = [];
+    [Parameter] public List<FolderNode> Destinations { get; set; } = [];
+    [Parameter] public Action? OnMoved { get; set; }
+
+    string FilterText { get; set; } = string.Empty;
+
+    List<FolderNode> FilteredFolders =>
+        string.IsNullOrWhiteSpace(FilterText)
+            ? Destinations
+            : [.. Destinations.Where(n => n.Folder.DisplayName.Contains(FilterText.Trim(), StringComparison.OrdinalIgnoreCase)
+                || n.Folder.FullName.Contains(FilterText.Trim(), StringComparison.OrdinalIgnoreCase))];
+
+    static string FolderIcon(MailFolderData folder) => folder.IsLocal ? "🗂️" : folder.Role switch
+    {
+        FolderRole.Inbox => "📥",
+        FolderRole.Sent => "📤",
+        FolderRole.Drafts => "📝",
+        FolderRole.Trash => "🗑️",
+        FolderRole.Junk => "🚫",
+        FolderRole.Archive => "📦",
+        FolderRole.Outbox => "⏳",
+        FolderRole.Flagged => "⭐",
+        FolderRole.AllMail => "📚",
+        _ => "📁"
+    };
+
+    async Task MoveToAsync(string folderFullName)
+    {
+        ModalService.CloseAll();
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.Move, Targets, folderFullName);
+        OnMoved?.Invoke();
+    }
+
+    static void Close() => ModalService.GoBack();
+}

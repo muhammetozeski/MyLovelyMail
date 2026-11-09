@@ -1,0 +1,109 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">⭐ Star, Importance &amp; Tags</span>
+    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div style="display:flex;gap:@(AppMeasures.Space.Px8)px;margin-bottom:@(AppMeasures.Space.Px12)px;">
+    <button class="mail-action-btn @(IsStarred ? "mail-action-btn--active" : "")"
+            style="flex:1;justify-content:center;padding:@(AppMeasures.Space.Px8)px;"
+            type="button" @onclick="ToggleStarAsync">
+        @(IsStarred ? "⭐ Starred" : "☆ Star")
+    </button>
+    <button class="mail-action-btn @(IsImportant ? "mail-action-btn--active" : "")"
+            style="flex:1;justify-content:center;padding:@(AppMeasures.Space.Px8)px;"
+            type="button" @onclick="ToggleImportantAsync">
+        @(IsImportant ? "❗ Important" : "❕ Mark important")
+    </button>
+</div>
+
+<div style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);margin-bottom:@(AppMeasures.Space.Px6)px;">
+    🏷️ TAGS
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:@(AppMeasures.Space.Px6)px;margin-bottom:@(AppMeasures.Space.Px12)px;max-height:160px;overflow-y:auto;">
+    @foreach (string tag in AllAvailableTags)
+    {
+        bool active = HasTag(tag);
+        <button class="mail-move-option"
+                style="width:auto;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid @(active ? TagStore.ColorOf(tag) : AppColors.GlassBorderDefault.ToRgbaHex(true));background:@(active ? AppColors.SurfaceTintPrimary.ToRgbaHex(true) : AppColors.SurfaceSubtle.ToRgbaHex(true));"
+                type="button" @onclick="() => ToggleTagAsync(tag)">
+            <span class="mail-tag-dot" style="background:@TagStore.ColorOf(tag)"></span>
+            <span>@tag</span>
+            @if (active)
+            {
+                <span style="font-weight:bold;">✓</span>
+            }
+        </button>
+    }
+    @if (AllAvailableTags.Count == 0)
+    {
+        <span style="font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextMuted.ToRgbaHex(true);">No tags yet. Create one below.</span>
+    }
+</div>
+
+<div class="mail-tag-new" style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
+    <input class="mail-tag-input" style="flex:1;" placeholder="New tag name…"
+           @bind="NewTagText" @bind:event="oninput"
+           @onkeydown="HandleNewTagKey" />
+    <PrimaryButton OnClick="@AddNewTagAsync" Disabled="@string.IsNullOrWhiteSpace(NewTagText)">+ Add</PrimaryButton>
+</div>
+
+@code {
+    [Parameter] public MailMessageIdentity[] Targets { get; set; } = [];
+    [Parameter] public Action? OnUpdated { get; set; }
+
+    string NewTagText { get; set; } = string.Empty;
+
+    List<MailMessageSummary> ResolvedSummaries =>
+        [.. Targets.Select(k => MessageStore.GetSummary(k.AccountId, k.FolderFullName, k.Uid)).OfType<MailMessageSummary>()];
+
+    bool IsStarred => ResolvedSummaries.Any(static s => s.Flags.HasFlag(MailFlags.Flagged));
+    bool IsImportant => ResolvedSummaries.Any(static s => s.Flags.HasFlag(MailFlags.Important));
+
+    IReadOnlyList<string> AllAvailableTags =>
+        [.. TagStore.AllTags.Concat(ResolvedSummaries.SelectMany(static s => s.Tags)).Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    bool HasTag(string tag) =>
+        ResolvedSummaries.Any(s => s.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase));
+
+    async Task ToggleStarAsync()
+    {
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.ToggleStar, Targets);
+        OnUpdated?.Invoke();
+        StateHasChanged();
+    }
+
+    async Task ToggleImportantAsync()
+    {
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.ToggleImportant, Targets);
+        OnUpdated?.Invoke();
+        StateHasChanged();
+    }
+
+    async Task ToggleTagAsync(string tag)
+    {
+        var command = HasTag(tag) ? MailMessageCommand.RemoveTag : MailMessageCommand.AddTag;
+        await MouseActionService.RunMessagesAsync(command, Targets, tag);
+        OnUpdated?.Invoke();
+        StateHasChanged();
+    }
+
+    async Task AddNewTagAsync()
+    {
+        string trimmed = NewTagText.Trim();
+        if (trimmed.Length == 0) return;
+        NewTagText = string.Empty;
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.AddTag, Targets, trimmed);
+        OnUpdated?.Invoke();
+        StateHasChanged();
+    }
+
+    async Task HandleNewTagKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddNewTagAsync();
+    }
+
+    static void Close() => ModalService.GoBack();
+}

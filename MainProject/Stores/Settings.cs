@@ -67,6 +67,44 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>Show the unread-count badge on folders and the tray icon.</summary>
         public static readonly Setting<bool> ShowUnreadBadge = new(true);
 
+        // ---- Fine-Tuning (Scrollbars, Column Splitters & Pinned Actions) ----
+
+        /// <summary>Default width in pixels of the unified custom scrollbar across the app.</summary>
+        public const int DefaultScrollbarWidthPx = 6;
+
+        /// <summary>Default bright light-green hex color for scrollbars and column splitters.</summary>
+        public const string DefaultScrollbarColorHex = "#4ADE80";
+
+        /// <summary>Default width percentage (double precision) for the left sidebar column.</summary>
+        public const double DefaultSidebarColumnPercent = 20.0;
+
+        /// <summary>Default width percentage (double precision) for the middle message list column.</summary>
+        public const double DefaultListColumnPercent = 32.0;
+
+        /// <summary>Default width percentage (double precision) for the right reader/workspace column.</summary>
+        public const double DefaultReaderColumnPercent = 48.0;
+
+        /// <summary>Snap threshold in percentage points when dragging a column splitter near its default value.</summary>
+        public const double SplitterSnapThresholdPercent = 3.0;
+
+        /// <summary>Width of scrollbars across the application in pixels (clamped 3-16).</summary>
+        public static readonly Setting<int> ScrollbarWidthPx = new(DefaultScrollbarWidthPx);
+
+        /// <summary>Flat accent color hex used for scrollbars and column splitters across the application.</summary>
+        public static readonly Setting<string> ScrollbarColorHex = new(DefaultScrollbarColorHex);
+
+        /// <summary>Left sidebar column width percentage stored in IEEE 754 double precision.</summary>
+        public static readonly Setting<double> SidebarColumnPercent = new(DefaultSidebarColumnPercent);
+
+        /// <summary>Middle message list column width percentage stored in IEEE 754 double precision.</summary>
+        public static readonly Setting<double> ListColumnPercent = new(DefaultListColumnPercent);
+
+        /// <summary>Right reader/workspace column width percentage stored in IEEE 754 double precision.</summary>
+        public static readonly Setting<double> ReaderColumnPercent = new(DefaultReaderColumnPercent);
+
+        /// <summary>Comma-separated list of reader action IDs pinned next to the Message actions button.</summary>
+        public static readonly Setting<string> PinnedReaderActions = new("archive,move,snooze");
+
         // ---- Sync ----
 
         /// <summary>Minutes between automatic mail syncs when IMAP IDLE is not active.</summary>

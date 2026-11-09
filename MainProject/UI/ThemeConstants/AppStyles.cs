@@ -18,6 +18,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             => $"{x}px {y}px {blur}px rgba({(int)(color.Red * 255)}, {(int)(color.Green * 255)}, {(int)(color.Blue * 255)}, {opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
 
         public static string ShadowSoft => GetShadow(0, 4, 12, Colors.Black, 0.05f);
+        public static string ShadowSmall => ShadowSoft;
         public static string ShadowMedium => GetShadow(0, 10, 25, Colors.Black, 0.15f);
         public static string ShadowHeavy => GetShadow(0, 20, 40, Colors.Black, 0.25f);
         public static string ShadowPrimaryGlow => GetShadow(0, 8, 20, AppColors.Primary, 0.3f);
@@ -154,5 +155,65 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// </summary>
         public static string BuildCalmMotionLayer() =>
             MotionPreference.IsCalm ? $"*, *::before, *::after {{ {CalmMotionDeclarations} }}" : string.Empty;
+
+        /// <summary>Resolves the configured scrollbar and splitter accent color, falling back to bright light green.</summary>
+        public static string ResolvedScrollbarColorHex()
+        {
+            string raw = Stores.Settings.ScrollbarColorHex.Value?.Trim() ?? string.Empty;
+            return raw.StartsWith('#') && (raw.Length == 7 || raw.Length == 9) ? raw : Stores.Settings.DefaultScrollbarColorHex;
+        }
+
+        /// <summary>Resolves a subtle translucent track color shown only when hovering over the scrollbar track.</summary>
+        public static string ResolvedScrollbarTrackHoverColor()
+        {
+            try
+            {
+                return Color.FromArgb(ResolvedScrollbarColorHex()).WithAlpha(0.16f).ToRgbaHex(true);
+            }
+            catch
+            {
+                return "rgba(74, 222, 128, 0.16)";
+            }
+        }
+
+        /// <summary>
+        /// Central inherited scrollbar CSS rules shared by the main window, modals, sidebars, lists, and reader iframes.
+        /// Backgroundless track by default, narrow flat bright light-green thumb, and a faint translucent track on hover.
+        /// </summary>
+        public static string BuildScrollbarStyles()
+        {
+            int widthPx = Math.Clamp(Stores.Settings.ScrollbarWidthPx.Value, 3, 16);
+            string thumbColor = ResolvedScrollbarColorHex();
+            string hoverTrackColor = ResolvedScrollbarTrackHoverColor();
+
+            return $$"""
+                *::-webkit-scrollbar {
+                    width: {{widthPx}}px;
+                    height: {{widthPx}}px;
+                    background: transparent;
+                }
+                *::-webkit-scrollbar-track {
+                    background: transparent;
+                    border-radius: 999px;
+                    transition: background 0.15s ease;
+                }
+                *::-webkit-scrollbar-track:hover,
+                *::-webkit-scrollbar-track:active {
+                    background: {{hoverTrackColor}};
+                }
+                *::-webkit-scrollbar-thumb {
+                    background: {{thumbColor}};
+                    border-radius: 999px;
+                    border: none;
+                }
+                *::-webkit-scrollbar-thumb:hover {
+                    background: {{thumbColor}};
+                    filter: brightness(1.12);
+                }
+                *::-webkit-scrollbar-corner {
+                    background: transparent;
+                }
+                """;
+        }
     }
 }

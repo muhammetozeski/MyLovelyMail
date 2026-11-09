@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
@@ -10,7 +8,6 @@ namespace MyLovelyMail.MainProject.UI.Pages;
 
 public partial class Mail
 {
-    [Inject] IJSRuntime FastMailJs { get; set; } = default!;
     readonly HashSet<string> fastMailDeletionPending = [];
 
     internal async Task DeleteFastMailAccountAsync(MailAccountData account)
@@ -19,8 +16,22 @@ public partial class Mail
         try
         {
             var recovery = FastMailRecovery.FindRecoveryAccount();
-            if (!await FastMailJs.InvokeAsync<bool>("confirm", $"Delete Fast Mail account {account.EmailAddress} and its local data? An encrypted recovery script will be put in the Recycle Bin.")) return;
-            if (!await FastMailJs.InvokeAsync<bool>("confirm", $"Confirm deletion again. Recovery will require the password of normal account {recovery.EmailAddress} as it is now. Continue?")) return;
+            bool firstConfirm = await ModalService.ConfirmAsync(
+                "Delete Fast Mail Account?",
+                $"Delete Fast Mail account {account.EmailAddress} and its local data? An encrypted recovery script will be put in the Recycle Bin.",
+                confirmLabel: "Continue",
+                cancelLabel: "Cancel",
+                isDanger: true);
+            if (!firstConfirm) return;
+
+            bool secondConfirm = await ModalService.ConfirmAsync(
+                "Confirm Encrypted Recovery",
+                $"Confirm deletion again. Recovery will require the password of normal account {recovery.EmailAddress} as it is now. Continue?",
+                confirmLabel: "🗑️ Delete Fast Mail",
+                cancelLabel: "Cancel",
+                isDanger: true);
+            if (!secondConfirm) return;
+
             if (MailUiState.ActiveCompose is { } draft && draft.Account?.Id == account.Id)
             {
                 ComposeService.SaveDraft(draft);
@@ -32,12 +43,13 @@ public partial class Mail
                 MailUiState.SelectAccount(AccountStore.Accounts.FirstOrDefault(a => a.Id != account.Id), restoreFolder: true);
             await FastMailRecovery.DeleteAsync(account, recovery);
             SaveStatus = "Fast Mail deleted. Its encrypted recovery script is in the Recycle Bin.";
+            MouseActionService.ReportStatus(SaveStatus);
         }
         catch (Exception ex)
         {
             SaveStatus = "Could not complete encrypted deletion: " + ex.Message;
             Log($"Encrypted Fast Mail deletion failed: {ex.GetType().Name}.", LogLevel.Error);
-            await FastMailJs.InvokeVoidAsync("alert", SaveStatus);
+            await ModalService.AlertAsync("Fast Mail Deletion Failed", SaveStatus);
         }
         finally { fastMailDeletionPending.Remove(account.Id); }
     }

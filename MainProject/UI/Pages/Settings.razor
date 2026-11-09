@@ -1,6 +1,7 @@
 @attribute [Route(NavigationConstants.Settings.Link)]
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
 @implements IDisposable
+@using System.Globalization
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>Settings — My Lovely Mail</PageTitle>
 
@@ -83,8 +84,85 @@
         </div>
     </GlassCard>
 
-    @* The tray, a minimized start and the sign-in autostart belong to a desktop window. On a phone the
-       app starts with the system on its own and has no window to hide. *@
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🎛️ Fine-tuning (İnce Ayarlar)</div>
+
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Scrollbar width (px)</span>
+                <span class="settings-row-hint">Backgroundless scrollbar thumb thickness across all scrollable surfaces · Default: @(GlobalSettings.DefaultScrollbarWidthPx) px</span>
+            </div>
+            <div class="settings-finetune-controls">
+                @foreach (int presetPx in ScrollbarWidthPresets)
+                {
+                    <button class="settings-density-option @(GlobalSettings.ScrollbarWidthPx.Value == presetPx ? "settings-density-option--on" : "")"
+                            @onclick="() => SetScrollbarWidth(presetPx.ToString(CultureInfo.InvariantCulture))">@(presetPx)px</button>
+                }
+                <div class="settings-number">
+                    <CoreInput Type="number" Value="@GlobalSettings.ScrollbarWidthPx.Value.ToString(CultureInfo.InvariantCulture)" ValueChanged="@SetScrollbarWidth" />
+                </div>
+                <SecondaryButton OnClick="@ResetScrollbarWidthDefault" Disabled="@(GlobalSettings.ScrollbarWidthPx.Value == GlobalSettings.DefaultScrollbarWidthPx)">↺ Default</SecondaryButton>
+            </div>
+        </div>
+
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Scrollbar &amp; column splitter color</span>
+                <span class="settings-row-hint">Single flat color for scrollbars and column splitters; hover reveals a subtle track · Default: @GlobalSettings.DefaultScrollbarColorHex</span>
+            </div>
+            <div class="settings-finetune-controls">
+                @foreach (var swatch in ScrollbarColorPresets)
+                {
+                    <button class="settings-color-swatch @(string.Equals(GlobalSettings.ScrollbarColorHex.Value, swatch.Hex, StringComparison.OrdinalIgnoreCase) ? "settings-color-swatch--on" : "")"
+                            style="background:@swatch.Hex"
+                            title="@swatch.Name (@swatch.Hex)"
+                            @onclick="() => SetScrollbarColor(swatch.Hex)"></button>
+                }
+                <input type="color" class="settings-color-picker"
+                       value="@AppStyles.ResolvedScrollbarColorHex()"
+                       @onchange="e => SetScrollbarColor(e.Value?.ToString() ?? GlobalSettings.DefaultScrollbarColorHex)" />
+                <div class="settings-number settings-number--hex">
+                    <CoreInput Value="@GlobalSettings.ScrollbarColorHex.Value" ValueChanged="@SetScrollbarColor" />
+                </div>
+                <SecondaryButton OnClick="@ResetScrollbarColorDefault" Disabled="@string.Equals(GlobalSettings.ScrollbarColorHex.Value, GlobalSettings.DefaultScrollbarColorHex, StringComparison.OrdinalIgnoreCase)">↺ Default</SecondaryButton>
+            </div>
+        </div>
+
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Three-column widths (%)</span>
+                <span class="settings-row-hint">
+                    Sidebar / Message list / Reader pane width percentages (double precision). Dragging the thin splitters between columns snaps within ±3% of default ·
+                    Defaults: @(GlobalSettings.DefaultSidebarColumnPercent.ToString("0.##", CultureInfo.InvariantCulture))% /
+                    @(GlobalSettings.DefaultListColumnPercent.ToString("0.##", CultureInfo.InvariantCulture))% /
+                    @(GlobalSettings.DefaultReaderColumnPercent.ToString("0.##", CultureInfo.InvariantCulture))%
+                </span>
+            </div>
+            <div class="settings-finetune-columns">
+                <div class="settings-column-field">
+                    <span class="settings-column-caption">Sidebar %</span>
+                    <CoreInput Value="@GlobalSettings.SidebarColumnPercent.Value.ToString("0.##", CultureInfo.InvariantCulture)"
+                               ValueChanged="@(v => SetSingleColumnPercent(0, v))" />
+                </div>
+                <div class="settings-column-field">
+                    <span class="settings-column-caption">List %</span>
+                    <CoreInput Value="@GlobalSettings.ListColumnPercent.Value.ToString("0.##", CultureInfo.InvariantCulture)"
+                               ValueChanged="@(v => SetSingleColumnPercent(1, v))" />
+                </div>
+                <div class="settings-column-field">
+                    <span class="settings-column-caption">Reader %</span>
+                    <CoreInput Value="@GlobalSettings.ReaderColumnPercent.Value.ToString("0.##", CultureInfo.InvariantCulture)"
+                               ValueChanged="@(v => SetSingleColumnPercent(2, v))" />
+                </div>
+                <SecondaryButton OnClick="@ResetColumnWidthDefaults" Disabled="@AreColumnWidthsDefault">↺ Reset columns</SecondaryButton>
+            </div>
+        </div>
+
+        <div class="settings-migration-actions">
+            <SecondaryButton OnClick="@ResetAllFineTuningDefaults">↺ Reset all fine-tuning to defaults</SecondaryButton>
+        </div>
+    </GlassCard>
+
     @if (PlatformFeatures.HasDesktopWindow)
     {
     <GlassCard CustomClass="settings-section">
@@ -190,8 +268,6 @@
         </div>
     </GlassCard>
 
-    @* Its own card, not a row inside Composing: a signature is content the user writes, and it
-       needs an editor and a preview rather than a one-line field. *@
     <GlassCard CustomClass="settings-section">
         <SignatureEditor Value="@GlobalSettings.Signature.Value"
                          ValueChanged="@(value => SetAndSave(GlobalSettings.Signature, value))" />
@@ -302,8 +378,6 @@
         }
     </GlassCard>
 
-    @* How to REACH Tor lives here; whether an account may only use it is that account's own
-       switch, on its settings page — it belongs to the mailbox, not to this machine. *@
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🛡️ Tor</div>
         <p class="settings-empty-text">
@@ -337,8 +411,6 @@
             </div>
             <CoreToggle Checked="@GlobalSettings.TorAutoStart.Value" CheckedChanged="@(v => SetAndSave(GlobalSettings.TorAutoStart, v))" />
         </div>
-        @* Only where the app searches for a tor. The Android app runs the one inside its own package,
-           and no path typed here could point at anything Android would let it execute. *@
         @if (TorProcess.BundledExecutablePath == null)
         {
             <div class="settings-row">
@@ -367,8 +439,6 @@
         <div class="settings-row">
             <div class="settings-row-text">
                 <span class="settings-row-label">Route</span>
-                @* polite, not assertive: this line changes several times during a bootstrap and a
-                   screen reader should finish the sentence it is on before taking the next one. *@
                 <span class="settings-row-hint" aria-live="polite">@TorRouteLine</span>
             </div>
         </div>
@@ -423,7 +493,6 @@
                         </span>
                         <span class="settings-row-hint">@account.Protocol · @account.IncomingHost · @SyncHealthLine(account.Id)</span>
                     </div>
-                    @* The rail order is also the Ctrl+1..9 order, so this is where that mapping is chosen. *@
                     <button class="settings-account-move" title="Move up" @onclick="() => AccountStore.Move(account.Id, -1)">▲</button>
                     <button class="settings-account-move" title="Move down" @onclick="() => AccountStore.Move(account.Id, 1)">▼</button>
                     <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
@@ -441,4 +510,3 @@
 </div>
 
 <SettingsCss />
-

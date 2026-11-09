@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using MyLovelyMail.MainProject.Constants;
 using MyLovelyMail.MainProject.Constants.ThemeConstants;
@@ -23,12 +24,6 @@ public partial class Settings
 
     readonly CancellationTokenSource pageAlive = new();
 
-    /// <summary>
-    /// Tor reports its progress on its own schedule and raises no event this page could subscribe
-    /// to, so the route line is re-read once a second — and repainted ONLY when the sentence
-    /// actually changed, which is a handful of times across a whole bootstrap and never once the
-    /// route is up.
-    /// </summary>
     async Task WatchTorBootstrapAsync()
     {
         using var ticker = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -45,7 +40,6 @@ public partial class Settings
         }
         catch (OperationCanceledException)
         {
-            // The page went away; nothing to report.
         }
     }
 
@@ -63,13 +57,6 @@ public partial class Settings
         SettingsManager.SaveSettings();
     }
 
-    /// <summary>
-    /// Keys the "Everything else" card must NOT render, for one of three reasons: a hand-written
-    /// control above already owns them, they are window/search state no one edits by hand, or —
-    /// CredentialVaultMode — a plain dropdown would be actively harmful. Written with nameof so a
-    /// renamed field breaks the build instead of quietly orphaning an entry here and showing the
-    /// setting twice.
-    /// </summary>
     static readonly HashSet<string> KeysWithTheirOwnControl =
     [
         // Appearance card
@@ -80,6 +67,13 @@ public partial class Settings
         nameof(GlobalSettings.UiScalePercent),
         nameof(GlobalSettings.ShowUnreadBadge),
         nameof(GlobalSettings.MessageListDensity),
+        // Fine-tuning card
+        nameof(GlobalSettings.ScrollbarWidthPx),
+        nameof(GlobalSettings.ScrollbarColorHex),
+        nameof(GlobalSettings.SidebarColumnPercent),
+        nameof(GlobalSettings.ListColumnPercent),
+        nameof(GlobalSettings.ReaderColumnPercent),
+        nameof(GlobalSettings.PinnedReaderActions),
         // Window & startup card
         nameof(GlobalSettings.CloseToTray),
         nameof(GlobalSettings.StartMinimized),
@@ -94,16 +88,12 @@ public partial class Settings
         nameof(GlobalSettings.Signature),
         nameof(GlobalSettings.UndoSendSeconds),
         nameof(GlobalSettings.EnableLogging),
-        // Its control is the reader toolbar's A- / A+ / reset, not a row here.
         nameof(GlobalSettings.ReaderTextScalePercent),
-        // Remembered window bounds and saved searches: state, not preferences.
         nameof(GlobalSettings.WindowX),
         nameof(GlobalSettings.WindowY),
         nameof(GlobalSettings.WindowWidth),
         nameof(GlobalSettings.WindowHeight),
         nameof(GlobalSettings.SavedSearches),
-        // The vault card switches this through CredentialVault, which re-encrypts every stored
-        // password on the way. A dropdown would flip the mode without that, losing all of them.
         nameof(GlobalSettings.CredentialVaultMode),
         // Tor card
         nameof(GlobalSettings.TorSocksHost),
@@ -117,38 +107,140 @@ public partial class Settings
             .Where(static s => !KeysWithTheirOwnControl.Contains(s.Key))
             .OrderBy(static s => s.KeyHumanReadable, StringComparer.CurrentCulture);
 
+    #region Fine-Tuning (Scrollbar & Column Widths)
+
+    static readonly int[] ScrollbarWidthPresets = [4, 6, 8, 10];
+
+    static readonly (string Name, string Hex)[] ScrollbarColorPresets =
+    [
+        ("Bright Light Green (Default)", "#4ADE80"),
+        ("Emerald Mint", "#34D399"),
+        ("Sky Cyan", "#38BDF8"),
+        ("Soft Violet", "#A78BFA"),
+        ("Sakura Rose", "#F472B6"),
+        ("Warm Amber", "#FBBF24")
+    ];
+
+    static bool AreColumnWidthsDefault =>
+        Math.Abs(GlobalSettings.SidebarColumnPercent.Value - GlobalSettings.DefaultSidebarColumnPercent) < 0.01 &&
+        Math.Abs(GlobalSettings.ListColumnPercent.Value - GlobalSettings.DefaultListColumnPercent) < 0.01 &&
+        Math.Abs(GlobalSettings.ReaderColumnPercent.Value - GlobalSettings.DefaultReaderColumnPercent) < 0.01;
+
+    static void SetScrollbarWidth(string text)
+    {
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int px))
+        {
+            SetAndSave(GlobalSettings.ScrollbarWidthPx, Math.Clamp(px, 3, 18));
+            Events.MainEvents.Trigger("OnStyleChanged");
+        }
+    }
+
+    static void ResetScrollbarWidthDefault()
+    {
+        SetAndSave(GlobalSettings.ScrollbarWidthPx, GlobalSettings.DefaultScrollbarWidthPx);
+        Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    static void SetScrollbarColor(string hex)
+    {
+        string trimmed = (hex ?? string.Empty).Trim();
+        if (!trimmed.StartsWith('#')) trimmed = "#" + trimmed;
+        if (trimmed.Length is 7 or 9)
+        {
+            SetAndSave(GlobalSettings.ScrollbarColorHex, trimmed.ToUpperInvariant());
+            Events.MainEvents.Trigger("OnStyleChanged");
+        }
+    }
+
+    static void ResetScrollbarColorDefault()
+    {
+        SetAndSave(GlobalSettings.ScrollbarColorHex, GlobalSettings.DefaultScrollbarColorHex);
+        Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    static void SetSingleColumnPercent(int index, string text)
+    {
+        string normalized = (text ?? string.Empty).Trim().Replace(',', '.');
+        if (!double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+            return;
+
+        double s = GlobalSettings.SidebarColumnPercent.Value;
+        double l = GlobalSettings.ListColumnPercent.Value;
+        double r = GlobalSettings.ReaderColumnPercent.Value;
+
+        if (index == 0)
+        {
+            s = Math.Clamp(value, 12.0, 45.0);
+            r = Math.Max(24.0, 100.0 - s - l);
+            l = 100.0 - s - r;
+        }
+        else if (index == 1)
+        {
+            l = Math.Clamp(value, 18.0, 58.0);
+            r = Math.Max(24.0, 100.0 - s - l);
+            s = Math.Clamp(100.0 - l - r, 12.0, 45.0);
+        }
+        else
+        {
+            r = Math.Clamp(value, 24.0, 68.0);
+            l = Math.Max(18.0, 100.0 - s - r);
+            s = Math.Clamp(100.0 - l - r, 12.0, 45.0);
+        }
+
+        GlobalSettings.SidebarColumnPercent.Set(s);
+        GlobalSettings.ListColumnPercent.Set(l);
+        GlobalSettings.ReaderColumnPercent.Set(r);
+        SettingsManager.SaveSettings();
+        Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    static void ResetColumnWidthDefaults()
+    {
+        GlobalSettings.SidebarColumnPercent.Set(GlobalSettings.DefaultSidebarColumnPercent);
+        GlobalSettings.ListColumnPercent.Set(GlobalSettings.DefaultListColumnPercent);
+        GlobalSettings.ReaderColumnPercent.Set(GlobalSettings.DefaultReaderColumnPercent);
+        SettingsManager.SaveSettings();
+        Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    static void ResetAllFineTuningDefaults()
+    {
+        GlobalSettings.ScrollbarWidthPx.Set(GlobalSettings.DefaultScrollbarWidthPx);
+        GlobalSettings.ScrollbarColorHex.Set(GlobalSettings.DefaultScrollbarColorHex);
+        GlobalSettings.SidebarColumnPercent.Set(GlobalSettings.DefaultSidebarColumnPercent);
+        GlobalSettings.ListColumnPercent.Set(GlobalSettings.DefaultListColumnPercent);
+        GlobalSettings.ReaderColumnPercent.Set(GlobalSettings.DefaultReaderColumnPercent);
+        SettingsManager.SaveSettings();
+        Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    #endregion
+
     static void SetSyncInterval(string text)
     {
         if (int.TryParse(text, out int minutes) && minutes > 0)
             SetAndSave(GlobalSettings.SyncIntervalMinutes, minutes);
     }
 
-    /// <summary>Last sync outcome of the account, or the error that is keeping it from syncing.</summary>
     static string SyncHealthLine(string accountId)
     {
         var health = SyncHealthService.For(accountId);
         if (health.IsFailing) return $"⚠️ failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
 
-        // The route belongs beside the time: "synced ten minutes ago" and "synced ten minutes ago
-        // on the third fallback route" are different states of the same mailbox, and only one of
-        // them is fine.
         string route = health.LastRoute is { Length: > 0 } last ? $" · {last}" : string.Empty;
         return health.LastSuccessUtc is { } success ? $"synced {success.ToLocalTime():dd MMM HH:mm}{route}" : "not synced yet";
     }
 
-    /// <summary>Switching this on re-picks the palette immediately, so the effect is visible without restarting.</summary>
     static void SetFollowSystemTheme(bool follow)
     {
         SetAndSave(GlobalSettings.FollowSystemTheme, follow);
         ThemeManager.ApplyFromSettings();
     }
 
-    /// <summary>While this is on the manual switch is disabled, so only one of the two can be the answer.</summary>
     static void SetFollowSystemMotion(bool follow) => SetAndSave(GlobalSettings.FollowSystemMotion, follow);
 
     static void SetReduceMotion(bool reduce) => SetAndSave(GlobalSettings.ReduceMotion, reduce);
 
-    /// <summary>Clamped: a negative count is meaningless and a big one turns every sync into a full-mailbox pass.</summary>
     static void SetBackgroundFolderRefresh(string text)
     {
         const int MaxFolders = 10;
@@ -156,7 +248,6 @@ public partial class Settings
             SetAndSave(GlobalSettings.BackgroundFolderRefreshCount, Math.Clamp(parsed, 0, MaxFolders));
     }
 
-    /// <summary>Clamped so a typo cannot shrink the window to an unreadable size or blow it up past the screen.</summary>
     static void SetUiScale(string text)
     {
         const int MinScalePercent = 50;
@@ -189,7 +280,6 @@ public partial class Settings
 
     bool StoreCheckRunning { get; set; }
 
-    /// <summary>The last scan in one line. Reads the persisted report, so it survives a restart.</summary>
     static string StoreCheckLine =>
         StoreCheckService.LastReport is not { } report
             ? "Never scanned. Looks for cached mail the app cannot see: folders without their info file, bodies with no index row, zero-byte and leftover files."
@@ -199,16 +289,11 @@ public partial class Settings
                   + string.Join(", ", report.CountsByDefect.Select(static c => $"{c.Value}× {c.Key}"))
                   + $". {Bytes(report.InvisibleFolderBytes + report.StrandedFileBytes)} the cache budget never counts.";
 
-    /// <summary>Scaled to the size it actually is: rounding a few hundred bytes to "0.0 MB" reads as "nothing", which is the opposite of the point.</summary>
     static string Bytes(long bytes) =>
         bytes >= 1024 * 1024 ? $"{bytes / 1024d / 1024d:0.0} MB"
         : bytes >= 1024 ? $"{bytes / 1024d:0.0} KB"
         : $"{bytes} bytes";
 
-    /// <summary>
-    /// Off the UI thread: the scan is file I/O over the whole cache, and on a large mailbox doing
-    /// it inline would freeze the window for as long as it takes.
-    /// </summary>
     async Task RunStoreCheck()
     {
         StoreCheckRunning = true;
@@ -240,13 +325,11 @@ public partial class Settings
     static string TorExecutableLine =>
         TorProcess.Find() is { } found ? $"Found via {found.FoundBy}: {found.Path}" : "None found yet.";
 
-    /// <summary>Where the app carries its own tor, that tor comes first and a running Orbot is the fallback; elsewhere a running tor comes first.</summary>
     static string TorAutoStartHint =>
         TorProcess.BundledExecutablePath != null
             ? "Runs the tor inside the app on a free port, before any tor that is already running such as Orbot. Off leaves Tor-only accounts to a tor that is already running."
             : "Runs a tor of the app's own on a free port. Off means a Tor-only account waits until you start one yourself.";
 
-    /// <summary>The setting stores separator-joined lines; the box shows real ones.</summary>
     static string BridgeText =>
         GlobalSettings.TorBridgeLines.Value.Replace(TorBridges.LineSeparator, '\n');
 
@@ -257,7 +340,6 @@ public partial class Settings
                 text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
     }
 
-    /// <summary>Whether each configured transport has a plugin, said before the start rather than after it fails.</summary>
     static string TorBridgeLine
     {
         get
@@ -291,10 +373,6 @@ public partial class Settings
 
     static void SetTorExecutable(string path) => SetAndSave(GlobalSettings.TorExecutablePath, path.Trim().Trim('"'));
 
-    /// <summary>
-    /// The real check: a Tor RESOLVE over the SOCKS port, which a general-purpose SOCKS5 proxy has
-    /// to reject. "Something is listening on 9050" is not the same claim and is not worth printing.
-    /// </summary>
     async Task CheckTorAsync()
     {
         TorBusy = true;
@@ -364,8 +442,17 @@ public partial class Settings
 
     static void SwitchVaultToDeviceBound() => CredentialVault.SwitchToDeviceBound();
 
-    void RemoveAccount(string accountId)
+    async Task RemoveAccount(string accountId)
     {
+        var account = AccountStore.GetById(accountId);
+        if (account == null) return;
+        bool confirmed = await ModalService.ConfirmAsync(
+            "🗑️ Remove Account",
+            $"Remove \"{account.EmailAddress}\" from this device?",
+            confirmLabel: "🗑️ Remove",
+            isDanger: true);
+        if (!confirmed) return;
+
         CredentialVault.RemovePassword(accountId);
         AccountStore.Remove(accountId);
     }

@@ -1,56 +1,165 @@
+@namespace MyLovelyMail.MainProject.UI.Components
 @inherits ThemedComponentBase
+
 <style>
-    .app-context-backdrop { position: fixed; inset: 0; z-index: @(AppMeasures.ZLayer.Popover); }
-    .app-context-menu {
+    .app-context-backdrop {
         position: fixed;
-        left: @(AppMeasures.Space.Px8)px;
-        top: @(AppMeasures.Space.Px8)px;
-        width: min(@(AppMeasures.Size.Px300)px, calc(100vw - @(AppMeasures.Space.Px16)px));
-        max-height: min(@(AppMeasures.Size.Px400)px, calc(100dvh - @(AppMeasures.Space.Px16)px));
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        box-sizing: border-box;
-        padding: @(AppMeasures.Space.Px8)px;
-        border-radius: @(AppMeasures.Radius.Medium)px;
-        @((MarkupString)AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong))
-        box-shadow: @AppStyles.ShadowHeavy;
-        color: @AppColors.TextPrimary.ToRgbaHex(true);
-    }
-    .app-context-menu button {
-        display: block;
-        width: 100%;
-        padding: @(AppMeasures.Space.Px8)px;
-        border: 0;
-        border-radius: @(AppMeasures.Radius.Small)px;
+        inset: 0;
+        z-index: @(AppMeasures.ZLayer.Modal + 20);
         background: transparent;
-        color: inherit;
-        text-align: left;
-        font: inherit;
-        cursor: pointer;
     }
-    .app-context-menu button:hover, .app-context-menu button:focus-visible { background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true); }
-    .app-context-menu button:disabled { color: @AppColors.TextMuted.ToRgbaHex(true); cursor: default; }
-    .app-context-title { padding: @(AppMeasures.Space.Px8)px; font-weight: @(AppMeasures.Weight.Bold); overflow-wrap: anywhere; }
-    .app-context-split { display: flex; }
-    .app-context-menu .app-context-arrow { flex: 0 0 @(AppMeasures.Size.Px40)px; text-align: center; border-left: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true); }
-    .app-context-children { margin-left: @(AppMeasures.Space.Px16)px; border-left: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true); }
-    .app-input-status {
+
+    .app-context-columns {
         position: fixed;
-        bottom: @(AppMeasures.Size.BottomNavHeight + AppMeasures.Space.Px8)px;
-        left: @(AppMeasures.Space.Px16)px;
-        right: @(AppMeasures.Space.Px16)px;
-        z-index: @(AppMeasures.ZLayer.Modal);
+        display: flex;
+        align-items: flex-start;
+        gap: @(AppMeasures.Space.Px6)px;
+        max-width: calc(100vw - @(AppMeasures.Space.Px16)px);
+        max-height: calc(100vh - @(AppMeasures.Space.Px16)px);
+    }
+
+    .app-context-panel {
+        min-width: @(AppMeasures.Size.Px220)px;
+        max-width: @(AppMeasures.Size.Px300)px;
+        max-height: calc(100vh - @(AppMeasures.Space.Px24)px);
+        overflow-y: auto;
+        padding: @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Large)px;
+        @((MarkupString)AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong, AppMeasures.Blur.Strong))
+        box-shadow: @AppStyles.ShadowHeavy;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+    }
+
+    .app-context-title {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        border-bottom: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        margin-bottom: @(AppMeasures.Space.Px2)px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: @(AppMeasures.Space.Px8)px;
-        padding: @(AppMeasures.Space.Px10)px;
+        gap: @(AppMeasures.Space.Px6)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-context-pin-hint {
+        font-size: 10px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        color: @AppColors.Primary.ToRgbaHex(true);
+        opacity: 0.85;
+    }
+
+    .app-context-item-wrap {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .app-context-item {
+        width: @(AppMeasures.Percent.Full)%;
+        border: none;
+        background: transparent;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
         border-radius: @(AppMeasures.Radius.Medium)px;
-        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px10)px;
+        transition: background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    .app-context-item-label {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .app-context-pin-badge {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        flex-shrink: 0;
+    }
+
+    .app-context-pin-popover {
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px4)px;
+    }
+
+    .app-context-pin-btn {
+        width: 100%;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.Primary.ToRgbaHex(true);
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        cursor: pointer;
+        text-align: left;
+    }
+
+        .app-context-item:hover:not(:disabled),
+        .app-context-item--open {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+            color: @AppColors.Primary.ToRgbaHex(true);
+        }
+
+        .app-context-item:disabled {
+            opacity: 0.42;
+            cursor: not-allowed;
+        }
+
+    .app-context-arrow {
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .app-input-status {
+        position: fixed;
+        right: @(AppMeasures.Space.Medium)px;
+        bottom: @(AppMeasures.Space.Px90)px;
+        z-index: @(AppMeasures.ZLayer.Toast);
+        max-width: min(@(AppMeasures.Size.Px420)px, calc(100vw - @(AppMeasures.Space.Px32)px));
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        @((MarkupString)AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong, AppMeasures.Blur.Normal))
         color: @AppColors.TextPrimary.ToRgbaHex(true);
         font-size: @(AppMeasures.Font.Small)px;
-        overflow-wrap: anywhere;
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
         box-shadow: @AppStyles.ShadowMedium;
+        cursor: pointer;
+        animation: app-toast-in @(AppMeasures.Duration.Fast)s ease-out;
     }
-    .app-input-status button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+
+    .app-input-status-close {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        cursor: pointer;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+    }
+
+    @@keyframes app-toast-in {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
 </style>

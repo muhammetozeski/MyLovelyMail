@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Storage
@@ -8,11 +10,31 @@ namespace MyLovelyMail.MainProject.Storage
     {
         #region Folder info
 
+        static readonly ConcurrentDictionary<string, List<MailFolderData>> FolderCache = new(StringComparer.Ordinal);
+        static readonly Lock FolderCacheLock = new();
+
         /// <summary>
-        /// Reads every stored folder of the account (empty list when nothing is stored yet). Both
-        /// roots are walked, because a folder's root depends on whether a server can hand it back.
+        /// Reads every stored folder of the account (empty list when nothing is stored yet), backed by an
+        /// in-memory cache so UI renders and sync status updates do not re-read and deserialize folder.json files from disk.
         /// </summary>
         public static List<MailFolderData> GetFolders(string accountId)
+        {
+            if (string.IsNullOrEmpty(accountId)) return [];
+            if (FolderCache.TryGetValue(accountId, out var cached))
+            {
+                lock (FolderCacheLock)
+                    return [.. cached];
+            }
+
+            List<MailFolderData> loaded = LoadFoldersFromDisk(accountId);
+            lock (FolderCacheLock)
+            {
+                FolderCache[accountId] = loaded;
+                return [.. loaded];
+            }
+        }
+
+        static List<MailFolderData> LoadFoldersFromDisk(string accountId)
         {
             List<MailFolderData> result = [];
             HashSet<string> seenNames = new(StringComparer.Ordinal);
@@ -28,8 +50,6 @@ namespace MyLovelyMail.MainProject.Storage
                     try
                     {
                         var folder = JsonSerializer.Deserialize<MailFolderData>(File.ReadAllText(infoPath), JsonDefaults.Indented);
-                        // A folder is claimed by exactly one root; a copy left in the other by an
-                        // interrupted migration must not appear twice in the list.
                         if (folder != null && seenNames.Add(folder.FullName))
                             result.Add(folder);
                     }
@@ -59,9 +79,6 @@ namespace MyLovelyMail.MainProject.Storage
                 string accountId = Path.GetFileName(accountDir);
                 foreach (string folderDir in SafeDirectories(Path.Combine(accountDir, FoldersFolderName)))
                 {
-                    // The directory name is the encoded folder path, so "Local/..." is readable
-                    // from it without opening folder.json — and a folder whose info file is
-                    // missing or broken still gets moved rather than being stranded in the cache.
                     string decoded = Path.GetFileName(folderDir);
                     if (!decoded.StartsWith(ToSafeName(LocalFolderPrefix), StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -80,6 +97,7 @@ namespace MyLovelyMail.MainProject.Storage
                         Log($"Could not move local folder '{folderDir}' into UserData: {ex.Message}", LogLevel.Warning);
                     }
                 }
+                FolderCache.TryRemove(accountId, out _);
             }
             if (moved > 0) Log($"Storage migration: {moved} local folder(s) now live in UserData.");
             return moved;
@@ -100,6 +118,58 @@ namespace MyLovelyMail.MainProject.Storage
             string dir = FolderCachePath(folder.AccountId, folder.FullName);
             Directory.CreateDirectory(dir);
             AtomicFile.WriteAllText(Path.Combine(dir, FolderInfoFileName), JsonSerializer.Serialize(folder, JsonDefaults.Indented));
+
+            lock (FolderCacheLock)
+            {
+                if (FolderCache.TryGetValue(folder.AccountId, out var list))
+                {
+                    int idx = list.FindIndex(f => string.Equals(f.FullName, folder.FullName, StringComparison.Ordinal));
+                    if (idx >= 0) list[idx] = folder;
+                    else list.Add(folder);
+                }
+            }
+        }
+
+        /// <summary>Toggles and persists whether a mail folder's children are expanded in the sidebar tree.</summary>
+        public static void ToggleFolderExpanded(string accountId, string folderFullName)
+        {
+            var folders = GetFolders(accountId);
+            var target = folders.FirstOrDefault(f => string.Equals(f.FullName, folderFullName, StringComparison.Ordinal));
+            if (target == null) return;
+            target.IsExpanded = !target.IsExpanded;
+            SaveFolder(target);
+            OnFolderChanged?.Invoke(accountId, folderFullName);
+        }
+
+        /// <summary>Reorders a mail folder before or after another mail folder in the sidebar and persists the order across restarts.</summary>
+        public static void ReorderFolder(string accountId, string draggedFullName, string targetFullName, bool insertAfter = false)
+        {
+            if (string.IsNullOrWhiteSpace(draggedFullName) || string.IsNullOrWhiteSpace(targetFullName)
+                || string.Equals(draggedFullName, targetFullName, StringComparison.Ordinal))
+                return;
+
+            var allFolders = GetFolders(accountId);
+            var ordered = FolderTreeService.Build(allFolders).Select(static n => n.Folder).ToList();
+            var dragged = ordered.FirstOrDefault(f => string.Equals(f.FullName, draggedFullName, StringComparison.Ordinal));
+            var target = ordered.FirstOrDefault(f => string.Equals(f.FullName, targetFullName, StringComparison.Ordinal));
+            if (dragged == null || target == null) return;
+
+            ordered.Remove(dragged);
+            int targetIdx = ordered.IndexOf(target);
+            if (targetIdx < 0) return;
+            if (insertAfter) targetIdx++;
+            ordered.Insert(Math.Clamp(targetIdx, 0, ordered.Count), dragged);
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                int desiredOrder = i + 1;
+                if (ordered[i].SortOrder != desiredOrder)
+                {
+                    ordered[i].SortOrder = desiredOrder;
+                    SaveFolder(ordered[i]);
+                }
+            }
+            OnFolderChanged?.Invoke(accountId, draggedFullName);
         }
 
         /// <summary>
@@ -110,6 +180,11 @@ namespace MyLovelyMail.MainProject.Storage
         public static void RemoveFolder(string accountId, string folderFullName)
         {
             Indexes.TryRemove(FolderKey(accountId, folderFullName), out _);
+            lock (FolderCacheLock)
+            {
+                if (FolderCache.TryGetValue(accountId, out var list))
+                    list.RemoveAll(f => string.Equals(f.FullName, folderFullName, StringComparison.Ordinal));
+            }
             try
             {
                 string dir = FolderCachePath(accountId, folderFullName);

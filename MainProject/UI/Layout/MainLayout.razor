@@ -15,15 +15,11 @@
 <VaultUnlockOverlay />
 <AppModalHost />
 <AppContextMenu />
-<AppContextMenu />
 <MainLayoutCss />
 
-
 @code {
-
     protected override void OnInitialized()
     {
-        
         Events.MainEvents.OnDataChanged += HandleDataChanged;
         // The layout outlives every page, so it is the right owner of the app-wide navigator.
         Services.NavigationBridge.Navigator = route => InvokeAsync(() => NavManager.NavigateTo(route));
@@ -32,7 +28,7 @@
 
     void HandleDataChanged(string eventName, object? data)
     {
-        if (eventName == "OnThemeChanged")
+        if (eventName is "OnThemeChanged" or "OnStyleChanged")
         {
             InvokeAsync(StateHasChanged);
         }

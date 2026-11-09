@@ -4,6 +4,7 @@ Start with the [project overview](../README.md) for the application, platform ta
 
 - [Documentation guidance](DOCUMENTATION.md): how to preserve verified project knowledge without duplicating source code or task history.
 - [Development guide](DEVELOPMENT.md): where to change each feature, mail page ownership, style ordering and build entry points.
+- [100 UI Element Principles & Proactive Extensions](UI-PRINCIPLES-100.md): unified modal/scrollbar/action hierarchy, 100 UI behavior principles, and performance rules.
 - [Tor and anonymous mail](ANONYMOUS-MAIL.md): transport isolation, offline rendering and verification boundaries.
 - [Fast Mail accounts and recovery](FAST-MAIL.md): one-click creation, credential generation and encrypted deletion/restore.
 - [Filtering](FILTERING.md): sender, account, folder and global rule precedence and scoped editor behavior.

@@ -14,6 +14,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Medium = 12;
             public const int Large = 20;
             public const int XLarge = 24;
+            public const int XXLarge = 28;
             /// <summary> Used as a percentage (border-radius: 50%) to turn a square box into a circle. </summary>
             public const int Circular = 50;
             /// <summary> A huge px radius (border-radius: 9999px) that fully rounds the short edges into a pill/stadium. </summary>
@@ -34,8 +35,10 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// steps; close one-off values are merged to the nearest step. T-shirt names are aliases (b = a). </summary>
         public static class Space
         {
+            public const int Px1 = 1;
             public const int Px2 = 2;
             public const int Px4 = 4;
+            public const int Px5 = 5;
             public const int Px6 = 6;
             public const int Px8 = 8;
             public const int Px10 = 10;
@@ -75,6 +78,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px4 = 4;
             public const int Px5 = 5;
             public const int Px8 = 8;
+            public const int Px10 = 10;
             public const int Px12 = 12;
             public const int Px14 = 14;
             public const int Px16 = 16;
@@ -92,6 +96,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px64 = 64;
             public const int Px70 = 70;
             public const int Px80 = 80;
+            public const int Px88 = 88;
             public const int Px100 = 100;
             public const int Px110 = 110;
             public const int Px120 = 120;
@@ -99,6 +104,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px180 = 180;
             public const int Px200 = 200;
             public const int Px220 = 220;
+            public const int Px240 = 240;
             public const int Px260 = 260;
             public const int Px280 = 280;
             public const int Px300 = 300;
@@ -106,6 +112,8 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px360 = 360;
             public const int Px400 = 400;
             public const int Px420 = 420;
+            public const int Px640 = 640;
+            public const int Px780 = 780;
             public const int ModalCompact = 480;
             public const int ModalMedium = 740;
             public const int ModalWide = 1100;
@@ -162,6 +170,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static class Font
         {
             public const int XSmall = 10;
+            public const int Tiny = 11;
             public const int Small = 12;
             public const int Normal = 14;
             public const int Medium = 16;
@@ -222,9 +231,6 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Effect = 2500;
         }
 
-        //TODO: animasyonların  constant'larını ayrı bir sınıfta barındır. float animasyonAdıSüresi = duration.slow gibi.
-
-        // bunları float yap
         /// <summary> Animation / transition lengths. Append the 's' (seconds) unit at the call site. </summary>
         public static class Duration
         {

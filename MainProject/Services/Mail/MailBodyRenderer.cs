@@ -185,7 +185,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
             // No DNS prefetch of link hosts and no Referer: both would leave the machine outside Tor.
             return "<!DOCTYPE html><html><head>" + ContentSecurityPolicy(blockRemoteContent) + "<meta http-equiv=\"x-dns-prefetch-control\" content=\"off\"><meta name=\"referrer\" content=\"no-referrer\">" + (anonymous ? string.Empty : "<base target=\"_blank\">") + "<style>" +
                 $"body{{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:{AppColors.MailCanvas.Text};background:{AppColors.MailCanvas.Background};" +
-                $"margin:12px;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}" +
+                $"margin:0;padding:12px 14px;box-sizing:border-box;overflow-y:hidden;line-height:1.55;font-size:{fontPx}px;word-break:break-word;}}html{{margin:0;padding:0;overflow-y:hidden;}}" +
+                AppStyles.BuildScrollbarStyles() +
                 // plaintext direction: an Arabic or Hebrew paragraph inside an otherwise
                 // left-to-right message decides its own direction from its first strong character,
                 // rather than inheriting the document's and reading backwards.

@@ -1,25 +1,25 @@
-@inherits ModalBase
+@namespace MyLovelyMail.MainProject.UI.Elements.Modals
 
-<CoreModal IsVisible="@IsVisible"
-           MaxWidthPx="@(MaxWidthPx ?? AppMeasures.Size.ModalCompact)"
-           TextAlignLeft="true"
-           OnBackdropClick="@TriggerCloseAsync">
-    @if (!string.IsNullOrWhiteSpace(Title) || CanNavigateBack)
-    {
-        <div class="core-modal-header">
-            @if (CanNavigateBack)
-            {
-                <BackButton OnClick="@TriggerBackAsync" />
-            }
-            @if (!string.IsNullOrWhiteSpace(Title))
-            {
-                <h2 class="core-modal-title">@Title</h2>
-            }
-            @if (ShowCloseButton)
-            {
-                <SecondaryButton OnClick="@TriggerCloseAsync">✕</SecondaryButton>
-            }
-        </div>
-    }
+<CoreModal IsOpen="@IsOpen"
+           IsOpenChanged="@IsOpenChanged"
+           OnClose="@OnClose"
+           DismissOnBackdropTap="@DismissOnBackdropTap"
+           MaxWidthPx="@AppMeasures.Size.Px420"
+           PaddingPx="@AppMeasures.Space.Large"
+           RadiusPx="@AppMeasures.Radius.XXLarge"
+           Title="@Title"
+           ShowCloseButton="@ShowCloseButton"
+           CustomClass="@($"dialog-modal {CustomClass}".Trim())">
     @ChildContent
 </CoreModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool DismissOnBackdropTap { get; set; } = true;
+    [Parameter] public string CustomClass { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool ShowCloseButton { get; set; }
+}

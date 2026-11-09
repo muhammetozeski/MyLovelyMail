@@ -78,5 +78,11 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         public int TotalCount { get; set; }
         public int UnreadCount { get; set; }
+
+        /// <summary>User-defined sort order in the sidebar folder tree (0 = default role/alphabetical order).</summary>
+        public int SortOrder { get; set; }
+
+        /// <summary>Whether child folders nested under this folder are expanded in the sidebar tree.</summary>
+        public bool IsExpanded { get; set; } = true;
     }
 }

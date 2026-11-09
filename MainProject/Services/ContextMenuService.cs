@@ -1,75 +1,71 @@
-using Microsoft.AspNetCore.Components;
+using MyLovelyMail.MainProject.UI.Pages;
 
 namespace MyLovelyMail.MainProject.Services;
 
-/// <summary>A menu action with optional children; an action plus children renders a split button.</summary>
-/// <param name="Label">Visible action name.</param>
-/// <param name="Run">Null for a children-only entry.</param>
-/// <param name="Enabled">Whether the action can currently run.</param>
-/// <param name="Children">Optional child actions, such as folder mute durations.</param>
-public sealed record ContextMenuItem(string Label, Func<Task>? Run = null, bool Enabled = true,
-    IReadOnlyList<ContextMenuItem>? Children = null)
+/// <summary>One item in the shared custom context menu; items with children open a submenu instead of closing.</summary>
+/// <param name="Label">Visible English command text.</param>
+/// <param name="Action">Async callback run after the menu closes.</param>
+/// <param name="Enabled">Disabled commands stay visible so the user sees what exists and what requires another state.</param>
+/// <param name="Children">Submenu commands.</param>
+/// <param name="PinActionId">Optional reader toolbar action ID that can be pinned/unpinned via middle-click or right-click.</param>
+public sealed record ContextMenuItem(
+    string Label,
+    Func<Task>? Action = null,
+    bool Enabled = true,
+    IReadOnlyList<ContextMenuItem>? Children = null,
+    string? PinActionId = null)
 {
-    /// <summary>Adapts synchronous page commands to the same awaited execution path.</summary>
-    /// <param name="label">Visible action name.</param>
-    /// <param name="run">Existing command.</param>
-    /// <param name="enabled">Whether it can run now.</param>
-    /// <param name="children">Optional child choices.</param>
-    public ContextMenuItem(string label, Action run, bool enabled = true, IReadOnlyList<ContextMenuItem>? children = null)
-        : this(label, () => { run(); return Task.CompletedTask; }, enabled, children) { }
+    public ContextMenuItem(string label, Action action, bool enabled = true, string? pinActionId = null)
+        : this(label, () => { action(); return Task.CompletedTask; }, enabled, null, pinActionId) { }
+
+    public bool HasChildren => Children is { Count: > 0 };
 }
 
-/// <summary>One open menu and its owning component, so callbacks repaint the same view that opened it.</summary>
-/// <param name="Owner">Blazor event receiver.</param>
-/// <param name="Title">Menu heading.</param>
-/// <param name="Items">Captured actions and targets.</param>
-/// <param name="X">Viewport horizontal coordinate.</param>
-/// <param name="Y">Viewport vertical coordinate.</param>
-public sealed record ContextMenuData(object Owner, string Title, IReadOnlyList<ContextMenuItem> Items, double X, double Y);
-
-/// <summary>Owns one app-wide menu; business actions remain in their existing services and page owners.</summary>
+/// <summary>Holds the single open custom context menu and keeps ownership scoped to the surface that opened it.</summary>
 public static class ContextMenuService
 {
-    const bool IsLogEnabled = true;
-    public static ContextMenuData? Current { get; private set; }
+    public static bool IsOpen { get; private set; }
+    public static object? Owner { get; private set; }
+    public static string Title { get; private set; } = string.Empty;
+    public static double X { get; private set; }
+    public static double Y { get; private set; }
+    public static IReadOnlyList<ContextMenuItem> Items { get; private set; } = [];
     public static event Action? OnChanged;
 
-    /// <summary>Replaces the open menu with captured actions for a particular component and target.</summary>
-    /// <param name="owner">Receiver whose Blazor event handling must repaint after the action.</param>
-    /// <param name="title">Visible heading.</param>
-    /// <param name="items">Actions in display order.</param>
-    /// <param name="x">Viewport horizontal coordinate.</param>
-    /// <param name="y">Viewport vertical coordinate.</param>
-    public static void Open(object owner, string title, IReadOnlyList<ContextMenuItem> items, double x = 0, double y = 0)
+    /// <summary>Opens the menu at the pointer, clamping later in CSS/layout so long menus stay inside the window.</summary>
+    public static void Open(object owner, string title, IReadOnlyList<ContextMenuItem> items, double x, double y)
     {
-        Current = new(owner, title, items, x, y);
-        Log($"Context menu opened: items={items.Count}.", Run: IsLogEnabled);
+        if (items.Count == 0) return;
+        Owner = owner;
+        Title = title;
+        Items = items;
+        X = Math.Max(8, x);
+        Y = Math.Max(8, y);
+        IsOpen = true;
         OnChanged?.Invoke();
     }
 
-    /// <summary>Drops captured targets and component references when the menu is dismissed.</summary>
-    public static void Close()
+    /// <summary>Closes the active menu, optionally only when the disposing component owns it.</summary>
+    public static void Close(object? owner = null)
     {
-        if (Current == null) return;
-        Current = null;
+        if (!IsOpen || owner != null && !ReferenceEquals(Owner, owner)) return;
+        IsOpen = false;
+        Owner = null;
+        Title = string.Empty;
+        Items = [];
         OnChanged?.Invoke();
     }
 
-    /// <summary>Executes one captured action through its component's event receiver and catches final UI failures.</summary>
-    /// <param name="item">Chosen menu entry.</param>
-    public static async Task RunAsync(ContextMenuItem item)
+    /// <summary>Closes the menu first, then executes the selected command through the shared input error boundary.</summary>
+    public static async Task InvokeAsync(ContextMenuItem item)
     {
-        if (Current is not { } menu || !item.Enabled || item.Run == null) return;
+        if (!item.Enabled || item.Action == null) return;
         Close();
-        try
-        {
-            Log($"Context action started: menu='{menu.Title}'; action='{item.Label}'.", Run: IsLogEnabled);
-            await EventCallback.Factory.Create(menu.Owner, item.Run).InvokeAsync();
-        }
+        try { await item.Action(); }
         catch (Exception exception)
         {
-            Log($"Context action failed: menu='{menu.Title}'; action='{item.Label}'; {exception}", LogLevel.Error, Run: IsLogEnabled);
-            MouseActionService.ReportStatus($"Could not complete {item.Label}: {exception.Message}");
+            Log($"Context menu command '{item.Label}' failed: {exception}", LogLevel.Error);
+            MouseActionService.ReportStatus($"Could not complete '{item.Label}': {exception.Message}");
         }
     }
 }

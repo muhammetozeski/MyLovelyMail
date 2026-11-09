@@ -13,6 +13,7 @@ namespace MyLovelyMail.MainProject.Services;
 public static class MouseActionService
 {
     const bool IsLogEnabled = true;
+    const int DefaultAutoDismissMs = 4200;
     public const string CopyAction = "copy";
     public const string ReadAction = "Read";
     public const string TrashAction = "Trash";
@@ -24,7 +25,10 @@ public static class MouseActionService
     public static Func<MouseMenuRequest, Task>? MenuRequested;
     public static Func<MouseMenuRequest, Task>? MailMenuRequested;
     public static string? LastStatus { get; private set; }
+    public static long LastStatusVersion => Interlocked.Read(ref statusVersion);
     public static event Action<string>? OnStatus;
+
+    static long statusVersion;
 
     /// <summary>Receives declared commands from the shared input script.</summary>
     /// <param name="action">Declared command name.</param>
@@ -50,12 +54,30 @@ public static class MouseActionService
         }
     }
 
-    /// <summary>Publishes an input result; null dismisses it.</summary>
+    /// <summary>
+    /// Publishes an input result to the single app-wide status toast, replacing any previous message without stacking
+    /// and automatically closing after <paramref name="autoDismissMs"/> milliseconds. Passing null dismisses immediately.
+    /// </summary>
     /// <param name="status">Result text for the app-wide status host.</param>
-    public static void ReportStatus(string? status)
+    /// <param name="autoDismissMs">Milliseconds before automatic dismissal (0 disables auto-close).</param>
+    public static void ReportStatus(string? status, int autoDismissMs = DefaultAutoDismissMs)
     {
+        long version = Interlocked.Increment(ref statusVersion);
         LastStatus = status;
         OnStatus?.Invoke(status ?? string.Empty);
+
+        if (!string.IsNullOrEmpty(status) && autoDismissMs > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(autoDismissMs).ConfigureAwait(false);
+                if (Interlocked.Read(ref statusVersion) == version)
+                {
+                    LastStatus = null;
+                    OnStatus?.Invoke(string.Empty);
+                }
+            });
+        }
     }
 
     /// <summary>Dispatches a markup/JavaScript command without duplicating the typed mail execution path.</summary>
@@ -173,6 +195,8 @@ public static class MouseActionService
         if (includeSelection && keys.Any(MailUiState.SelectedMessages.Contains)) keys = [.. keys.Concat(MailUiState.SelectedMessages).Distinct()];
         bool filing = command is MailMessageCommand.Trash or MailMessageCommand.Archive or MailMessageCommand.Spam
             or MailMessageCommand.Restore or MailMessageCommand.Move;
+        bool permanentTrash = command == MailMessageCommand.Trash && keys.Length > 0
+            && keys.All(k => MessageStore.GetFolders(k.AccountId).Any(f => f.FullName == k.FolderFullName && f.Role == FolderRole.Trash));
         bool includesReader = filing && MailUiState.OpenMessageKey is { } opened && keys.Contains(opened);
         int changed = MessageActions.Execute(command, keys, argument, dueUtc);
         if (includesReader && changed > 0) MailUiState.CloseMessage();
@@ -180,6 +204,8 @@ public static class MouseActionService
             && !ReferenceEquals(updated, MailUiState.OpenMessage)) MailUiState.OpenMessageInReader(updated, current);
         if (filing || command is MailMessageCommand.Snooze or MailMessageCommand.Wake)
             MailUiState.SelectMessages(keys, selected: false);
+        if (permanentTrash)
+            return $"🗑️ Permanently deleted {changed} message(s) from Trash.";
         return filing ? $"{command}: filing requested for {changed} message(s)." : $"{command}: {changed} message(s) changed.";
     }
 

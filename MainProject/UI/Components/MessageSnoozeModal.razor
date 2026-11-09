@@ -1,0 +1,50 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">⏰ Snooze Until</span>
+    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:4px;">
+    @foreach (var preset in SnoozeService.Presets)
+    {
+        var due = preset.DueUtc();
+        <button class="mail-move-option" style="display:flex;justify-content:space-between;align-items:center;gap:12px;"
+                type="button" @onclick="() => SnoozeAsync(due)">
+            <span>@preset.Label</span>
+            <span class="mail-snooze-when">@due.ToLocalTime().ToString("ddd HH:mm", UiCulture.Display)</span>
+        </button>
+    }
+    @if (AnySnoozed)
+    {
+        <button class="mail-move-option" style="margin-top:4px;border-top:1px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);padding-top:8px;"
+                type="button" @onclick="WakeNowAsync">
+            ☀️ Wake snoozed message(s) now
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public MailMessageIdentity[] Targets { get; set; } = [];
+    [Parameter] public Action? OnChanged { get; set; }
+
+    bool AnySnoozed => Targets
+        .Select(k => MessageStore.GetSummary(k.AccountId, k.FolderFullName, k.Uid))
+        .Any(static s => s?.SnoozedUntilUtc != null);
+
+    async Task SnoozeAsync(DateTime dueUtc)
+    {
+        ModalService.CloseAll();
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.Snooze, Targets, dueUtc: dueUtc);
+        OnChanged?.Invoke();
+    }
+
+    async Task WakeNowAsync()
+    {
+        ModalService.CloseAll();
+        await MouseActionService.RunMessagesAsync(MailMessageCommand.Wake, Targets);
+        OnChanged?.Invoke();
+    }
+
+    static void Close() => ModalService.GoBack();
+}

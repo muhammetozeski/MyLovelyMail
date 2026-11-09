@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Components.Web;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
+using MyLovelyMail.MainProject.Services.Mail;
+using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.UI.Pages;
 
@@ -10,26 +13,18 @@ public partial class Mail
     MailMessageIdentity? SelectionAnchor;
 
     /// <summary>Expands a row using its already-built conversation group; no second grouping algorithm is needed.</summary>
-    /// <param name="message">Clicked row or reader message.</param>
-    /// <returns>Complete identities behind that row.</returns>
     internal MailMessageIdentity[] MessageTargets(MailMessageSummary message) =>
         MessageIdentities(RowMessages.GetValueOrDefault(message) ?? [message]);
 
     /// <summary>Resolves and deduplicates cached messages using the page's complete identity map.</summary>
-    /// <param name="messages">Visible or conversation member summaries.</param>
-    /// <returns>Identities that can safely be passed to a shared mail command.</returns>
     MailMessageIdentity[] MessageIdentities(IEnumerable<MailMessageSummary> messages) =>
         [.. messages.Select(MessageIdentityOf).OfType<MailMessageIdentity>().Distinct()];
 
     /// <summary>Whether every member represented by a checkbox is selected.</summary>
-    /// <param name="message">Row summary.</param>
-    /// <returns>True for a fully selected row.</returns>
     internal bool IsRowSelected(MailMessageSummary message) =>
         MessageTargets(message) is { Length: > 0 } targets && targets.All(MailUiState.SelectedMessages.Contains);
 
     /// <summary>Checkboxes, Ctrl-click and selection mode share range and conversation expansion.</summary>
-    /// <param name="pointer">Modifier keys from the click.</param>
-    /// <param name="message">Row being selected.</param>
     internal void ToggleRowSelection(MouseEventArgs pointer, MailMessageSummary message)
     {
         if (pointer.ShiftKey && SelectionAnchor is { } anchor)
@@ -57,10 +52,24 @@ public partial class Mail
         : MailUiState.OpenMessage is { } opened ? MessageTargets(opened)
         : MailUiState.FocusedMessage is { } focused ? MessageTargets(focused) : [];
 
+    /// <summary>Returns valid destination folders for moving the given message identities.</summary>
+    internal List<MailFolderData> MoveTargets(IEnumerable<MailMessageIdentity> targets)
+    {
+        var keys = targets.Distinct().ToArray();
+        if (keys.Length == 0) return [];
+        string accountId = keys[0].AccountId;
+        if (keys.Any(k => k.AccountId != accountId) || AccountStore.GetById(accountId) is not { } account)
+            return [];
+
+        bool canMoveRemote = account.Protocol == IncomingProtocol.Imap && keys.All(key =>
+            !MessageStore.IsLocalFolder(key.FolderFullName) && FolderSyncPolicy.PushesToServer(account.Id, key.FolderFullName));
+
+        return [.. MessageStore.GetFolders(account.Id)
+            .Where(folder => folder.Selectable && folder.Role is not (FolderRole.Drafts or FolderRole.Outbox))
+            .Where(folder => keys.Any(key => key.FolderFullName != folder.FullName) && (folder.IsLocal || canMoveRemote))];
+    }
+
     /// <summary>Runs toolbar operations through the same typed command path as context menus and side buttons.</summary>
-    /// <param name="command">Requested operation.</param>
-    /// <param name="argument">Optional tag or folder.</param>
-    /// <param name="dueUtc">Optional snooze deadline.</param>
     Task RunSelectionCommandAsync(MailMessageCommand command, string? argument = null, DateTime? dueUtc = null) =>
         MouseActionService.RunMessagesAsync(command, MailUiState.SelectedMessages.ToArray(), argument, dueUtc);
 }

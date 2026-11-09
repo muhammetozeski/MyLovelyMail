@@ -1,9 +1,12 @@
 using System.Text;
+using Microsoft.AspNetCore.Components.Web;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.UI.Components;
+using MyLovelyMail.MainProject.UI.Elements.Modals;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages
@@ -20,8 +23,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         int bodyLoadGeneration;
 
         /// <summary>Resolves a reader message through the current account and search-hit folder map.</summary>
-        /// <param name="message">The opened message, or null when the reader is closed.</param>
-        /// <returns>The complete cache identity, or null when no account or folder is selected.</returns>
         internal MailMessageIdentity? MessageIdentityOf(MailMessageSummary? message)
         {
             if (message == null || MailUiState.SelectedAccount is not { } account) return null;
@@ -37,33 +38,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return MailUiState.SelectedFolder is { } folder ? new(account.Id, folder.FullName, message.Uid) : null;
         }
 
+        internal FolderRole ResolveFolderRole(MailMessageSummary message)
+        {
+            if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName)
+                return FolderRole.None;
+            return MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folderName)?.Role ?? FolderRole.None;
+        }
+
         internal List<AttachmentInfo> OpenAttachments { get; set; } = [];
         internal string? SaveStatus { get; set; }
         internal bool ShowTagPicker { get; set; }
         internal string NewTagName { get; set; } = string.Empty;
 
-        /// <summary>Unsubscribe targets of the open message; filled with its body, cleared with it.</summary>
         internal UnsubscribeTargets? unsubscribeTargets;
-
-        /// <summary>What does not add up about the open message's sender; same lifetime as the body.</summary>
         internal IReadOnlyList<AuthFinding> authFindings = [];
-
-        /// <summary>What the rules already did to the open message; same lifetime as the body.</summary>
         IReadOnlyList<RuleAuditEntry> ruleTrace = [];
 
-        /// <summary>One row of the rule strip: an action a rule took on this message, and how often.</summary>
         public readonly record struct RuleTraceLine(string RuleName, string Action, string Argument, int Count);
 
-        /// <summary>The trace folded to one row per (rule, action), most important action first.</summary>
         internal IReadOnlyList<RuleTraceLine> ruleTraceLines = [];
-
-        /// <summary>Collapsed by default and reset with the message: the strip is a footnote, not the header.</summary>
         internal bool ruleTraceExpanded;
 
-        /// <summary>
-        /// Actions from the one that changed the most to the one that changed the least. A move put
-        /// the mail somewhere else; a notification sound only changed a chime nobody may have heard.
-        /// </summary>
         static readonly string[] ActionImportance =
         [
             nameof(FilterActionType.MoveToRemoteFolder),
@@ -79,26 +74,23 @@ namespace MyLovelyMail.MainProject.UI.Pages
         static int ActionRank(string action)
         {
             int index = Array.IndexOf(ActionImportance, action);
-            // Anything unranked (today: the engine's "StopProcessing" note) sorts last rather than first.
             return index < 0 ? ActionImportance.Length : index;
         }
 
-        /// <summary>What one row says, in the same voice the rule editor uses for the action.</summary>
         internal static string RuleTraceLabel(RuleTraceLine line) => line.Action switch
         {
-            nameof(FilterActionType.MoveToRemoteFolder) => $"📁 Moved to {line.Argument}",
-            nameof(FilterActionType.MoveToLocalFolder) => $"💾 Moved to {line.Argument} on this PC",
+            nameof(FilterActionType.MoveToRemoteFolder) => $"📂 Moved to {line.Argument}",
+            nameof(FilterActionType.MoveToLocalFolder) => $"💻 Moved to {line.Argument} on this PC",
             nameof(FilterActionType.AddTag) => $"🏷️ Tagged {line.Argument}",
             nameof(FilterActionType.MarkImportant) => "❗ Marked important",
             nameof(FilterActionType.Flag) => "⭐ Starred",
-            nameof(FilterActionType.MarkRead) => "👁️ Marked read",
-            nameof(FilterActionType.Mute) => "🔕 Muted",
+            nameof(FilterActionType.MarkRead) => "✉️ Marked read",
+            nameof(FilterActionType.Mute) => "🔇 Muted",
             nameof(FilterActionType.SetNotificationSound) => $"🔔 Notification sound: {line.Argument}",
-            "StopProcessing" => "⛔ Stopped the later rules",
+            "StopProcessing" => "✋ Stopped the later rules",
             _ => line.Action
         };
 
-        /// <summary>Folds the raw audit rows into the strip's rows. Repeats become a count, not a row.</summary>
         static IReadOnlyList<RuleTraceLine> FoldTrace(IReadOnlyList<RuleAuditEntry> trace) =>
             [.. trace
                 .GroupBy(static e => (e.RuleName, e.Action, e.Argument))
@@ -106,16 +98,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 .OrderBy(static line => ActionRank(line.Action))
                 .ThenBy(static line => line.RuleName, StringComparer.OrdinalIgnoreCase)];
 
-        /// <summary>Opens the unsubscribe page in the default browser — never automatically, only from the chip.</summary>
         internal void OpenUnsubscribePage(string url)
         {
             if (MailUiState.SelectedAccount is not { TorOnly: false }) return;
             SaveStatus = ExternalLinkService.TryOpen(url, out string failureReason)
                 ? "🌐 Unsubscribe page opened in your browser"
                 : $"❌ {failureReason}";
+            MouseActionService.ReportStatus(SaveStatus);
         }
 
-        /// <summary>Prepares the unsubscribe mail as a normal draft — the user still presses Send.</summary>
         internal void ComposeUnsubscribeMail(UnsubscribeTargets targets)
         {
             if (MailUiState.SelectedAccount is not { } account || targets.MailtoAddress is not { } address) return;
@@ -128,12 +119,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         PersonProfile? senderHistory;
         MailMessageIdentity? senderHistoryKey;
 
-        /// <summary>
-        /// Everything the cache knows about this sender. The scan walks every cached summary, so
-        /// it runs ONCE per opened message (keyed by uid) — never per render, which the reader
-        /// does on any state change. The pill and the person sheet read the same profile, so
-        /// opening the sheet costs no second scan.
-        /// </summary>
         internal PersonProfile? HistoryOfOpenSender(MailMessageSummary open)
         {
             var key = MessageIdentityOf(open);
@@ -153,15 +138,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         List<MailMessageSummary>? openThread;
         MailMessageIdentity? openThreadKey;
 
-        /// <summary>
-        /// The conversation the open message belongs to, oldest first, or null when it stands
-        /// alone. Cached by uid like <see cref="HistoryOfOpenSender"/>: threading walks the whole
-        /// folder, and the reader re-renders on any state change.
-        /// <para>
-        /// Built from the folder's FULL summaries rather than the filtered list — an active search
-        /// would otherwise cut the conversation down to the messages that happen to match it.
-        /// </para>
-        /// </summary>
         internal List<MailMessageSummary>? ThreadOfOpenMessage(MailMessageSummary open)
         {
             var key = MessageIdentityOf(open);
@@ -177,19 +153,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 thread = ThreadingService.BuildThreads(MessageStore.GetSummaries(account.Id, folderName))
                     .FirstOrDefault(t => t.Messages.Any(m => m.Uid == open.Uid));
 
-            // A single message is not a conversation; the strip would be noise on most mail.
             openThread = thread is { Messages.Count: > 1 } ? thread.Messages : null;
             return openThread;
         }
 
-        /// <summary>Position of the open message in its conversation, 1-based, for "3 of 7".</summary>
         internal int OpenThreadPosition(MailMessageSummary open) =>
             (ThreadOfOpenMessage(open)?.FindIndex(m => m.Uid == open.Uid) ?? -1) + 1;
 
-        /// <summary>
-        /// Opens the neighbouring message in the conversation. Returns false at either end, so the
-        /// arrows can be disabled rather than silently doing nothing.
-        /// </summary>
         internal bool StepThread(int delta)
         {
             if (MailUiState.OpenMessage is not { } open || ThreadOfOpenMessage(open) is not { } thread) return false;
@@ -199,14 +169,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return true;
         }
 
-        /// <summary>How far one press of A- / A+ moves the reader text size.</summary>
         const int ReaderScaleStep = 10;
 
-        /// <summary>
-        /// Steps the reader text size, or resets it when <paramref name="delta"/> is 0. Re-renders
-        /// through the same path AllowImagesOnce uses, because the size lives in the generated
-        /// document rather than in the page's own CSS.
-        /// </summary>
         internal void StepReaderTextScale(int delta)
         {
             var setting = GlobalSettings.ReaderTextScalePercent;
@@ -216,7 +180,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ = LoadOpenBodyIfNeededAsync();
         }
 
-        /// <summary>Re-renders the open message with remote images allowed for THIS message only.</summary>
         internal void AllowImagesOnce()
         {
             if (MailUiState.OpenMessage is not { } open) return;
@@ -225,9 +188,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             _ = LoadOpenBodyIfNeededAsync();
         }
 
-        /// <summary>
-        /// Renders or downloads the opened body. Account, folder and load generation reject stale results.
-        /// </summary>
         async Task LoadOpenBodyIfNeededAsync()
         {
             var account = MailUiState.SelectedAccount;
@@ -296,7 +256,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             await InvokeAsync(StateHasChanged);
         }
 
-        /// <summary>Applies the opened-equals-read behavior, honoring the configured delay.</summary>
         static void MarkOpenAsRead(MailAccountData account, string folderName, MailMessageSummary open)
         {
             int delaySeconds = GlobalSettings.MarkAsReadDelaySeconds.Value;
@@ -313,8 +272,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             });
         }
 
-        /// <summary>Shared guard of the single-message actions: runs the action with the selected
-        /// account and the message's real folder, or does nothing when either is missing.</summary>
         void WithAccountAndFolder(MailMessageSummary message, Action<MailAccountData, string> action)
         {
             if (MailUiState.SelectedAccount is { } account && ResolveFolderOf(message) is { } folderName)
@@ -328,23 +285,25 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             string tagName = NewTagName.Trim();
             if (tagName.Length == 0) return;
-            TagStore.ColorOf(tagName); // registers the new tag's chip color before first render
+            TagStore.ColorOf(tagName);
             ToggleTagOnOpen(message, tagName);
             NewTagName = string.Empty;
         }
 
-        /// <summary>Guard-plus-status shell of the save/export buttons: resolves the message's account
-        /// and folder, runs the save, and puts the returned path (or the failure) into <see cref="SaveStatus"/>.</summary>
         async Task ReportSaveAsync(MailMessageSummary message, Func<MailAccountData, string, Task<string>> save, string successText = "Saved to")
         {
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
             try
             {
-                SaveStatus = $"💾 {successText} {await save(account, folderName)}";
+                string savedPath = await save(account, folderName);
+                SaveStatus = $"💾 {successText} {savedPath}";
+                MouseActionService.ReportStatus(SaveStatus);
+                FileSaveHelper.RevealInFileExplorer(savedPath);
             }
             catch (Exception ex)
             {
                 SaveStatus = $"❌ {ex.Message}";
+                MouseActionService.ReportStatus(SaveStatus);
             }
         }
 
@@ -368,7 +327,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             WithAccountAndFolder(message, (account, folderName) =>
                 MailUiState.OpenCompose(ComposeService.BuildForward(account, folderName, message)));
 
-        /// <summary>Passes the message on as a file, so its attachments and headers survive the trip.</summary>
         internal void StartForwardAsAttachment(MailMessageSummary message) =>
             WithAccountAndFolder(message, (account, folderName) =>
                 MailUiState.OpenCompose(ComposeService.BuildForwardAsAttachment(account, folderName, message)));
@@ -379,38 +337,125 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal void ToggleOpenImportant(MailMessageSummary message) =>
             WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleImportant(account, folderName, message));
 
-        /// <summary>Raw MIME shown in the source modal is capped here; a 20 MB newsletter would otherwise freeze the render.</summary>
+        internal IReadOnlyList<PinnedReaderAction> GetPinnedReaderActions(MailMessageSummary message) =>
+            MailMenuItems.BuildPinnedReaderActions(this, message);
+
+        internal void ToggleReaderPinnedAction(string pinId)
+        {
+            bool nowPinned = MailMenuItems.TogglePinAction(pinId);
+            MouseActionService.ReportStatus(nowPinned ? $"📌 Pinned '{pinId}' to reader toolbar." : $"Unpinned '{pinId}' from reader toolbar.");
+        }
+
+        internal void OpenReplyMenu(MailMessageSummary message, MouseEventArgs pointer)
+        {
+            ContextMenuService.Open(this, "Reply & Forward", [
+                new("↩️ Reply", () => StartReply(message, replyAll: false), pinActionId: "reply"),
+                new("↩️ Reply all", () => StartReply(message, replyAll: true), pinActionId: "reply-all"),
+                new("↪️ Forward", () => StartForward(message), pinActionId: "forward"),
+                new("📎 Forward as attachment (.eml)", () => StartForwardAsAttachment(message), pinActionId: "forward-attachment")
+            ], pointer.ClientX, pointer.ClientY);
+        }
+
+        internal void OpenMarkersModal(MailMessageSummary message)
+        {
+            var targets = MessageTargets(message);
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageMarkersModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageMarkersModal.Targets)] = targets
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenBulkMarkersModal()
+        {
+            var targets = MailUiState.SelectedMessages.ToArray();
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageMarkersModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageMarkersModal.Targets)] = targets
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenMoveModal(MailMessageSummary message)
+        {
+            var targets = MessageTargets(message);
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageMoveModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageMoveModal.Targets)] = targets,
+                [nameof(MessageMoveModal.Destinations)] = MoveTargets(targets)
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenBulkMoveModal()
+        {
+            var targets = MailUiState.SelectedMessages.ToArray();
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageMoveModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageMoveModal.Targets)] = targets,
+                [nameof(MessageMoveModal.Destinations)] = MoveTargets(targets)
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenSnoozeModal(MailMessageSummary message)
+        {
+            var targets = MessageTargets(message);
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageSnoozeModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageSnoozeModal.Targets)] = targets
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenBulkSnoozeModal()
+        {
+            var targets = MailUiState.SelectedMessages.ToArray();
+            if (targets.Length == 0) return;
+            ModalService.Open<MessageSnoozeModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageSnoozeModal.Targets)] = targets
+            }, ModalSize.Compact);
+        }
+
+        internal void OpenSaveModal(MailMessageSummary message, string initialFormat = "eml")
+        {
+            if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
+            ModalService.Open<MessageSaveModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageSaveModal.Account)] = account,
+                [nameof(MessageSaveModal.FolderFullName)] = folderName,
+                [nameof(MessageSaveModal.Message)] = message,
+                [nameof(MessageSaveModal.InitialFormat)] = initialFormat
+            }, ModalSize.Compact);
+        }
+
         const int MaxShownSourceChars = 256 * 1024;
 
-        bool ShowMessageSource { get; set; }
-        bool ShowRawSource { get; set; }
-        List<(string Name, string Value)> SourceHeaders { get; set; } = [];
-        string SourceRaw { get; set; } = string.Empty;
-
-        /// <summary>Reads headers and raw MIME straight from the cached .eml — no protocol traffic, works offline.</summary>
+        /// <summary>Reads headers and raw MIME straight from the cached .eml and opens MessageSourceModal.</summary>
         internal void OpenMessageSource(MailMessageSummary message)
         {
             if (MailUiState.SelectedAccount is not { } account || ResolveFolderOf(message) is not { } folderName) return;
 
-            SourceHeaders = MessageStore.TryLoadMimeMessage(account.Id, folderName, message.Uid) is { } mime
-                ? [.. mime.Headers.Select(h => (h.Field, h.Value))]
+            var headers = MessageStore.TryLoadMimeMessage(account.Id, folderName, message.Uid) is { } mime
+                ? mime.Headers.Select(h => (h.Field, h.Value)).ToList()
                 : [];
 
             byte[]? rawBytes = MessageStore.TryLoadFullMessage(account.Id, folderName, message.Uid);
             string raw = rawBytes == null ? string.Empty : Encoding.UTF8.GetString(rawBytes);
-            SourceRaw = raw.Length > MaxShownSourceChars
+            string sourceRaw = raw.Length > MaxShownSourceChars
                 ? raw[..MaxShownSourceChars] + $"\n\n… truncated at {MaxShownSourceChars / 1024} KB"
                 : raw;
 
-            ShowRawSource = false;
-            ModalService.CloseAll();
-            ShowShortcutHelp = false;
-            ShowRawSource = false;
-            ShowMessageSource = true;
+            ModalService.Open<MessageSourceModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageSourceModal.Headers)] = headers,
+                [nameof(MessageSourceModal.RawSource)] = sourceRaw
+            }, ModalSize.Wide);
         }
 
-        Task CopySourceAsync() => ClipboardService.CopyAsync(ShowRawSource ? SourceRaw
-            : string.Join('\n', SourceHeaders.Select(h => $"{h.Name}: {h.Value}")));
+        internal void OpenShortcutHelpModal() =>
+            ModalService.Open<ShortcutHelpModal>(size: ModalSize.Dialog);
 
         /// <summary>Saves the open message to Downloads as .eml (raw MIME) or .html (rendered snapshot).</summary>
         internal Task ExportOpen(MailMessageSummary message, bool asHtml) =>
@@ -420,8 +465,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         internal void OpenMessage(MailMessageSummary message)
         {
-            // A click while composing looked dead: the compose pane owns the right side, so the
-            // reader never appeared. Autosave the draft and close compose, then open the message.
             if (MailUiState.ActiveCompose != null)
                 SaveAndCloseCompose();
             var identity = MessageIdentityOf(message);
@@ -429,7 +472,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MailUiState.OpenMessageInReader(message, identity);
         }
 
-        /// <summary>Rows in the local Drafts folder reopen in the compose pane instead of the reader.</summary>
         void OpenMessageOrDraft(MailMessageSummary message)
         {
             if (MailUiState.SelectedAccount is { } account

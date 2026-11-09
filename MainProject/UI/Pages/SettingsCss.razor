@@ -28,8 +28,6 @@
         margin-bottom: @(AppMeasures.Space.Px12)px;
     }
 
-    /* Wraps when the controls and a readable text column do not fit side by side: on a phone the
-       three density buttons squeezed the label to one word per line. */
     .settings-row {
         display: flex;
         flex-wrap: wrap;
@@ -71,6 +69,64 @@
         flex-shrink: 0;
     }
 
+    .settings-number--hex {
+        width: @(AppMeasures.Size.Px110)px;
+    }
+
+    .settings-finetune-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .settings-color-swatch {
+        width: @(AppMeasures.Size.Px24)px;
+        height: @(AppMeasures.Size.Px24)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        border: @(AppMeasures.Border.Medium)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        cursor: pointer;
+        padding: 0;
+        transition: transform @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .settings-color-swatch:hover {
+            transform: scale(1.14);
+        }
+
+    .settings-color-swatch--on {
+        border-color: @AppColors.TextPrimary.ToRgbaHex(true);
+        box-shadow: @AppStyles.ShadowSmall;
+    }
+
+    .settings-color-picker {
+        width: @(AppMeasures.Size.Px32)px;
+        height: @(AppMeasures.Size.Px28)px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    .settings-finetune-columns {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .settings-column-field {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
+        width: @(AppMeasures.Size.Px88)px;
+    }
+
+    .settings-column-caption {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+    }
+
     .settings-empty-text {
         color: @AppColors.TextMuted.ToRgbaHex(true);
         margin: 0;
@@ -106,8 +162,6 @@
         border-color: transparent;
     }
 
-    /* Bridge lines are long and must not wrap into an unreadable block: the box scrolls sideways
-       and the text stays monospaced, so a fingerprint can be compared character by character. */
     .settings-bridge-input {
         width: 100%;
         resize: vertical;
@@ -118,7 +172,6 @@
         line-height: 1.5;
     }
 
-    /* Wraps when both do not fit: on a phone the second box or button slid past the card's right edge. */
     .settings-vault-switch {
         display: flex;
         flex-wrap: wrap;
@@ -153,7 +206,6 @@
         flex-shrink: 0;
     }
 
-    /* Rail order is also the Ctrl+1..9 order; these choose it. */
     .settings-account-move {
         flex-shrink: 0;
         border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
@@ -193,7 +245,6 @@
         transition: transform @(AppMeasures.Duration.Fast)s ease, box-shadow @(AppMeasures.Duration.Fast)s ease;
     }
 
-    /* Miniature inbox: a sidebar sliver plus three fake mail rows painted from the theme's own tokens. */
     .settings-theme-mini {
         flex: 1;
         display: flex;
@@ -252,4 +303,3 @@
         font-weight: @(AppMeasures.Weight.Bold);
     }
 </style>
-

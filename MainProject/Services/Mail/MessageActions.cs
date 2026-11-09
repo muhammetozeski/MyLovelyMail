@@ -150,7 +150,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static int Delete(MailAccountData account, string folderFullName, IReadOnlyList<MailMessageSummary> summaries,
             DeleteBehavior? behavior = null)
         {
-            var selectedBehavior = behavior ?? AccountStore.GetSettings(account.Id).DeleteAction.Value;
+            bool isAlreadyInTrash = MessageStore.GetFolders(account.Id).Any(f => f.FullName == folderFullName && f.Role == FolderRole.Trash);
+            var selectedBehavior = isAlreadyInTrash
+                ? DeleteBehavior.DeletePermanently
+                : (behavior ?? AccountStore.GetSettings(account.Id).DeleteAction.Value);
             if (selectedBehavior != DeleteBehavior.DeletePermanently)
                 return MoveToRole(account, folderFullName, summaries,
                     selectedBehavior == DeleteBehavior.ArchiveInstead ? FolderRole.Archive : FolderRole.Trash);
@@ -174,6 +177,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     await folder.ExpungeAsync(serverUids, ct);
                 });
             return uids.Length;
+        }
+
+        /// <summary>Permanently deletes all cached messages in a Trash or Junk folder.</summary>
+        public static int EmptyFolder(MailAccountData account, string folderFullName)
+        {
+            var summaries = MessageStore.GetSummaries(account.Id, folderFullName);
+            if (summaries.Count == 0) return 0;
+            return Delete(account, folderFullName, summaries, DeleteBehavior.DeletePermanently);
         }
 
         /// <summary>Chooses a standard destination, retaining local mail when no writable server destination exists.</summary>

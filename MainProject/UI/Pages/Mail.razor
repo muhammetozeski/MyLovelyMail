@@ -9,9 +9,6 @@
 <PageTitle>My Lovely Mail</PageTitle>
 @{ var workspaceTargets = WorkspaceTargets; var workspacePayload = JsonSerializer.Serialize(workspaceTargets); }
 
-@* The narrow-window rule asked only about OpenMessage, so under the two-pane breakpoint the
-   sidebar Compose button rendered its card inside a display:none column and the autosave timer
-   wrote a draft nobody could see. It asks about the pane itself now. *@
 <div class="mail-screen @(MailUiState.ThirdPane != null ? "mail-screen--pane-open" : "")"
      data-context-menu="true" @oncontextmenu="e => OpenWorkspaceMenu(e)" @oncontextmenu:preventDefault="true"
      data-mouse4="@(workspaceTargets.Length > 0 ? MouseActionService.TrashAction : "menu")" data-mouse4-value="@workspacePayload"
@@ -19,15 +16,34 @@
      style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     <MailSidebar View="this" />
+
+    <div class="mail-column-splitter"
+         title="Drag to resize sidebar (snaps near 20.0% · double-click to reset)"
+         @onpointerdown="e => StartColumnSplitterDragAsync(1, e)"
+         @ondblclick="() => ResetColumnSplitter(1)">
+        <span class="mail-column-splitter-grip"></span>
+    </div>
+
     @* ---- Middle: message list ---- *@
     <section class="mail-list">
         <div class="mail-search">
-            <CoreInput Placeholder="Search mail..." Icon="🔍" @bind-Value="SearchText" />
+            <CoreInput Placeholder="Search mail..." Icon="🔎" @bind-Value="SearchText" />
             <div class="mail-selection-tools">
                 <button class="mail-search-toggle @(SelectionMode ? "mail-search-toggle--on" : "")" @onclick="() => SelectionMode = !SelectionMode">☑ Select</button>
                 <button class="mail-search-toggle" @onclick="SelectAllMessages" disabled="@(Rows.Count == 0)">Select all</button>
                 <button class="mail-search-toggle" title="Select by read state, stars, attachments or tags" @onclick="OpenSelectionMenu" disabled="@(Rows.Count == 0)">Select ▾</button>
                 <button class="mail-search-toggle" title="List navigation, selection and keyboard shortcuts" @onclick="OpenListActionsMenu">Actions ▾</button>
+                <button class="mail-search-toggle mail-search-toggle--icon" title="Keyboard shortcuts (?)" @onclick="OpenShortcutHelpModal">⌨️</button>
+                @if (MailUiState.SelectedFolder is { Role: FolderRole.Trash or FolderRole.Junk } trashOrJunkFolder
+                     && MailUiState.SelectedAccount is { } activeAcc
+                     && CachedCount > 0)
+                {
+                    <button class="mail-search-toggle mail-search-toggle--danger"
+                            title="Permanently delete all messages in @trashOrJunkFolder.DisplayName"
+                            @onclick="() => EmptyFolderWithConfirmationAsync(activeAcc, trashOrJunkFolder)">
+                        @(trashOrJunkFolder.Role == FolderRole.Trash ? "🗑️ Empty Trash" : "🧹 Empty Spam")
+                    </button>
+                }
                 @if (MailUiState.SelectedMessages.Count > 0)
                 {
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">Clear selection</button>
@@ -37,9 +53,6 @@
             {
                 <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
             }
-            @* Seven pills wrapped onto three rows and pushed the message list off the screen,
-               so the row folds away. Folded it still carries the count of live filters - a
-               filter you cannot see is worse than one you can. *@
             <div class="mail-search-fold-row">
                 <button class="mail-search-toggle @(!ShowSearchTools && ActiveFilterCount > 0 ? "mail-search-toggle--on" : "")"
                         title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
@@ -59,11 +72,11 @@
                     {
                         <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
                                 title="Group replies into conversations"
-                                @onclick="ToggleConversationMode">💬 Conversations</button>
+                                @onclick="ToggleConversationMode">🧵 Conversations</button>
                     }
                     @if (!string.IsNullOrWhiteSpace(SearchText))
                     {
-                        <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🌍 All folders</button>
+                        <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🗂️ All folders</button>
                         <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
                     }
                 </div>
@@ -73,7 +86,7 @@
         @if (MailUiState.SelectedFolder == null)
         {
             <div class="mail-empty">
-                <div class="mail-empty-icon">📮</div>
+                <div class="mail-empty-icon">📭</div>
                 <div class="mail-empty-text">Pick a folder to see its mail</div>
             </div>
         }
@@ -94,17 +107,13 @@
                     <div class="mail-inbox-zero-hearts">
                         @for (int heartIndex = 0; heartIndex < InboxZeroHeartCount; heartIndex++)
                         {
-                            <span class="mail-inbox-zero-heart" style="@InboxZeroHeartStyle(heartIndex)">💗</span>
+                            <span class="mail-inbox-zero-heart" style="@InboxZeroHeartStyle(heartIndex)">💖</span>
                         }
                     </div>
-                    @* Emoji stays OUTSIDE the gradient span: background-clip:text turns color emoji into flat blocks. *@
-                    <div class="mail-inbox-zero-headline"><span class="mail-inbox-zero-title">Inbox Zero</span> 💖</div>
+                    <div class="mail-inbox-zero-headline"><span class="mail-inbox-zero-title">Inbox Zero</span> ✨</div>
                     <div class="mail-empty-text">Nothing left to read — enjoy the quiet.</div>
                 </div>
             }
-            @* No search text means the folder itself is the answer, and "this folder is empty" is
-               a claim about the server the app is often in no position to make. FolderEmptyReason
-               says which of the reasons it actually is, and offers the one action that fixes it. *@
             else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { } emptyFolder)
             {
                 var why = FolderEmptyReason.Explain(emptyFolder);
@@ -123,8 +132,6 @@
                 <div class="mail-empty">
                     <div class="mail-empty-icon">🕊️</div>
                     <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? FolderEmptyReason.PlainlyEmpty : "Nothing matches your search")</div>
-                    @* A refused operator becomes a literal text search, so the query looks right
-                       and the screen says only that it failed. These say what would work. *@
                     <div class="mail-rescue">
                         @foreach (var rescue in SearchRescues)
                         {
@@ -138,78 +145,25 @@
         {
             @if (MailUiState.SelectedMessages.Count > 0)
             {
+                bool bulkInTrash = MailUiState.SelectedFolder?.Role == FolderRole.Trash;
                 <div class="mail-bulk-bar">
-                    <span class="mail-bulk-count">@MailUiState.SelectedMessages.Count messages selected</span>
+                    <span class="mail-bulk-count">@MailUiState.SelectedMessages.Count selected</span>
                     <button class="mail-search-toggle" @onclick="OpenBulkActionsMenu">More actions ▾</button>
                     <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</button>
                     <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</button>
-                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.ToggleStar)">⭐ Star</button>
-                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.ToggleImportant)">❗ Important</button>
-                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">🗑️ Trash</button>
-                    @{
-                        var moveTargets = MoveTargets(MailUiState.SelectedMessages);
-                    }
-                    @if (moveTargets.Count > 0)
+                    <button class="mail-search-toggle" @onclick="OpenBulkMarkersModal">⭐ Labels</button>
+                    @if (MoveTargets(MailUiState.SelectedMessages).Count > 0)
                     {
-                        <span class="mail-bulk-move">
-                            <button class="mail-search-toggle" @onclick="() => ShowMovePicker = !ShowMovePicker">📂 Move</button>
-                            @if (ShowMovePicker)
-                            {
-                                <div class="mail-move-popover">
-                                    @foreach (var targetGroup in moveTargets.GroupBy(f => f.IsLocal).OrderBy(g => g.Key))
-                                    {
-                                        @if (targetGroup.Key && moveTargets.Any(f => !f.IsLocal))
-                                        {
-                                            <div class="mail-move-divider">📁 On this machine</div>
-                                        }
-                                        @foreach (var targetFolder in targetGroup)
-                                        {
-                                            <button class="mail-move-option" @onclick="() => BulkMoveTo(targetFolder)">
-                                                @FolderIcon(targetFolder) @FolderLabel(targetFolder)
-                                            </button>
-                                        }
-                                    }
-                                </div>
-                            }
-                        </span>
+                        <button class="mail-search-toggle" @onclick="OpenBulkMoveModal">📂 Move</button>
                     }
-                    <span class="mail-bulk-move">
-                        <button class="mail-search-toggle" @onclick="() => ShowSnoozePicker = !ShowSnoozePicker">💤 Snooze</button>
-                        @if (ShowSnoozePicker)
-                        {
-                            <div class="mail-move-popover">
-                                @foreach (var (label, dueUtc) in SnoozeService.Presets)
-                                {
-                                    <button class="mail-move-option" @onclick="() => BulkSnooze(dueUtc)">@label</button>
-                                }
-                            </div>
-                        }
-                    </span>
-                    @* Tagging was the one local triage action with no bulk path: forty receipts
-                       meant opening forty messages and using the reader picker forty times. *@
-                    <span class="mail-bulk-move">
-                        <button class="mail-search-toggle" @onclick="() => ShowBulkTagPicker = !ShowBulkTagPicker">🏷️ Tag</button>
-                        @if (ShowBulkTagPicker)
-                        {
-                            <div class="mail-move-popover">
-                                @foreach (string tag in TagStore.AllTags)
-                                {
-                                    <button class="mail-move-option" @onclick="() => BulkTag(tag, add: true)">🏷️ @tag</button>
-                                }
-                                <div class="mail-bulk-tag-new">
-                                    <CoreInput Placeholder="New tag…" @bind-Value="BulkTagName" />
-                                    <button class="mail-move-option" @onclick="() => BulkTag(BulkTagName, add: true)">Add</button>
-                                </div>
-                            </div>
-                        }
-                    </span>
+                    <button class="mail-search-toggle" @onclick="OpenBulkSnoozeModal">⏰ Snooze</button>
+                    <button class="mail-search-toggle mail-search-toggle--danger" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">
+                        @(bulkInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
+                    </button>
                     <button class="mail-search-toggle" @onclick="SelectAllMessages">☑️ All</button>
                     <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
                 </div>
             }
-            @* No :preventDefault here: Blazor evaluates it once per render, not per event, so it
-               cancelled EVERY keydown that reached the list — Tab included — and a keyboard user
-               who landed on a row could not get back out to the sidebar, search box or reader. *@
             <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown">
                 <Virtualize Items="Rows" Context="row" ItemSize="76">
                     @{
@@ -219,6 +173,9 @@
                         string payload = JsonSerializer.Serialize(targets);
                     }
                     <div class="mail-row-shell" @key="MessageIdentityOf(message)" data-context-menu="true"
+                         draggable="true"
+                         @ondragstart="() => StartMessageDrag(targets)"
+                         @ondragend="EndMessageDrag"
                          @oncontextmenu="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                     <button class="mail-row @(rowUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
                             data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@payload"
@@ -227,7 +184,7 @@
                             @onclick="e => HandleRowClick(e, message)">
                         <span class="mail-row-check @(IsRowSelected(message) ? "mail-row-check--on" : "")" title="Select this conversation; Shift selects a range"
                               @onclick="e => ToggleRowSelection(e, message)" @onclick:stopPropagation="true">
-                            @(IsRowSelected(message) ? "☑" : "☐")
+                            @(IsRowSelected(message) ? "✓" : "○")
                         </span>
                         <span class="mail-row-avatar @(rowUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
                         <span class="mail-row-dot"></span>
@@ -243,7 +200,7 @@
                             <span class="mail-row-subject">
                                 @if (message.Flags.HasFlag(MailFlags.Muted))
                                 {
-                                    <span class="mail-row-flag mail-row-flag--muted" title="Muted conversation — replies arrive quietly">🔕</span>
+                                    <span class="mail-row-flag mail-row-flag--muted" title="Muted conversation — replies arrive quietly">🔇</span>
                                 }
                                 @if (message.Flags.HasFlag(MailFlags.Important))
                                 {
@@ -256,8 +213,6 @@
                                 @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
                             </span>
                             <span class="mail-row-preview">
-                                @* The Outbox row carried no state at all, so a message queued a
-                                   moment ago looked like one failing for three days. *@
                                 @if (OutboxStatusOf(message) is { } outboxStatus)
                                 {
                                     <span class="mail-row-outbox">@outboxStatus</span>
@@ -286,15 +241,13 @@
                         </span>
                     </button>
                     <div class="mail-row-quick-actions">
-                        <button title="Mark read (Mouse 5)" aria-label="Mark read" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, targets, includeSelection: true)">✅</button>
-                        <button title="Move to Trash (Mouse 4)" aria-label="Move to Trash" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, targets, includeSelection: true)">🗑️</button>
+                        <button title="Mark read (Mouse 5)" aria-label="Mark read" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, targets, includeSelection: false)">✓</button>
+                        <button title="@(MailUiState.SelectedFolder?.Role == FolderRole.Trash ? "Delete forever (Mouse 4)" : "Move to Trash (Mouse 4)")" aria-label="Trash" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, targets, includeSelection: false)">🗑️</button>
                         <button title="Message actions" aria-label="Message actions" aria-haspopup="menu" @onclick="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)">⋯</button>
                     </div>
                     </div>
                 </Virtualize>
 
-                @* The store knows the folder is truncated (TotalCount is the server's own number),
-                   so say it instead of letting a search come back empty for mail that was never fetched. *@
                 @if (!SearchAllFolders && TruncatedFolder is { } truncated)
                 {
                     <div class="mail-backfill">
@@ -317,47 +270,14 @@
         }
     </section>
 
+    <div class="mail-column-splitter"
+         title="Drag to resize message list & reader (snaps near 32.0% / 48.0% · double-click to reset)"
+         @onpointerdown="e => StartColumnSplitterDragAsync(2, e)"
+         @ondblclick="() => ResetColumnSplitter(2)">
+        <span class="mail-column-splitter-grip"></span>
+    </div>
+
     <MailReaderPane View="this" />
 </div>
-
-<WideModal IsVisible="ShowMessageSource" Title="🔍 Message Source" OnClose="@(() => ShowMessageSource = false)">
-    <div class="mail-source">
-        <div class="mail-source-tabs">
-            <button class="mail-search-toggle @(ShowRawSource ? "" : "mail-search-toggle--on")" @onclick="() => ShowRawSource = false">📋 Headers</button>
-            <button class="mail-search-toggle @(ShowRawSource ? "mail-search-toggle--on" : "")" @onclick="() => ShowRawSource = true">📄 Raw MIME</button>
-            <button class="mail-search-toggle" @onclick="CopySourceAsync">⧉ Copy</button>
-        </div>
-        @if (ShowRawSource)
-        {
-            <pre class="mail-source-raw">@(SourceRaw.Length > 0 ? SourceRaw : "The message body is not cached yet — open it once while online.")</pre>
-        }
-        else if (SourceHeaders.Count == 0)
-        {
-            <p class="mail-empty-text">The message body is not cached yet — open it once while online.</p>
-        }
-        else
-        {
-            <div class="mail-source-headers">
-                @foreach (var (name, value) in SourceHeaders)
-                {
-                    <div class="mail-source-header-name">@name</div>
-                    <div class="mail-source-header-value">@value</div>
-                }
-            </div>
-        }
-    </div>
-</WideModal>
-
-<DialogModal IsVisible="ShowShortcutHelp" Title="⌨️ Keyboard shortcuts" OnClose="@(() => ShowShortcutHelp = false)">
-    <div class="mail-shortcuts">
-        @foreach (var (keys, action) in ShortcutHelpRows)
-        {
-            <div class="mail-shortcuts-row">
-                <span class="mail-shortcuts-keys">@keys</span>
-                <span class="mail-shortcuts-action">@action</span>
-            </div>
-        }
-    </div>
-</DialogModal>
 
 <MailCss />

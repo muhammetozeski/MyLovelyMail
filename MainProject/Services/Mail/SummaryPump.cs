@@ -7,12 +7,12 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// <summary>
     /// Producer/consumer pool between fetchers and the store: any number of fetchers Add
     /// summaries as they arrive, one drain loop upserts whatever has accumulated since its last
-    /// write. The UI repaints per arrival burst (MessageStore.OnFolderChanged fires on every
-    /// upsert), so the list fills live without paying a full index write per single message.
-    /// Shared by the POP3 fetchers and the IMAP first-fill slices.
+    /// write. Coalesces rapid bursts over a brief window so large mailbox syncs do not rewrite
+    /// index.jsonl and repaint the UI hundreds of times per second.
     /// </summary>
     public sealed class SummaryPump(string accountId, string folderFullName)
     {
+        const int BurstCoalesceMs = 90;
         readonly Channel<MailMessageSummary> pool = Channel.CreateUnbounded<MailMessageSummary>();
 
         public void Add(MailMessageSummary summary) => pool.Writer.TryWrite(summary);
@@ -26,9 +26,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
             List<MailMessageSummary> drained = [];
             while (await pool.Reader.WaitToReadAsync(cancellationToken))
             {
+                if (!pool.Reader.Completion.IsCompleted)
+                {
+                    try { await Task.Delay(BurstCoalesceMs, cancellationToken); }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+                }
+
                 List<MailMessageSummary> burst = [];
                 while (pool.Reader.TryRead(out var summary))
                     burst.Add(summary);
+                if (burst.Count == 0) continue;
                 drained.AddRange(burst);
                 MessageStore.UpsertSummaries(accountId, folderFullName, burst);
             }

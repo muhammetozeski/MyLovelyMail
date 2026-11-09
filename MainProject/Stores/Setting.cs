@@ -131,7 +131,7 @@ namespace MyLovelyMail.MainProject.Stores
         internal static string SerializeValue(T? value) => value switch
         {
             bool b => b.ToString(),
-            IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+            IFormattable f => value is double d ? d.ToString("R", CultureInfo.InvariantCulture) : f.ToString(null, CultureInfo.InvariantCulture),
             _ => value?.ToString() ?? string.Empty
         };
 

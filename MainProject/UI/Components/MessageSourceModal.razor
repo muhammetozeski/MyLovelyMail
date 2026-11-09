@@ -1,0 +1,51 @@
+@inherits ModalBase
+
+<div class="core-modal-header">
+    <span class="core-modal-title">🧾 Message Source (RFC 5322)</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+        @if (Headers.Count > 0)
+        {
+            <button class="mail-search-toggle @(ShowRawSource ? "" : "mail-search-toggle--on")" type="button" @onclick="() => ShowRawSource = false">📋 Headers</button>
+            <button class="mail-search-toggle @(ShowRawSource ? "mail-search-toggle--on" : "")" type="button" @onclick="() => ShowRawSource = true">🧾 Raw MIME</button>
+        }
+        <button class="mail-search-toggle" type="button" @onclick="CopySourceAsync">📋 Copy</button>
+        <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+    </div>
+</div>
+
+<div class="mail-source" style="max-height:68vh;overflow:auto;">
+    @if (ShowRawSource || Headers.Count == 0)
+    {
+        <pre class="mail-source-raw" style="margin:0;">@(EffectiveRaw.Length > 0 ? EffectiveRaw : "The message body is not cached yet — open it once while online.")</pre>
+    }
+    else
+    {
+        <div class="mail-source-headers">
+            @foreach (var (name, value) in Headers)
+            {
+                <div class="mail-source-header-name">@name</div>
+                <div class="mail-source-header-value">@value</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<(string Name, string Value)> Headers { get; set; } = [];
+    [Parameter] public string RawSource { get; set; } = string.Empty;
+    [Parameter] public string SourceText { get; set; } = string.Empty;
+
+    bool ShowRawSource { get; set; }
+
+    string EffectiveRaw => !string.IsNullOrEmpty(RawSource) ? RawSource : SourceText;
+
+    async Task CopySourceAsync()
+    {
+        string text = (ShowRawSource || Headers.Count == 0)
+            ? EffectiveRaw
+            : string.Join('\n', Headers.Select(h => $"{h.Name}: {h.Value}"));
+        await MouseActionService.RunAsync(MouseActionService.CopyAction, text);
+    }
+
+    static void Close() => ModalService.GoBack();
+}

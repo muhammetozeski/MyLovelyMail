@@ -3,8 +3,11 @@ using MyLovelyMail.MainProject.Storage;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
-    /// <summary>One row of the folder list: the folder plus how deep it sits under its parents.</summary>
-    public readonly record struct FolderNode(MailFolderData Folder, int Depth);
+    /// <summary>One row of the folder list: the folder, how deep it sits under its parents, and whether it has child folders.</summary>
+    public readonly record struct FolderNode(MailFolderData Folder, int Depth, bool HasChildren = false)
+    {
+        public bool IsExpanded => Folder.IsExpanded;
+    }
 
     /// <summary>
     /// Turns the flat folder list into the tree the server actually sent. MailFolderData keeps the
@@ -15,7 +18,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
     /// </summary>
     public static class FolderTreeService
     {
-        /// <summary>Roles that lead the list, in this order; everything else follows alphabetically.</summary>
+        /// <summary>Roles that lead the list, in this order; everything else follows alphabetically unless reordered by the user.</summary>
         static readonly FolderRole[] RoleOrder =
         [
             FolderRole.Inbox, FolderRole.Flagged, FolderRole.Drafts, FolderRole.Sent,
@@ -28,34 +31,41 @@ namespace MyLovelyMail.MainProject.Services.Mail
             return index < 0 ? RoleOrder.Length : index;
         }
 
+        static IEnumerable<MailFolderData> OrderSiblings(IEnumerable<MailFolderData> siblings, bool isRoot) =>
+            siblings
+                .OrderBy(static f => f.SortOrder > 0 ? 0 : 1)
+                .ThenBy(static f => f.SortOrder)
+                .ThenBy(f => isRoot ? RoleRank(f.Role) : 0)
+                .ThenBy(static f => f.DisplayName, StringComparer.OrdinalIgnoreCase);
+
         /// <summary>
-        /// The folders in display order, each with its depth. Local folders stay one flat group:
+        /// The folders in display order, each with its depth and child indicator. Local folders stay one flat group:
         /// their "Local/" prefix is a storage marker, not a mailbox the user has, so nesting them
         /// under a phantom parent would invent a folder that does not exist.
         /// </summary>
-        public static List<FolderNode> Build(List<MailFolderData> folders)
+        public static List<FolderNode> Build(List<MailFolderData> folders, bool respectCollapsed = true)
         {
             List<FolderNode> nodes = [];
             var byPath = folders.ToDictionary(f => f.FullName, StringComparer.OrdinalIgnoreCase);
             var children = folders.ToLookup(folder => ParentPathOf(folder, byPath), StringComparer.Ordinal);
 
-            foreach (var root in children[null]
-                                        .OrderBy(f => RoleRank(f.Role))
-                                        .ThenBy(f => f.DisplayName, StringComparer.OrdinalIgnoreCase))
+            foreach (var root in OrderSiblings(children[null], isRoot: true))
             {
-                AppendWithChildren(root, children, depth: 0, nodes);
+                AppendWithChildren(root, children, depth: 0, respectCollapsed, nodes);
             }
             return nodes;
         }
 
         static void AppendWithChildren(MailFolderData folder, ILookup<string?, MailFolderData> children,
-            int depth, List<FolderNode> nodes)
+            int depth, bool respectCollapsed, List<FolderNode> nodes)
         {
-            nodes.Add(new FolderNode(folder, depth));
-            foreach (var child in children[folder.FullName]
-                                     .OrderBy(f => f.DisplayName, StringComparer.OrdinalIgnoreCase))
+            var childList = OrderSiblings(children[folder.FullName], isRoot: false).ToList();
+            nodes.Add(new FolderNode(folder, depth, HasChildren: childList.Count > 0));
+            if (respectCollapsed && !folder.IsExpanded) return;
+
+            foreach (var child in childList)
             {
-                AppendWithChildren(child, children, depth + 1, nodes);
+                AppendWithChildren(child, children, depth + 1, respectCollapsed, nodes);
             }
         }
 

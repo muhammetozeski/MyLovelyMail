@@ -1,54 +1,60 @@
-@inherits ModalBase
 @implements IDisposable
 
-@if (ModalService.Current is { } current)
+@if (Current != null)
 {
-    @switch (current.Kind)
+    ModalSize effectiveSize = ResolveModalSize(Current);
+    if (effectiveSize == ModalSize.Wide)
     {
-        case AppModalKind.AddAccount:
-            <WorkspaceModal IsVisible="true" OnClose="@(() => ModalService.CloseAll())">
-                <AccountWizard IsModal="true" InitialFolderId="@current.FolderId" />
-            </WorkspaceModal>
-            break;
-
-        case AppModalKind.FastMail:
-            <WorkspaceModal IsVisible="true" OnClose="@(() => ModalService.CloseAll())">
-                <FastMailModal InitialFolderId="@current.FolderId" />
-            </WorkspaceModal>
-            break;
-
-        case AppModalKind.AccountNote:
-            <DialogModal IsVisible="true"
-                         Title="📝 Account Title & Note"
-                         OnClose="@(() => ModalService.CloseAll())">
-                <AccountNoteModal AccountId="@current.AccountId" />
-            </DialogModal>
-            break;
-
-        case AppModalKind.AccountFolder:
-            <DialogModal IsVisible="true"
-                         Title="@(current.IsRenameFolder ? "📁 Rename Account Folder" : "📁 New Account Folder")"
-                         OnClose="@(() => ModalService.CloseAll())">
-                <AccountFolderModal FolderId="@current.FolderId"
-                                    ParentFolderId="@current.ParentFolderId"
-                                    IsRename="@current.IsRenameFolder" />
-            </DialogModal>
-            break;
+        <WideModal IsOpen="true" OnClose="@HandleBackdropClose">
+            <DynamicComponent Type="@Current.ComponentType" Parameters="@(new Dictionary<string, object?>(Current.Parameters))" />
+        </WideModal>
+    }
+    else if (effectiveSize == ModalSize.Dialog)
+    {
+        <DialogModal IsOpen="true" OnClose="@HandleBackdropClose">
+            <DynamicComponent Type="@Current.ComponentType" Parameters="@(new Dictionary<string, object?>(Current.Parameters))" />
+        </DialogModal>
+    }
+    else if (effectiveSize == ModalSize.Compact)
+    {
+        <CompactModal IsOpen="true" OnClose="@HandleBackdropClose">
+            <DynamicComponent Type="@Current.ComponentType" Parameters="@(new Dictionary<string, object?>(Current.Parameters))" />
+        </CompactModal>
+    }
+    else
+    {
+        <WorkspaceModal IsOpen="true" OnClose="@HandleBackdropClose">
+            <DynamicComponent Type="@Current.ComponentType" Parameters="@(new Dictionary<string, object?>(Current.Parameters))" />
+        </WorkspaceModal>
     }
 }
 
 @code {
-    protected override void OnInitialized()
+    ModalDescriptor? Current => ModalService.Current;
+
+    static ModalSize ResolveModalSize(ModalDescriptor descriptor)
     {
-        base.OnInitialized();
-        ModalService.OnChanged += HandleModalChanged;
+        if (descriptor.Size != ModalSize.Workspace) return descriptor.Size;
+        if (descriptor.ComponentType == typeof(FastMailModal) || descriptor.ComponentType == typeof(MessageSourceModal))
+            return ModalSize.Wide;
+        if (descriptor.ComponentType == typeof(AccountFolderModal)
+            || descriptor.ComponentType == typeof(AccountNoteModal)
+            || descriptor.ComponentType == typeof(ConfirmDialogModal)
+            || descriptor.ComponentType == typeof(ShortcutHelpModal))
+            return ModalSize.Dialog;
+        if (descriptor.ComponentType == typeof(MessageMarkersModal)
+            || descriptor.ComponentType == typeof(MessageMoveModal)
+            || descriptor.ComponentType == typeof(MessageSnoozeModal)
+            || descriptor.ComponentType == typeof(MessageSaveModal))
+            return ModalSize.Compact;
+        return ModalSize.Workspace;
     }
 
-    void HandleModalChanged() => InvokeAsync(StateHasChanged);
+    protected override void OnInitialized() => ModalService.OnChanged += HandleChanged;
 
-    public new void Dispose()
-    {
-        ModalService.OnChanged -= HandleModalChanged;
-        base.Dispose();
-    }
+    void HandleChanged() => InvokeAsync(StateHasChanged);
+
+    void HandleBackdropClose() => ModalService.GoBack();
+
+    public void Dispose() => ModalService.OnChanged -= HandleChanged;
 }
