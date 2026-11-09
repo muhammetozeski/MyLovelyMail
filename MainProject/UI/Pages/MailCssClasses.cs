@@ -105,6 +105,11 @@ public static class MailCssClasses
     public const string RowQuickActions = "mail-row-quick-actions";
     public const string TagChip = "mail-tag-chip";
 
+    public const string Backfill = "mail-backfill";
+    public const string BackfillText = "mail-backfill-text";
+    public const string BackfillButton = "mail-backfill-button";
+    public const string BackfillInput = "mail-backfill-input";
+
     public const string Reader = "mail-reader";
     public const string ReaderContent = "mail-reader-content";
     public const string ReaderHeaderCard = "mail-reader-header-card";

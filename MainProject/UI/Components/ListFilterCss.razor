@@ -1,0 +1,163 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+
+<style>
+    .@(ListFilterCssClasses.Container) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .@(ListFilterCssClasses.Stack) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+        max-height: @(AppMeasures.Size.Px240)px;
+        overflow-y: auto;
+    }
+
+    .@(ListFilterCssClasses.EmptyText) {
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+        padding: @(AppMeasures.Space.Px10)px 0;
+        text-align: center;
+    }
+
+    .@(ListFilterCssClasses.Item) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        transition: opacity @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    .@(ListFilterCssClasses.ItemOverridden) {
+        opacity: @(AppMeasures.Opacity.Disabled);
+        text-decoration: line-through;
+    }
+
+    .@(ListFilterCssClasses.ItemHeader) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex: 1;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .@(ListFilterCssClasses.ItemBadge) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        white-space: nowrap;
+    }
+
+    .@(ListFilterCssClasses.ItemBadgeActive) {
+        background: @AppColors.Primary.WithAlpha(0.2f).ToRgbaHex(true);
+        color: @AppColors.Primary.ToRgbaHex(true);
+    }
+
+    .@(ListFilterCssClasses.ItemBadgeOverridden) {
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+    }
+
+    .@(ListFilterCssClasses.ItemText) {
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        word-break: break-word;
+    }
+
+    .@(ListFilterCssClasses.ItemOverrideHint) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @AppColors.TextWarning.ToRgbaHex(true);
+        font-style: italic;
+    }
+
+    .@(ListFilterCssClasses.ItemActions) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px2)px;
+        flex-shrink: 0;
+    }
+
+    .@(ListFilterCssClasses.ItemMoveBtn) {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px4)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        transition: color @(AppMeasures.Duration.Fast)s ease, background-color @(AppMeasures.Duration.Fast)s ease;
+        line-height: 1;
+    }
+
+        .@(ListFilterCssClasses.ItemMoveBtn):hover:not(:disabled) {
+            color: @AppColors.Primary.ToRgbaHex(true);
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        }
+
+        .@(ListFilterCssClasses.ItemMoveBtn):disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
+            cursor: default;
+        }
+
+    .@(ListFilterCssClasses.ItemRemove) {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px4)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        transition: color @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .@(ListFilterCssClasses.ItemRemove):hover {
+            color: @AppColors.TextDanger.ToRgbaHex(true);
+        }
+
+    .@(ListFilterCssClasses.AddSection) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding-top: @(AppMeasures.Space.Px8)px;
+        border-top: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+    }
+
+    .@(ListFilterCssClasses.AddRow) {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        align-items: center;
+    }
+
+    .@(ListFilterCssClasses.Select),
+    .@(ListFilterCssClasses.Input) {
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        outline: none;
+    }
+
+    .@(ListFilterCssClasses.Input) {
+        flex: 1;
+        min-width: @(AppMeasures.Size.Px100)px;
+    }
+
+    .@(ListFilterCssClasses.Actions) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+</style>

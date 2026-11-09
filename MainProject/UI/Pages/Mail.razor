@@ -30,12 +30,16 @@
     @* ---- Middle: message list ---- *@
     <section class="@MailCssClasses.List">
         <div class="@MailCssClasses.Search">
-            <CoreInput Placeholder="Search mail..." Icon="🔎" @bind-Value="SearchText" />
+            <CoreInput Placeholder="Search mail..." Icon="🔎" Clearable="true" @bind-Value="SearchText" />
             <div class="@MailCssClasses.SelectionTools">
                 <PillButton IsActive="@SelectionMode" OnClick="() => SelectionMode = !SelectionMode">☑ Select</PillButton>
                 <PillButton OnClick="SelectAllMessages" Disabled="@(Rows.Count == 0)">Select all</PillButton>
                 <PillButton Title="Select by read state, stars, attachments or tags" OnClick="OpenSelectionMenu" Disabled="@(Rows.Count == 0)">Select ▾</PillButton>
                 <PillButton Title="List navigation, selection and keyboard shortcuts" OnClick="OpenListActionsMenu">Actions ▾</PillButton>
+                <PillButton Title="Sort list" OnClick="OpenSortMenu">⇅ @(IsSenderListView ? ListViewState.SenderSortLabel : ListViewState.MailSortLabel) ▾</PillButton>
+                <PillButton IsActive="@IsSenderListView" Title="Switch between Mail List and Sender List" OnClick="ToggleSenderListView">
+                    @(IsSenderListView ? "✉️ Mails" : "👥 Senders")
+                </PillButton>
                 <PillButton IsIcon="true" Title="Keyboard shortcuts (?)" OnClick="OpenShortcutHelpModal">⌨️</PillButton>
                 @if (MailUiState.SelectedFolder is { Role: FolderRole.Trash or FolderRole.Junk } trashOrJunkFolder
                      && MailUiState.SelectedAccount is { } activeAcc
@@ -61,6 +65,11 @@
                             Title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
                             OnClick="() => ShowSearchTools = !ShowSearchTools">
                     🎛️ Filters@(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "") @(ShowSearchTools ? "▴" : "▾")
+                </PillButton>
+                <PillButton IsActive="@ListViewState.IsFilterWindowOpen"
+                            Title="Open advanced draggable filters window"
+                            OnClick="ToggleAdvancedFilterWindow">
+                    🎯 Advanced@(ListViewState.ActiveFilterCount > 0 ? $" · {ListViewState.ActiveFilterCount}" : "") @(ListViewState.IsFilterWindowOpen ? "▴" : "▾")
                 </PillButton>
             </div>
             @if (ShowSearchTools)
@@ -167,7 +176,47 @@
                     <PillButton OnClick="MailUiState.ClearSelection">✕ Clear</PillButton>
                 </div>
             }
-            <div class="@MailCssClasses.Rows" tabindex="0" @onkeydown="HandleListKeyDown">
+            @if (IsSenderListView)
+            {
+                var senders = GetSenderItems();
+                <div class="@MailCssClasses.Rows" tabindex="0">
+                    @if (senders.Count == 0)
+                    {
+                        <div class="mail-empty-text">No senders found in this account</div>
+                    }
+                    else
+                    {
+                        <Virtualize Items="senders" Context="sender" ItemSize="76">
+                            <div class="@MailCssClasses.RowShell" @key="sender.Address">
+                                <button class="@MailCssClasses.Row" type="button" @onclick="() => SelectSender(sender)">
+                                    <span class="@MailCssClasses.RowAvatar">👤</span>
+                                    <span class="@MailCssClasses.RowMain">
+                                        <span class="@MailCssClasses.RowTop">
+                                            <span class="@MailCssClasses.RowFrom">@sender.DisplayName</span>
+                                            <span class="@MailCssClasses.RowThreadCount" title="@sender.MessageCount messages from this sender">
+                                                @sender.MessageCount.ToString("N0")
+                                            </span>
+                                            <span class="@MailCssClasses.RowDate">@FormatDate(sender.LatestDateUtc)</span>
+                                        </span>
+                                        <span class="@MailCssClasses.RowPreview">
+                                            <span>@sender.Address</span>
+                                            @if (sender.UnreadCount > 0)
+                                            {
+                                                <span class="@MailCssClasses.TagChip" style="background:@AppColors.Primary.ToRgbaHex(true);color:@AppColors.TextOnAccent.ToRgbaHex(true)">
+                                                    @sender.UnreadCount unread
+                                                </span>
+                                            }
+                                        </span>
+                                    </span>
+                                </button>
+                            </div>
+                        </Virtualize>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="@MailCssClasses.Rows" tabindex="0" @onkeydown="HandleListKeyDown">
                 <Virtualize Items="Rows" Context="row" ItemSize="76">
                     @{
                         var message = row.Message;
@@ -263,13 +312,23 @@
                         }
                         else
                         {
-                            <button class="mail-backfill-button" @onclick="() => LoadOlder(truncated)">
-                                ⬇️ Load @BackfillBatchSize older
+                            <button class="@MailCssClasses.BackfillButton" type="button" @onclick="() => LoadOlder(truncated)">
+                                <span>⬇️ Load</span>
+                                <input class="@MailCssClasses.BackfillInput"
+                                       type="number"
+                                       min="1"
+                                       max="1000000"
+                                       step="50"
+                                       @bind="BackfillBatchSize"
+                                       @onclick:stopPropagation="true"
+                                       @onkeydown:stopPropagation="true" />
+                                <span>older</span>
                             </button>
                         }
                     </div>
                 }
             </div>
+            }
         }
     </section>
 
@@ -281,5 +340,14 @@
 
     <MailReaderPane View="this" />
 </div>
+
+<FloatingWindow IsOpen="@ListViewState.IsFilterWindowOpen"
+                IsOpenChanged="@(open => { if (!open) ListViewState.CloseFilterWindow(); })"
+                Title="🎯 Advanced Filters"
+                RightPx="@ListViewState.WindowRightPx"
+                TopPx="@ListViewState.WindowTopPx"
+                PositionChanged="@(pos => ListViewState.SetWindowPosition(pos.Right, pos.Top))">
+    <ListFilterWindow />
+</FloatingWindow>
 
 <MailCss />

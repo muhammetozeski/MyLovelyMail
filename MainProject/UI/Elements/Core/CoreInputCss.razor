@@ -1,19 +1,19 @@
 @inherits ThemedComponentBase
 <style>
-    .core-input-group {
+    .@(CoreInputCssClasses.Group) {
         display: flex;
         align-items: center;
         padding: 0 @(AppMeasures.Space.Px16)px;
         border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
     }
 
-    .core-input-icon {
+    .@(CoreInputCssClasses.Icon) {
         font-size: @(AppMeasures.Font.Large)px;
         opacity: @(AppMeasures.Opacity.Muted);
         margin-right: @(AppMeasures.Space.Px8)px;
     }
 
-    .core-input-element {
+    .@(CoreInputCssClasses.Element) {
         flex: 1;
         border: none;
         background: transparent;
@@ -25,13 +25,31 @@
 
         /* outline:none above kills the browser ring; keyboard focus gets one back on the wrapper,
            so the field that is listening is visible without a box drawn inside a box. */
-        .core-input-element:focus-visible {
+        .@(CoreInputCssClasses.Element):focus-visible {
             outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
             outline-offset: @(AppMeasures.Space.Px4)px;
         }
 
-        .core-input-element:disabled {
+        .@(CoreInputCssClasses.Element):disabled {
             opacity: @(AppMeasures.Opacity.Disabled);
             cursor: not-allowed;
+        }
+
+    .@(CoreInputCssClasses.Clear) {
+        border: none;
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Medium)px;
+        line-height: 1;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        margin-left: @(AppMeasures.Space.Px4)px;
+        transition: color @(AppMeasures.Duration.Fast)s ease, background @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .@(CoreInputCssClasses.Clear):hover {
+            color: @AppColors.Primary.ToRgbaHex(true);
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
         }
 </style>

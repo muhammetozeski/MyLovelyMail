@@ -219,4 +219,29 @@ Rules(Rule(FilterActionType.Mute, accountId: account.Id, sender: "sender@example
 AccountStore.GetSettings(account.Id).NotifyOnNewMail.Value = true;
 Check(!Allows(inbox, Process().Message), "sender mute overrides account notify");
 
+// ListFilterService conflict resolution tests
+var condUnread1 = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.IsUnread, Operator = FilterOperator.Equals, Value = "false" } };
+var condUnread2 = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.IsUnread, Operator = FilterOperator.Equals, Value = "true" } };
+var resolvedBooleans = ListFilterService.Resolve([condUnread1, condUnread2]);
+Check(resolvedBooleans[0].Status == FilterConditionStatus.Overridden && resolvedBooleans[1].Status == FilterConditionStatus.Active, "later boolean filter overrides earlier one");
+
+var condDateAfter1 = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.ReceivedDate, Operator = FilterOperator.GreaterThan, Value = "2026-01-01" } };
+var condDateAfter2 = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.ReceivedDate, Operator = FilterOperator.GreaterThan, Value = "2026-02-01" } };
+var resolvedDates = ListFilterService.Resolve([condDateAfter1, condDateAfter2]);
+Check(resolvedDates[0].Status == FilterConditionStatus.Overridden && resolvedDates[1].Status == FilterConditionStatus.Active, "later date after bound overrides earlier after bound");
+
+var condDateBefore = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.ReceivedDate, Operator = FilterOperator.LessThan, Value = "2026-03-01" } };
+var resolvedRange = ListFilterService.Resolve([condDateAfter1, condDateBefore]);
+Check(resolvedRange[0].Status == FilterConditionStatus.Active && resolvedRange[1].Status == FilterConditionStatus.Active, "non-conflicting after and before bounds form an active range");
+
+var condContradictoryBefore = new FilterConditionEntry { Condition = new FilterCondition { Field = FilterField.ReceivedDate, Operator = FilterOperator.LessThan, Value = "2025-12-01" } };
+var resolvedContradiction = ListFilterService.Resolve([condDateAfter1, condContradictoryBefore]);
+Check(resolvedContradiction[0].Status == FilterConditionStatus.Overridden && resolvedContradiction[1].Status == FilterConditionStatus.Active, "contradictory date range causes later bound to override earlier");
+
+var testMsg = Message();
+testMsg.DateUtc = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc);
+Check(ListFilterService.MatchesAllActive(testMsg, resolvedRange), "test message inside active range matches");
+testMsg.DateUtc = new DateTime(2025, 12, 15, 0, 0, 0, DateTimeKind.Utc);
+Check(!ListFilterService.MatchesAllActive(testMsg, resolvedRange), "test message outside active range does not match");
+
 Console.WriteLine($"Completed {passed} filter checks. Data: {AppPaths.Root}");

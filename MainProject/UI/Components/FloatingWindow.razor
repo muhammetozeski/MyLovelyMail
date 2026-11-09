@@ -1,0 +1,80 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@using Microsoft.AspNetCore.Components.Web
+
+@if (IsOpen)
+{
+    @if (isDragging)
+    {
+        <div class="@FloatingWindowCssClasses.DragOverlay"
+             @onpointermove="OnDragMove"
+             @onpointerup="EndDrag" />
+    }
+
+    <div class="@FloatingWindowCssClasses.Window"
+         style="right: @(RightPx)px; top: @(TopPx)px; width: @(WidthPx)px;"
+         @onclick:stopPropagation="true"
+         @oncontextmenu:stopPropagation="true">
+        <div class="@FloatingWindowCssClasses.Header"
+             @onpointerdown="StartDrag">
+            <span class="@FloatingWindowCssClasses.Title">@Title</span>
+            <div class="@FloatingWindowCssClasses.Tools" @onpointerdown:stopPropagation="true">
+                <button type="button" class="@FloatingWindowCssClasses.Close" title="Close" @onclick="CloseAsync">✕</button>
+            </div>
+        </div>
+        <div class="@FloatingWindowCssClasses.Body">
+            @ChildContent
+        </div>
+    </div>
+
+    <FloatingWindowCss />
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public double RightPx { get; set; } = 16.0;
+    [Parameter] public double TopPx { get; set; } = 80.0;
+    [Parameter] public int WidthPx { get; set; } = AppMeasures.Size.Px360 + AppMeasures.Size.Px60;
+    [Parameter] public EventCallback<(double Right, double Top)> PositionChanged { get; set; }
+
+    bool isDragging;
+    double dragStartPointerX;
+    double dragStartPointerY;
+    double dragStartRight;
+    double dragStartTop;
+
+    void StartDrag(PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        isDragging = true;
+        dragStartPointerX = e.ClientX;
+        dragStartPointerY = e.ClientY;
+        dragStartRight = RightPx;
+        dragStartTop = TopPx;
+    }
+
+    void OnDragMove(PointerEventArgs e)
+    {
+        if (!isDragging) return;
+        double deltaX = e.ClientX - dragStartPointerX;
+        double deltaY = e.ClientY - dragStartPointerY;
+        RightPx = Math.Max(8.0, dragStartRight - deltaX);
+        TopPx = Math.Max(40.0, dragStartTop + deltaY);
+        PositionChanged.InvokeAsync((RightPx, TopPx));
+    }
+
+    void EndDrag(PointerEventArgs e)
+    {
+        isDragging = false;
+    }
+
+    async Task CloseAsync()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+        await OnClose.InvokeAsync();
+    }
+}

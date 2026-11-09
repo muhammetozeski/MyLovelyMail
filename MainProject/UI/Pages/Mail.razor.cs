@@ -151,6 +151,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 MouseActionService.ReportStatus("Column resize cancelled.");
                 return;
             }
+            if (e.Key == "Escape" && ListViewState.IsFilterWindowOpen)
+            {
+                ListViewState.CloseFilterWindow();
+                return;
+            }
             if (e.Key == "Escape" && ModalService.Active != null)
             {
                 ModalService.Close();
@@ -210,6 +215,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MessageActions.OnMoveStateChanged += HandleMoveStateChanged;
             ModalService.OnChanged += HandleModalServiceChanged;
             MailMenuItems.OnPinnedActionsChanged += HandleSyncStateChanged;
+            ListViewState.OnChanged += HandleListViewStateChanged;
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -230,10 +236,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MessageActions.OnMoveStateChanged -= HandleMoveStateChanged;
             ModalService.OnChanged -= HandleModalServiceChanged;
             MailMenuItems.OnPinnedActionsChanged -= HandleSyncStateChanged;
+            ListViewState.OnChanged -= HandleListViewStateChanged;
             ContextMenuService.Close();
         }
 
         void HandleModalServiceChanged() => InvokeAsync(StateHasChanged);
+        void HandleListViewStateChanged() => InvokeAsync(() => { RefreshLists(); StateHasChanged(); });
 
         bool TrySelectFirstAccount()
         {
@@ -282,11 +290,14 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             var account = MailUiState.SelectedAccount;
             Folders = account == null ? [] : FolderTreeService.Build(MessageStore.GetFolders(account.Id));
+            var resolvedFilters = ListViewState.GetResolvedFilters();
 
             if (account != null && SearchAllFolders && !string.IsNullOrWhiteSpace(SearchText))
             {
                 var hits = SearchService.Search(account.Id, SearchText)
-                    .Where(hit => !MessageActions.IsMoving(account.Id, hit.FolderFullName, hit.Summary.Uid)).ToList();
+                    .Where(hit => !MessageActions.IsMoving(account.Id, hit.FolderFullName, hit.Summary.Uid))
+                    .Where(hit => ListFilterService.MatchesAllActive(hit.Summary, resolvedFilters))
+                    .ToList();
                 HitFolders = hits.ToDictionary(h => h.Summary, h => (h.FolderFullName, h.FolderDisplayName));
                 FilteredSummaries = [.. hits.Select(h => h.Summary)];
                 BuildRows();
@@ -305,7 +316,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
             // The matcher runs even for an empty query: it is also what hides snoozed mail.
             FilteredSummaries = [.. MessageStore.GetSummaries(account.Id, folder.FullName)
                 .Where(SearchService.BuildMatcher(SearchText, account.Id))
-                .Where(summary => !MessageActions.IsMoving(account.Id, folder.FullName, summary.Uid))];
+                .Where(summary => !MessageActions.IsMoving(account.Id, folder.FullName, summary.Uid))
+                .Where(summary => ListFilterService.MatchesAllActive(summary, resolvedFilters))];
             BuildRows();
         }
 
@@ -338,8 +350,38 @@ namespace MyLovelyMail.MainProject.UI.Pages
                     1,
                     summary.IsUnread ? 1 : 0,
                     string.IsNullOrWhiteSpace(summary.FromName) ? summary.FromAddress : summary.FromName))];
+
+            ApplySorting();
+
             RowMessages = Rows.SelectMany(static row => row.Messages.Select(message => (Message: message, Members: row.Messages)))
                 .ToDictionary(static pair => pair.Message, static pair => pair.Members);
+        }
+
+        void ApplySorting()
+        {
+            if (Rows.Count <= 1) return;
+
+            IEnumerable<MailRow> query = Rows;
+            query = ListViewState.MailSort switch
+            {
+                MailSortField.Sender => ListViewState.MailSortDirection == SortDirection.Ascending
+                    ? query.OrderBy(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc)
+                    : query.OrderByDescending(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc),
+                MailSortField.Subject => ListViewState.MailSortDirection == SortDirection.Ascending
+                    ? query.OrderBy(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc)
+                    : query.OrderByDescending(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc),
+                MailSortField.Size => ListViewState.MailSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc)
+                    : query.OrderBy(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc),
+                MailSortField.Unread => ListViewState.MailSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc)
+                    : query.OrderBy(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc),
+                _ => ListViewState.MailSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(r => r.Message.DateUtc)
+                    : query.OrderBy(r => r.Message.DateUtc)
+            };
+
+            Rows = [.. query];
         }
 
         void ToggleConversationMode()
@@ -349,6 +391,162 @@ namespace MyLovelyMail.MainProject.UI.Pages
             conversationView.Value = !conversationView.Value;
             AccountStore.GetSettings(account.Id).Save();
             RefreshLists();
+        }
+
+        public sealed record SenderItem(
+            string Address,
+            string DisplayName,
+            int MessageCount,
+            int UnreadCount,
+            DateTime LatestDateUtc);
+
+        internal bool IsSenderListView { get; set; }
+
+        void ToggleSenderListView()
+        {
+            IsSenderListView = !IsSenderListView;
+        }
+
+        void ToggleAdvancedFilterWindow()
+        {
+            ListViewState.ToggleFilterWindow();
+        }
+
+        void OpenSortMenu(MouseEventArgs e)
+        {
+            List<ContextMenuItem> items = [];
+            if (IsSenderListView)
+            {
+                ContextMenuItem Opt(string label, SenderSortField field, SortDirection dir)
+                {
+                    bool active = ListViewState.SenderSort == field && ListViewState.SenderSortDirection == dir;
+                    return new ContextMenuItem((active ? "✓ " : "   ") + label, () =>
+                    {
+                        ListViewState.SetSenderSort(field, dir);
+                        RefreshLists();
+                    });
+                }
+
+                items.Add(Opt("Date (newest first)", SenderSortField.LatestDate, SortDirection.Descending));
+                items.Add(Opt("Date (oldest first)", SenderSortField.LatestDate, SortDirection.Ascending));
+                items.Add(Opt("Message count (most first)", SenderSortField.MessageCount, SortDirection.Descending));
+                items.Add(Opt("Message count (fewest first)", SenderSortField.MessageCount, SortDirection.Ascending));
+                items.Add(Opt("Unread count (most first)", SenderSortField.UnreadCount, SortDirection.Descending));
+                items.Add(Opt("Unread count (fewest first)", SenderSortField.UnreadCount, SortDirection.Ascending));
+                items.Add(Opt("Name (A to Z)", SenderSortField.Name, SortDirection.Ascending));
+                items.Add(Opt("Name (Z to A)", SenderSortField.Name, SortDirection.Descending));
+            }
+            else
+            {
+                ContextMenuItem Opt(string label, MailSortField field, SortDirection dir)
+                {
+                    bool active = ListViewState.MailSort == field && ListViewState.MailSortDirection == dir;
+                    return new ContextMenuItem((active ? "✓ " : "   ") + label, () =>
+                    {
+                        ListViewState.SetMailSort(field, dir);
+                        RefreshLists();
+                    });
+                }
+
+                items.Add(Opt("Date (newest first)", MailSortField.Date, SortDirection.Descending));
+                items.Add(Opt("Date (oldest first)", MailSortField.Date, SortDirection.Ascending));
+                items.Add(Opt("Sender (A to Z)", MailSortField.Sender, SortDirection.Ascending));
+                items.Add(Opt("Sender (Z to A)", MailSortField.Sender, SortDirection.Descending));
+                items.Add(Opt("Subject (A to Z)", MailSortField.Subject, SortDirection.Ascending));
+                items.Add(Opt("Subject (Z to A)", MailSortField.Subject, SortDirection.Descending));
+                items.Add(Opt("Size (largest first)", MailSortField.Size, SortDirection.Descending));
+                items.Add(Opt("Size (smallest first)", MailSortField.Size, SortDirection.Ascending));
+                items.Add(Opt("Unread first", MailSortField.Unread, SortDirection.Descending));
+                items.Add(Opt("Read first", MailSortField.Unread, SortDirection.Ascending));
+            }
+
+            ContextMenuService.Open(this, "Sort by", items, e.ClientX, e.ClientY);
+        }
+
+        List<SenderItem> GetSenderItems()
+        {
+            var account = MailUiState.SelectedAccount;
+            var folder = MailUiState.SelectedFolder;
+            if (account == null || folder == null) return [];
+
+            var groups = new Dictionary<string, (string Name, int Count, int Unread, DateTime Latest)>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var summary in MessageStore.GetSummaries(account.Id, folder.FullName))
+            {
+                if (string.IsNullOrWhiteSpace(summary.FromAddress)) continue;
+                string addr = summary.FromAddress.Trim();
+                string name = string.IsNullOrWhiteSpace(summary.FromName) ? addr : summary.FromName.Trim();
+
+                if (groups.TryGetValue(addr, out var existing))
+                {
+                    groups[addr] = (
+                        string.IsNullOrWhiteSpace(existing.Name) || existing.Name == addr ? name : existing.Name,
+                        existing.Count + 1,
+                        existing.Unread + (summary.IsUnread ? 1 : 0),
+                        summary.DateUtc > existing.Latest ? summary.DateUtc : existing.Latest
+                    );
+                }
+                else
+                {
+                    groups[addr] = (name, 1, summary.IsUnread ? 1 : 0, summary.DateUtc);
+                }
+            }
+
+            IEnumerable<SenderItem> query = groups.Select(static kv => new SenderItem(kv.Key, kv.Value.Name, kv.Value.Count, kv.Value.Unread, kv.Value.Latest));
+
+            query = ListViewState.SenderSort switch
+            {
+                SenderSortField.MessageCount => ListViewState.SenderSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc)
+                    : query.OrderBy(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc),
+                SenderSortField.UnreadCount => ListViewState.SenderSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc)
+                    : query.OrderBy(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc),
+                SenderSortField.Name => ListViewState.SenderSortDirection == SortDirection.Ascending
+                    ? query.OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderByDescending(s => s.DisplayName, StringComparer.OrdinalIgnoreCase),
+                _ => ListViewState.SenderSortDirection == SortDirection.Descending
+                    ? query.OrderByDescending(s => s.LatestDateUtc)
+                    : query.OrderBy(s => s.LatestDateUtc)
+            };
+
+            var list = query.ToList();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                string filter = SearchText.Trim();
+                list = list.Where(s => s.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                                       s.Address.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            return list;
+        }
+
+        void SelectSender(SenderItem sender)
+        {
+            IsSenderListView = false;
+            var account = MailUiState.SelectedAccount;
+            var folder = MailUiState.SelectedFolder;
+            if (account == null || folder == null) return;
+
+            SearchAllFolders = false;
+            SearchText = "from:" + sender.Address;
+            RefreshLists();
+
+            var targets = MessageStore.GetSummaries(account.Id, folder.FullName)
+                .Where(m => m.FromAddress.Equals(sender.Address, StringComparison.OrdinalIgnoreCase))
+                .Select(m => new MailMessageIdentity(account.Id, folder.FullName, m.Uid))
+                .ToArray();
+
+            if (targets.Length > 0)
+            {
+                MailUiState.SelectMessages(targets, replace: true);
+                var newest = MessageStore.GetSummary(account.Id, folder.FullName, targets[0].Uid);
+                if (newest != null)
+                {
+                    MailUiState.FocusMessage(newest, MessageIdentityOf(newest));
+                }
+            }
         }
 
         List<SearchRescue> SearchRescues =>
@@ -405,7 +603,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         internal void SearchByTag(string tagName) => RunSavedSearch($"tag:{tagName}");
 
-        internal const int BackfillBatchSize = 300;
+        internal int BackfillBatchSize { get; set; } = 300;
 
         int CachedCount => MailUiState.SelectedFolder is { } folder
             ? MessageStore.CountSummaries(folder.AccountId, folder.FullName)

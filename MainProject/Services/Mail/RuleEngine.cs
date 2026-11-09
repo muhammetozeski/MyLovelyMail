@@ -165,14 +165,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         }
 
         /// <summary>
-        /// True when the engine will not honour the chosen operator for this field. Three such
-        /// combinations exist and all of them fail silently today: HasAttachment never reads the
-        /// operator, SizeKb treats everything that is not LessThan as greater-than, and an
-        /// ordering operator on a text field falls through to "never matches".
+        /// True when the engine will not honour the chosen operator for this field.
         /// </summary>
         static bool IgnoresOperator(FilterCondition condition) => condition.Field switch
         {
-            FilterField.HasAttachment => condition.Operator != FilterOperator.Equals,
+            FilterField.HasAttachment or FilterField.IsUnread or FilterField.IsStarred
+                or FilterField.IsImportant or FilterField.IsMuted => condition.Operator != FilterOperator.Equals,
+            FilterField.ReceivedDate => condition.Operator is not (FilterOperator.Equals or FilterOperator.LessThan or FilterOperator.GreaterThan),
             FilterField.SizeKb => condition.Operator is not (FilterOperator.Equals or FilterOperator.LessThan or FilterOperator.GreaterThan),
             _ => condition.Operator is FilterOperator.GreaterThan or FilterOperator.LessThan
         };
@@ -188,10 +187,45 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 : rule.Conditions.Any(c => MatchesCondition(c, summary));
         }
 
-        static bool MatchesCondition(FilterCondition condition, MailMessageSummary summary)
+        public static bool MatchesCondition(FilterCondition condition, MailMessageSummary summary)
         {
             if (condition.Field == FilterField.HasAttachment)
                 return summary.HasAttachments == !string.Equals(condition.Value, "false", StringComparison.OrdinalIgnoreCase);
+
+            if (condition.Field == FilterField.IsUnread)
+                return summary.IsUnread == !string.Equals(condition.Value, "false", StringComparison.OrdinalIgnoreCase);
+
+            if (condition.Field == FilterField.IsStarred)
+                return summary.Flags.HasFlag(MailFlags.Flagged) == !string.Equals(condition.Value, "false", StringComparison.OrdinalIgnoreCase);
+
+            if (condition.Field == FilterField.IsImportant)
+                return summary.Flags.HasFlag(MailFlags.Important) == !string.Equals(condition.Value, "false", StringComparison.OrdinalIgnoreCase);
+
+            if (condition.Field == FilterField.IsMuted)
+                return summary.Flags.HasFlag(MailFlags.Muted) == !string.Equals(condition.Value, "false", StringComparison.OrdinalIgnoreCase);
+
+            if (condition.Field == FilterField.Tag)
+            {
+                return condition.Operator switch
+                {
+                    FilterOperator.Contains => summary.Tags.Any(t => t.Contains(condition.Value, StringComparison.OrdinalIgnoreCase)),
+                    FilterOperator.NotContains => !summary.Tags.Any(t => t.Contains(condition.Value, StringComparison.OrdinalIgnoreCase)),
+                    FilterOperator.Equals => summary.Tags.Any(t => t.Equals(condition.Value, StringComparison.OrdinalIgnoreCase)),
+                    _ => false
+                };
+            }
+
+            if (condition.Field == FilterField.ReceivedDate)
+            {
+                if (!FilterFieldInfo.TryReadDate(condition.Value, out var dateUtc)) return true;
+                return condition.Operator switch
+                {
+                    FilterOperator.GreaterThan => summary.DateUtc >= dateUtc,
+                    FilterOperator.LessThan => summary.DateUtc < dateUtc,
+                    FilterOperator.Equals => summary.DateUtc >= dateUtc && summary.DateUtc < dateUtc.AddDays(1),
+                    _ => true
+                };
+            }
 
             if (condition.Field == FilterField.SizeKb)
             {

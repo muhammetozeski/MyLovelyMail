@@ -205,11 +205,27 @@
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Medium);
         transition: background @(AppMeasures.Duration.Fast)s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
     }
 
         .mail-backfill-button:hover {
             background: @surfaceTint;
         }
+
+    .mail-backfill-input {
+        width: @(AppMeasures.Size.Px60)px;
+        background: @surfaceTint;
+        color: var(--account-accent, @primary);
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        padding: @(AppMeasures.Space.Px1)px @(AppMeasures.Space.Px4)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        text-align: center;
+        outline: none;
+    }
 
     /* Conversation count pill: how many messages the collapsed row stands for. */
     .mail-row-thread-count {

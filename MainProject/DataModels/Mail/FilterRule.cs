@@ -10,7 +10,13 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         SenderDomain,
         SizeKb,
         HasAttachment,
-        FromAddress
+        FromAddress,
+        ReceivedDate,
+        IsUnread,
+        IsStarred,
+        IsImportant,
+        IsMuted,
+        Tag
     }
 
     /// <summary>How the condition compares its value. Numeric operators apply to SizeKb only.</summary>

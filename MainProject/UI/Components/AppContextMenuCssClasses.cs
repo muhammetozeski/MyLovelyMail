@@ -11,6 +11,7 @@ public static class AppContextMenuCssClasses
     public const string ColumnsLeft = "app-context-columns--left";
     public const string Panel = "app-context-panel";
     public const string PanelSub = "app-context-panel--sub";
+    public const string PanelGrand = "app-context-panel--grand";
     public const string Title = "app-context-title";
     public const string PinHint = "app-context-pin-hint";
     public const string ItemWrap = "app-context-item-wrap";

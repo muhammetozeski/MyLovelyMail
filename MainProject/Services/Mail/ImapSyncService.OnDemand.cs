@@ -97,7 +97,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (cached is not { OldestFetchedUid: > 1 }) return 0;
 
             using var syncScope = SyncScheduler.EnterSyncScope();
-            return await ResiliencePolicy.RunNetwork(async ct =>
+            int totalLanded = 0;
+            const int ChunkSize = 300;
+
+            var wanted = await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
                 var folder = await client.GetFolderAsync(folderFullName, ct);
@@ -105,26 +108,38 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
                 var below = new UniqueIdRange(UniqueId.MinValue, new UniqueId(cached.OldestFetchedUid - 1));
                 var olderUids = await folder.SearchAsync(SearchQuery.Uids(below), ct);
-                // Newest of the older ones first: the user is walking backwards through the folder.
-                var wanted = olderUids.OrderByDescending(static u => u.Id).Take(count).ToList();
-                if (wanted.Count == 0)
-                {
-                    await client.DisconnectAsync(true, ct);
-                    return 0;
-                }
+                await client.DisconnectAsync(true, ct);
+                return olderUids.OrderByDescending(static u => u.Id).Take(count).ToList();
+            }, cancellationToken, account);
 
-                var fetched = await folder.FetchAsync(wanted, SummaryItems, ct);
-                List<MailMessageSummary> older = [.. fetched.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
+            if (wanted.Count == 0) return 0;
+
+            using var fetchClient = await MailConnections.OpenImapAsync(account, cancellationToken);
+            var fetchFolder = await fetchClient.GetFolderAsync(folderFullName, cancellationToken);
+            await fetchFolder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+
+            for (int i = 0; i < wanted.Count; i += ChunkSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var chunk = wanted.Skip(i).Take(ChunkSize).ToList();
+
+                var fetched = await ResiliencePolicy.RunNetwork(
+                    ct => fetchFolder.FetchAsync(chunk, SummaryItems, ct),
+                    cancellationToken,
+                    account);
+
+                List<MailMessageSummary> older = [.. fetched.Where(static item => item.UniqueId.IsValid).Select(ToSummary)];
                 if (older.Count > 0)
                 {
                     MessageStore.UpsertSummaries(account.Id, folderFullName, older);
                     cached.OldestFetchedUid = older.Min(static s => s.Uid);
                     MessageStore.SaveFolder(cached);
+                    totalLanded += older.Count;
                 }
+            }
 
-                await client.DisconnectAsync(true, ct);
-                return older.Count;
-            }, cancellationToken, account);
+            await fetchClient.DisconnectAsync(true, cancellationToken);
+            return totalLanded;
         }
     }
 }

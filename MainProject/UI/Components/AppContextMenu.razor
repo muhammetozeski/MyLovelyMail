@@ -8,122 +8,129 @@
          @onclick="Close"
          @oncontextmenu="Close"
          @oncontextmenu:preventDefault="true">
-        <div class="@AppContextMenuCssClasses.Columns @(OpensLeft ? AppContextMenuCssClasses.ColumnsLeft : "")" style="@MenuPositionStyle"
+        <div class="@AppContextMenuCssClasses.Panel" role="menu" aria-label="@ContextMenuService.Title"
+             style="@RootPanelStyle"
              @onclick:stopPropagation="true"
              @oncontextmenu:stopPropagation="true"
              @oncontextmenu:preventDefault="true">
-            <div class="@AppContextMenuCssClasses.Panel" role="menu" aria-label="@ContextMenuService.Title">
-                @if (!string.IsNullOrWhiteSpace(ContextMenuService.Title))
-                {
-                    <div class="@AppContextMenuCssClasses.Title">
-                        <span>@ContextMenuService.Title</span>
-                        @if (ContextMenuService.Items.Any(static i => i.PinActionId != null))
+            @if (!string.IsNullOrWhiteSpace(ContextMenuService.Title))
+            {
+                <div class="@AppContextMenuCssClasses.Title">
+                    <span>@ContextMenuService.Title</span>
+                    @if (ContextMenuService.Items.Any(static i => i.PinActionId != null))
+                    {
+                        <span class="@AppContextMenuCssClasses.PinHint" title="Right-click or middle-click an item to pin/unpin it to the reader toolbar">📌 middle/right-click to pin</span>
+                    }
+                </div>
+            }
+            @foreach (var item in ContextMenuService.Items)
+            {
+                bool open = ReferenceEquals(ActiveParent, item);
+                bool pinned = item.PinActionId != null && MailMenuItems.IsActionPinned(item.PinActionId);
+                bool showPinOption = ReferenceEquals(PinOptionItem, item) && item.PinActionId != null;
+                <div class="@AppContextMenuCssClasses.ItemWrap">
+                    <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
+                            type="button"
+                            disabled="@(!item.Enabled)"
+                            title="@(item.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
+                            @onmouseenter="() => HoverParent(item)"
+                            @onmouseup="e => HandleItemMouseUp(item, e)"
+                            @oncontextmenu="e => HandleItemRightClick(item, e)"
+                            @oncontextmenu:preventDefault="true"
+                            @oncontextmenu:stopPropagation="true"
+                            @onclick="() => ActivateRootAsync(item)">
+                        <span class="@AppContextMenuCssClasses.ItemLabel">
+                            @if (pinned)
+                            {
+                                <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
+                            }
+                            <span>@item.Label</span>
+                        </span>
+                        @if (item.HasChildren)
                         {
-                            <span class="@AppContextMenuCssClasses.PinHint" title="Right-click or middle-click an item to pin/unpin it to the reader toolbar">📌 middle/right-click to pin</span>
+                            <span class="@AppContextMenuCssClasses.Arrow">▸</span>
                         }
-                    </div>
-                }
-                @foreach (var item in ContextMenuService.Items)
+                    </button>
+                    @if (showPinOption && item.PinActionId is { } pinId)
+                    {
+                        <div class="@AppContextMenuCssClasses.PinPopover">
+                            <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(pinId, item.Label)">
+                                @(pinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (ActiveParent?.Children is { Count: > 0 } children)
+        {
+            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveParent.Label"
+                 style="@Sub1PanelStyle"
+                 @onclick:stopPropagation="true"
+                 @oncontextmenu:stopPropagation="true"
+                 @oncontextmenu:preventDefault="true">
+                <div class="@AppContextMenuCssClasses.Title">@ActiveParent.Label</div>
+                @foreach (var child in children)
                 {
-                    bool open = ReferenceEquals(ActiveParent, item);
-                    bool pinned = item.PinActionId != null && MailMenuItems.IsActionPinned(item.PinActionId);
-                    bool showPinOption = ReferenceEquals(PinOptionItem, item) && item.PinActionId != null;
+                    bool open = ReferenceEquals(ActiveGrandParent, child);
+                    bool childPinned = child.PinActionId != null && MailMenuItems.IsActionPinned(child.PinActionId);
+                    bool showChildPinOption = ReferenceEquals(PinOptionItem, child) && child.PinActionId != null;
                     <div class="@AppContextMenuCssClasses.ItemWrap">
                         <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
                                 type="button"
-                                disabled="@(!item.Enabled)"
-                                title="@(item.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
-                                @onmouseenter="() => HoverParent(item)"
-                                @onmouseup="e => HandleItemMouseUp(item, e)"
-                                @oncontextmenu="e => HandleItemRightClick(item, e)"
+                                disabled="@(!child.Enabled)"
+                                title="@(child.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
+                                @onmouseenter="() => HoverChild(child)"
+                                @onmouseup="e => HandleItemMouseUp(child, e)"
+                                @oncontextmenu="e => HandleItemRightClick(child, e)"
                                 @oncontextmenu:preventDefault="true"
                                 @oncontextmenu:stopPropagation="true"
-                                @onclick="() => ActivateRootAsync(item)">
+                                @onclick="() => ActivateChildAsync(child)">
                             <span class="@AppContextMenuCssClasses.ItemLabel">
-                                @if (pinned)
+                                @if (childPinned)
                                 {
                                     <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
                                 }
-                                <span>@item.Label</span>
+                                <span>@child.Label</span>
                             </span>
-                            @if (item.HasChildren)
+                            @if (child.HasChildren)
                             {
                                 <span class="@AppContextMenuCssClasses.Arrow">▸</span>
                             }
                         </button>
-                        @if (showPinOption && item.PinActionId is { } pinId)
+                        @if (showChildPinOption && child.PinActionId is { } cPinId)
                         {
                             <div class="@AppContextMenuCssClasses.PinPopover">
-                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(pinId, item.Label)">
-                                    @(pinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(cPinId, child.Label)">
+                                    @(childPinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
                                 </button>
                             </div>
                         }
                     </div>
                 }
             </div>
+        }
 
-            @if (ActiveParent?.Children is { Count: > 0 } children)
-            {
-                <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveParent.Label">
-                    <div class="@AppContextMenuCssClasses.Title">@ActiveParent.Label</div>
-                    @foreach (var child in children)
-                    {
-                        bool open = ReferenceEquals(ActiveGrandParent, child);
-                        bool childPinned = child.PinActionId != null && MailMenuItems.IsActionPinned(child.PinActionId);
-                        bool showChildPinOption = ReferenceEquals(PinOptionItem, child) && child.PinActionId != null;
-                        <div class="@AppContextMenuCssClasses.ItemWrap">
-                            <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
-                                    type="button"
-                                    disabled="@(!child.Enabled)"
-                                    title="@(child.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
-                                    @onmouseenter="() => HoverChild(child)"
-                                    @onmouseup="e => HandleItemMouseUp(child, e)"
-                                    @oncontextmenu="e => HandleItemRightClick(child, e)"
-                                    @oncontextmenu:preventDefault="true"
-                                    @oncontextmenu:stopPropagation="true"
-                                    @onclick="() => ActivateChildAsync(child)">
-                                <span class="@AppContextMenuCssClasses.ItemLabel">
-                                    @if (childPinned)
-                                    {
-                                        <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
-                                    }
-                                    <span>@child.Label</span>
-                                </span>
-                                @if (child.HasChildren)
-                                {
-                                    <span class="@AppContextMenuCssClasses.Arrow">▸</span>
-                                }
-                            </button>
-                            @if (showChildPinOption && child.PinActionId is { } cPinId)
-                            {
-                                <div class="@AppContextMenuCssClasses.PinPopover">
-                                    <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(cPinId, child.Label)">
-                                        @(childPinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
-                                    </button>
-                                </div>
-                            }
-                        </div>
-                    }
-                </div>
-            }
-
-            @if (ActiveGrandParent?.Children is { Count: > 0 } grandChildren)
-            {
-                <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveGrandParent.Label">
-                    <div class="@AppContextMenuCssClasses.Title">@ActiveGrandParent.Label</div>
-                    @foreach (var leaf in grandChildren)
-                    {
-                        <button class="@AppContextMenuCssClasses.Item"
-                                type="button"
-                                disabled="@(!leaf.Enabled)"
-                                @onclick="() => ContextMenuService.InvokeAsync(leaf)">
-                            <span>@leaf.Label</span>
-                        </button>
-                    }
-                </div>
-            }
-        </div>
+        @if (ActiveGrandParent?.Children is { Count: > 0 } grandChildren)
+        {
+            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelGrand" role="menu" aria-label="@ActiveGrandParent.Label"
+                 style="@Sub2PanelStyle"
+                 @onclick:stopPropagation="true"
+                 @oncontextmenu:stopPropagation="true"
+                 @oncontextmenu:preventDefault="true">
+                <div class="@AppContextMenuCssClasses.Title">@ActiveGrandParent.Label</div>
+                @foreach (var leaf in grandChildren)
+                {
+                    <button class="@AppContextMenuCssClasses.Item"
+                            type="button"
+                            disabled="@(!leaf.Enabled)"
+                            @onclick="() => ContextMenuService.InvokeAsync(leaf)">
+                        <span>@leaf.Label</span>
+                    </button>
+                }
+            </div>
+        }
     </div>
 }
 
@@ -143,38 +150,113 @@
     ContextMenuItem? ActiveGrandParent { get; set; }
     ContextMenuItem? PinOptionItem { get; set; }
 
-    int EstimatedMenuHeight => 38 + (ContextMenuService.Items.Count * 32);
+    int RootX { get; set; }
+    int RootY { get; set; }
 
-    bool OpensLeft
+    int PanelWidth => AppMeasures.Size.Px240;
+    int Gap => AppMeasures.Space.Px6;
+    int Pad => AppMeasures.Space.Px12;
+
+    string RootPanelStyle => $"left:{RootX}px;top:{RootY}px;";
+    string Sub1PanelStyle => $"left:{GetSub1X()}px;top:{RootY}px;";
+    string Sub2PanelStyle => $"left:{GetSub2X()}px;top:{RootY}px;";
+
+    int GetSub1X()
     {
-        get
+        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
+
+        if (RootX + PanelWidth + Gap + PanelWidth + Pad <= winW)
         {
-            int winWidth = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
-            bool hasSubmenus = ContextMenuService.Items.Any(static i => i.HasChildren);
-            int threshold = winWidth - (hasSubmenus ? 560 : 280);
-            return ContextMenuService.X > threshold;
+            return RootX + PanelWidth + Gap;
+        }
+
+        if (RootX - Gap - PanelWidth >= Pad)
+        {
+            return RootX - Gap - PanelWidth;
+        }
+
+        return RootX;
+    }
+
+    int GetSub2X()
+    {
+        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
+        int sub1X = GetSub1X();
+
+        if (sub1X > RootX)
+        {
+            if (sub1X + PanelWidth + Gap + PanelWidth + Pad <= winW)
+            {
+                return sub1X + PanelWidth + Gap;
+            }
+            if (RootX - Gap - PanelWidth >= Pad)
+            {
+                return RootX - Gap - PanelWidth;
+            }
+            return sub1X;
+        }
+        else if (sub1X < RootX)
+        {
+            if (sub1X - Gap - PanelWidth >= Pad)
+            {
+                return sub1X - Gap - PanelWidth;
+            }
+            if (RootX + PanelWidth + Gap + PanelWidth + Pad <= winW)
+            {
+                return RootX + PanelWidth + Gap;
+            }
+            return sub1X;
+        }
+        else
+        {
+            if (sub1X + PanelWidth + Gap + PanelWidth + Pad <= winW)
+            {
+                return sub1X + PanelWidth + Gap;
+            }
+            if (sub1X - Gap - PanelWidth >= Pad)
+            {
+                return sub1X - Gap - PanelWidth;
+            }
+            return sub1X;
         }
     }
 
-    string MenuPositionStyle
+    void CalculateRootPosition()
     {
-        get
+        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
+        int winH = StoreSettings.WindowHeight.Value > 300 ? StoreSettings.WindowHeight.Value : 800;
+
+        int clickX = (int)Math.Round(ContextMenuService.X);
+        int clickY = (int)Math.Round(ContextMenuService.Y);
+
+        if (clickX + PanelWidth + Pad > winW)
         {
-            string horizontal = OpensLeft
-                ? $"right:clamp({AppMeasures.Space.Px12}px, calc(100vw - {ContextMenuService.X:F0}px), calc(100vw - {AppMeasures.Size.Px280}px));"
-                : $"left:clamp({AppMeasures.Space.Px12}px, {ContextMenuService.X:F0}px, calc(100vw - {AppMeasures.Size.Px280}px));";
-
-            string vertical =
-                $"top:clamp({AppMeasures.Space.Px12}px, {ContextMenuService.Y:F0}px, calc(100vh - min({AppMeasures.Percent.ThreeQuarters}vh, {EstimatedMenuHeight}px) - {AppMeasures.Space.Px16}px));";
-
-            return $"{horizontal}{vertical}";
+            if (clickX - PanelWidth >= Pad)
+            {
+                RootX = clickX - PanelWidth;
+            }
+            else
+            {
+                RootX = Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
+            }
         }
+        else
+        {
+            RootX = Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
+        }
+
+        int maxMenuH = winH * AppMeasures.Percent.ThreeQuarters / 100;
+        RootY = Math.Clamp(clickY, Pad, Math.Max(Pad, winH - maxMenuH - Pad));
     }
 
     protected override void OnInitialized()
     {
         ContextMenuService.OnChanged += HandleMenuChanged;
         MouseActionService.OnStatus += HandleStatusChanged;
+        if (ContextMenuService.IsOpen)
+        {
+            CalculateRootPosition();
+        }
     }
 
     void HandleMenuChanged()
@@ -182,6 +264,10 @@
         ActiveParent = null;
         ActiveGrandParent = null;
         PinOptionItem = null;
+        if (ContextMenuService.IsOpen)
+        {
+            CalculateRootPosition();
+        }
         InvokeAsync(StateHasChanged);
     }
 
@@ -197,7 +283,6 @@
 
     void HandleItemMouseUp(ContextMenuItem item, MouseEventArgs e)
     {
-        // Middle-click (Button == 1) directly toggles pinning when the item supports toolbar pinning.
         if (e.Button == 1 && item.PinActionId is { } pinId)
         {
             TogglePinFromOption(pinId, item.Label);

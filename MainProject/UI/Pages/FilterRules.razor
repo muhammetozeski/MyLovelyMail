@@ -1,4 +1,4 @@
-@attribute [Route(RoutePath)]
+﻿@attribute [Route(RoutePath)]
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
 @inject NavigationManager Navigation
 <PageTitle>Filters — My Lovely Mail</PageTitle>
@@ -96,7 +96,7 @@
             {
                 <div class="filters-rowline">
                     <select class="filters-select" @bind="condition.Field" @bind:after="() => NormalizeCondition(condition)">
-                        @foreach (var field in Enum.GetValues<FilterField>())
+                        @foreach (var field in FilterFieldInfo.RuleFields)
                         {
                             <option value="@field">@FieldLabel(field)</option>
                         }

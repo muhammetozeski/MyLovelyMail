@@ -1,0 +1,174 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+@implements IDisposable
+
+<div class="@ListFilterCssClasses.Container">
+    @{
+        var resolved = ListViewState.GetResolvedFilters();
+    }
+
+    <div class="@ListFilterCssClasses.Stack">
+        @if (resolved.Count == 0)
+        {
+            <div class="@ListFilterCssClasses.EmptyText">
+                No advanced filters active. Choose fields below to filter this folder.
+            </div>
+        }
+        else
+        {
+            @for (int i = 0; i < resolved.Count; i++)
+            {
+                var item = resolved[i];
+                int index = i;
+                <div class="@ListFilterCssClasses.Item @(item.Status == FilterConditionStatus.Overridden ? ListFilterCssClasses.ItemOverridden : "")" @key="item.Id">
+                    <div class="@ListFilterCssClasses.ItemHeader">
+                        <span class="@ListFilterCssClasses.ItemBadge @(item.Status == FilterConditionStatus.Active ? ListFilterCssClasses.ItemBadgeActive : ListFilterCssClasses.ItemBadgeOverridden)">
+                            #@item.Index · @(item.Status == FilterConditionStatus.Active ? "Active" : "Overridden")
+                        </span>
+                        <span class="@ListFilterCssClasses.ItemText">@item.Description</span>
+                        @if (!string.IsNullOrEmpty(item.OverriddenByDescription))
+                        {
+                            <span class="@ListFilterCssClasses.ItemOverrideHint">(@item.OverriddenByDescription)</span>
+                        }
+                    </div>
+                    <div class="@ListFilterCssClasses.ItemActions">
+                        <button type="button"
+                                class="@ListFilterCssClasses.ItemMoveBtn"
+                                disabled="@(index == 0)"
+                                title="Move up"
+                                @onclick="() => ListViewState.MoveFilterUp(index)">▲</button>
+                        <button type="button"
+                                class="@ListFilterCssClasses.ItemMoveBtn"
+                                disabled="@(index == resolved.Count - 1)"
+                                title="Move down"
+                                @onclick="() => ListViewState.MoveFilterDown(index)">▼</button>
+                        <button type="button"
+                                class="@ListFilterCssClasses.ItemRemove"
+                                title="Remove filter"
+                                @onclick="() => ListViewState.RemoveFilter(item.Id)">✕</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="@ListFilterCssClasses.AddSection">
+        <div class="@ListFilterCssClasses.AddRow">
+            <select class="@ListFilterCssClasses.Select" @bind="newField" @bind:after="OnFieldChanged">
+                @foreach (var field in FilterFieldInfo.ListFields)
+                {
+                    <option value="@field">@FilterFieldInfo.FieldLabel(field)</option>
+                }
+            </select>
+
+            <select class="@ListFilterCssClasses.Select" @bind="newOperator">
+                @foreach (var op in FilterFieldInfo.OperatorsFor(newField))
+                {
+                    <option value="@op">@FilterFieldInfo.OperatorLabel(op, newField)</option>
+                }
+            </select>
+
+            @if (FilterFieldInfo.GetKind(newField) == FilterValueKind.Boolean)
+            {
+                <select class="@ListFilterCssClasses.Select" @bind="newValue">
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                </select>
+            }
+            else if (FilterFieldInfo.GetKind(newField) == FilterValueKind.Date)
+            {
+                <input class="@ListFilterCssClasses.Input" type="date" @bind="newDateValue" />
+            }
+            else if (FilterFieldInfo.GetKind(newField) == FilterValueKind.Number)
+            {
+                <input class="@ListFilterCssClasses.Input" type="number" min="0" step="10" placeholder="KB" @bind="newValue" />
+            }
+            else
+            {
+                <input class="@ListFilterCssClasses.Input" placeholder="Value..." @bind="newValue" />
+            }
+        </div>
+
+        <div class="@ListFilterCssClasses.Actions">
+            <PillButton IsActive="true" OnClick="AddCondition">➕ Add filter</PillButton>
+            @if (resolved.Count > 0)
+            {
+                <PillButton IsDanger="true" OnClick="() => ListViewState.ClearFilters()">Clear all</PillButton>
+            }
+        </div>
+    </div>
+</div>
+
+<ListFilterCss />
+
+@code {
+    FilterField newField = FilterField.ReceivedDate;
+    FilterOperator newOperator = FilterOperator.GreaterThan;
+    DateTime newDateValue = DateTime.Today;
+    string newValue = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ListViewState.OnChanged += HandleStateChanged;
+    }
+
+    void HandleStateChanged() => InvokeAsync(StateHasChanged);
+
+    void OnFieldChanged()
+    {
+        var ops = FilterFieldInfo.OperatorsFor(newField).ToArray();
+        if (!ops.Contains(newOperator))
+        {
+            newOperator = ops[0];
+        }
+
+        var kind = FilterFieldInfo.GetKind(newField);
+        if (kind == FilterValueKind.Boolean)
+        {
+            newValue = "true";
+        }
+        else if (kind == FilterValueKind.Date)
+        {
+            newDateValue = DateTime.Today;
+        }
+        else if (kind == FilterValueKind.Number)
+        {
+            newValue = "100";
+        }
+        else
+        {
+            newValue = string.Empty;
+        }
+    }
+
+    void AddCondition()
+    {
+        string val = FilterFieldInfo.GetKind(newField) == FilterValueKind.Date
+            ? newDateValue.ToString("yyyy-MM-dd")
+            : newValue;
+
+        if (FilterFieldInfo.GetKind(newField) == FilterValueKind.Text && string.IsNullOrWhiteSpace(val))
+            return;
+
+        var condition = new FilterCondition
+        {
+            Field = newField,
+            Operator = newOperator,
+            Value = val
+        };
+
+        ListViewState.AddFilter(condition);
+
+        if (FilterFieldInfo.GetKind(newField) == FilterValueKind.Text)
+        {
+            newValue = string.Empty;
+        }
+    }
+
+    public new void Dispose()
+    {
+        base.Dispose();
+        ListViewState.OnChanged -= HandleStateChanged;
+    }
+}

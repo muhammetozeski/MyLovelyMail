@@ -9,23 +9,9 @@
         background: transparent;
     }
 
-    .@(AppContextMenuCssClasses.Columns) {
-        position: fixed;
-        display: flex;
-        align-items: flex-start;
-        gap: @(AppMeasures.Space.Px6)px;
-        max-width: calc(100vw - @(AppMeasures.Space.Px16)px);
-        max-height: @(AppMeasures.Percent.ThreeQuarters)vh;
-        z-index: @(AppMeasures.ZLayer.Modal + 21);
-    }
-
-    .@(AppContextMenuCssClasses.ColumnsLeft) {
-        flex-direction: row-reverse;
-    }
-
     .@(AppContextMenuCssClasses.Panel) {
-        min-width: @(AppMeasures.Size.Px220)px;
-        max-width: @(AppMeasures.Size.Px300)px;
+        position: fixed;
+        width: @(AppMeasures.Size.Px240)px;
         max-height: @(AppMeasures.Percent.ThreeQuarters)vh;
         overflow-y: auto;
         padding: @(AppMeasures.Space.Px6)px;
@@ -35,6 +21,15 @@
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px2)px;
+        z-index: @(AppMeasures.ZLayer.Modal + 21);
+    }
+
+    .@(AppContextMenuCssClasses.PanelSub) {
+        z-index: @(AppMeasures.ZLayer.Modal + 22);
+    }
+
+    .@(AppContextMenuCssClasses.PanelGrand) {
+        z-index: @(AppMeasures.ZLayer.Modal + 23);
     }
 
     .@(AppContextMenuCssClasses.Title) {

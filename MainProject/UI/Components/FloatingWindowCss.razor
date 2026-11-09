@@ -1,0 +1,93 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+
+<style>
+    .@(FloatingWindowCssClasses.DragOverlay) {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: @(AppMeasures.ZLayer.Sticky + 25);
+        cursor: move;
+        background: transparent;
+    }
+
+    .@(FloatingWindowCssClasses.Window) {
+        position: fixed;
+        max-width: calc(100vw - @(AppMeasures.Space.Px32)px);
+        max-height: calc(100vh - @(AppMeasures.Space.Px100)px);
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Large)px;
+        box-shadow: inset 0 @(AppMeasures.Border.Thin)px 0 @AppColors.GlassBorderTop.ToRgbaHex(true), @AppStyles.ShadowHeavy;
+        z-index: @(AppMeasures.ZLayer.Sticky + 20);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: floating-window-appear @(AppMeasures.Duration.Fast)s cubic-bezier(0.16, 1, 0.3, 1);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+
+    .@(FloatingWindowCssClasses.Header) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px14)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        border-bottom: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        cursor: move;
+        user-select: none;
+    }
+
+    .@(FloatingWindowCssClasses.Title) {
+        font-size: @(AppMeasures.Font.Medium)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+
+    .@(FloatingWindowCssClasses.Tools) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(FloatingWindowCssClasses.Close) {
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        width: @(AppMeasures.Size.Px24)px;
+        height: @(AppMeasures.Size.Px24)px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .@(FloatingWindowCssClasses.Close):hover {
+            color: @AppColors.Primary.ToRgbaHex(true);
+            border-color: @AppColors.Primary.ToRgbaHex(true);
+        }
+
+    .@(FloatingWindowCssClasses.Body) {
+        padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px14)px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px10)px;
+    }
+
+    @@keyframes floating-window-appear {
+        from {
+            opacity: 0;
+            transform: scale(0.96) translateY(-@(AppMeasures.Space.Px6)px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+</style>
