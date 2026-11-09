@@ -34,6 +34,7 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win-x64</RuntimeIdentifier>
+    <SatelliteResourceLanguages>en-US;tr-TR;en;tr</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <!-- The exe/taskbar/window icon on Windows reuses the same lovely-mail icon as the tray, instead
@@ -43,9 +44,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+    <MauiIcon Include="Resources\AppIcon\appicon.png" />
 
-    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+    <MauiSplashScreen Include="Resources\Splash\splash.png" Color="#1E1428" BaseSize="128,128" />
 
     <MauiImage Include="Resources\Images\*" />
 
@@ -66,5 +67,14 @@
     <ProjectReference Include="..\MainProject\MainProject.csproj" />
   </ItemGroup>
 
-</Project>
+  <!-- Strip out 80+ unused satellite language folders (MUI and resource DLLs) from build and publish output -->
+  <Target Name="FilterUnwantedSatelliteAndMuiFiles" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.mui' and !($([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('en-us')) or $([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('tr')))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(FileName)' == 'Microsoft.Maui.Controls.resources' and !($([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('en')) or $([System.String]::Copy('%(RelativePath)').ToLower().StartsWith('tr')))" />
+    </ItemGroup>
+  </Target>
 
+</Project>
