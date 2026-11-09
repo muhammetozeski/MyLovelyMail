@@ -154,16 +154,208 @@ public static partial class DebugApi
                     return new { result };
                 }
 
-                // Dispatches a real mouse event on an element — the only way to exercise the
-                // side-button script itself rather than the C# it ends up calling.
+                // Dispatches a real mouse event on an element or at (x, y) coordinates, including click + drag simulation.
                 case ("POST", "/dom/mouse"):
+                case ("POST", "/dom/drag"):
+                case ("POST", "/input/mouse"):
                 {
-                    string selector = JsonSerializer.Serialize(RequireQueryValue(query, "selector"));
-                    int button = int.TryParse(query["button"], out int parsedButton) ? parsedButton : 3;
-                    string? result = await RenderedPageProbe.RunScriptAsync(
-                        $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';"
-                        + $"e.dispatchEvent(new MouseEvent('auxclick',{{button:{button},bubbles:true,cancelable:true}}));return 'dispatched';}})()");
-                    return new { result, button };
+                    string routePath = request.Url?.AbsolutePath.TrimEnd('/').ToLowerInvariant() ?? string.Empty;
+                    double x = 0, y = 0;
+                    bool hasCoords = double.TryParse(query["x"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x)
+                                  && double.TryParse(query["y"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y);
+
+                    if (!hasCoords && query["selector"] is { Length: > 0 } selText)
+                    {
+                        string selector = JsonSerializer.Serialize(selText);
+                        int button = int.TryParse(query["button"], out int parsedButton) ? parsedButton : 3;
+                        string? result = await RenderedPageProbe.RunScriptAsync(
+                            $"(function(){{var e=document.querySelector({selector});if(!e)return 'not found';"
+                            + $"e.dispatchEvent(new MouseEvent('auxclick',{{button:{button},bubbles:true,cancelable:true}}));return 'dispatched';}})()");
+                        return new { result, button };
+                    }
+
+                    string action = (query["action"] ?? (routePath == "/dom/drag" || query["toX"] != null ? "drag" : "click")).ToLowerInvariant();
+                    string btnName = (query["button"] ?? "left").ToLowerInvariant();
+                    (string cdpButton, int domButton, int domButtons) = btnName switch
+                    {
+                        "right" or "2" or "context" => ("right", 2, 2),
+                        "middle" or "1" or "aux" => ("middle", 1, 4),
+                        "back" or "3" or "mouse4" => ("back", 3, 8),
+                        "forward" or "4" or "mouse5" => ("forward", 4, 16),
+                        _ => ("left", 0, 1)
+                    };
+
+                    string invX = x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                    string invY = y.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+                    if (action == "drag")
+                    {
+                        double toX = double.TryParse(query["toX"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double tx) ? tx : x;
+                        double toY = double.TryParse(query["toY"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double ty) ? ty : y;
+                        int steps = int.TryParse(query["steps"], out int parsedSteps) && parsedSteps > 0 ? parsedSteps : 12;
+
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mouseMoved\",\"x\":{invX},\"y\":{invY},\"button\":\"none\",\"buttons\":0}}");
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mousePressed\",\"x\":{invX},\"y\":{invY},\"button\":\"{cdpButton}\",\"buttons\":{domButtons},\"clickCount\":1}}");
+
+                        string? startInfo = await RenderedPageProbe.RunScriptAsync(
+                            $"(function(){{var el=document.elementFromPoint({invX},{invY})||document.body;"
+                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
+                            + $"el.dispatchEvent(new PointerEvent('pointerdown',opts));"
+                            + $"el.dispatchEvent(new MouseEvent('mousedown',opts));"
+                            + $"var dragEl=el.closest('[draggable=\"true\"]');"
+                            + $"if(dragEl){{window.__debugDragEl=dragEl;window.__debugDataTransfer=new DataTransfer();dragEl.dispatchEvent(new DragEvent('dragstart',{{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},dataTransfer:window.__debugDataTransfer}}));}}"
+                            + $"else{{window.__debugDragEl=null;}}"
+                            + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
+
+                        for (int i = 1; i <= steps; i++)
+                        {
+                            double curX = x + (toX - x) * i / steps;
+                            double curY = y + (toY - y) * i / steps;
+                            string cx = curX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                            string cy = curY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                            await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                                $"{{\"type\":\"mouseMoved\",\"x\":{cx},\"y\":{cy},\"button\":\"{cdpButton}\",\"buttons\":{domButtons}}}");
+                            await RenderedPageProbe.RunScriptAsync(
+                                $"(function(){{var el=document.elementFromPoint({cx},{cy})||document.body;"
+                                + $"var opts={{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
+                                + $"el.dispatchEvent(new PointerEvent('pointermove',opts));"
+                                + $"el.dispatchEvent(new MouseEvent('mousemove',opts));"
+                                + $"window.dispatchEvent(new PointerEvent('pointermove',opts));"
+                                + $"window.dispatchEvent(new MouseEvent('mousemove',opts));"
+                                + $"if(window.__debugDragEl){{el.dispatchEvent(new DragEvent('dragenter',{{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},dataTransfer:window.__debugDataTransfer}}));"
+                                + $"el.dispatchEvent(new DragEvent('dragover',{{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},dataTransfer:window.__debugDataTransfer}}));}}"
+                                + $"return 'moved';}})()");
+                            await Task.Delay(12);
+                        }
+
+                        string invToX = toX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        string invToY = toY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        string? endInfo = await RenderedPageProbe.RunScriptAsync(
+                            $"(function(){{var el=document.elementFromPoint({invToX},{invToY})||document.body;"
+                            + $"if(window.__debugDragEl){{if(!window.__mailDragCancelled){{el.dispatchEvent(new DragEvent('drop',{{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},dataTransfer:window.__debugDataTransfer}}));}}"
+                            + $"window.__debugDragEl.dispatchEvent(new DragEvent('dragend',{{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},dataTransfer:window.__debugDataTransfer}}));window.__debugDragEl=null;}}"
+                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},button:{domButton},buttons:0,pointerId:1,isPrimary:true}};"
+                            + $"el.dispatchEvent(new PointerEvent('pointerup',opts));"
+                            + $"el.dispatchEvent(new MouseEvent('mouseup',opts));"
+                            + $"window.dispatchEvent(new PointerEvent('pointerup',opts));"
+                            + $"window.dispatchEvent(new MouseEvent('mouseup',opts));"
+                            + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
+
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mouseReleased\",\"x\":{invToX},\"y\":{invToY},\"button\":\"{cdpButton}\",\"buttons\":0,\"clickCount\":1}}");
+
+                        return new { action = "drag", from = new { x, y, element = startInfo }, to = new { x = toX, y = toY, element = endInfo }, steps };
+                    }
+
+                    if (action is "move" or "hover")
+                    {
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mouseMoved\",\"x\":{invX},\"y\":{invY},\"button\":\"none\",\"buttons\":0}}");
+                        string? hoverEl = await RenderedPageProbe.RunScriptAsync(
+                            $"(function(){{var el=document.elementFromPoint({invX},{invY})||document.body;"
+                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY}}};"
+                            + $"el.dispatchEvent(new PointerEvent('pointerover',opts));"
+                            + $"el.dispatchEvent(new PointerEvent('pointerenter',opts));"
+                            + $"el.dispatchEvent(new MouseEvent('mouseover',opts));"
+                            + $"el.dispatchEvent(new MouseEvent('mouseenter',opts));"
+                            + $"el.dispatchEvent(new MouseEvent('mousemove',opts));"
+                            + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
+                        return new { action = "hover", x, y, element = hoverEl };
+                    }
+
+                    int clickCount = action == "dblclick" ? 2 : 1;
+                    await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        $"{{\"type\":\"mouseMoved\",\"x\":{invX},\"y\":{invY},\"button\":\"none\",\"buttons\":0}}");
+                    await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        $"{{\"type\":\"mousePressed\",\"x\":{invX},\"y\":{invY},\"button\":\"{cdpButton}\",\"buttons\":{domButtons},\"clickCount\":{clickCount}}}");
+                    await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        $"{{\"type\":\"mouseReleased\",\"x\":{invX},\"y\":{invY},\"button\":\"{cdpButton}\",\"buttons\":0,\"clickCount\":{clickCount}}}");
+
+                    string? targetInfo = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var el=document.elementFromPoint({invX},{invY})||document.body;"
+                        + $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},button:{domButton},buttons:0, detail:{clickCount}}};"
+                        + (domButton == 2 || action == "contextmenu" || action == "rightclick"
+                            ? $"el.dispatchEvent(new MouseEvent('contextmenu',opts));"
+                            : domButton == 1 || action == "middleclick"
+                                ? $"el.dispatchEvent(new MouseEvent('mouseup',opts));el.dispatchEvent(new MouseEvent('auxclick',opts));"
+                                : action == "dblclick"
+                                    ? $"el.dispatchEvent(new MouseEvent('dblclick',opts));"
+                                    : "")
+                        + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
+
+                    return new { action, button = cdpButton, x, y, element = targetInfo };
+                }
+
+                // Simulates a keyboard keystroke or text typing at an optional (x, y) coordinate inside the window.
+                case ("POST", "/dom/key"):
+                case ("POST", "/input/key"):
+                {
+                    double x = 0, y = 0;
+                    bool hasCoords = double.TryParse(query["x"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x)
+                                  && double.TryParse(query["y"], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y);
+                    string key = query["key"] ?? "Enter";
+                    string? text = query["text"];
+                    bool ctrl = bool.TryParse(query["ctrl"], out bool c) && c;
+                    bool shift = bool.TryParse(query["shift"], out bool s) && s;
+                    bool alt = bool.TryParse(query["alt"], out bool a) && a;
+                    bool clickFirst = !bool.TryParse(query["click"], out bool cl) || cl;
+
+                    int modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0) | (shift ? 8 : 0);
+                    if (hasCoords && clickFirst)
+                    {
+                        string ix = x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        string iy = y.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mousePressed\",\"x\":{ix},\"y\":{iy},\"button\":\"left\",\"buttons\":1,\"clickCount\":1}}");
+                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            $"{{\"type\":\"mouseReleased\",\"x\":{ix},\"y\":{iy},\"button\":\"left\",\"buttons\":0,\"clickCount\":1}}");
+                    }
+
+                    string keyJson = JsonSerializer.Serialize(key);
+                    string textJson = JsonSerializer.Serialize(text ?? string.Empty);
+                    string coordFind = hasCoords
+                        ? $"document.elementFromPoint({x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)},{y.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)})"
+                        : "null";
+
+                    string? domTarget = await RenderedPageProbe.RunScriptAsync(
+                        $"(function(){{var el={coordFind}||document.activeElement||document.body;"
+                        + $"if(el&&typeof el.focus==='function')el.focus();"
+                        + $"var k={keyJson};var t={textJson};"
+                        + $"var evInit={{key:k,code:k.length===1?'Key'+k.toUpperCase():k,ctrlKey:{(ctrl ? "true" : "false")},shiftKey:{(shift ? "true" : "false")},altKey:{(alt ? "true" : "false")},bubbles:true,cancelable:true}};"
+                        + $"el.dispatchEvent(new KeyboardEvent('keydown',evInit));"
+                        + $"if(t&&('value' in el)){{el.value=(el.value||'')+t;el.dispatchEvent(new Event('input',{{bubbles:true}}));el.dispatchEvent(new Event('change',{{bubbles:true}}));}}"
+                        + $"el.dispatchEvent(new KeyboardEvent('keyup',evInit));"
+                        + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
+
+                    await RenderedPageProbe.CallCdpAsync("Input.dispatchKeyEvent",
+                        $"{{\"type\":\"keyDown\",\"key\":{keyJson},\"modifiers\":{modifiers}}}");
+                    await RenderedPageProbe.CallCdpAsync("Input.dispatchKeyEvent",
+                        $"{{\"type\":\"keyUp\",\"key\":{keyJson},\"modifiers\":{modifiers}}}");
+
+                    return new { dispatched = true, x = hasCoords ? (double?)x : null, y = hasCoords ? (double?)y : null, key, text, ctrl, shift, alt, target = domTarget };
+                }
+
+                // Captures a PNG screenshot of the app window in the background without bringing it to the foreground.
+                case ("GET", "/screenshot"):
+                case ("POST", "/screenshot"):
+                {
+                    byte[]? pngBytes = await RenderedPageProbe.CaptureScreenshotAsync();
+                    if (pngBytes == null || pngBytes.Length == 0)
+                        throw new InvalidOperationException("Screenshot capture returned empty bytes.");
+
+                    string? savePath = query["path"];
+                    if (!string.IsNullOrWhiteSpace(savePath))
+                    {
+                        string fullPath = Path.GetFullPath(savePath);
+                        if (Path.GetDirectoryName(fullPath) is { Length: > 0 } dir)
+                            Directory.CreateDirectory(dir);
+                        await File.WriteAllBytesAsync(fullPath, pngBytes);
+                        return new { saved = true, path = fullPath, bytes = pngBytes.Length };
+                    }
+
+                    return new { saved = false, bytes = pngBytes.Length, base64 = Convert.ToBase64String(pngBytes) };
                 }
 
                 // Fires a side-button action without a mouse, so the behavior is testable without

@@ -10,8 +10,13 @@
            the two panes back to sharing that height instead of being pinned inside it. */
         .mail-screen {
             grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
+            gap: @(AppMeasures.Space.Medium)px;
             height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
             align-items: stretch;
+        }
+
+        .mail-column-splitter {
+            display: none;
         }
 
         .mail-sidebar,

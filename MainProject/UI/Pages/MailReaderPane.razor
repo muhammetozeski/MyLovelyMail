@@ -52,10 +52,10 @@
                     </div>
                 }
                 <div class="mail-person-actions">
-                    <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(person.Address, e)">Actions ▾</button>
-                    <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("from:" + person.Address)'>🔍 From them</button>
-                    <button class="mail-search-toggle" @onclick='() => View.RunSavedSearch("to:" + person.Address)'>🔍 To them</button>
-                    <button class="mail-search-toggle" @onclick="() => MouseActionService.RunAsync(MouseActionService.ComposeToAction, person.Address)">✏️ Write</button>
+                    <PillButton OnClick="e => View.OpenAddressMenu(person.Address, e)">Actions ▾</PillButton>
+                    <PillButton OnClick='() => View.RunSavedSearch("from:" + person.Address)'>🔍 From them</PillButton>
+                    <PillButton OnClick='() => View.RunSavedSearch("to:" + person.Address)'>🔍 To them</PillButton>
+                    <PillButton OnClick="() => MouseActionService.RunAsync(MouseActionService.ComposeToAction, person.Address)">✏️ Write</PillButton>
                 </div>
             </div>
         }
@@ -202,24 +202,24 @@
             @* Full-width stacked header: Back + Avatar + Subject sit inline on the top row, so every
                line below (From/Date/To, history, badges, toolbar, body) utilizes the full column width
                with zero empty space beneath Back or the avatar. *@
-            <div class="mail-reader-header-card">
-                <div class="mail-reader-top-row">
+            <div class="@MailCssClasses.ReaderHeaderCard">
+                <div class="@MailCssClasses.ReaderTopRow">
                     <BackButton OnClick="@MailUiState.CloseMessage" />
-                    <button class="mail-reader-avatar" title="Everything known about this correspondent"
+                    <button class="@MailCssClasses.ReaderAvatar" title="Everything known about this correspondent"
                             style="background:@Mail.AvatarGradient(open)"
                             data-context-menu="true" @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)"
                             @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
                             @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@Mail.AvatarInitials(open)</button>
-                    <div class="mail-reader-subject" title="@open.Subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
-                    <nav class="mail-reader-list-nav" aria-label="Navigate listed messages">
-                        <button class="mail-search-toggle mail-search-toggle--compact" title="Previous listed message" disabled="@(View.ListedNavigationTarget(-1) == null)" @onclick="() => View.OpenListedMessage(-1)">←</button>
-                        <button class="mail-search-toggle mail-search-toggle--compact" title="Next listed message" disabled="@(View.ListedNavigationTarget(1) == null)" @onclick="() => View.OpenListedMessage(1)">→</button>
-                        <button class="mail-search-toggle mail-search-toggle--compact" title="Next unread conversation" disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" @onclick="() => View.OpenListedMessage(1, unreadOnly: true)">📩→</button>
+                    <div class="@MailCssClasses.ReaderSubject" title="@open.Subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
+                    <nav class="@MailCssClasses.ReaderListNav" aria-label="Navigate listed messages">
+                        <PillButton IsCompact="true" Title="Previous listed message" Disabled="@(View.ListedNavigationTarget(-1) == null)" OnClick="() => View.OpenListedMessage(-1)">←</PillButton>
+                        <PillButton IsCompact="true" Title="Next listed message" Disabled="@(View.ListedNavigationTarget(1) == null)" OnClick="() => View.OpenListedMessage(1)">→</PillButton>
+                        <PillButton IsCompact="true" Title="Next unread conversation" Disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" OnClick="() => View.OpenListedMessage(1, unreadOnly: true)">📩→</PillButton>
                     </nav>
                 </div>
 
-                <div class="mail-reader-meta-row">
-                    <div class="mail-reader-meta-left">
+                <div class="@MailCssClasses.ReaderMetaRow">
+                    <div class="@MailCssClasses.ReaderMetaLeft">
                         <span class="mail-reader-from" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@open.FromAddress" data-mouse5="menu"
                               @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                             @(string.IsNullOrWhiteSpace(open.FromName) ? open.FromAddress : $"{open.FromName} <{open.FromAddress}>")
@@ -227,7 +227,7 @@
                         <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                         @if (View.HistoryOfOpenSender(open) is { } history)
                         {
-                            <button class="mail-reader-history" title="Show everything from this sender"
+                            <button class="@MailCssClasses.ReaderHistory" title="Show everything from this sender"
                                     @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
                                 💌 @history.MessageCount@(history.UnreadCount > 0 ? $" ({history.UnreadCount} unread)" : "")
                             </button>
@@ -235,7 +235,7 @@
                     </div>
                     @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
-                        <div class="mail-reader-to" title="to @open.ToAddresses">to @open.ToAddresses</div>
+                        <div class="@MailCssClasses.ReaderTo" title="to @open.ToAddresses">to @open.ToAddresses</div>
                     }
                 </div>
 
@@ -347,39 +347,39 @@
                - Trash / Delete forever
                - Text zoom scale *@
             <div class="mail-reader-actions">
-                <button class="mail-search-toggle"
-                        @onclick="@(() => MouseActionService.RunMessagesAsync(open.IsUnread ? MailMessageCommand.Read : MailMessageCommand.Unread, readerTargets, includeSelection: false))">
+                <PillButton OnClick="@(() => MouseActionService.RunMessagesAsync(open.IsUnread ? MailMessageCommand.Read : MailMessageCommand.Unread, readerTargets, includeSelection: false))">
                     @(open.IsUnread ? "✅ Mark read" : "📩 Mark unread")
-                </button>
-                <button class="mail-search-toggle" @onclick="e => View.OpenReplyMenu(open, e)">↩️ Reply ▾</button>
-                <button class="mail-search-toggle" title="Star, Importance & Tags" @onclick="() => View.OpenMarkersModal(open)">
+                </PillButton>
+                <PillButton OnClick="e => View.OpenReplyMenu(open, e)">↩️ Reply ▾</PillButton>
+                <PillButton Title="Star, Importance & Tags" OnClick="() => View.OpenMarkersModal(open)">
                     @starIcon@(impIcon) Labels@(tagCountBadge)
-                </button>
-                <button class="mail-search-toggle" title="Save as .eml or .html" @onclick="() => View.OpenSaveModal(open)">💾 Save</button>
-                <button class="mail-search-toggle" title="All message actions (middle-click or right-click any item to pin/unpin)" @onclick="e => View.OpenReaderActionsMenu(open, e)">⚡ Message actions ▾</button>
+                </PillButton>
+                <PillButton Title="Save as .eml or .html" OnClick="() => View.OpenSaveModal(open)">💾 Save</PillButton>
+                <PillButton Title="All message actions (middle-click or right-click any item to pin/unpin)" OnClick="e => View.OpenReaderActionsMenu(open, e)">⚡ Message actions ▾</PillButton>
 
                 @foreach (var pinned in View.GetPinnedReaderActions(open))
                 {
-                    <button class="mail-search-toggle mail-search-toggle--pinned"
-                            title="@pinned.Label — middle-click or right-click to unpin from toolbar"
-                            @onclick="pinned.Execute"
-                            @onmouseup="e => { if (e.Button == 1) View.ToggleReaderPinnedAction(pinned.PinId); }"
-                            @oncontextmenu="() => View.ToggleReaderPinnedAction(pinned.PinId)"
-                            @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                    <PillButton IsPinned="true"
+                                Title="@($"{pinned.Label} — middle-click or right-click to unpin from toolbar")"
+                                OnClick="@(() => pinned.Execute())"
+                                OnMouseUp="@(e => { if (e.Button == 1) View.ToggleReaderPinnedAction(pinned.PinId); })"
+                                OnContextMenu="@(() => View.ToggleReaderPinnedAction(pinned.PinId))"
+                                PreventContextMenuDefault="true"
+                                StopContextMenuPropagation="true">
                         @pinned.ToolbarLabel
-                    </button>
+                    </PillButton>
                 }
 
-                <button class="mail-search-toggle" @onclick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">👤 Sender ▾</button>
+                <PillButton OnClick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">👤 Sender ▾</PillButton>
                 <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px4 + "px " + AppMeasures.Space.Px10 + "px")"
                               OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: false))">
                     @(isInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
                 </DangerButton>
 
                 <span class="mail-text-scale">
-                    <button class="mail-folder-action mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => View.StepReaderTextScale(-1)">A-</button>
-                    <button class="mail-folder-action mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => View.StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
-                    <button class="mail-folder-action mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => View.StepReaderTextScale(1)">A+</button>
+                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => View.StepReaderTextScale(-1)">A-</button>
+                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => View.StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
+                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => View.StepReaderTextScale(1)">A+</button>
                 </span>
             </div>
 
@@ -416,7 +416,7 @@
                     else
                     {
                         <span>🖼️ Remote images were blocked for your privacy.</span>
-                        <button class="mail-search-toggle" @onclick="View.AllowImagesOnce">Show images once</button>
+                        <PillButton OnClick="View.AllowImagesOnce">Show images once</PillButton>
                     }
                 </div>
             }

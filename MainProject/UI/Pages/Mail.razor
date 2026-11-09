@@ -9,7 +9,11 @@
 <PageTitle>My Lovely Mail</PageTitle>
 @{ var workspaceTargets = WorkspaceTargets; var workspacePayload = JsonSerializer.Serialize(workspaceTargets); }
 
-<div class="mail-screen @(MailUiState.ThirdPane != null ? "mail-screen--pane-open" : "")"
+<div class="@MailCssClasses.Screen @(MailUiState.ThirdPane != null ? MailCssClasses.ScreenPaneOpen : "") @(activeSplitter != 0 ? MailCssClasses.ScreenResizing : "")"
+     tabindex="-1"
+     @onpointermove="OnScreenPointerMove"
+     @onpointerup="OnScreenPointerUp"
+     @onkeydown="OnScreenKeyDown"
      data-context-menu="true" @oncontextmenu="e => OpenWorkspaceMenu(e)" @oncontextmenu:preventDefault="true"
      data-mouse4="@(workspaceTargets.Length > 0 ? MouseActionService.TrashAction : "menu")" data-mouse4-value="@workspacePayload"
      data-mouse5="@(workspaceTargets.Length > 0 ? MouseActionService.ReadAction : MouseActionService.SyncAction)" data-mouse5-value="@workspacePayload"
@@ -17,67 +21,66 @@
 
     <MailSidebar View="this" />
 
-    <div class="mail-column-splitter"
-         title="Drag to resize sidebar (snaps near 20.0% · double-click to reset)"
-         @onpointerdown="e => StartColumnSplitterDragAsync(1, e)"
-         @ondblclick="() => ResetColumnSplitter(1)">
-        <span class="mail-column-splitter-grip"></span>
-    </div>
+    <ColumnSplitter Index="1"
+                    IsDragging="@(activeSplitter == 1)"
+                    Title="Drag to resize sidebar (snaps near 20.0% · double-click to reset)"
+                    OnPointerDown="e => StartColumnSplitterDrag(1, e)"
+                    OnDoubleClick="() => ResetColumnSplitter(1)" />
 
     @* ---- Middle: message list ---- *@
-    <section class="mail-list">
-        <div class="mail-search">
+    <section class="@MailCssClasses.List">
+        <div class="@MailCssClasses.Search">
             <CoreInput Placeholder="Search mail..." Icon="🔎" @bind-Value="SearchText" />
-            <div class="mail-selection-tools">
-                <button class="mail-search-toggle @(SelectionMode ? "mail-search-toggle--on" : "")" @onclick="() => SelectionMode = !SelectionMode">☑ Select</button>
-                <button class="mail-search-toggle" @onclick="SelectAllMessages" disabled="@(Rows.Count == 0)">Select all</button>
-                <button class="mail-search-toggle" title="Select by read state, stars, attachments or tags" @onclick="OpenSelectionMenu" disabled="@(Rows.Count == 0)">Select ▾</button>
-                <button class="mail-search-toggle" title="List navigation, selection and keyboard shortcuts" @onclick="OpenListActionsMenu">Actions ▾</button>
-                <button class="mail-search-toggle mail-search-toggle--icon" title="Keyboard shortcuts (?)" @onclick="OpenShortcutHelpModal">⌨️</button>
+            <div class="@MailCssClasses.SelectionTools">
+                <PillButton IsActive="@SelectionMode" OnClick="() => SelectionMode = !SelectionMode">☑ Select</PillButton>
+                <PillButton OnClick="SelectAllMessages" Disabled="@(Rows.Count == 0)">Select all</PillButton>
+                <PillButton Title="Select by read state, stars, attachments or tags" OnClick="OpenSelectionMenu" Disabled="@(Rows.Count == 0)">Select ▾</PillButton>
+                <PillButton Title="List navigation, selection and keyboard shortcuts" OnClick="OpenListActionsMenu">Actions ▾</PillButton>
+                <PillButton IsIcon="true" Title="Keyboard shortcuts (?)" OnClick="OpenShortcutHelpModal">⌨️</PillButton>
                 @if (MailUiState.SelectedFolder is { Role: FolderRole.Trash or FolderRole.Junk } trashOrJunkFolder
                      && MailUiState.SelectedAccount is { } activeAcc
                      && CachedCount > 0)
                 {
-                    <button class="mail-search-toggle mail-search-toggle--danger"
-                            title="Permanently delete all messages in @trashOrJunkFolder.DisplayName"
-                            @onclick="() => EmptyFolderWithConfirmationAsync(activeAcc, trashOrJunkFolder)">
+                    <PillButton IsDanger="true"
+                                Title="@($"Permanently delete all messages in {trashOrJunkFolder.DisplayName}")"
+                                OnClick="() => EmptyFolderWithConfirmationAsync(activeAcc, trashOrJunkFolder)">
                         @(trashOrJunkFolder.Role == FolderRole.Trash ? "🗑️ Empty Trash" : "🧹 Empty Spam")
-                    </button>
+                    </PillButton>
                 }
                 @if (MailUiState.SelectedMessages.Count > 0)
                 {
-                    <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">Clear selection</button>
+                    <PillButton OnClick="MailUiState.ClearSelection">Clear selection</PillButton>
                 }
             </div>
             @if (SyncScheduler.IsSyncing)
             {
-                <div class="mail-sync-line"><span class="mail-sync-line-runner"></span></div>
+                <div class="@MailCssClasses.SyncLine"><span class="@MailCssClasses.SyncLineRunner"></span></div>
             }
-            <div class="mail-search-fold-row">
-                <button class="mail-search-toggle @(!ShowSearchTools && ActiveFilterCount > 0 ? "mail-search-toggle--on" : "")"
-                        title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
-                        @onclick="() => ShowSearchTools = !ShowSearchTools">
+            <div class="@MailCssClasses.SearchFoldRow">
+                <PillButton IsActive="@(!ShowSearchTools && ActiveFilterCount > 0)"
+                            Title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
+                            OnClick="() => ShowSearchTools = !ShowSearchTools">
                     🎛️ Filters@(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "") @(ShowSearchTools ? "▴" : "▾")
-                </button>
+                </PillButton>
             </div>
             @if (ShowSearchTools)
             {
-                <div class="mail-search-tools">
+                <div class="@MailCssClasses.SearchTools">
                     @foreach (var (label, token) in QuickFilters)
                     {
-                        <button class="mail-search-toggle @(HasSearchToken(token) ? "mail-search-toggle--on" : "")"
-                                @onclick="() => ToggleSearchToken(token)">@label</button>
+                        <PillButton IsActive="@HasSearchToken(token)"
+                                    OnClick="() => ToggleSearchToken(token)">@label</PillButton>
                     }
                     @if (MailUiState.SelectedAccount != null)
                     {
-                        <button class="mail-search-toggle @(ConversationMode ? "mail-search-toggle--on" : "")"
-                                title="Group replies into conversations"
-                                @onclick="ToggleConversationMode">🧵 Conversations</button>
+                        <PillButton IsActive="@ConversationMode"
+                                    Title="Group replies into conversations"
+                                    OnClick="ToggleConversationMode">🧵 Conversations</PillButton>
                     }
                     @if (!string.IsNullOrWhiteSpace(SearchText))
                     {
-                        <button class="mail-search-toggle @(SearchAllFolders ? "mail-search-toggle--on" : "")" @onclick="ToggleSearchAllFolders">🗂️ All folders</button>
-                        <button class="mail-search-toggle" @onclick="SaveCurrentSearch">⭐ Save search</button>
+                        <PillButton IsActive="@SearchAllFolders" OnClick="ToggleSearchAllFolders">🗂️ All folders</PillButton>
+                        <PillButton OnClick="SaveCurrentSearch">⭐ Save search</PillButton>
                     }
                 </div>
             }
@@ -135,7 +138,7 @@
                     <div class="mail-rescue">
                         @foreach (var rescue in SearchRescues)
                         {
-                            <button class="mail-search-toggle" @onclick="() => ApplyRescue(rescue)">@rescue.Label</button>
+                            <PillButton OnClick="() => ApplyRescue(rescue)">@rescue.Label</PillButton>
                         }
                     </div>
                 </div>
@@ -146,25 +149,25 @@
             @if (MailUiState.SelectedMessages.Count > 0)
             {
                 bool bulkInTrash = MailUiState.SelectedFolder?.Role == FolderRole.Trash;
-                <div class="mail-bulk-bar">
-                    <span class="mail-bulk-count">@MailUiState.SelectedMessages.Count selected</span>
-                    <button class="mail-search-toggle" @onclick="OpenBulkActionsMenu">More actions ▾</button>
-                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</button>
-                    <button class="mail-search-toggle" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</button>
-                    <button class="mail-search-toggle" @onclick="OpenBulkMarkersModal">⭐ Labels</button>
+                <div class="@MailCssClasses.BulkBar">
+                    <span class="@MailCssClasses.BulkCount">@MailUiState.SelectedMessages.Count selected</span>
+                    <PillButton OnClick="OpenBulkActionsMenu">More actions ▾</PillButton>
+                    <PillButton OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</PillButton>
+                    <PillButton OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</PillButton>
+                    <PillButton OnClick="OpenBulkMarkersModal">⭐ Labels</PillButton>
                     @if (MoveTargets(MailUiState.SelectedMessages).Count > 0)
                     {
-                        <button class="mail-search-toggle" @onclick="OpenBulkMoveModal">📂 Move</button>
+                        <PillButton OnClick="OpenBulkMoveModal">📂 Move</PillButton>
                     }
-                    <button class="mail-search-toggle" @onclick="OpenBulkSnoozeModal">⏰ Snooze</button>
-                    <button class="mail-search-toggle mail-search-toggle--danger" @onclick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">
+                    <PillButton OnClick="OpenBulkSnoozeModal">⏰ Snooze</PillButton>
+                    <PillButton IsDanger="true" OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">
                         @(bulkInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
-                    </button>
-                    <button class="mail-search-toggle" @onclick="SelectAllMessages">☑️ All</button>
-                    <button class="mail-search-toggle" @onclick="MailUiState.ClearSelection">✕ Clear</button>
+                    </PillButton>
+                    <PillButton OnClick="SelectAllMessages">☑️ All</PillButton>
+                    <PillButton OnClick="MailUiState.ClearSelection">✕ Clear</PillButton>
                 </div>
             }
-            <div class="mail-rows" tabindex="0" @onkeydown="HandleListKeyDown">
+            <div class="@MailCssClasses.Rows" tabindex="0" @onkeydown="HandleListKeyDown">
                 <Virtualize Items="Rows" Context="row" ItemSize="76">
                     @{
                         var message = row.Message;
@@ -270,12 +273,11 @@
         }
     </section>
 
-    <div class="mail-column-splitter"
-         title="Drag to resize message list & reader (snaps near 32.0% / 48.0% · double-click to reset)"
-         @onpointerdown="e => StartColumnSplitterDragAsync(2, e)"
-         @ondblclick="() => ResetColumnSplitter(2)">
-        <span class="mail-column-splitter-grip"></span>
-    </div>
+    <ColumnSplitter Index="2"
+                    IsDragging="@(activeSplitter == 2)"
+                    Title="Drag to resize message list & reader (snaps near 32.0% / 48.0% · double-click to reset)"
+                    OnPointerDown="e => StartColumnSplitterDrag(2, e)"
+                    OnDoubleClick="() => ResetColumnSplitter(2)" />
 
     <MailReaderPane View="this" />
 </div>

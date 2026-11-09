@@ -16,10 +16,41 @@ namespace MyLovelyMail
 #if DEBUG
             MainProject.Services.RenderedPageProbe.HtmlProvider = ReadRenderedHtmlAsync;
             MainProject.Services.RenderedPageProbe.ScriptRunner = RunPageScriptAsync;
+            MainProject.Services.RenderedPageProbe.CdpCaller = CallCdpMethodAsync;
+            MainProject.Services.RenderedPageProbe.ScreenshotProvider = CaptureWebViewScreenshotAsync;
 #endif
         }
 
 #if DEBUG
+#if WINDOWS
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool IsIconic(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        const int SW_SHOWNOACTIVATE = 4;
+        static readonly IntPtr HWND_BOTTOM = new(1);
+        const uint SWP_NOSIZE = 0x0001;
+        const uint SWP_NOMOVE = 0x0002;
+        const uint SWP_NOACTIVATE = 0x0010;
+
+        void EnsureBackgroundRenderableWindow()
+        {
+            if (Window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window winuiWindow) return;
+            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(winuiWindow);
+            if (hwnd != IntPtr.Zero && IsIconic(hwnd))
+            {
+                // Restore from minimized state without activating or stealing focus, and keep behind all windows.
+                ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+        }
+#endif
+
         /// <summary>
         /// Debug-only: hands the debug API the HTML the WebView is showing, so the UI can be
         /// audited without clicking or scrolling on the user's screen.
@@ -38,6 +69,7 @@ namespace MyLovelyMail
             // HttpListener thread, hence the dispatch. It answers with a JSON-encoded string.
             return await Dispatcher.DispatchAsync(async () =>
             {
+                EnsureBackgroundRenderableWindow();
                 if (blazorWebView.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.WebView2 webView)
                     return string.Empty;
                 await webView.EnsureCoreWebView2Async();
@@ -47,6 +79,62 @@ namespace MyLovelyMail
 #else
             await Task.CompletedTask;
             return string.Empty;
+#endif
+        }
+
+        async Task<string> CallCdpMethodAsync(string methodName, string parametersJson)
+        {
+#if WINDOWS
+            return await Dispatcher.DispatchAsync(async () =>
+            {
+                EnsureBackgroundRenderableWindow();
+                if (blazorWebView.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.WebView2 webView)
+                    return string.Empty;
+                await webView.EnsureCoreWebView2Async();
+                return await webView.CoreWebView2.CallDevToolsProtocolMethodAsync(
+                    methodName,
+                    string.IsNullOrWhiteSpace(parametersJson) ? "{}" : parametersJson);
+            });
+#else
+            await Task.CompletedTask;
+            return string.Empty;
+#endif
+        }
+
+        async Task<byte[]?> CaptureWebViewScreenshotAsync()
+        {
+#if WINDOWS
+            return await Dispatcher.DispatchAsync(async () =>
+            {
+                EnsureBackgroundRenderableWindow();
+                if (blazorWebView.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.WebView2 webView)
+                    return null;
+                await webView.EnsureCoreWebView2Async();
+
+                try
+                {
+                    string cdpJson = await webView.CoreWebView2.CallDevToolsProtocolMethodAsync(
+                        "Page.captureScreenshot",
+                        "{\"format\":\"png\",\"fromSurface\":true}");
+                    using var doc = System.Text.Json.JsonDocument.Parse(cdpJson);
+                    if (doc.RootElement.TryGetProperty("data", out var dataProp) && dataProp.GetString() is { Length: > 0 } b64)
+                        return Convert.FromBase64String(b64);
+                }
+                catch
+                {
+                    // Fallback to CapturePreviewAsync below.
+                }
+
+                using var ms = new MemoryStream();
+                using var ras = ms.AsRandomAccessStream();
+                await webView.CoreWebView2.CapturePreviewAsync(
+                    Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png,
+                    ras);
+                return ms.Length > 0 ? ms.ToArray() : null;
+            });
+#else
+            await Task.CompletedTask;
+            return null;
 #endif
         }
 #endif

@@ -1,0 +1,50 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Buttons
+@inherits ThemedComponentBase
+@using Microsoft.AspNetCore.Components.Web
+@using MyLovelyMail.MainProject.UI.Pages
+
+<button type="button"
+        class="@ComputedClass"
+        title="@Title"
+        disabled="@Disabled"
+        @onclick="OnClick"
+        @onmouseup="OnMouseUp"
+        @oncontextmenu="OnContextMenu"
+        @oncontextmenu:preventDefault="@PreventContextMenuDefault"
+        @oncontextmenu:stopPropagation="@StopContextMenuPropagation"
+        @attributes="AdditionalAttributes">
+    @ChildContent
+</button>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public bool IsDanger { get; set; }
+    [Parameter] public bool IsPinned { get; set; }
+    [Parameter] public bool IsIcon { get; set; }
+    [Parameter] public bool IsCompact { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+    [Parameter] public bool PreventContextMenuDefault { get; set; }
+    [Parameter] public bool StopContextMenuPropagation { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnMouseUp { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnContextMenu { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    string ComputedClass
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder(MailCssClasses.SearchToggle);
+            if (IsActive) sb.Append(' ').Append(MailCssClasses.SearchToggleOn);
+            if (IsDanger) sb.Append(' ').Append(MailCssClasses.SearchToggleDanger);
+            if (IsPinned) sb.Append(' ').Append(MailCssClasses.SearchTogglePinned);
+            if (IsIcon) sb.Append(' ').Append(MailCssClasses.SearchToggleIcon);
+            if (IsCompact) sb.Append(' ').Append(MailCssClasses.SearchToggleCompact);
+            if (!string.IsNullOrWhiteSpace(CustomClass)) sb.Append(' ').Append(CustomClass);
+            return sb.ToString();
+        }
+    }
+}

@@ -220,4 +220,25 @@
         for (const frame of document.querySelectorAll("iframe.mail-reader-frame")) window.lovelyMouse.attachFrame(frame);
     }
     attachDocument(document, null);
+
+    let sidebarDragRef = null;
+    window.__mailDragCancelled = false;
+
+    document.addEventListener("dragstart", function () {
+        window.__mailDragCancelled = false;
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            window.__mailDragCancelled = true;
+            if (sidebarDragRef) {
+                try { sidebarDragRef.invokeMethodAsync("CancelActiveDragFromJs"); } catch { }
+            }
+        }
+    }, true);
+
+    window.myLovelyMailSidebarDrag = {
+        register: function (dotNetRef) { sidebarDragRef = dotNetRef; },
+        unregister: function () { sidebarDragRef = null; }
+    };
 })();

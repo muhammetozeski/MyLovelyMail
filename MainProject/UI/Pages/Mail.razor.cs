@@ -24,7 +24,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
     public partial class Mail
     {
         [Inject] IJSRuntime JS { get; set; } = default!;
-        DotNetObjectReference<Mail>? splitterDotNetRef;
 
         string _searchText = string.Empty;
 
@@ -76,27 +75,98 @@ namespace MyLovelyMail.MainProject.UI.Pages
             StateHasChanged();
         }
 
-        internal async Task StartColumnSplitterDragAsync(int splitterIndex, PointerEventArgs e)
+        internal int activeSplitter;
+        double dragStartClientX;
+        double dragStartSidebarPct;
+        double dragStartListPct;
+        double dragUsableWidth = 1200.0;
+
+        internal void StartColumnSplitterDrag(int splitterIndex, PointerEventArgs e)
         {
-            try
+            if (e.Button != 0) return;
+            activeSplitter = splitterIndex;
+            dragStartClientX = e.ClientX;
+            dragStartSidebarPct = GlobalSettings.SidebarColumnPercent.Value;
+            dragStartListPct = GlobalSettings.ListColumnPercent.Value;
+
+            if (splitterIndex == 1)
             {
-                splitterDotNetRef ??= DotNetObjectReference.Create(this);
-                await JS.InvokeVoidAsync(
-                    "myLovelyMailSplitters.startDrag",
-                    splitterDotNetRef,
-                    splitterIndex,
-                    e.ClientX,
-                    GlobalSettings.SidebarColumnPercent.Value,
-                    GlobalSettings.ListColumnPercent.Value);
+                double col1Px = Math.Max(180.0, e.ClientX - 24.0);
+                dragUsableWidth = Math.Clamp(col1Px / (Math.Max(12.0, dragStartSidebarPct) / 100.0), 600.0, 3840.0);
             }
-            catch
+            else
             {
-                // Ignore JS disconnect on teardown.
+                double col1And2Px = Math.Max(440.0, e.ClientX - 40.0);
+                dragUsableWidth = Math.Clamp(col1And2Px / (Math.Max(30.0, dragStartSidebarPct + dragStartListPct) / 100.0), 600.0, 3840.0);
             }
+            StateHasChanged();
+        }
+
+        internal void OnScreenPointerMove(PointerEventArgs e)
+        {
+            if (activeSplitter == 0) return;
+            if ((e.Buttons & 1) == 0)
+            {
+                FinishColumnSplitterDrag();
+                return;
+            }
+
+            double deltaPct = ((e.ClientX - dragStartClientX) / dragUsableWidth) * 100.0;
+            double sb = dragStartSidebarPct;
+            double ls = dragStartListPct;
+
+            if (activeSplitter == 1)
+            {
+                double totalFirstTwo = dragStartSidebarPct + dragStartListPct;
+                sb = Math.Clamp(dragStartSidebarPct + deltaPct, 12.0, Math.Min(38.0, totalFirstTwo - 16.0));
+                if (Math.Abs(sb - GlobalSettings.DefaultSidebarColumnPercent) <= 1.2 && (totalFirstTwo - GlobalSettings.DefaultSidebarColumnPercent) >= 16.0)
+                    sb = GlobalSettings.DefaultSidebarColumnPercent;
+                ls = Math.Clamp(totalFirstTwo - sb, 16.0, 58.0);
+            }
+            else if (activeSplitter == 2)
+            {
+                double maxList = Math.Max(16.0, 100.0 - sb - 22.0);
+                ls = Math.Clamp(dragStartListPct + deltaPct, 16.0, Math.Min(58.0, maxList));
+                if (Math.Abs(ls - GlobalSettings.DefaultListColumnPercent) <= 1.2 && ls <= maxList)
+                    ls = GlobalSettings.DefaultListColumnPercent;
+                else if (Math.Abs((100.0 - sb - ls) - GlobalSettings.DefaultReaderColumnPercent) <= 1.2 && (100.0 - sb - GlobalSettings.DefaultReaderColumnPercent) >= 16.0)
+                    ls = 100.0 - sb - GlobalSettings.DefaultReaderColumnPercent;
+            }
+
+            ApplyColumnSplit(sb, ls, saveToDisk: false);
+        }
+
+        internal void OnScreenPointerUp(PointerEventArgs e)
+        {
+            if (activeSplitter == 0) return;
+            FinishColumnSplitterDrag();
+        }
+
+        internal void OnScreenKeyDown(KeyboardEventArgs e)
+        {
+            if (activeSplitter != 0 && e.Key == "Escape")
+            {
+                activeSplitter = 0;
+                ApplyColumnSplit(dragStartSidebarPct, dragStartListPct, saveToDisk: true);
+                MouseActionService.ReportStatus("Column resize cancelled.");
+                return;
+            }
+            if (e.Key == "Escape" && ModalService.Active != null)
+            {
+                ModalService.Close();
+            }
+        }
+
+        void FinishColumnSplitterDrag()
+        {
+            if (activeSplitter == 0) return;
+            activeSplitter = 0;
+            ApplyColumnSplit(GlobalSettings.SidebarColumnPercent.Value, GlobalSettings.ListColumnPercent.Value, saveToDisk: true);
         }
 
         internal void ResetColumnSplitter(int splitterIndex)
         {
+            activeSplitter = 0;
             if (splitterIndex == 1)
             {
                 GlobalSettings.SidebarColumnPercent.Set(GlobalSettings.DefaultSidebarColumnPercent);
@@ -112,8 +182,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             Events.MainEvents.Trigger("OnStyleChanged");
         }
 
-        [JSInvokable]
-        public void UpdateColumnSplitFromJs(double sidebarPct, double listPct, bool saveToDisk)
+        void ApplyColumnSplit(double sidebarPct, double listPct, bool saveToDisk)
         {
             double sb = Math.Round(sidebarPct, 2);
             double ls = Math.Round(listPct, 2);
@@ -124,6 +193,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             if (saveToDisk)
                 SettingsManager.SaveSettings();
             Events.MainEvents.Trigger("OnStyleChanged");
+            StateHasChanged();
         }
 
         protected override void OnInitialized()
@@ -149,7 +219,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
         {
             draftAutosaveTimer?.Dispose();
             undoCountdownTimer?.Dispose();
-            splitterDotNetRef?.Dispose();
             MailUiState.OnSelectionChanged -= HandleStateChanged;
             AccountStore.OnAccountsChanged -= HandleStateChanged;
             AccountFolderStore.OnFoldersChanged -= HandleStateChanged;

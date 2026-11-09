@@ -1,0 +1,23 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Layout
+@inherits ThemedComponentBase
+@using Microsoft.AspNetCore.Components.Web
+@using MyLovelyMail.MainProject.UI.Pages
+
+<div class="@ComputedClass"
+     title="@Title"
+     @onpointerdown="OnPointerDown"
+     @ondblclick="OnDoubleClick">
+    <span class="@MailCssClasses.ColumnSplitterGrip"></span>
+</div>
+
+@code {
+    [Parameter] public int Index { get; set; } = 1;
+    [Parameter] public bool IsDragging { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public EventCallback<PointerEventArgs> OnPointerDown { get; set; }
+    [Parameter] public EventCallback OnDoubleClick { get; set; }
+
+    string ComputedClass => IsDragging
+        ? $"{MailCssClasses.ColumnSplitter} {MailCssClasses.ColumnSplitterDragging}"
+        : MailCssClasses.ColumnSplitter;
+}

@@ -26,6 +26,42 @@ namespace MyLovelyMail.MainProject.Services
         /// </summary>
         public static Func<string, Task<string>>? ScriptRunner;
 
+        /// <summary>Calls a Chromium DevTools Protocol (CDP) method on the underlying WebView2 without bringing the window to the foreground.</summary>
+        public static Func<string, string, Task<string>>? CdpCaller;
+
+        /// <summary>Captures a PNG screenshot of the rendered WebView2 surface even when the window is in the background.</summary>
+        public static Func<Task<byte[]?>>? ScreenshotProvider;
+
+        /// <summary>Invokes a CDP command on WebView2; returns null if unavailable.</summary>
+        public static async Task<string?> CallCdpAsync(string method, string parametersJson = "{}")
+        {
+            if (CdpCaller == null) return null;
+            try
+            {
+                return await CdpCaller(method, parametersJson);
+            }
+            catch (Exception ex)
+            {
+                Log($"CDP call {method} failed: {ex.Message}", LogLevel.Warning);
+                return null;
+            }
+        }
+
+        /// <summary>Captures a PNG screenshot from the WebView2 surface without activating the window.</summary>
+        public static async Task<byte[]?> CaptureScreenshotAsync()
+        {
+            if (ScreenshotProvider == null) return null;
+            try
+            {
+                return await ScreenshotProvider();
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not capture page screenshot: {ex.Message}", LogLevel.Warning);
+                return null;
+            }
+        }
+
         /// <summary>Runs the script; null when nothing has registered a runner.</summary>
         public static async Task<string?> RunScriptAsync(string script)
         {

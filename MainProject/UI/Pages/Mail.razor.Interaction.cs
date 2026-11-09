@@ -136,6 +136,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleListKeyDown(KeyboardEventArgs e)
         {
+            if (e.Key == "?")
+            {
+                OpenShortcutHelpModal();
+                return;
+            }
+            if (e.Key == "Escape" && ModalService.Active != null)
+            {
+                ModalService.Close();
+                return;
+            }
             var account = MailUiState.SelectedAccount;
             if (account == null) return;
             // Modified browser shortcuts must not accidentally trigger plain-letter triage.

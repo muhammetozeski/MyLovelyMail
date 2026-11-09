@@ -1,190 +1,163 @@
 @namespace MyLovelyMail.MainProject.UI.Pages
 @inherits ThemedComponentBase
 
-<style>
-    .mail-main {
-        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px12)px;
-        overflow-y: auto;
-        box-sizing: border-box;
-    }
+@{
+    string textPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string textSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string primary = AppColors.Primary.ToRgbaHex(true);
+    string danger = AppColors.TextDanger.ToRgbaHex(true);
+    string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+}
 
-    /* Compact two-row top bar without huge vertical gaps or multi-line button towers (7.png & 8.png fix). */
-    .mail-search-bar {
-        margin-bottom: @(AppMeasures.Space.Px8)px;
+<style>
+    /* ---- Search tools and saved searches (compact 4px spacing per 7.png & 8.png) ---- */
+
+    .mail-search {
         display: flex;
         flex-direction: column;
-        gap: @(AppMeasures.Space.Px6)px;
-    }
-
-    .mail-search-row {
-        display: flex;
-        gap: @(AppMeasures.Space.Px6)px;
-        align-items: center;
-    }
-
-    .mail-search-input {
-        flex: 1;
-        min-width: 0;
+        gap: @(AppMeasures.Space.Px4)px;
     }
 
     .mail-selection-tools {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
-        flex-wrap: wrap;
     }
 
-    .mail-search-scope, .mail-select-mode {
+    /* Indeterminate sync line: a soft accent runner sweeping under the search bar while syncing. */
+    .mail-sync-line {
+        height: @(AppMeasures.Size.Px4)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .mail-sync-line-runner {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: @(AppMeasures.Percent.Half)%;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: linear-gradient(90deg, transparent, var(--account-accent, @primary), transparent);
+        animation: sync-sweep @(AppMeasures.Duration.Longer)s ease-in-out infinite;
+    }
+
+    @@keyframes sync-sweep {
+        0% { left: -@(AppMeasures.Percent.Half)%; }
+        100% { left: @(AppMeasures.Percent.Full)%; }
+    }
+
+    .mail-search-fold-row {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+    }
+
+    .mail-search-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px4)px;
+        animation: filters-unfold @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    @@keyframes filters-unfold {
+        from {
+            opacity: 0;
+            transform: translateY(-@(AppMeasures.Space.Px4)px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .mail-search-toggle {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textSecondary;
         padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
-        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
-        color: @AppColors.TextSecondary.ToRgbaHex(true);
-        font-size: @(AppMeasures.Font.XSmall)px;
-        font-weight: @(AppMeasures.Weight.Medium);
-        white-space: nowrap;
         cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        white-space: nowrap;
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-    .mail-select-mode--icon {
-        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
-        font-size: @(AppMeasures.Font.Normal)px;
-        line-height: 1.2;
-    }
-
-        .mail-select-mode:hover:not(:disabled),
-        .mail-search-scope:hover {
-            border-color: @AppColors.Primary.ToRgbaHex(true);
-            color: @AppColors.Primary.ToRgbaHex(true);
+        .mail-search-toggle:hover:not(:disabled) {
+            background: @surfaceTint;
+            color: @textPrimary;
         }
 
-        .mail-select-mode:disabled {
+        .mail-search-toggle:disabled {
             opacity: 0.45;
             cursor: not-allowed;
         }
 
-    .mail-search-scope--on, .mail-select-mode--on {
-        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
-        border-color: @AppColors.Primary.ToRgbaHex(true);
-        color: @AppColors.Primary.ToRgbaHex(true);
-        font-weight: @(AppMeasures.Weight.Bold);
+    .mail-search-toggle--icon {
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-filter-bar {
-        display: flex;
-        gap: @(AppMeasures.Space.Px4)px;
-        flex-wrap: wrap;
-        align-items: center;
+    .mail-search-toggle--on {
+        background: linear-gradient(135deg, @primary, @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
     }
 
-    .mail-filter-chip {
-        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
-        border-radius: @(AppMeasures.Radius.Pill)px;
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
-        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
-        color: @AppColors.TextSecondary.ToRgbaHex(true);
-        font-size: @(AppMeasures.Font.XSmall)px;
-        cursor: pointer;
-        transition: all @(AppMeasures.Duration.Fast)s ease;
+    .mail-search-toggle--danger {
+        color: @danger;
+        border-color: @AppColors.TextDanger.WithAlpha(0.35f).ToRgbaHex(true);
     }
 
-        .mail-filter-chip:hover {
-            background: @AppColors.SurfaceNormal.ToRgbaHex(true);
-            color: @AppColors.TextPrimary.ToRgbaHex(true);
+        .mail-search-toggle--danger:hover:not(:disabled) {
+            background: @AppColors.TextDanger.WithAlpha(0.14f).ToRgbaHex(true);
+            color: @danger;
+            border-color: @danger;
         }
 
-    .mail-filter-chip--on {
-        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
-        border-color: @AppColors.Primary.ToRgbaHex(true);
-        color: @AppColors.Primary.ToRgbaHex(true);
-        font-weight: @(AppMeasures.Weight.Bold);
+    .mail-saved-searches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: 0 @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-filter-chip--save {
-        border-style: dashed;
-        color: @AppColors.Primary.ToRgbaHex(true);
-    }
-
-    .mail-saved-search {
+    .mail-saved-chip {
         display: inline-flex;
         align-items: center;
-        border-radius: @(AppMeasures.Radius.Pill)px;
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
-        font-size: @(AppMeasures.Font.XSmall)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
         overflow: hidden;
     }
 
-    .mail-saved-search--on {
-        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
-        border-color: @AppColors.Primary.ToRgbaHex(true);
-    }
-
-    .mail-saved-search-run {
+    .mail-saved-run,
+    .mail-saved-remove {
         border: none;
         background: transparent;
-        color: @AppColors.TextSecondary.ToRgbaHex(true);
-        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        color: @textSecondary;
         cursor: pointer;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
         font-size: @(AppMeasures.Font.XSmall)px;
+        max-width: @(AppMeasures.Size.Px180)px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
-    .mail-saved-search-del {
-        border: none;
-        background: transparent;
-        color: @AppColors.TextMuted.ToRgbaHex(true);
-        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
-        cursor: pointer;
-        font-size: @(AppMeasures.Font.XSmall)px;
+        .mail-saved-run:hover,
+        .mail-saved-remove:hover {
+            background: @surfaceTint;
+            color: @textPrimary;
+        }
+
+    .mail-row-folder {
+        color: var(--account-accent, @primary);
+        margin-right: @(AppMeasures.Space.Px6)px;
+        font-weight: @(AppMeasures.Weight.Medium);
     }
 
-    .mail-folder-badge {
-        display: inline-block;
-        margin-left: @(AppMeasures.Space.Px6)px;
-        padding: @(AppMeasures.Space.Px1)px @(AppMeasures.Space.Px6)px;
-        border-radius: @(AppMeasures.Radius.Small)px;
-        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
-        color: @AppColors.TextMuted.ToRgbaHex(true);
-        font-size: @(AppMeasures.Font.Tiny)px;
-        font-weight: @(AppMeasures.Weight.Normal);
-    }
-
-    .mail-bulk-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: @(AppMeasures.Space.Px6)px;
-        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
-        margin-bottom: @(AppMeasures.Space.Px8)px;
-        border-radius: @(AppMeasures.Radius.Medium)px;
-        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.Primary.ToRgbaHex(true);
-    }
-
-    .mail-bulk-count {
-        font-size: @(AppMeasures.Font.XSmall)px;
-        font-weight: @(AppMeasures.Weight.Bold);
-        color: @AppColors.Primary.ToRgbaHex(true);
-    }
-
-    .mail-bulk-actions {
-        display: flex;
-        gap: @(AppMeasures.Space.Px4)px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .mail-row-check {
-        width: @(AppMeasures.Size.Px16)px;
-        height: @(AppMeasures.Size.Px16)px;
-        accent-color: @AppColors.Primary.ToRgbaHex(true);
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-
-    .mail-row--checked {
-        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true) !important;
-    }
 </style>

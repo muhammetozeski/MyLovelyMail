@@ -1,15 +1,6 @@
-// Gives every reader iframe the height of the message inside it.
-//
-// An iframe is the one element that cannot size itself to its content, so the mail body used to
-// be whatever height the window had left after the headers, the sender history, the rule traces
-// and the attachment chips - on a message with a long trace that was almost nothing. Measured
-// here, the mail opens whole and the page grows with it. The CSS bounds on .mail-reader-frame
-// clamp the result, so an endless newsletter still stops somewhere.
-//
-// No Blazor interop on purpose: Blazor owns this DOM and rebuilds it on every message switch,
-// so the script watches the document instead of waiting to be called. contentDocument is
-// readable because the frame is sandboxed WITH allow-same-origin (and deliberately without
-// allow-scripts, so nothing in the mail itself runs).
+// Gives every reader iframe 110% of the message height inside it with overflow-y: hidden
+// and forwards mouse-wheel scrolling to the outer scroll container so the iframe never
+// shows its own inner vertical scrollbar.
 (function () {
     "use strict";
 
@@ -20,16 +11,34 @@
     function fit(frame) {
         try {
             var doc = frame.contentDocument;
-            if (!doc || !doc.body) return;
-            var height = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
-            if (height > 0) frame.style.height = height + "px";
+            if (!doc || !doc.body || !doc.documentElement) return;
+            doc.documentElement.style.overflowY = "hidden";
+            doc.body.style.overflowY = "hidden";
+            var rawHeight = Math.max(
+                doc.body.scrollHeight,
+                doc.documentElement.scrollHeight,
+                doc.body.offsetHeight,
+                doc.documentElement.offsetHeight
+            );
+            if (rawHeight > 0) {
+                var paddedHeight = Math.ceil(rawHeight * 1.10) + 16;
+                frame.style.height = Math.max(paddedHeight, 220) + "px";
+            }
+            if (!doc.__mlmWheelWired) {
+                doc.__mlmWheelWired = true;
+                doc.addEventListener("wheel", function (event) {
+                    if (event.ctrlKey) return;
+                    var scroller = frame.closest(".mail-reader") || document.scrollingElement || document.documentElement;
+                    if (scroller) {
+                        scroller.scrollBy({ top: event.deltaY, left: event.deltaX, behavior: "auto" });
+                    }
+                }, { passive: true });
+            }
         } catch (error) {
             // Frame torn down mid-measure, or a document we may not read: the CSS height stands.
         }
     }
 
-    // Images arrive after load and quoted blocks fold open on click - both change the height of a
-    // document that is already showing, so one measurement at load time is not enough.
     function followContent(frame) {
         var previous = resizeWatchers.get(frame);
         if (previous) previous.disconnect();
@@ -51,7 +60,6 @@
             followContent(frame);
             if (window.lovelyMouse) window.lovelyMouse.attachFrame(frame);
         });
-        // srcdoc may already have finished before the observer reached this element.
         fit(frame);
         followContent(frame);
         if (window.lovelyMouse) window.lovelyMouse.attachFrame(frame);
@@ -74,4 +82,22 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
 
     scan(document.documentElement);
+
+    window.mailReader = {
+        fit: function (frameId) {
+            var frame = frameId ? document.getElementById(frameId) : document.querySelector(SELECTOR);
+            if (frame) fit(frame);
+        },
+        print: function (frameId) {
+            var frame = frameId ? document.getElementById(frameId) : document.querySelector(SELECTOR);
+            if (frame && frame.contentWindow) {
+                try {
+                    frame.contentWindow.focus();
+                    frame.contentWindow.print();
+                    return;
+                } catch (e) { }
+            }
+            window.print();
+        }
+    };
 })();
