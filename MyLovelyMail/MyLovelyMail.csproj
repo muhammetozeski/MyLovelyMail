@@ -67,12 +67,73 @@
     <ProjectReference Include="..\MainProject\MainProject.csproj" />
   </ItemGroup>
 
-  <!-- Strip out all satellite language folders (MUI and resource DLLs) from build and publish output -->
-  <Target Name="FilterUnwantedSatelliteAndMuiFiles" AfterTargets="ComputeFilesToPublish">
+  <!-- =========================================================================================
+       MANUEL DAĞITIM FİLTRELERİ (BOYUT VE TEMİZLİK OPTİMİZASYONU)
+       
+       DİKKAT (AI AJANLARI VE GELİŞTİRİCİLER İÇİN ZORUNLU KURAL):
+       Aşağıdaki filtreler, uygulamada doğrudan kullanılmayan monolitik Windows App SDK,
+       hata ayıklama/çökme araçları, mağaza (MSIX) varyasyonları ve gereksiz varlıkların
+       dağıtım boyutunu ~25 MB küçültmek amacıyla manuel olarak eklenmiştir.
+       
+       - Bir sorun veya beklenmedik çalışma zamanı hatası oluşması halinde, KULLANICIYA AÇIKÇA
+         SÖYLEMEK ŞARTIYLA buradaki kurallar geri alınabilir.
+       - Sorunun kesin olarak buradan kaynaklandığından şüphelenilmiyorsa AI ajanı bu kuralları
+         KESİNLİKLE kaldırmamalıdır.
+       - Bir kural devre dışı bırakılacaksa kuralı SİLMEK YASAKTIR; silmek yerine XML yorum
+         satırına (<!-- ... -->) alınmalıdır.
+       ========================================================================================= -->
+  <Target Name="FilterUnwantedPublishFiles" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
+      <!-- 1. Uydu Dil ve Yerelleştirme Dosyaları (MUI & resources.dll) -->
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.mui'" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)' == 'Microsoft.Maui.Controls.resources'" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').EndsWith('.resources'))" />
+
+      <!-- 2. Hata Ayıklama, Profilleme ve Çökme Dökümü Araçları (PDB'ler hariç bırakılmıştır, PDB'ler korunur) -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'createdump.exe'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'mscordbi.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'mscordaccore.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('mscordaccore_'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'clrgcexp.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'clretwrc.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'Microsoft.DiaSymReader.Native.amd64.dll'" />
+
+      <!-- 3. Kullanılmayan Windows Copilot+ / Windows AI Kütüphaneleri ve İş Yükleri -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.AI.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.Workloads'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.json' and $([System.String]::Copy('%(FileName)').StartsWith('workloads.'))" />
+
+      <!-- 4. Kullanılmayan Windows App SDK / WinUI Bileşenleri -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'WinUIEdit.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.Widgets'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'RestartAgent.exe'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('WindowsAppSdk.AppxDeploymentExtensions'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'WindowsAppRuntime.DeploymentExtensions.OneCore.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'PushNotificationsLongRunningTask.ProxyStub.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'SessionHandleIPCProxyStub.dll'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.PushNotifications'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.BadgeNotifications'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dll' and $([System.String]::Copy('%(FileName)').StartsWith('Microsoft.Windows.ApplicationModel.Background'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'Microsoft.Windows.Media.Capture.Projection.dll'" />
+
+      <!-- 5. Windows Metadata (.winmd) Dosyaları -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.winmd'" />
+
+      <!-- 6. MAUI Resizetizer MSIX Mağaza ve Döşeme Görsel Varyasyonları (Paketlenmemiş Masaüstü Exe İçin Gereksiz) -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'appicon.ico'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'WindowsAppRuntime.png'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('appiconLargeTile.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('appiconMediumTile.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('appiconSmallTile.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('appiconWideTile.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('appiconStoreLogo.'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.png' and $([System.String]::Copy('%(FileName)').StartsWith('splashSplashScreen.'))" />
+
+      <!-- 7. Web ve Statik Varlık Sıkıştırma / Mükerrer Kalıntıları -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.br' or '%(Extension)' == '.gz'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(RelativePath)').Replace('\', '/').Contains('wwwroot/_content/MainProject/js/'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'map.html'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(FileName)%(Extension)' == 'NoiseAsset_256x256_PNG.png'" />
     </ItemGroup>
   </Target>
 
