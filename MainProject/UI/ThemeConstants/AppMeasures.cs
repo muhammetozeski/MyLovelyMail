@@ -136,6 +136,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static class Percent
         {
             public const int Half = 50;
+            public const int ThreeQuarters = 75;
             public const int Most = 88;
             public const int Full = 100;
             public const int Double = 200;
@@ -144,6 +145,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         /// <summary> Viewport-relative sizes. Append the 'vh' suffix at the call site. </summary>
         public static class Viewport
         {
+            public const int ThreeQuarters = 75;
             public const int Most = 80;
             public const int Full = 100;
             public const int Overflow = 110;

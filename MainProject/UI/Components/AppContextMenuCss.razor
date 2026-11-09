@@ -2,26 +2,31 @@
 @inherits ThemedComponentBase
 
 <style>
-    .app-context-backdrop {
+    .@(AppContextMenuCssClasses.Backdrop) {
         position: fixed;
         inset: 0;
         z-index: @(AppMeasures.ZLayer.Modal + 20);
         background: transparent;
     }
 
-    .app-context-columns {
+    .@(AppContextMenuCssClasses.Columns) {
         position: fixed;
         display: flex;
         align-items: flex-start;
         gap: @(AppMeasures.Space.Px6)px;
         max-width: calc(100vw - @(AppMeasures.Space.Px16)px);
-        max-height: calc(100vh - @(AppMeasures.Space.Px16)px);
+        max-height: @(AppMeasures.Percent.ThreeQuarters)vh;
+        z-index: @(AppMeasures.ZLayer.Modal + 21);
     }
 
-    .app-context-panel {
+    .@(AppContextMenuCssClasses.ColumnsLeft) {
+        flex-direction: row-reverse;
+    }
+
+    .@(AppContextMenuCssClasses.Panel) {
         min-width: @(AppMeasures.Size.Px220)px;
         max-width: @(AppMeasures.Size.Px300)px;
-        max-height: calc(100vh - @(AppMeasures.Space.Px24)px);
+        max-height: @(AppMeasures.Percent.ThreeQuarters)vh;
         overflow-y: auto;
         padding: @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Large)px;
@@ -32,7 +37,7 @@
         gap: @(AppMeasures.Space.Px2)px;
     }
 
-    .app-context-title {
+    .@(AppContextMenuCssClasses.Title) {
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @AppColors.TextMuted.ToRgbaHex(true);
@@ -48,19 +53,19 @@
         white-space: nowrap;
     }
 
-    .app-context-pin-hint {
-        font-size: 10px;
+    .@(AppContextMenuCssClasses.PinHint) {
+        font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Medium);
         color: @AppColors.Primary.ToRgbaHex(true);
-        opacity: 0.85;
+        opacity: @AppMeasures.Opacity.Bright;
     }
 
-    .app-context-item-wrap {
+    .@(AppContextMenuCssClasses.ItemWrap) {
         display: flex;
         flex-direction: column;
     }
 
-    .app-context-item {
+    .@(AppContextMenuCssClasses.Item) {
         width: @(AppMeasures.Percent.Full)%;
         border: none;
         background: transparent;
@@ -77,7 +82,7 @@
         transition: background @(AppMeasures.Duration.Fast)s ease;
     }
 
-    .app-context-item-label {
+    .@(AppContextMenuCssClasses.ItemLabel) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px6)px;
@@ -87,17 +92,17 @@
         white-space: nowrap;
     }
 
-    .app-context-pin-badge {
+    .@(AppContextMenuCssClasses.PinBadge) {
         font-size: @(AppMeasures.Font.XSmall)px;
         flex-shrink: 0;
     }
 
-    .app-context-pin-popover {
+    .@(AppContextMenuCssClasses.PinPopover) {
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px4)px;
     }
 
-    .app-context-pin-btn {
-        width: 100%;
+    .@(AppContextMenuCssClasses.PinButton) {
+        width: @(AppMeasures.Percent.Full)%;
         border: @(AppMeasures.Border.Thin)px solid @AppColors.Primary.ToRgbaHex(true);
         background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
         color: @AppColors.TextPrimary.ToRgbaHex(true);
@@ -109,23 +114,23 @@
         text-align: left;
     }
 
-        .app-context-item:hover:not(:disabled),
-        .app-context-item--open {
+        .@(AppContextMenuCssClasses.Item):hover:not(:disabled),
+        .@(AppContextMenuCssClasses.ItemOpen) {
             background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
             color: @AppColors.Primary.ToRgbaHex(true);
         }
 
-        .app-context-item:disabled {
-            opacity: 0.42;
+        .@(AppContextMenuCssClasses.Item):disabled {
+            opacity: @AppMeasures.Opacity.Disabled;
             cursor: not-allowed;
         }
 
-    .app-context-arrow {
+    .@(AppContextMenuCssClasses.Arrow) {
         color: @AppColors.TextMuted.ToRgbaHex(true);
         font-size: @(AppMeasures.Font.XSmall)px;
     }
 
-    .app-input-status {
+    .@(AppContextMenuCssClasses.InputStatus) {
         position: fixed;
         right: @(AppMeasures.Space.Medium)px;
         bottom: @(AppMeasures.Space.Px90)px;
@@ -144,7 +149,7 @@
         animation: app-toast-in @(AppMeasures.Duration.Fast)s ease-out;
     }
 
-    .app-input-status-close {
+    .@(AppContextMenuCssClasses.InputStatusClose) {
         border: none;
         background: transparent;
         color: @AppColors.TextMuted.ToRgbaHex(true);
@@ -155,7 +160,7 @@
     @@keyframes app-toast-in {
         from {
             opacity: 0;
-            transform: translateY(6px);
+            transform: translateY(@(AppMeasures.Space.Px6)px);
         }
         to {
             opacity: 1;

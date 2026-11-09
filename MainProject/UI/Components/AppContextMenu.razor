@@ -1,23 +1,25 @@
 @implements IDisposable
+@using StoreSettings = MyLovelyMail.MainProject.Stores.Settings
+@using MyLovelyMail.MainProject.Constants.ThemeConstants
 
 @if (ContextMenuService.IsOpen)
 {
-    <div class="app-context-backdrop"
+    <div class="@AppContextMenuCssClasses.Backdrop"
          @onclick="Close"
          @oncontextmenu="Close"
          @oncontextmenu:preventDefault="true">
-        <div class="app-context-columns" style="@MenuPositionStyle"
+        <div class="@AppContextMenuCssClasses.Columns @(OpensLeft ? AppContextMenuCssClasses.ColumnsLeft : "")" style="@MenuPositionStyle"
              @onclick:stopPropagation="true"
              @oncontextmenu:stopPropagation="true"
              @oncontextmenu:preventDefault="true">
-            <div class="app-context-panel" role="menu" aria-label="@ContextMenuService.Title">
+            <div class="@AppContextMenuCssClasses.Panel" role="menu" aria-label="@ContextMenuService.Title">
                 @if (!string.IsNullOrWhiteSpace(ContextMenuService.Title))
                 {
-                    <div class="app-context-title">
+                    <div class="@AppContextMenuCssClasses.Title">
                         <span>@ContextMenuService.Title</span>
                         @if (ContextMenuService.Items.Any(static i => i.PinActionId != null))
                         {
-                            <span class="app-context-pin-hint" title="Right-click or middle-click an item to pin/unpin it to the reader toolbar">📌 middle/right-click to pin</span>
+                            <span class="@AppContextMenuCssClasses.PinHint" title="Right-click or middle-click an item to pin/unpin it to the reader toolbar">📌 middle/right-click to pin</span>
                         }
                     </div>
                 }
@@ -26,8 +28,8 @@
                     bool open = ReferenceEquals(ActiveParent, item);
                     bool pinned = item.PinActionId != null && MailMenuItems.IsActionPinned(item.PinActionId);
                     bool showPinOption = ReferenceEquals(PinOptionItem, item) && item.PinActionId != null;
-                    <div class="app-context-item-wrap">
-                        <button class="app-context-item @(open ? "app-context-item--open" : "")"
+                    <div class="@AppContextMenuCssClasses.ItemWrap">
+                        <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
                                 type="button"
                                 disabled="@(!item.Enabled)"
                                 title="@(item.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
@@ -37,22 +39,22 @@
                                 @oncontextmenu:preventDefault="true"
                                 @oncontextmenu:stopPropagation="true"
                                 @onclick="() => ActivateRootAsync(item)">
-                            <span class="app-context-item-label">
+                            <span class="@AppContextMenuCssClasses.ItemLabel">
                                 @if (pinned)
                                 {
-                                    <span class="app-context-pin-badge" title="Pinned to reader toolbar">📌</span>
+                                    <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
                                 }
                                 <span>@item.Label</span>
                             </span>
                             @if (item.HasChildren)
                             {
-                                <span class="app-context-arrow">▸</span>
+                                <span class="@AppContextMenuCssClasses.Arrow">▸</span>
                             }
                         </button>
                         @if (showPinOption && item.PinActionId is { } pinId)
                         {
-                            <div class="app-context-pin-popover">
-                                <button class="app-context-pin-btn" type="button" @onclick="() => TogglePinFromOption(pinId, item.Label)">
+                            <div class="@AppContextMenuCssClasses.PinPopover">
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(pinId, item.Label)">
                                     @(pinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
                                 </button>
                             </div>
@@ -63,15 +65,15 @@
 
             @if (ActiveParent?.Children is { Count: > 0 } children)
             {
-                <div class="app-context-panel app-context-panel--sub" role="menu" aria-label="@ActiveParent.Label">
-                    <div class="app-context-title">@ActiveParent.Label</div>
+                <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveParent.Label">
+                    <div class="@AppContextMenuCssClasses.Title">@ActiveParent.Label</div>
                     @foreach (var child in children)
                     {
                         bool open = ReferenceEquals(ActiveGrandParent, child);
                         bool childPinned = child.PinActionId != null && MailMenuItems.IsActionPinned(child.PinActionId);
                         bool showChildPinOption = ReferenceEquals(PinOptionItem, child) && child.PinActionId != null;
-                        <div class="app-context-item-wrap">
-                            <button class="app-context-item @(open ? "app-context-item--open" : "")"
+                        <div class="@AppContextMenuCssClasses.ItemWrap">
+                            <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
                                     type="button"
                                     disabled="@(!child.Enabled)"
                                     title="@(child.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
@@ -81,22 +83,22 @@
                                     @oncontextmenu:preventDefault="true"
                                     @oncontextmenu:stopPropagation="true"
                                     @onclick="() => ActivateChildAsync(child)">
-                                <span class="app-context-item-label">
+                                <span class="@AppContextMenuCssClasses.ItemLabel">
                                     @if (childPinned)
                                     {
-                                        <span class="app-context-pin-badge" title="Pinned to reader toolbar">📌</span>
+                                        <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
                                     }
                                     <span>@child.Label</span>
                                 </span>
                                 @if (child.HasChildren)
                                 {
-                                    <span class="app-context-arrow">▸</span>
+                                    <span class="@AppContextMenuCssClasses.Arrow">▸</span>
                                 }
                             </button>
                             @if (showChildPinOption && child.PinActionId is { } cPinId)
                             {
-                                <div class="app-context-pin-popover">
-                                    <button class="app-context-pin-btn" type="button" @onclick="() => TogglePinFromOption(cPinId, child.Label)">
+                                <div class="@AppContextMenuCssClasses.PinPopover">
+                                    <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(cPinId, child.Label)">
                                         @(childPinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
                                     </button>
                                 </div>
@@ -108,11 +110,11 @@
 
             @if (ActiveGrandParent?.Children is { Count: > 0 } grandChildren)
             {
-                <div class="app-context-panel app-context-panel--sub" role="menu" aria-label="@ActiveGrandParent.Label">
-                    <div class="app-context-title">@ActiveGrandParent.Label</div>
+                <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveGrandParent.Label">
+                    <div class="@AppContextMenuCssClasses.Title">@ActiveGrandParent.Label</div>
                     @foreach (var leaf in grandChildren)
                     {
-                        <button class="app-context-item"
+                        <button class="@AppContextMenuCssClasses.Item"
                                 type="button"
                                 disabled="@(!leaf.Enabled)"
                                 @onclick="() => ContextMenuService.InvokeAsync(leaf)">
@@ -127,10 +129,10 @@
 
 @if (!string.IsNullOrWhiteSpace(MouseActionService.LastStatus))
 {
-    <div class="app-input-status" @key="MouseActionService.LastStatusVersion" role="status"
+    <div class="@AppContextMenuCssClasses.InputStatus" @key="MouseActionService.LastStatusVersion" role="status"
          title="Click to dismiss (auto-closes in 4s)" @onclick="DismissStatus">
         <span>@MouseActionService.LastStatus</span>
-        <button class="app-input-status-close" type="button" title="Dismiss" @onclick="DismissStatus" @onclick:stopPropagation="true">✕</button>
+        <button class="@AppContextMenuCssClasses.InputStatusClose" type="button" title="Dismiss" @onclick="DismissStatus" @onclick:stopPropagation="true">✕</button>
     </div>
 }
 
@@ -141,9 +143,33 @@
     ContextMenuItem? ActiveGrandParent { get; set; }
     ContextMenuItem? PinOptionItem { get; set; }
 
-    string MenuPositionStyle =>
-        $"left:min({ContextMenuService.X:F0}px, calc(100vw - 260px));" +
-        $"top:min({ContextMenuService.Y:F0}px, calc(100vh - 340px));";
+    int EstimatedMenuHeight => 38 + (ContextMenuService.Items.Count * 32);
+
+    bool OpensLeft
+    {
+        get
+        {
+            int winWidth = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
+            bool hasSubmenus = ContextMenuService.Items.Any(static i => i.HasChildren);
+            int threshold = winWidth - (hasSubmenus ? 560 : 280);
+            return ContextMenuService.X > threshold;
+        }
+    }
+
+    string MenuPositionStyle
+    {
+        get
+        {
+            string horizontal = OpensLeft
+                ? $"right:clamp({AppMeasures.Space.Px12}px, calc(100vw - {ContextMenuService.X:F0}px), calc(100vw - {AppMeasures.Size.Px280}px));"
+                : $"left:clamp({AppMeasures.Space.Px12}px, {ContextMenuService.X:F0}px, calc(100vw - {AppMeasures.Size.Px280}px));";
+
+            string vertical =
+                $"top:clamp({AppMeasures.Space.Px12}px, {ContextMenuService.Y:F0}px, calc(100vh - min({AppMeasures.Percent.ThreeQuarters}vh, {EstimatedMenuHeight}px) - {AppMeasures.Space.Px16}px));";
+
+            return $"{horizontal}{vertical}";
+        }
+    }
 
     protected override void OnInitialized()
     {
