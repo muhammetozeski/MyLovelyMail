@@ -29,12 +29,7 @@ namespace MyLovelyMail.MainProject.Services
         /// <returns>The full path of the cached file.</returns>
         public static async Task<string> ExtractToCacheAsync(string soundName, Func<string, Task<Stream>> openPackagedFile)
         {
-            // The user rejected the old long success.wav outright — nothing maps to it anymore.
-            string fileName = soundName.ToLowerInvariant() switch
-            {
-                "spin" => "spin.wav",
-                _ => "notify.wav"
-            };
+            const string fileName = "notify.wav";
 
             string cachedPath = Path.Combine(AppPaths.AppCache, "Sounds", fileName);
             if (File.Exists(cachedPath)) return cachedPath;
