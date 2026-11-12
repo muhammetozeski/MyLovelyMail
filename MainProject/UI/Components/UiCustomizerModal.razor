@@ -1,0 +1,413 @@
+@inherits ModalBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">🎛️ Customize Buttons &amp; Right-Click Menus</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div class="@UiCustomizerCssClasses.Layout">
+    <div class="@UiCustomizerCssClasses.Sidebar">
+        <div class="@UiCustomizerCssClasses.GroupTitle">TOOLBARS &amp; BUTTON BARS</div>
+        @foreach (string sId in ToolbarSurfaces)
+        {
+            bool active = SelectedSurfaceId.Equals(sId, StringComparison.OrdinalIgnoreCase);
+            <button type="button"
+                    class="@UiCustomizerCssClasses.SurfaceBtn @(active ? UiCustomizerCssClasses.SurfaceBtnActive : "")"
+                    data-customizer-surface="@sId"
+                    @onclick="() => SelectSurface(sId)">
+                <span>@UiSurfaceIds.DisplayNameOf(sId)</span>
+                @if (UiCustomizationStore.IsSurfaceCustomized(sId))
+                {
+                    <span class="@UiCustomizerCssClasses.SurfaceBadge" title="Customized">●</span>
+                }
+            </button>
+        }
+
+        <div class="@UiCustomizerCssClasses.GroupTitle">RIGHT-CLICK MENUS</div>
+        @foreach (string mId in MenuSurfaces)
+        {
+            bool active = SelectedSurfaceId.Equals(mId, StringComparison.OrdinalIgnoreCase);
+            <button type="button"
+                    class="@UiCustomizerCssClasses.SurfaceBtn @(active ? UiCustomizerCssClasses.SurfaceBtnActive : "")"
+                    data-customizer-surface="@mId"
+                    @onclick="() => SelectSurface(mId)">
+                <span>@UiSurfaceIds.DisplayNameOf(mId)</span>
+                @if (UiCustomizationStore.IsSurfaceCustomized(mId))
+                {
+                    <span class="@UiCustomizerCssClasses.SurfaceBadge" title="Customized">●</span>
+                }
+            </button>
+        }
+    </div>
+
+    <div class="@UiCustomizerCssClasses.Main">
+        @{
+            var snapshot = GetCurrentSnapshot();
+            var visibleIds = snapshot.VisibleItems.Select(static x => x.ActionId).ToList();
+            string pairedSurface = UiSurfaceIds.IsContextMenu(SelectedSurfaceId)
+                ? UiSurfaceIds.DefaultPairedToolbarOf(SelectedSurfaceId)
+                : UiSurfaceIds.PairedContextMenuOf(SelectedSurfaceId);
+        }
+
+        <div class="@UiCustomizerCssClasses.TopBar">
+            <div>
+                <strong>@UiSurfaceIds.DisplayNameOf(SelectedSurfaceId)</strong>
+                <span class="@UiCustomizerCssClasses.RowMeta">
+                    — Drag rows to reorder, toggle visibility, or add any command / tag / folder / rule.
+                </span>
+            </div>
+            <div class="@UiCustomizerCssClasses.RowTools">
+                <PillButton IsCompact="true"
+                            OnClick="() => SelectSurface(pairedSurface)"
+                            Title="Switch to paired menu / toolbar">
+                    ⇄ Switch to @UiSurfaceIds.DisplayNameOf(pairedSurface)
+                </PillButton>
+                @if (UiCustomizationStore.IsSurfaceCustomized(SelectedSurfaceId))
+                {
+                    <PillButton IsCompact="true"
+                                OnClick="ResetSelectedSurface">
+                        ↺ Reset This Surface
+                    </PillButton>
+                }
+                @if (UiCustomizationStore.HasAnyCustomization)
+                {
+                    <PillButton IsCompact="true"
+                                IsDanger="true"
+                                OnClick="ResetAllSurfaces">
+                        ↺ Reset All
+                    </PillButton>
+                }
+            </div>
+        </div>
+
+        <div class="@UiCustomizerCssClasses.Columns">
+            <div class="@UiCustomizerCssClasses.ColumnCard">
+                <div class="@UiCustomizerCssClasses.ColumnTitle">
+                    <span>✅ Active Items (@snapshot.VisibleItems.Count)</span>
+                    <span class="@UiCustomizerCssClasses.RowMeta">Drag to reorder</span>
+                </div>
+
+                <div class="@UiCustomizerCssClasses.ItemList">
+                    @if (snapshot.VisibleItems.Count == 0)
+                    {
+                        <div class="@UiCustomizerCssClasses.EmptyHint">No active items on this surface.</div>
+                    }
+                    @for (int i = 0; i < snapshot.VisibleItems.Count; i++)
+                    {
+                        var entry = snapshot.VisibleItems[i];
+                        int idx = i;
+                        <div class="@GetModalRowClass(idx)"
+                             @key="entry.ActionId"
+                             data-active-entry="@entry.ActionId"
+                             @onpointerdown="e => StartModalRowDrag(idx, e)"
+                             @onpointermove="e => MoveModalRowDrag(idx, visibleIds, e)"
+                             @onpointerup="e => EndModalRowDrag(visibleIds, e)">
+                            <span class="@UiCustomizerCssClasses.RowLabel" title="@entry.ActionId">
+                                ⠿ @entry.Label
+                            </span>
+                            <span class="@UiCustomizerCssClasses.RowTools">
+                                <PillButton IsCompact="true"
+                                            Disabled="@(idx == 0)"
+                                            Title="Move up"
+                                            OnClick="() => MoveVisibleItem(visibleIds, entry.ActionId, idx - 1)">▲</PillButton>
+                                <PillButton IsCompact="true"
+                                            Disabled="@(idx == snapshot.VisibleItems.Count - 1)"
+                                            Title="Move down"
+                                            OnClick="() => MoveVisibleItem(visibleIds, entry.ActionId, idx + 2)">▼</PillButton>
+                                @if (!entry.IsFixed)
+                                {
+                                    <PillButton IsCompact="true"
+                                                Title="@($"Move to {UiSurfaceIds.DisplayNameOf(pairedSurface)}")"
+                                                OnClick="() => TransferToPaired(entry.ActionId, entry.Label, pairedSurface)">⇄</PillButton>
+                                    <PillButton IsCompact="true"
+                                                IsDanger="true"
+                                                Title="Hide from this surface"
+                                                OnClick="() => HideItem(entry.ActionId, entry.Label, visibleIds)">👁️</PillButton>
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+
+                @if (snapshot.HiddenDefaultItems.Count > 0)
+                {
+                    <div class="@UiCustomizerCssClasses.ColumnTitle">
+                        <span>🚫 Hidden Default Items (@snapshot.HiddenDefaultItems.Count)</span>
+                    </div>
+                    <div class="@UiCustomizerCssClasses.ItemList">
+                        @foreach (var hidden in snapshot.HiddenDefaultItems)
+                        {
+                            <div class="@UiCustomizerCssClasses.Row" @key="hidden.ActionId">
+                                <span class="@UiCustomizerCssClasses.RowLabel">@hidden.Label</span>
+                                <PillButton IsCompact="true"
+                                            IsActive="true"
+                                            OnClick="() => RestoreItem(hidden.ActionId, hidden.Label, visibleIds)">
+                                    + Show
+                                </PillButton>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="@UiCustomizerCssClasses.ColumnCard">
+                <div class="@UiCustomizerCssClasses.ColumnTitle">
+                    <span>⚡ Add Any Action / 1-Click Item</span>
+                </div>
+
+                <input class="@UiCustomizerCssClasses.FilterInput"
+                       placeholder="Search commands, tags, folders, snooze presets, rules…"
+                       @bind="CatalogSearchText"
+                       @bind:event="oninput" />
+
+                <div class="@UiCustomizerCssClasses.TagCreator">
+                    <input class="@UiCustomizerCssClasses.FilterInput"
+                           placeholder="Create new tag (immediately available as 1-click button)…"
+                           @bind="NewTagInput"
+                           @bind:event="oninput"
+                           @onkeydown="HandleNewTagKeyDown" />
+                    <PillButton IsCompact="true"
+                                IsActive="true"
+                                Disabled="@string.IsNullOrWhiteSpace(NewTagInput)"
+                                OnClick="CreateTagAndRefresh">
+                        + Tag
+                    </PillButton>
+                </div>
+
+                <div class="@UiCustomizerCssClasses.ItemList">
+                    @{
+                        var filteredCatalog = FilterCatalog(snapshot.AvailablePromotableItems, visibleIds);
+                    }
+                    @if (filteredCatalog.Count == 0)
+                    {
+                        <div class="@UiCustomizerCssClasses.EmptyHint">No additional matching actions.</div>
+                    }
+                    @foreach (var cat in filteredCatalog)
+                    {
+                        <div class="@UiCustomizerCssClasses.Row" @key="cat.ActionId" data-catalog-entry="@cat.ActionId">
+                            <span class="@UiCustomizerCssClasses.RowLabel" title="@cat.ActionId">
+                                @cat.Label
+                                <span class="@UiCustomizerCssClasses.RowMeta">(@cat.Category)</span>
+                            </span>
+                            <PillButton IsCompact="true"
+                                        IsActive="true"
+                                        OnClick="() => AddPromotedItem(cat.ActionId, cat.Label, visibleIds)">
+                                + Add
+                            </PillButton>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<UiCustomizerCss />
+
+@code {
+    static readonly string[] ToolbarSurfaces =
+    [
+        UiSurfaceIds.ListToolbar,
+        UiSurfaceIds.QuickFiltersBar,
+        UiSurfaceIds.ReaderToolbar,
+        UiSurfaceIds.ReaderHeaderNav,
+        UiSurfaceIds.BulkToolbar,
+        UiSurfaceIds.MailRowHover,
+        UiSurfaceIds.SenderRowHover,
+        UiSurfaceIds.SidebarTop,
+        UiSurfaceIds.SidebarFolderHover,
+        UiSurfaceIds.SidebarAccountFolderHover,
+        UiSurfaceIds.PersonActionsBar,
+        UiSurfaceIds.ComposeQuoteBar,
+        UiSurfaceIds.ComposeFooterBar
+    ];
+
+    static readonly string[] MenuSurfaces =
+    [
+        UiSurfaceIds.MessageContextMenu,
+        UiSurfaceIds.SenderContextMenu,
+        UiSurfaceIds.FolderContextMenu,
+        UiSurfaceIds.AccountContextMenu,
+        UiSurfaceIds.AccountFolderContextMenu,
+        UiSurfaceIds.WorkspaceContextMenu
+    ];
+
+    [Parameter] public string? InitialSurfaceId { get; set; }
+
+    string SelectedSurfaceId { get; set; } = UiSurfaceIds.MessageContextMenu;
+    string CatalogSearchText { get; set; } = string.Empty;
+    string NewTagInput { get; set; } = string.Empty;
+
+    int? modalDraggingIndex;
+    int? modalHoverIndex;
+    bool modalHoverAfter;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(InitialSurfaceId))
+            SelectedSurfaceId = InitialSurfaceId;
+        UiCustomizationStore.OnChanged += Refresh;
+        TagStore.OnTagsChanged += Refresh;
+    }
+
+    void Refresh() => InvokeAsync(StateHasChanged);
+
+    void SelectSurface(string surfaceId)
+    {
+        SelectedSurfaceId = surfaceId;
+        modalDraggingIndex = null;
+        modalHoverIndex = null;
+    }
+
+    SurfaceInspectionSnapshot GetCurrentSnapshot()
+    {
+        if (ActionDragService.SurfaceInspector != null)
+            return ActionDragService.SurfaceInspector(SelectedSurfaceId);
+
+        // Fallback if opened when Mail page hasn't mounted yet
+        var snap = UiCustomizationStore.GetSnapshot(SelectedSurfaceId);
+        var visible = snap.OrderedIds.Select(id => new CatalogEntryDescriptor(id, id, "Saved")).ToList();
+        var tags = TagStore.AllTags
+            .Select(t => new CatalogEntryDescriptor($"Msg.AddTag:{t}", $"🏷️ {t}", "Tag"))
+            .ToList();
+        return new SurfaceInspectionSnapshot(SelectedSurfaceId, visible, [], tags);
+    }
+
+    List<CatalogEntryDescriptor> FilterCatalog(IReadOnlyList<CatalogEntryDescriptor> source, IReadOnlyList<string> visibleIds)
+    {
+        var activeSet = new HashSet<string>(visibleIds, StringComparer.OrdinalIgnoreCase);
+        string q = CatalogSearchText.Trim();
+        return source
+            .Where(item => !activeSet.Contains(item.ActionId))
+            .Where(item => q.Length == 0
+                || item.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || item.Category.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || item.ActionId.Contains(q, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    string GetModalRowClass(int index)
+    {
+        var sb = new System.Text.StringBuilder(UiCustomizerCssClasses.Row);
+        if (modalDraggingIndex == index) sb.Append(' ').Append(UiCustomizerCssClasses.RowDragging);
+        if (modalDraggingIndex.HasValue && modalHoverIndex == index && modalDraggingIndex != index)
+        {
+            sb.Append(' ').Append(modalHoverAfter
+                ? UiCustomizerCssClasses.RowDropAfter
+                : UiCustomizerCssClasses.RowDropBefore);
+        }
+        return sb.ToString();
+    }
+
+    void StartModalRowDrag(int index, PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        modalDraggingIndex = index;
+        modalHoverIndex = index;
+    }
+
+    void MoveModalRowDrag(int index, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        if (!modalDraggingIndex.HasValue) return;
+        modalHoverIndex = index;
+        modalHoverAfter = modalDraggingIndex.Value < index;
+    }
+
+    void EndModalRowDrag(IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        if (!modalDraggingIndex.HasValue) return;
+        int from = modalDraggingIndex.Value;
+        int? to = modalHoverIndex;
+        bool after = modalHoverAfter;
+        modalDraggingIndex = null;
+        modalHoverIndex = null;
+
+        if (to.HasValue && from != to.Value && from >= 0 && from < visibleIds.Count)
+        {
+            int insertIdx = after ? to.Value + 1 : to.Value;
+            UiCustomizationStore.Reorder(SelectedSurfaceId, visibleIds, visibleIds[from], insertIdx);
+        }
+    }
+
+    void MoveVisibleItem(IReadOnlyList<string> visibleIds, string actionId, int targetIndex)
+    {
+        UiCustomizationStore.Reorder(SelectedSurfaceId, visibleIds, actionId, targetIndex);
+    }
+
+    void HideItem(string actionId, string label, IReadOnlyList<string> visibleIds)
+    {
+        UiCustomizationStore.SetVisible(SelectedSurfaceId, actionId, visible: false, currentVisibleIds: visibleIds);
+        MouseActionService.ReportStatus($"👁️ Hidden '{label}'");
+    }
+
+    void RestoreItem(string actionId, string label, IReadOnlyList<string> visibleIds)
+    {
+        UiCustomizationStore.SetVisible(SelectedSurfaceId, actionId, visible: true, currentVisibleIds: visibleIds);
+        MouseActionService.ReportStatus($"✅ Restored '{label}'");
+    }
+
+    void AddPromotedItem(string actionId, string label, IReadOnlyList<string> visibleIds)
+    {
+        UiCustomizationStore.SetVisible(
+            SelectedSurfaceId,
+            actionId,
+            visible: true,
+            currentVisibleIds: visibleIds,
+            insertIndex: visibleIds.Count,
+            markAsAddedWhenShown: true);
+        MouseActionService.ReportStatus($"⚡ Added '{label}' to {UiSurfaceIds.DisplayNameOf(SelectedSurfaceId)}");
+    }
+
+    void TransferToPaired(string actionId, string label, string pairedSurfaceId)
+    {
+        var dstVisible = ActionDragService.GetEffectiveVisibleIds(pairedSurfaceId);
+        int insertAt = UiSurfaceIds.IsContextMenu(pairedSurfaceId) ? 0 : dstVisible.Count;
+        UiCustomizationStore.TransferAction(
+            SelectedSurfaceId,
+            null,
+            pairedSurfaceId,
+            null,
+            actionId,
+            dstVisible,
+            insertAt,
+            hideFromSource: true);
+        MouseActionService.ReportStatus($"⇄ Moved '{label}' to {UiSurfaceIds.DisplayNameOf(pairedSurfaceId)}");
+    }
+
+    void CreateTagAndRefresh()
+    {
+        string trimmed = NewTagInput.Trim();
+        if (trimmed.Length == 0) return;
+        _ = TagStore.ColorOf(trimmed);
+        NewTagInput = string.Empty;
+        StateHasChanged();
+    }
+
+    void HandleNewTagKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") CreateTagAndRefresh();
+    }
+
+    void ResetSelectedSurface()
+    {
+        UiCustomizationStore.ResetSurface(SelectedSurfaceId);
+        MouseActionService.ReportStatus($"↺ Reset {UiSurfaceIds.DisplayNameOf(SelectedSurfaceId)}");
+    }
+
+    static void ResetAllSurfaces()
+    {
+        UiCustomizationStore.ResetAll();
+        MouseActionService.ReportStatus("↺ Reset all button bars and menus to defaults");
+    }
+
+    static void Close() => ModalService.GoBack();
+
+    public new void Dispose()
+    {
+        base.Dispose();
+        UiCustomizationStore.OnChanged -= Refresh;
+        TagStore.OnTagsChanged -= Refresh;
+    }
+}

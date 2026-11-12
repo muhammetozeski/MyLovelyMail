@@ -187,6 +187,8 @@ namespace MyLovelyMail.MainProject.Stores
             FolderSettingsStore.Reload();
             FilterRuleStore.Load();
             TagStore.Load();
+            UiCustomizationStore.Load();
+            Services.Mail.ListViewState.Load();
             CredentialVault.Load();
 
             bool vaultMerged = File.Exists(temporaryVault) && CredentialVault.ImportPortable(temporaryVault, passphrase);

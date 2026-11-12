@@ -202,9 +202,9 @@
 
     @if (FilterRuleStore.Rules.Count == 0 && EditingRule == null)
     {
-        <div class="mail-empty">
-            <div class="mail-empty-icon">🧹</div>
-            <div class="mail-empty-text">No filters yet — create one and incoming mail will sort itself.</div>
+        <div class="@MailCssClasses.Empty">
+            <div class="@MailCssClasses.EmptyIcon">🧹</div>
+            <div class="@MailCssClasses.EmptyText">No filters yet — create one and incoming mail will sort itself.</div>
         </div>
     }
 
@@ -216,7 +216,8 @@
     <p class="filters-rule-summary">@ScopeCaption · @VisibleRules.Count() filter(s)</p>
     @foreach (var existingRule in VisibleRules)
     {
-        <div class="filters-rule-surface" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle"
+        <div class="filters-rule-surface" data-context-menu="true"
+             @onmouseup="e => OnRuleMouseUp(existingRule, e)"
              @oncontextmenu="e => OpenRuleMenu(existingRule, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         <GlassCard CustomClass="filters-card filters-card--row">
             <div class="filters-rule-main">
@@ -491,4 +492,10 @@
         Add("account", accountId); Add("folder", folderFullName); Add("accountFolder", accountFolderId); Add("sender", senderAddress);
         return RoutePath + (values.Count == 0 ? "" : "?" + string.Join("&", values));
     }
+
+    Task OnRuleMouseUp(FilterRule rule, MouseEventArgs e) =>
+        MouseActionService.HandleSideMouseUpAsync(
+            e,
+            onMouse4: () => RunRuleCommand(rule, RuleCommand.Delete),
+            onMouse5: () => { SetEnabled(rule, !rule.Enabled); return Task.CompletedTask; });
 }

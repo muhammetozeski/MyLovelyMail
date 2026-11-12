@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Diagnostics;
 using System.Text.Json;
@@ -30,7 +31,15 @@ public static class MouseActionService
 
     static long statusVersion;
 
-    /// <summary>Receives declared commands from the shared input script.</summary>
+    /// <summary>Handles Mouse4 (button 3) and Mouse5 (button 4) directly in Blazor C# without DOM scraping.</summary>
+    public static Task HandleSideMouseUpAsync(MouseEventArgs e, Func<Task>? onMouse4 = null, Func<Task>? onMouse5 = null)
+    {
+        if (e.Button == 3 && onMouse4 != null) return onMouse4();
+        if (e.Button == 4 && onMouse5 != null) return onMouse5();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Receives declared commands from the sandboxed iframe bridge.</summary>
     /// <param name="action">Declared command name.</param>
     /// <param name="payload">Plain text or serialized complete message identities.</param>
     [JSInvokable("MouseSideButton")]

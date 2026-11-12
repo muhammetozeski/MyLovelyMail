@@ -8,6 +8,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px2 = 2;
             public const int Px4 = 4;
             public const int Px6 = 6;
+            public const int Px10 = 10;
             public const int Px16 = 16;
             public const int Px32 = 32;
             public const int Small = 8;
@@ -37,6 +38,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         {
             public const int Px1 = 1;
             public const int Px2 = 2;
+            public const int Px3 = 3;
             public const int Px4 = 4;
             public const int Px5 = 5;
             public const int Px6 = 6;
@@ -75,16 +77,20 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static class Size
         {
             public const int Px1 = 1;
+            public const int Px2 = 2;
             public const int Px4 = 4;
             public const int Px5 = 5;
+            public const int Px6 = 6;
             public const int Px8 = 8;
             public const int Px10 = 10;
             public const int Px12 = 12;
             public const int Px14 = 14;
             public const int Px16 = 16;
+            public const int Px18 = 18;
             public const int Px20 = 20;
             public const int Px22 = 22;
             public const int Px24 = 24;
+            public const int Px26 = 26;
             public const int Px28 = 28;
             public const int Px32 = 32;
             public const int Px36 = 36;
@@ -101,6 +107,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
             public const int Px110 = 110;
             public const int Px120 = 120;
             public const int Px140 = 140;
+            public const int Px160 = 160;
             public const int Px180 = 180;
             public const int Px200 = 200;
             public const int Px220 = 220;
@@ -147,6 +154,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         {
             public const int ThreeQuarters = 75;
             public const int Most = 80;
+            public const int Ninety = 90;
             public const int Full = 100;
             public const int Overflow = 110;
         }

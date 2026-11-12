@@ -337,22 +337,30 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal void ToggleOpenImportant(MailMessageSummary message) =>
             WithAccountAndFolder(message, (account, folderName) => MessageActions.ToggleImportant(account, folderName, message));
 
-        internal IReadOnlyList<PinnedReaderAction> GetPinnedReaderActions(MailMessageSummary message) =>
-            MailMenuItems.BuildPinnedReaderActions(this, message);
-
-        internal void ToggleReaderPinnedAction(string pinId)
+        internal static IReadOnlyList<(string RawDisplay, string Address)> ParseRecipients(string rawAddresses)
         {
-            bool nowPinned = MailMenuItems.TogglePinAction(pinId);
-            MouseActionService.ReportStatus(nowPinned ? $"📌 Pinned '{pinId}' to reader toolbar." : $"Unpinned '{pinId}' from reader toolbar.");
+            if (string.IsNullOrWhiteSpace(rawAddresses)) return [];
+            var result = new List<(string, string)>();
+            foreach (string segment in rawAddresses.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int lt = segment.IndexOf('<');
+                int gt = segment.IndexOf('>', lt + 1);
+                string addr = lt >= 0 && gt > lt + 1
+                    ? segment[(lt + 1)..gt].Trim()
+                    : segment.Trim();
+                if (addr.Contains('@'))
+                    result.Add((segment, addr));
+            }
+            return result;
         }
 
         internal void OpenReplyMenu(MailMessageSummary message, MouseEventArgs pointer)
         {
             ContextMenuService.Open(this, "Reply & Forward", [
-                new("↩️ Reply", () => StartReply(message, replyAll: false), pinActionId: "reply"),
-                new("↩️ Reply all", () => StartReply(message, replyAll: true), pinActionId: "reply-all"),
-                new("↪️ Forward", () => StartForward(message), pinActionId: "forward"),
-                new("📎 Forward as attachment (.eml)", () => StartForwardAsAttachment(message), pinActionId: "forward-attachment")
+                new("↩️ Reply", () => StartReply(message, replyAll: false), actionId: "Msg.Reply"),
+                new("↩️ Reply all", () => StartReply(message, replyAll: true), actionId: "Msg.ReplyAll"),
+                new("↪️ Forward", () => StartForward(message), actionId: "Msg.Forward"),
+                new("📎 Forward as attachment (.eml)", () => StartForwardAsAttachment(message), actionId: "Msg.ForwardAttachment")
             ], pointer.ClientX, pointer.ClientY);
         }
 

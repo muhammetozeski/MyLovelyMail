@@ -2,7 +2,7 @@
 @inherits ThemedComponentBase
 
 <style>
-    .core-modal-backdrop {
+    .@(CoreModalCssClasses.Backdrop) {
         position: fixed;
         top: 0;
         left: 0;
@@ -18,9 +18,9 @@
         outline: none;
     }
 
-    .core-modal-sheet {
+    .@(CoreModalCssClasses.Sheet) {
         width: @(AppMeasures.Percent.Full)%;
-        max-height: 90vh;
+        max-height: @(AppMeasures.Viewport.Ninety)vh;
         overflow-y: auto;
         text-align: left;
         box-sizing: border-box;
@@ -31,7 +31,7 @@
         color: @AppColors.TextPrimary.ToRgbaHex(true);
     }
 
-    .core-modal-header {
+    .@(CoreModalCssClasses.Header) {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -41,13 +41,13 @@
         border-bottom: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
     }
 
-    .core-modal-title {
+    .@(CoreModalCssClasses.Title) {
         font-size: @(AppMeasures.Font.Medium)px;
         font-weight: @(AppMeasures.Weight.Bold);
         color: @AppColors.TextPrimary.ToRgbaHex(true);
     }
 
-    .core-modal-close {
+    .@(CoreModalCssClasses.Close) {
         border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
         color: @AppColors.TextSecondary.ToRgbaHex(true);
@@ -62,7 +62,7 @@
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .core-modal-close:hover {
+        .@(CoreModalCssClasses.Close):hover {
             color: @AppColors.Primary.ToRgbaHex(true);
             border-color: @AppColors.Primary.ToRgbaHex(true);
         }

@@ -1,22 +1,23 @@
 @inherits ModalBase
+@using MyLovelyMail.MainProject.UI.Pages
 
-<div class="core-modal-header">
-    <span class="core-modal-title">💾 Save Message</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">💾 Save Message</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
 </div>
 
 <div style="display:flex;flex-direction:column;gap:@(AppMeasures.Space.Px10)px;">
     <div>
-        <div style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);margin-bottom:4px;">
+        <div style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);margin-bottom:@(AppMeasures.Space.Px4)px;">
             FORMAT
         </div>
         <div style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
-            <button class="mail-action-btn @(Format == "eml" ? "mail-action-btn--active" : "")"
+            <button class="@MailCssClasses.ActionBtn @(Format == "eml" ? MailCssClasses.ActionBtnActive : "")"
                     style="flex:1;justify-content:center;" type="button"
                     @onclick="@(() => SelectFormat("eml"))">
                 📄 Raw (.eml)
             </button>
-            <button class="mail-action-btn @(Format == "html" ? "mail-action-btn--active" : "")"
+            <button class="@MailCssClasses.ActionBtn @(Format == "html" ? MailCssClasses.ActionBtnActive : "")"
                     style="flex:1;justify-content:center;" type="button"
                     @onclick="@(() => SelectFormat("html"))">
                 🌐 Web Page (.html)
@@ -25,27 +26,27 @@
     </div>
 
     <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:@(AppMeasures.Space.Px4)px;">
             <span style="font-size:@(AppMeasures.Font.XSmall)px;font-weight:@(AppMeasures.Weight.Bold);color:@AppColors.TextMuted.ToRgbaHex(true);">
                 DESTINATION PATH
             </span>
             @if (OperatingSystem.IsWindows())
             {
-                <button class="mail-action-btn" type="button" title="Choose location in Windows Explorer" @onclick="BrowseLocation">
+                <button class="@MailCssClasses.ActionBtn" type="button" title="Choose location in Windows Explorer" @onclick="BrowseLocation">
                     📂 Browse…
                 </button>
             }
         </div>
-        <input class="mail-move-filter" style="width:100%;box-sizing:border-box;"
+        <input class="@MailCssClasses.MoveFilter" style="width:100%;box-sizing:border-box;"
                @bind="TargetPath" @bind:event="oninput" />
     </div>
 
-    <label style="display:flex;align-items:center;gap:8px;font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextSecondary.ToRgbaHex(true);cursor:pointer;">
+    <label style="display:flex;align-items:center;gap:@(AppMeasures.Space.Px8)px;font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextSecondary.ToRgbaHex(true);cursor:pointer;">
         <input type="checkbox" @bind="OpenFolderAfterSave" />
         <span>Open saved folder in Explorer after saving</span>
     </label>
 
-    <div style="display:flex;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;margin-top:4px;">
+    <div style="display:flex;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;margin-top:@(AppMeasures.Space.Px4)px;">
         <SecondaryButton OnClick="@Close">Cancel</SecondaryButton>
         <PrimaryButton OnClick="@SaveNow" Disabled="@string.IsNullOrWhiteSpace(TargetPath)">💾 Save</PrimaryButton>
     </div>

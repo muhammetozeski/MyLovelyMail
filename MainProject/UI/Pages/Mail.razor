@@ -14,125 +14,86 @@
      @onpointermove="OnScreenPointerMove"
      @onpointerup="OnScreenPointerUp"
      @onkeydown="OnScreenKeyDown"
-     data-context-menu="true" @oncontextmenu="e => OpenWorkspaceMenu(e)" @oncontextmenu:preventDefault="true"
-     data-mouse4="@(workspaceTargets.Length > 0 ? MouseActionService.TrashAction : "menu")" data-mouse4-value="@workspacePayload"
-     data-mouse5="@(workspaceTargets.Length > 0 ? MouseActionService.ReadAction : MouseActionService.SyncAction)" data-mouse5-value="@workspacePayload"
+     @oncontextmenu="e => OpenWorkspaceMenu(e)" @oncontextmenu:preventDefault="true"
+     @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+         () => { if (workspaceTargets.Length > 0) return MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, workspaceTargets); OpenWorkspaceMenu(e); return Task.CompletedTask; },
+         () => workspaceTargets.Length > 0 ? MouseActionService.RunMessagesAsync(MailMessageCommand.Read, workspaceTargets) : MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty))"
      style="--account-accent: @(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)); --account-ink: @(AppColors.InkOn(MailUiState.SelectedAccount?.ColorHex ?? AppColors.Primary.ToRgbaHex(true)).ToRgbaHex(true))">
 
     <MailSidebar View="this" />
 
     <ColumnSplitter Index="1"
                     IsDragging="@(activeSplitter == 1)"
-                    Title="Drag to resize sidebar (snaps near 20.0% · double-click to reset)"
+                    Title="Drag to resize sidebar (snaps within ±3% of 20.0% · double-click to reset)"
                     OnPointerDown="e => StartColumnSplitterDrag(1, e)"
                     OnDoubleClick="() => ResetColumnSplitter(1)" />
 
-    @* ---- Middle: message list ---- *@
+    @* ---- Middle: message / sender list ---- *@
     <section class="@MailCssClasses.List">
         <div class="@MailCssClasses.Search">
             <CoreInput Placeholder="Search mail..." Icon="🔎" Clearable="true" @bind-Value="SearchText" />
-            <div class="@MailCssClasses.SelectionTools">
-                <PillButton IsActive="@SelectionMode" OnClick="() => SelectionMode = !SelectionMode">☑ Select</PillButton>
-                <PillButton OnClick="SelectAllMessages" Disabled="@(Rows.Count == 0)">Select all</PillButton>
-                <PillButton Title="Select by read state, stars, attachments or tags" OnClick="OpenSelectionMenu" Disabled="@(Rows.Count == 0)">Select ▾</PillButton>
-                <PillButton Title="List navigation, selection and keyboard shortcuts" OnClick="OpenListActionsMenu">Actions ▾</PillButton>
-                <PillButton Title="Sort list" OnClick="OpenSortMenu">⇅ @(IsSenderListView ? ListViewState.SenderSortLabel : ListViewState.MailSortLabel) ▾</PillButton>
-                <PillButton IsActive="@IsSenderListView" Title="Switch between Mail List and Sender List" OnClick="ToggleSenderListView">
-                    @(IsSenderListView ? "✉️ Mails" : "👥 Senders")
-                </PillButton>
-                <PillButton IsIcon="true" Title="Keyboard shortcuts (?)" OnClick="OpenShortcutHelpModal">⌨️</PillButton>
-                @if (MailUiState.SelectedFolder is { Role: FolderRole.Trash or FolderRole.Junk } trashOrJunkFolder
-                     && MailUiState.SelectedAccount is { } activeAcc
-                     && CachedCount > 0)
-                {
-                    <PillButton IsDanger="true"
-                                Title="@($"Permanently delete all messages in {trashOrJunkFolder.DisplayName}")"
-                                OnClick="() => EmptyFolderWithConfirmationAsync(activeAcc, trashOrJunkFolder)">
-                        @(trashOrJunkFolder.Role == FolderRole.Trash ? "🗑️ Empty Trash" : "🧹 Empty Spam")
-                    </PillButton>
-                }
-                @if (MailUiState.SelectedMessages.Count > 0)
-                {
-                    <PillButton OnClick="MailUiState.ClearSelection">Clear selection</PillButton>
-                }
-            </div>
+
+            <CustomizableActionBar SurfaceId="@UiSurfaceIds.ListToolbar"
+                                   PairedMenuSurfaceId="@UiSurfaceIds.WorkspaceContextMenu"
+                                   DefaultActions="@BuildListToolbarActions()"
+                                   AddedActionResolver="@(id => ResolveToolbarAddedAction(UiSurfaceIds.ListToolbar, id))"
+                                   Wrap="true"
+                                   CustomClass="@MailCssClasses.SelectionTools" />
+
             @if (SyncScheduler.IsSyncing)
             {
                 <div class="@MailCssClasses.SyncLine"><span class="@MailCssClasses.SyncLineRunner"></span></div>
             }
-            <div class="@MailCssClasses.SearchFoldRow">
-                <PillButton IsActive="@(!ShowSearchTools && ActiveFilterCount > 0)"
-                            Title="@(ShowSearchTools ? "Hide the quick filters" : "Show the quick filters")"
-                            OnClick="() => ShowSearchTools = !ShowSearchTools">
-                    🎛️ Filters@(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "") @(ShowSearchTools ? "▴" : "▾")
-                </PillButton>
-                <PillButton IsActive="@ListViewState.IsFilterWindowOpen"
-                            Title="Open advanced draggable filters window"
-                            OnClick="ToggleAdvancedFilterWindow">
-                    🎯 Advanced@(ListViewState.ActiveFilterCount > 0 ? $" · {ListViewState.ActiveFilterCount}" : "") @(ListViewState.IsFilterWindowOpen ? "▴" : "▾")
-                </PillButton>
-            </div>
+
             @if (ShowSearchTools)
             {
-                <div class="@MailCssClasses.SearchTools">
-                    @foreach (var (label, token) in QuickFilters)
-                    {
-                        <PillButton IsActive="@HasSearchToken(token)"
-                                    OnClick="() => ToggleSearchToken(token)">@label</PillButton>
-                    }
-                    @if (MailUiState.SelectedAccount != null)
-                    {
-                        <PillButton IsActive="@ConversationMode"
-                                    Title="Group replies into conversations"
-                                    OnClick="ToggleConversationMode">🧵 Conversations</PillButton>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(SearchText))
-                    {
-                        <PillButton IsActive="@SearchAllFolders" OnClick="ToggleSearchAllFolders">🗂️ All folders</PillButton>
-                        <PillButton OnClick="SaveCurrentSearch">⭐ Save search</PillButton>
-                    }
-                </div>
+                <CustomizableActionBar SurfaceId="@UiSurfaceIds.QuickFiltersBar"
+                                       PairedMenuSurfaceId="@UiSurfaceIds.WorkspaceContextMenu"
+                                       DefaultActions="@BuildQuickFilterActions()"
+                                       AddedActionResolver="@(id => ResolveToolbarAddedAction(UiSurfaceIds.QuickFiltersBar, id))"
+                                       Wrap="true"
+                                       CustomClass="@MailCssClasses.SearchTools" />
             }
         </div>
 
         @if (MailUiState.SelectedFolder == null)
         {
-            <div class="mail-empty">
-                <div class="mail-empty-icon">📭</div>
-                <div class="mail-empty-text">Pick a folder to see its mail</div>
+            <div class="@MailCssClasses.Empty">
+                <div class="@MailCssClasses.EmptyIcon">📭</div>
+                <div class="@MailCssClasses.EmptyText">Pick a folder to see its mail</div>
             </div>
         }
-        else if (FilteredSummaries.Count == 0)
+        else if (!IsSenderListView && FilteredSummaries.Count == 0)
         {
             @if (string.IsNullOrWhiteSpace(SearchText)
                  && MailUiState.SelectedFolder is { } waitedFolder
                  && ImapSyncService.IsFolderSyncing(waitedFolder.AccountId, waitedFolder.FullName))
             {
-                <div class="mail-empty">
+                <div class="@MailCssClasses.Empty">
                     <CoreSpinner />
-                    <div class="mail-empty-text">Fetching this folder from the server…</div>
+                    <div class="@MailCssClasses.EmptyText">Fetching this folder from the server…</div>
                 </div>
             }
             else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { Role: FolderRole.Inbox })
             {
-                <div class="mail-empty mail-inbox-zero">
-                    <div class="mail-inbox-zero-hearts">
+                <div class="@MailCssClasses.Empty @MailCssClasses.InboxZero">
+                    <div class="@MailCssClasses.InboxZeroHearts">
                         @for (int heartIndex = 0; heartIndex < InboxZeroHeartCount; heartIndex++)
                         {
-                            <span class="mail-inbox-zero-heart" style="@InboxZeroHeartStyle(heartIndex)">💖</span>
+                            <span class="@MailCssClasses.InboxZeroHeart" style="@InboxZeroHeartStyle(heartIndex)">💖</span>
                         }
                     </div>
-                    <div class="mail-inbox-zero-headline"><span class="mail-inbox-zero-title">Inbox Zero</span> ✨</div>
-                    <div class="mail-empty-text">Nothing left to read — enjoy the quiet.</div>
+                    <div class="@MailCssClasses.InboxZeroHeadline"><span class="@MailCssClasses.InboxZeroTitle">Inbox Zero</span> ✨</div>
+                    <div class="@MailCssClasses.EmptyText">Nothing left to read — enjoy the quiet.</div>
                 </div>
             }
             else if (string.IsNullOrWhiteSpace(SearchText) && MailUiState.SelectedFolder is { } emptyFolder)
             {
                 var why = FolderEmptyReason.Explain(emptyFolder);
-                <div class="mail-empty">
-                    <div class="mail-empty-icon">🕊️</div>
-                    <div class="mail-empty-text">@why.Headline</div>
-                    <div class="mail-empty-detail">@why.Detail</div>
+                <div class="@MailCssClasses.Empty">
+                    <div class="@MailCssClasses.EmptyIcon">🕊️</div>
+                    <div class="@MailCssClasses.EmptyText">@why.Headline</div>
+                    <div class="@MailCssClasses.EmptyDetail">@why.Detail</div>
                     @if (why.Action != EmptyFolderAction.None)
                     {
                         <SecondaryButton OnClick="@(() => RunEmptyFolderAction(emptyFolder, why.Action))">@why.ActionLabel</SecondaryButton>
@@ -141,10 +102,10 @@
             }
             else
             {
-                <div class="mail-empty">
-                    <div class="mail-empty-icon">🕊️</div>
-                    <div class="mail-empty-text">@(string.IsNullOrWhiteSpace(SearchText) ? FolderEmptyReason.PlainlyEmpty : "Nothing matches your search")</div>
-                    <div class="mail-rescue">
+                <div class="@MailCssClasses.Empty">
+                    <div class="@MailCssClasses.EmptyIcon">🕊️</div>
+                    <div class="@MailCssClasses.EmptyText">@(string.IsNullOrWhiteSpace(SearchText) ? FolderEmptyReason.PlainlyEmpty : "Nothing matches your search")</div>
+                    <div class="@MailCssClasses.Rescue">
                         @foreach (var rescue in SearchRescues)
                         {
                             <PillButton OnClick="() => ApplyRescue(rescue)">@rescue.Label</PillButton>
@@ -157,23 +118,14 @@
         {
             @if (MailUiState.SelectedMessages.Count > 0)
             {
-                bool bulkInTrash = MailUiState.SelectedFolder?.Role == FolderRole.Trash;
                 <div class="@MailCssClasses.BulkBar">
                     <span class="@MailCssClasses.BulkCount">@MailUiState.SelectedMessages.Count selected</span>
-                    <PillButton OnClick="OpenBulkActionsMenu">More actions ▾</PillButton>
-                    <PillButton OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Read)">✅ Read</PillButton>
-                    <PillButton OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Unread)">📩 Unread</PillButton>
-                    <PillButton OnClick="OpenBulkMarkersModal">⭐ Labels</PillButton>
-                    @if (MoveTargets(MailUiState.SelectedMessages).Count > 0)
-                    {
-                        <PillButton OnClick="OpenBulkMoveModal">📂 Move</PillButton>
-                    }
-                    <PillButton OnClick="OpenBulkSnoozeModal">⏰ Snooze</PillButton>
-                    <PillButton IsDanger="true" OnClick="() => RunSelectionCommandAsync(MailMessageCommand.Trash)">
-                        @(bulkInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
-                    </PillButton>
-                    <PillButton OnClick="SelectAllMessages">☑️ All</PillButton>
-                    <PillButton OnClick="MailUiState.ClearSelection">✕ Clear</PillButton>
+                    <CustomizableActionBar SurfaceId="@UiSurfaceIds.BulkToolbar"
+                                           PairedMenuSurfaceId="@UiSurfaceIds.MessageContextMenu"
+                                           DefaultActions="@BuildBulkToolbarActions()"
+                                           AddedActionResolver="@(id => ResolveToolbarAddedAction(UiSurfaceIds.BulkToolbar, id))"
+                                           Wrap="true"
+                                           Inline="true" />
                 </div>
             }
             @if (IsSenderListView)
@@ -182,14 +134,37 @@
                 <div class="@MailCssClasses.Rows" tabindex="0">
                     @if (senders.Count == 0)
                     {
-                        <div class="mail-empty-text">No senders found in this account</div>
+                        <div class="@MailCssClasses.Empty">
+                            <div class="@MailCssClasses.EmptyIcon">👥</div>
+                            <div class="@MailCssClasses.EmptyText">No senders found in this folder</div>
+                        </div>
                     }
                     else
                     {
                         <Virtualize Items="senders" Context="sender" ItemSize="76">
-                            <div class="@MailCssClasses.RowShell" @key="sender.Address">
-                                <button class="@MailCssClasses.Row" type="button" @onclick="() => SelectSender(sender)">
-                                    <span class="@MailCssClasses.RowAvatar">👤</span>
+                            @{
+                                bool senderOpen = MailUiState.ThirdPane == MailUiState.PaneOccupant.Person
+                                    && string.Equals(MailUiState.OpenPersonAddress, sender.Address, StringComparison.OrdinalIgnoreCase);
+                                bool senderUnread = sender.UnreadCount > 0;
+                            }
+                            <div class="@MailCssClasses.RowShell"
+                                 @key="sender.Address"
+                                 data-sender-row="@sender.Address"
+                                 @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                     () => MouseActionService.RunAsync(MouseActionService.CopyAction, sender.Address),
+                                     () => { OpenSenderRowMenu(sender, e); return Task.CompletedTask; })"
+                                 @onmouseup:stopPropagation="true"
+                                 @oncontextmenu="e => OpenSenderRowMenu(sender, e)"
+                                 @oncontextmenu:preventDefault="true"
+                                 @oncontextmenu:stopPropagation="true">
+                                <button class="@MailCssClasses.Row @(senderUnread ? MailCssClasses.RowUnread : "") @(senderOpen ? MailCssClasses.RowActive : "")"
+                                        type="button"
+                                        @onclick="() => OpenSenderPerson(sender)">
+                                    <span class="@MailCssClasses.RowAvatar @(senderUnread ? MailCssClasses.RowAvatarUnread : "")"
+                                          style="background:@AvatarGradientForAddress(sender.Address)">
+                                        @AvatarInitialsForText(sender.DisplayName, sender.Address)
+                                    </span>
+                                    <span class="@MailCssClasses.RowDot"></span>
                                     <span class="@MailCssClasses.RowMain">
                                         <span class="@MailCssClasses.RowTop">
                                             <span class="@MailCssClasses.RowFrom">@sender.DisplayName</span>
@@ -209,6 +184,13 @@
                                         </span>
                                     </span>
                                 </button>
+                                <CustomizableActionBar SurfaceId="@UiSurfaceIds.SenderRowHover"
+                                                       PairedMenuSurfaceId="@UiSurfaceIds.SenderContextMenu"
+                                                       DefaultActions="@BuildSenderRowHoverActions(sender)"
+                                                       AddedActionResolver="@(id => ResolveToolbarAddedAction(UiSurfaceIds.SenderRowHover, id, senderRowContext: sender))"
+                                                       Compact="true"
+                                                       StopClickPropagation="true"
+                                                       CustomClass="@MailCssClasses.RowQuickActions" />
                             </div>
                         </Virtualize>
                     }
@@ -223,87 +205,119 @@
                         bool rowUnread = row.UnreadCount > 0;
                         var targets = MessageTargets(message);
                         string payload = JsonSerializer.Serialize(targets);
+                        string? rowAccountId = MessageIdentityOf(message)?.AccountId;
                     }
-                    <div class="mail-row-shell" @key="MessageIdentityOf(message)" data-context-menu="true"
-                         draggable="true"
-                         @ondragstart="() => StartMessageDrag(targets)"
-                         @ondragend="EndMessageDrag"
-                         @oncontextmenu="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-                    <button class="mail-row @(rowUnread ? "mail-row--unread" : "") @(MailUiState.OpenMessage == message ? "mail-row--active" : "") @(MailUiState.FocusedMessage == message ? "mail-row--focused" : "") @(bloomingUids.Contains(message.Uid) ? "mail-row--bloom" : "")"
-                            data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@payload"
-                            data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@payload"
+                    <div class="@MailCssClasses.RowShell" @key="MessageIdentityOf(message)"
+                         data-mail-uid="@message.Uid"
+                         @onpointerdown="e => { if (e.Button == 0) WorkspaceDragService.BeginMessagesCandidate(targets, message.Subject, e.ClientX, e.ClientY); }"
+                         @oncontextmenu="e => OpenMessageMenu(targets, e.ClientX, e.ClientY, primary: MessageIdentityOf(message))"
+                         @oncontextmenu:preventDefault="true"
+                         @oncontextmenu:stopPropagation="true">
+                    <button class="@MailCssClasses.Row @(rowUnread ? MailCssClasses.RowUnread : "") @(MailUiState.OpenMessage == message ? MailCssClasses.RowActive : "") @(MailUiState.FocusedMessage == message ? MailCssClasses.RowFocused : "") @(bloomingUids.Contains(message.Uid) ? MailCssClasses.RowBloom : "")"
+                            @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                () => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, targets),
+                                () => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, targets))"
+                            @onmouseup:stopPropagation="true"
                             @onfocus="() => MailUiState.FocusMessage(message, MessageIdentityOf(message))"
-                            @onclick="e => HandleRowClick(e, message)">
-                        <span class="mail-row-check @(IsRowSelected(message) ? "mail-row-check--on" : "")" title="Select this conversation; Shift selects a range"
-                              @onclick="e => ToggleRowSelection(e, message)" @onclick:stopPropagation="true">
+                            @onclick="e => { if (!WorkspaceDragService.ConsumeSuppressedClick()) HandleRowClick(e, message); }">
+                        <span class="@MailCssClasses.RowCheck @(IsRowSelected(message) ? MailCssClasses.RowCheckOn : "")"
+                              title="Select this conversation; Shift selects a range"
+                              @onpointerdown:stopPropagation="true"
+                              @onclick="e => ToggleRowSelection(e, message)"
+                              @onclick:stopPropagation="true">
                             @(IsRowSelected(message) ? "✓" : "○")
                         </span>
-                        <span class="mail-row-avatar @(rowUnread ? "mail-row-avatar--unread" : "")" style="background:@AvatarGradient(message)">@AvatarInitials(message)</span>
-                        <span class="mail-row-dot"></span>
-                        <span class="mail-row-main">
-                            <span class="mail-row-top">
-                                <span class="mail-row-from">@row.SenderText</span>
+                        <span class="@MailCssClasses.RowAvatar @(rowUnread ? MailCssClasses.RowAvatarUnread : "")"
+                              style="background:@AvatarGradient(message)"
+                              title="@($"Sender actions for {message.FromAddress}")"
+                              @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                  () => MouseActionService.RunAsync(MouseActionService.CopyAction, message.FromAddress),
+                                  () => { OpenAddressMenu(message.FromAddress, e, rowAccountId); return Task.CompletedTask; })"
+                              @onmouseup:stopPropagation="true"
+                              @oncontextmenu="e => OpenAddressMenu(message.FromAddress, e, rowAccountId)"
+                              @oncontextmenu:preventDefault="true"
+                              @oncontextmenu:stopPropagation="true">@AvatarInitials(message)</span>
+                        <span class="@MailCssClasses.RowDot"></span>
+                        <span class="@MailCssClasses.RowMain">
+                            <span class="@MailCssClasses.RowTop">
+                                <span class="@MailCssClasses.RowFrom"
+                                      title="@($"Right-click for sender actions ({message.FromAddress})")"
+                                      @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                          () => MouseActionService.RunAsync(MouseActionService.CopyAction, message.FromAddress),
+                                          () => { OpenAddressMenu(message.FromAddress, e, rowAccountId); return Task.CompletedTask; })"
+                                      @onmouseup:stopPropagation="true"
+                                      @oncontextmenu="e => OpenAddressMenu(message.FromAddress, e, rowAccountId)"
+                                      @oncontextmenu:preventDefault="true"
+                                      @oncontextmenu:stopPropagation="true">@row.SenderText</span>
                                 @if (row.ConversationCount > 1)
                                 {
-                                    <span class="mail-row-thread-count" title="@row.ConversationCount messages in this conversation">@row.ConversationCount</span>
+                                    <span class="@MailCssClasses.RowThreadCount" title="@row.ConversationCount messages in this conversation">@row.ConversationCount</span>
                                 }
-                                <span class="mail-row-date">@FormatDate(message.DateUtc)</span>
+                                <span class="@MailCssClasses.RowDate">@FormatDate(message.DateUtc)</span>
                             </span>
-                            <span class="mail-row-subject">
+                            <span class="@MailCssClasses.RowSubject">
                                 @if (message.Flags.HasFlag(MailFlags.Muted))
                                 {
-                                    <span class="mail-row-flag mail-row-flag--muted" title="Muted conversation — replies arrive quietly">🔇</span>
+                                    <span class="@MailCssClasses.RowFlag @MailCssClasses.RowFlagMuted" title="Muted conversation — replies arrive quietly">🔇</span>
                                 }
                                 @if (message.Flags.HasFlag(MailFlags.Important))
                                 {
-                                    <span class="mail-row-flag">❗</span>
+                                    <span class="@MailCssClasses.RowFlag">❗</span>
                                 }
                                 @if (message.Flags.HasFlag(MailFlags.Flagged))
                                 {
-                                    <span class="mail-row-flag">⭐</span>
+                                    <span class="@MailCssClasses.RowFlag">⭐</span>
                                 }
                                 @(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)
                             </span>
-                            <span class="mail-row-preview">
+                            <span class="@MailCssClasses.RowPreview">
                                 @if (OutboxStatusOf(message) is { } outboxStatus)
                                 {
-                                    <span class="mail-row-outbox">@outboxStatus</span>
+                                    <span class="@MailCssClasses.RowOutbox">@outboxStatus</span>
                                 }
                                 @if (HitFolderDisplay(message) is { } hitFolder)
                                 {
-                                    <span class="mail-row-folder">📁 @hitFolder</span>
+                                    <span class="@MailCssClasses.RowFolder">📁 @hitFolder</span>
                                 }
                                 @foreach (var tag in message.Tags)
                                 {
-                                    <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
-                                          data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = targets, Argument = tag })" data-mouse5="menu"
-                                          @oncontextmenu="e => OpenTagMenu(tag, message, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@tag</span>
+                                    <span class="@MailCssClasses.TagChip"
+                                          style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                          @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                              () => MouseActionService.RunMessagesAsync(MailMessageCommand.RemoveTag, targets, tag),
+                                              () => { OpenTagMenu(tag, message, e); return Task.CompletedTask; })"
+                                          @onmouseup:stopPropagation="true"
+                                          @oncontextmenu="e => OpenTagMenu(tag, message, e)"
+                                          @oncontextmenu:preventDefault="true"
+                                          @oncontextmenu:stopPropagation="true">@tag</span>
                                 }
                                 @if (message.HasAttachments)
                                 {
-                                    <span class="mail-row-attach">📎</span>
+                                    <span class="@MailCssClasses.RowAttach">📎</span>
                                 }
                                 @if (message.SnoozedUntilUtc is { } snoozedUntil)
                                 {
-                                    <button class="mail-row-snoozed" title="Bring it back now"
+                                    <button class="@MailCssClasses.RowSnoozed" title="Bring it back now"
                                             @onclick="() => WakeMessage(message)" @onclick:stopPropagation="true">@SnoozeLabel(snoozedUntil)</button>
                                 }
                                 @message.PreviewText
                             </span>
                         </span>
                     </button>
-                    <div class="mail-row-quick-actions">
-                        <button title="Mark read (Mouse 5)" aria-label="Mark read" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, targets, includeSelection: false)">✓</button>
-                        <button title="@(MailUiState.SelectedFolder?.Role == FolderRole.Trash ? "Delete forever (Mouse 4)" : "Move to Trash (Mouse 4)")" aria-label="Trash" @onclick="() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, targets, includeSelection: false)">🗑️</button>
-                        <button title="Message actions" aria-label="Message actions" aria-haspopup="menu" @onclick="e => OpenMessageMenu(targets, e.ClientX, e.ClientY)">⋯</button>
-                    </div>
+                    <CustomizableActionBar SurfaceId="@UiSurfaceIds.MailRowHover"
+                                           PairedMenuSurfaceId="@UiSurfaceIds.MessageContextMenu"
+                                           DefaultActions="@BuildMailRowHoverActions(message, targets)"
+                                           AddedActionResolver="@(id => ResolveToolbarAddedAction(UiSurfaceIds.MailRowHover, id, messageContext: message, targetsContext: targets))"
+                                           Compact="true"
+                                           StopClickPropagation="true"
+                                           CustomClass="@MailCssClasses.RowQuickActions" />
                     </div>
                 </Virtualize>
 
                 @if (!SearchAllFolders && TruncatedFolder is { } truncated)
                 {
-                    <div class="mail-backfill">
-                        <span class="mail-backfill-text">
+                    <div class="@MailCssClasses.Backfill">
+                        <span class="@MailCssClasses.BackfillText">
                             Showing @CachedCount.ToString("N0") of @truncated.TotalCount.ToString("N0") here
                         </span>
                         @if (ImapSyncService.IsFolderSyncing(truncated.AccountId, truncated.FullName))
@@ -334,7 +348,7 @@
 
     <ColumnSplitter Index="2"
                     IsDragging="@(activeSplitter == 2)"
-                    Title="Drag to resize message list & reader (snaps near 32.0% / 48.0% · double-click to reset)"
+                    Title="Drag to resize message list & reader (snaps within ±3% of 32.0% / 48.0% · double-click to reset)"
                     OnPointerDown="e => StartColumnSplitterDrag(2, e)"
                     OnDoubleClick="() => ResetColumnSplitter(2)" />
 

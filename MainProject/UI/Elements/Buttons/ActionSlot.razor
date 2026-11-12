@@ -1,0 +1,279 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Buttons
+@inherits ThemedComponentBase
+@using Microsoft.AspNetCore.Components.Web
+@using MyLovelyMail.MainProject.Services
+@using MyLovelyMail.MainProject.Stores
+@using MyLovelyMail.MainProject.UI.Components
+@using MyLovelyMail.MainProject.UI.Pages
+
+<span class="@SlotClass"
+      data-surface-id="@SurfaceId"
+      data-action-id="@Item.ActionId"
+      @onpointerdown="HandlePointerDown"
+      @onpointerdown:stopPropagation="true"
+      @onpointermove="HandlePointerMove"
+      @onpointerup="HandlePointerUp"
+      @onmouseup="HandleSideMouseUpAsync">
+    @if (Item.VisualKind == ActionVisualKind.Pill)
+    {
+        <PillButton IsActive="@Item.IsActive"
+                    IsDanger="@Item.IsDanger"
+                    IsPinned="@Item.IsPinned"
+                    IsIcon="@Item.IsIcon"
+                    IsCompact="@Item.IsCompact"
+                    Disabled="@Item.Disabled"
+                    Title="@EffectiveTitle"
+                    CustomClass="@Item.CustomClass"
+                    OnClick="HandleClickAsync"
+                    OnContextMenu="HandleContextMenu"
+                    PreventContextMenuDefault="true"
+                    StopContextMenuPropagation="true"
+                    @attributes="ExtraAttributes">
+            @Item.Label
+        </PillButton>
+    }
+    else
+    {
+        <button type="button"
+                class="@ButtonClass"
+                style="@Item.InlineStyle"
+                title="@EffectiveTitle"
+                disabled="@Item.Disabled"
+                @onclick="HandleClickAsync"
+                @onclick:stopPropagation="@StopClickPropagation"
+                @oncontextmenu="HandleContextMenu"
+                @oncontextmenu:preventDefault="true"
+                @oncontextmenu:stopPropagation="true"
+                @attributes="ExtraAttributes">
+            @Item.Label
+        </button>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string SurfaceId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string PairedMenuSurfaceId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public UiActionModel Item { get; set; } = default!;
+    [Parameter, EditorRequired] public int Index { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<string> VisibleIds { get; set; } = [];
+    [Parameter] public bool StopClickPropagation { get; set; }
+
+    string EffectiveTitle =>
+        string.IsNullOrWhiteSpace(Item.Title)
+            ? $"{Item.Label} (Drag to reorder · Right-click to customize)"
+            : Item.Title;
+
+    string SlotClass
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder(ActionBarCssClasses.Slot);
+            if (Item.IsFixed) sb.Append(' ').Append(ActionBarCssClasses.SlotFixed);
+            if (ActionDragService.IsDragging
+                && ActionDragService.SourceSurfaceId == SurfaceId
+                && string.IsNullOrEmpty(ActionDragService.SourceSubmenuParentId)
+                && ActionDragService.SourceActionId.Equals(Item.ActionId, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(' ').Append(ActionBarCssClasses.SlotDragging);
+            }
+            if (ActionDragService.IsDragging
+                && ActionDragService.HoverSurfaceId == SurfaceId
+                && string.IsNullOrEmpty(ActionDragService.HoverSubmenuParentId)
+                && !ActionDragService.HoverIsMenuDock
+                && !ActionDragService.HoverHideZone
+                && ActionDragService.HoverTargetActionId.Equals(Item.ActionId, StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(' ').Append(ActionDragService.HoverInsertAfter
+                    ? ActionBarCssClasses.SlotDropAfter
+                    : ActionBarCssClasses.SlotDropBefore);
+            }
+            return sb.ToString();
+        }
+    }
+
+    string ButtonClass
+    {
+        get
+        {
+            string baseClass = Item.VisualKind switch
+            {
+                ActionVisualKind.ActionBtn => Item.IsDanger
+                    ? $"{MailCssClasses.ActionBtn} {MailCssClasses.ActionBtnDanger}"
+                    : Item.IsActive
+                        ? $"{MailCssClasses.ActionBtn} {MailCssClasses.ActionBtnActive}"
+                        : MailCssClasses.ActionBtn,
+                ActionVisualKind.RowQuick => Item.IsDanger
+                    ? $"{MailCssClasses.RowQuickBtn} {MailCssClasses.RowQuickBtnDanger}"
+                    : MailCssClasses.RowQuickBtn,
+                ActionVisualKind.SidebarQuick => MailCssClasses.FolderQuickBtn,
+                ActionVisualKind.SidebarNewFolder => MailCssClasses.NewFolderBtn,
+                ActionVisualKind.ComposeBtn => MailCssClasses.ComposeBtn,
+                _ => MailCssClasses.SearchToggle
+            };
+            return string.IsNullOrWhiteSpace(Item.CustomClass) ? baseClass : $"{baseClass} {Item.CustomClass}";
+        }
+    }
+
+    Dictionary<string, object>? ExtraAttributes
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(Item.InlineStyle) && Item.VisualKind == ActionVisualKind.Pill)
+                return new Dictionary<string, object> { ["style"] = Item.InlineStyle };
+            return null;
+        }
+    }
+
+    Task HandleSideMouseUpAsync(MouseEventArgs e)
+    {
+        if (e.Button == 3 && !string.IsNullOrWhiteSpace(Item.Mouse4Action))
+        {
+            if (Item.Mouse4Action == "menu") { HandleContextMenu(e); return Task.CompletedTask; }
+            return MouseActionService.RunAsync(Item.Mouse4Action, string.Empty);
+        }
+        if (e.Button == 4 && !string.IsNullOrWhiteSpace(Item.Mouse5Action))
+        {
+            if (Item.Mouse5Action == "menu") { HandleContextMenu(e); return Task.CompletedTask; }
+            if (Item.Mouse5Action == "click") return HandleClickAsync(e);
+            return MouseActionService.RunAsync(Item.Mouse5Action, string.Empty);
+        }
+        return Task.CompletedTask;
+    }
+
+    void HandlePointerDown(PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        ActionDragService.BeginCandidate(
+            SurfaceId,
+            submenuParentId: null,
+            Item.ActionId,
+            Item.Label,
+            Item.IsFixed,
+            VisibleIds,
+            e.ClientX,
+            e.ClientY);
+    }
+
+    void HandlePointerMove(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (!ActionDragService.IsDragging) return;
+
+        bool sameSurface = ActionDragService.SourceSurfaceId.Equals(SurfaceId, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(ActionDragService.SourceSubmenuParentId);
+
+        bool insertAfter;
+        if (sameSurface)
+        {
+            int srcIdx = -1;
+            for (int i = 0; i < VisibleIds.Count; i++)
+            {
+                if (VisibleIds[i].Equals(ActionDragService.SourceActionId, StringComparison.OrdinalIgnoreCase))
+                {
+                    srcIdx = i;
+                    break;
+                }
+            }
+            insertAfter = srcIdx >= 0 && srcIdx < Index;
+        }
+        else
+        {
+            insertAfter = e.OffsetX > 20;
+        }
+
+        ActionDragService.HoverSlot(SurfaceId, null, Item.ActionId, Index, VisibleIds, insertAfter);
+    }
+
+    void HandlePointerUp(PointerEventArgs e)
+    {
+        if (ActionDragService.IsDragging)
+        {
+            HandlePointerMove(e);
+            ActionDragService.CompleteDrop();
+        }
+    }
+
+    async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (ActionDragService.ConsumeSuppressedClick()) return;
+        if (Item.Disabled || Item.OnClick == null) return;
+        await Item.OnClick(e);
+    }
+
+    void HandleContextMenu(MouseEventArgs e)
+    {
+        var menuItems = new List<ContextMenuItem>();
+
+        if (Item.ExtraContextMenuItems is { Count: > 0 } extra)
+        {
+            menuItems.AddRange(extra);
+        }
+
+        menuItems.Add(new ContextMenuItem(
+            "⬅️ Move earlier",
+            () => UiCustomizationStore.Reorder(SurfaceId, VisibleIds, Item.ActionId, Math.Max(0, Index - 1)),
+            enabled: Index > 0,
+            actionId: "Customize.MoveEarlier"));
+
+        menuItems.Add(new ContextMenuItem(
+            "➡️ Move later",
+            () => UiCustomizationStore.Reorder(SurfaceId, VisibleIds, Item.ActionId, Math.Min(VisibleIds.Count, Index + 2)),
+            enabled: Index < VisibleIds.Count - 1,
+            actionId: "Customize.MoveLater"));
+
+        if (!Item.IsFixed && !string.IsNullOrWhiteSpace(PairedMenuSurfaceId))
+        {
+            string pairedName = UiSurfaceIds.DisplayNameOf(PairedMenuSurfaceId);
+            menuItems.Add(new ContextMenuItem(
+                $"📥 Move to {pairedName}",
+                () =>
+                {
+                    var menuVisibleIds = ActionDragService.GetEffectiveVisibleIds(PairedMenuSurfaceId);
+                    UiCustomizationStore.TransferAction(
+                        SurfaceId,
+                        null,
+                        PairedMenuSurfaceId,
+                        null,
+                        Item.ActionId,
+                        menuVisibleIds,
+                        0,
+                        hideFromSource: true);
+                    MouseActionService.ReportStatus($"📥 Moved '{Item.Label}' to {pairedName}");
+                },
+                actionId: "Customize.MoveToContextMenu"));
+        }
+
+        if (!Item.IsFixed)
+        {
+            menuItems.Add(new ContextMenuItem(
+                "👁️ Hide button",
+                () =>
+                {
+                    UiCustomizationStore.SetVisible(SurfaceId, Item.ActionId, visible: false, VisibleIds);
+                    MouseActionService.ReportStatus($"👁️ Hidden '{Item.Label}'");
+                },
+                actionId: "Customize.HideButton"));
+        }
+
+        menuItems.Add(new ContextMenuItem(
+            "🎛️ Customize buttons & menus…",
+            () => ModalService.Open<UiCustomizerModal>(
+                new Dictionary<string, object?> { ["InitialSurfaceId"] = SurfaceId },
+                ModalSize.Wide),
+            actionId: "Customize.OpenModal"));
+
+        if (UiCustomizationStore.IsSurfaceCustomized(SurfaceId))
+        {
+            menuItems.Add(new ContextMenuItem(
+                $"↺ Reset {UiSurfaceIds.DisplayNameOf(SurfaceId)}",
+                () =>
+                {
+                    UiCustomizationStore.ResetSurface(SurfaceId);
+                    MouseActionService.ReportStatus($"↺ Reset {UiSurfaceIds.DisplayNameOf(SurfaceId)} to defaults");
+                },
+                actionId: "Customize.ResetSurface"));
+        }
+
+        ContextMenuService.Open(this, $"🎛️ {Item.Label}", menuItems, e.ClientX, e.ClientY);
+    }
+}

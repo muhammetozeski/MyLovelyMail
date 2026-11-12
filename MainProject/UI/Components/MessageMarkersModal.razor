@@ -1,17 +1,18 @@
 @inherits ModalBase
+@using MyLovelyMail.MainProject.UI.Pages
 
-<div class="core-modal-header">
-    <span class="core-modal-title">⭐ Star, Importance &amp; Tags</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">⭐ Star, Importance &amp; Tags</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
 </div>
 
 <div style="display:flex;gap:@(AppMeasures.Space.Px8)px;margin-bottom:@(AppMeasures.Space.Px12)px;">
-    <button class="mail-action-btn @(IsStarred ? "mail-action-btn--active" : "")"
+    <button class="@MailCssClasses.ActionBtn @(IsStarred ? MailCssClasses.ActionBtnActive : "")"
             style="flex:1;justify-content:center;padding:@(AppMeasures.Space.Px8)px;"
             type="button" @onclick="ToggleStarAsync">
         @(IsStarred ? "⭐ Starred" : "☆ Star")
     </button>
-    <button class="mail-action-btn @(IsImportant ? "mail-action-btn--active" : "")"
+    <button class="@MailCssClasses.ActionBtn @(IsImportant ? MailCssClasses.ActionBtnActive : "")"
             style="flex:1;justify-content:center;padding:@(AppMeasures.Space.Px8)px;"
             type="button" @onclick="ToggleImportantAsync">
         @(IsImportant ? "❗ Important" : "❕ Mark important")
@@ -22,14 +23,14 @@
     🏷️ TAGS
 </div>
 
-<div style="display:flex;flex-wrap:wrap;gap:@(AppMeasures.Space.Px6)px;margin-bottom:@(AppMeasures.Space.Px12)px;max-height:160px;overflow-y:auto;">
+<div style="display:flex;flex-wrap:wrap;gap:@(AppMeasures.Space.Px6)px;margin-bottom:@(AppMeasures.Space.Px12)px;max-height:@(AppMeasures.Size.Px160)px;overflow-y:auto;">
     @foreach (string tag in AllAvailableTags)
     {
         bool active = HasTag(tag);
-        <button class="mail-move-option"
-                style="width:auto;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid @(active ? TagStore.ColorOf(tag) : AppColors.GlassBorderDefault.ToRgbaHex(true));background:@(active ? AppColors.SurfaceTintPrimary.ToRgbaHex(true) : AppColors.SurfaceSubtle.ToRgbaHex(true));"
+        <button class="@MailCssClasses.MoveOption"
+                style="width:auto;display:inline-flex;align-items:center;gap:@(AppMeasures.Space.Px6)px;padding:@(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;border-radius:@(AppMeasures.Radius.Pill)px;border:@(AppMeasures.Border.Thin)px solid @(active ? TagStore.ColorOf(tag) : AppColors.GlassBorderDefault.ToRgbaHex(true));background:@(active ? AppColors.SurfaceTintPrimary.ToRgbaHex(true) : AppColors.SurfaceSubtle.ToRgbaHex(true));"
                 type="button" @onclick="() => ToggleTagAsync(tag)">
-            <span class="mail-tag-dot" style="background:@TagStore.ColorOf(tag)"></span>
+            <span class="@MailCssClasses.TagDot" style="background:@TagStore.ColorOf(tag)"></span>
             <span>@tag</span>
             @if (active)
             {
@@ -43,8 +44,8 @@
     }
 </div>
 
-<div class="mail-tag-new" style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
-    <input class="mail-tag-input" style="flex:1;" placeholder="New tag name…"
+<div class="@MailCssClasses.TagNew" style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
+    <input class="@MailCssClasses.TagInput" style="flex:1;" placeholder="New tag name…"
            @bind="NewTagText" @bind:event="oninput"
            @onkeydown="HandleNewTagKey" />
     <PrimaryButton OnClick="@AddNewTagAsync" Disabled="@string.IsNullOrWhiteSpace(NewTagText)">+ Add</PrimaryButton>

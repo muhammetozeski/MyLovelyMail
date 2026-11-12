@@ -136,14 +136,19 @@ namespace MyLovelyMail.MainProject.Stores
 
         /// <summary>
         /// Moves <paramref name="accountId"/> into <paramref name="targetFolderId"/> and optionally
-        /// positions it before <paramref name="insertBeforeAccountId"/>, persisting the new folder
+        /// positions it before or after <paramref name="insertBeforeAccountId"/>, persisting the new folder
         /// and global sort order.
         /// </summary>
-        public static void MoveToFolder(string accountId, string? targetFolderId, string? insertBeforeAccountId = null)
+        public static void MoveToFolder(
+            string accountId,
+            string? targetFolderId,
+            string? insertBeforeAccountId = null,
+            bool insertAfter = false)
         {
             var dragged = GetById(accountId);
             if (dragged == null) return;
 
+            accounts.Sort(CompareAccounts);
             dragged.FolderId = AccountFolderStore.NormalizeFolderId(targetFolderId);
             accounts.Remove(dragged);
 
@@ -151,10 +156,10 @@ namespace MyLovelyMail.MainProject.Stores
             if (!string.IsNullOrWhiteSpace(insertBeforeAccountId))
             {
                 int found = accounts.FindIndex(a => a.Id == insertBeforeAccountId);
-                if (found >= 0) insertIndex = found;
+                if (found >= 0) insertIndex = insertAfter ? found + 1 : found;
             }
 
-            accounts.Insert(insertIndex, dragged);
+            accounts.Insert(Math.Clamp(insertIndex, 0, accounts.Count), dragged);
             for (int i = 0; i < accounts.Count; i++)
             {
                 accounts[i].SortOrder = i + 1;

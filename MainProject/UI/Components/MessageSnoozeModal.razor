@@ -1,23 +1,24 @@
 @inherits ModalBase
+@using MyLovelyMail.MainProject.UI.Pages
 
-<div class="core-modal-header">
-    <span class="core-modal-title">⏰ Snooze Until</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">⏰ Snooze Until</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
 </div>
 
-<div style="display:flex;flex-direction:column;gap:4px;">
+<div style="display:flex;flex-direction:column;gap:@(AppMeasures.Space.Px4)px;">
     @foreach (var preset in SnoozeService.Presets)
     {
         var due = preset.DueUtc();
-        <button class="mail-move-option" style="display:flex;justify-content:space-between;align-items:center;gap:12px;"
+        <button class="@MailCssClasses.MoveOption" style="display:flex;justify-content:space-between;align-items:center;gap:@(AppMeasures.Space.Px12)px;"
                 type="button" @onclick="() => SnoozeAsync(due)">
             <span>@preset.Label</span>
-            <span class="mail-snooze-when">@due.ToLocalTime().ToString("ddd HH:mm", UiCulture.Display)</span>
+            <span class="@MailCssClasses.SnoozeWhen">@due.ToLocalTime().ToString("ddd HH:mm", UiCulture.Display)</span>
         </button>
     }
     @if (AnySnoozed)
     {
-        <button class="mail-move-option" style="margin-top:4px;border-top:1px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);padding-top:8px;"
+        <button class="@MailCssClasses.MoveOption" style="margin-top:@(AppMeasures.Space.Px4)px;border-top:@(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);padding-top:@(AppMeasures.Space.Px8)px;"
                 type="button" @onclick="WakeNowAsync">
             ☀️ Wake snoozed message(s) now
         </button>

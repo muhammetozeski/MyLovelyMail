@@ -2,16 +2,16 @@
 
 @if (IsOpen)
 {
-    <div class="core-modal-backdrop" style="@_backdropStyle" tabindex="-1"
+    <div class="@CoreModalCssClasses.Backdrop" style="@_backdropStyle" tabindex="-1"
          @onclick="HandleBackdropClick" @onkeydown="HandleKeyDown">
-        <div class="core-modal-sheet @CustomClass" style="@_sheetStyle" @onclick:stopPropagation="true">
+        <div class="@CoreModalCssClasses.Sheet @CustomClass" style="@_sheetStyle" @onclick:stopPropagation="true">
             @if (!string.IsNullOrWhiteSpace(Title) || ShowCloseButton)
             {
-                <div class="core-modal-header">
-                    <span class="core-modal-title">@Title</span>
+                <div class="@CoreModalCssClasses.Header">
+                    <span class="@CoreModalCssClasses.Title">@Title</span>
                     @if (ShowCloseButton)
                     {
-                        <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="CloseAsync">✕</button>
+                        <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="CloseAsync">✕</button>
                     }
                 </div>
             }

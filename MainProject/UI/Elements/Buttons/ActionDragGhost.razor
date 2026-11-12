@@ -1,0 +1,72 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Buttons
+@inherits ThemedComponentBase
+@implements IDisposable
+@using MyLovelyMail.MainProject.Services
+@using MyLovelyMail.MainProject.Stores
+
+@if (ActionDragService.IsDragging)
+{
+    <div class="@ActionBarCssClasses.Ghost"
+         style="@ActionGhostPositionStyle">
+        <span>⠿ @ActionDragService.SourceLabel</span>
+        <span class="@ActionBarCssClasses.GhostHint">@ActionTargetHint</span>
+    </div>
+}
+else if (WorkspaceDragService.IsDragging)
+{
+    <div class="@ActionBarCssClasses.Ghost"
+         style="@WorkspaceGhostPositionStyle">
+        <span>⠿ @WorkspaceDragService.SourceLabel</span>
+        <span class="@ActionBarCssClasses.GhostHint">@WorkspaceDragService.TargetHint</span>
+    </div>
+}
+
+@code {
+    string ActionGhostPositionStyle => string.Create(
+        System.Globalization.CultureInfo.InvariantCulture,
+        $"left:{ActionDragService.PointerX:0.#}px;top:{ActionDragService.PointerY:0.#}px;");
+
+    string WorkspaceGhostPositionStyle => string.Create(
+        System.Globalization.CultureInfo.InvariantCulture,
+        $"left:{WorkspaceDragService.PointerX:0.#}px;top:{WorkspaceDragService.PointerY:0.#}px;");
+
+    string ActionTargetHint
+    {
+        get
+        {
+            if (ActionDragService.HoverHideZone)
+                return "👁️ Drop to hide";
+            if (ActionDragService.HoverIsMenuDock)
+                return $"📥 Drop into {UiSurfaceIds.DisplayNameOf(ActionDragService.HoverSurfaceId)}";
+            if (!string.IsNullOrWhiteSpace(ActionDragService.HoverSurfaceId))
+            {
+                bool same = ActionDragService.HoverSurfaceId.Equals(ActionDragService.SourceSurfaceId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ActionDragService.HoverSubmenuParentId ?? string.Empty, ActionDragService.SourceSubmenuParentId ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+                return same
+                    ? $"↕️ Reorder in {UiSurfaceIds.DisplayNameOf(ActionDragService.HoverSurfaceId)}"
+                    : $"📌 Drop onto {UiSurfaceIds.DisplayNameOf(ActionDragService.HoverSurfaceId)}";
+            }
+            return "Esc to cancel";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ActionDragService.OnStateChanged += Refresh;
+        ActionDragService.OnGhostMoved += Refresh;
+        WorkspaceDragService.OnStateChanged += Refresh;
+        WorkspaceDragService.OnGhostMoved += Refresh;
+    }
+
+    void Refresh() => InvokeAsync(StateHasChanged);
+
+    public new void Dispose()
+    {
+        base.Dispose();
+        ActionDragService.OnStateChanged -= Refresh;
+        ActionDragService.OnGhostMoved -= Refresh;
+        WorkspaceDragService.OnStateChanged -= Refresh;
+        WorkspaceDragService.OnGhostMoved -= Refresh;
+    }
+}

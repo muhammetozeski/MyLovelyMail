@@ -7,9 +7,9 @@
 <div class="settings-screen">
     @if (Account == null)
     {
-        <div class="mail-empty">
-            <div class="mail-empty-icon">👻</div>
-            <div class="mail-empty-text">This account no longer exists.</div>
+        <div class="@MailCssClasses.Empty">
+            <div class="@MailCssClasses.EmptyIcon">👻</div>
+            <div class="@MailCssClasses.EmptyText">This account no longer exists.</div>
         </div>
     }
     else

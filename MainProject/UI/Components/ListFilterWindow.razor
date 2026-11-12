@@ -2,7 +2,9 @@
 @inherits ThemedComponentBase
 @implements IDisposable
 
-<div class="@ListFilterCssClasses.Container">
+<div class="@ListFilterCssClasses.Container"
+     @onpointermove="HandleContainerPointerMove"
+     @onpointerup="HandleContainerPointerUp">
     @{
         var resolved = ListViewState.GetResolvedFilters();
     }
@@ -20,10 +22,15 @@
             {
                 var item = resolved[i];
                 int index = i;
-                <div class="@ListFilterCssClasses.Item @(item.Status == FilterConditionStatus.Overridden ? ListFilterCssClasses.ItemOverridden : "")" @key="item.Id">
+                <div class="@GetFilterItemClass(index, item.Status)"
+                     @key="item.Id"
+                     title="Drag to reorder filter priority"
+                     @onpointerdown="e => BeginFilterDrag(index, e)"
+                     @onpointermove="e => HoverFilterItem(index, e)"
+                     @onpointerup="e => DropFilterItem(index, e)">
                     <div class="@ListFilterCssClasses.ItemHeader">
                         <span class="@ListFilterCssClasses.ItemBadge @(item.Status == FilterConditionStatus.Active ? ListFilterCssClasses.ItemBadgeActive : ListFilterCssClasses.ItemBadgeOverridden)">
-                            #@item.Index · @(item.Status == FilterConditionStatus.Active ? "Active" : "Overridden")
+                            ⠿ #@item.Index · @(item.Status == FilterConditionStatus.Active ? "Active" : "Overridden")
                         </span>
                         <span class="@ListFilterCssClasses.ItemText">@item.Description</span>
                         @if (!string.IsNullOrEmpty(item.OverriddenByDescription))
@@ -31,7 +38,7 @@
                             <span class="@ListFilterCssClasses.ItemOverrideHint">(@item.OverriddenByDescription)</span>
                         }
                     </div>
-                    <div class="@ListFilterCssClasses.ItemActions">
+                    <div class="@ListFilterCssClasses.ItemActions" @onpointerdown:stopPropagation="true">
                         <button type="button"
                                 class="@ListFilterCssClasses.ItemMoveBtn"
                                 disabled="@(index == 0)"
@@ -107,6 +114,11 @@
     DateTime newDateValue = DateTime.Today;
     string newValue = string.Empty;
 
+    int? dragSourceIndex;
+    int? dragHoverIndex;
+    bool dragActive;
+    double dragStartY;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -114,6 +126,64 @@
     }
 
     void HandleStateChanged() => InvokeAsync(StateHasChanged);
+
+    string GetFilterItemClass(int index, FilterConditionStatus status)
+    {
+        var sb = new System.Text.StringBuilder(ListFilterCssClasses.Item);
+        if (status == FilterConditionStatus.Overridden)
+            sb.Append(' ').Append(ListFilterCssClasses.ItemOverridden);
+        if (dragActive && dragSourceIndex == index)
+            sb.Append(' ').Append(ListFilterCssClasses.ItemDragging);
+        if (dragActive && dragHoverIndex == index && dragSourceIndex is { } src && src != index)
+            sb.Append(' ').Append(src < index ? ListFilterCssClasses.ItemDropAfter : ListFilterCssClasses.ItemDropBefore);
+        return sb.ToString();
+    }
+
+    void BeginFilterDrag(int index, PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        dragSourceIndex = index;
+        dragHoverIndex = index;
+        dragActive = false;
+        dragStartY = e.ClientY;
+    }
+
+    void HandleContainerPointerMove(PointerEventArgs e)
+    {
+        if (dragSourceIndex == null) return;
+        if (!dragActive && Math.Abs(e.ClientY - dragStartY) >= 5.0)
+            dragActive = true;
+    }
+
+    void HoverFilterItem(int index, PointerEventArgs e)
+    {
+        if (dragSourceIndex == null) return;
+        if (!dragActive && Math.Abs(e.ClientY - dragStartY) >= 5.0)
+            dragActive = true;
+        if (dragActive && dragHoverIndex != index)
+            dragHoverIndex = index;
+    }
+
+    void DropFilterItem(int index, PointerEventArgs e)
+    {
+        if (dragSourceIndex is { } src && dragActive && src != index)
+            ListViewState.MoveFilter(src, index);
+        ResetFilterDrag();
+    }
+
+    void HandleContainerPointerUp(PointerEventArgs e)
+    {
+        if (dragSourceIndex is { } src && dragHoverIndex is { } dst && dragActive && src != dst)
+            ListViewState.MoveFilter(src, dst);
+        ResetFilterDrag();
+    }
+
+    void ResetFilterDrag()
+    {
+        dragSourceIndex = null;
+        dragHoverIndex = null;
+        dragActive = false;
+    }
 
     void OnFieldChanged()
     {

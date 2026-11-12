@@ -52,8 +52,12 @@ public static class MailCssClasses
     public const string FolderName = "mail-folder-name";
     public const string FolderHoverActions = "mail-folder-hover-actions";
     public const string FolderAction = "mail-folder-action";
+    public const string FolderQuickBtn = "mail-folder-action";
+    public const string NewFolderBtn = "mail-folder-action mail-account-folder-action";
     public const string FolderMenuTrigger = "mail-folder-menu-trigger";
     public const string DropTarget = "mail-drop-target";
+    public const string DropBefore = "mail-drop-before";
+    public const string DropAfter = "mail-drop-after";
 
     public const string List = "mail-list";
     public const string Search = "mail-search";
@@ -70,6 +74,10 @@ public static class MailCssClasses
     public const string SearchTogglePinned = "mail-search-toggle--pinned";
     public const string SearchToggleCompact = "mail-search-toggle--compact";
 
+    public const string ActionBtn = "mail-action-btn";
+    public const string ActionBtnActive = "mail-action-btn--active";
+    public const string ActionBtnDanger = "mail-action-btn--danger";
+
     public const string SavedSearches = "mail-saved-searches";
     public const string SavedChip = "mail-saved-chip";
     public const string SavedRun = "mail-saved-run";
@@ -77,6 +85,13 @@ public static class MailCssClasses
 
     public const string BulkBar = "mail-bulk-bar";
     public const string BulkCount = "mail-bulk-count";
+    public const string BulkMove = "mail-bulk-move";
+    public const string BulkTagNew = "mail-bulk-tag-new";
+    public const string MovePopover = "mail-move-popover";
+    public const string MoveDivider = "mail-move-divider";
+    public const string MoveOption = "mail-move-option";
+    public const string MoveFilter = "mail-move-filter";
+
     public const string Rows = "mail-rows";
     public const string RowShell = "mail-row-shell";
     public const string Row = "mail-row";
@@ -103,7 +118,16 @@ public static class MailCssClasses
     public const string RowAttach = "mail-row-attach";
     public const string RowSnoozed = "mail-row-snoozed";
     public const string RowQuickActions = "mail-row-quick-actions";
+    public const string RowQuickBtn = "mail-row-quick-btn";
+    public const string RowQuickBtnDanger = "mail-row-quick-btn--danger";
+
     public const string TagChip = "mail-tag-chip";
+    public const string TagChipAction = "mail-tag-chip--action";
+    public const string TagChipOff = "mail-tag-chip--off";
+    public const string TagDot = "mail-tag-dot";
+    public const string TagPicker = "mail-tag-picker";
+    public const string TagInput = "mail-tag-input";
+    public const string TagNew = "mail-tag-new";
 
     public const string Backfill = "mail-backfill";
     public const string BackfillText = "mail-backfill-text";
@@ -119,11 +143,120 @@ public static class MailCssClasses
     public const string ReaderListNav = "mail-reader-list-nav";
     public const string ReaderMetaRow = "mail-reader-meta-row";
     public const string ReaderMetaLeft = "mail-reader-meta-left";
+    public const string ReaderFrom = "mail-reader-from";
+    public const string ReaderDate = "mail-reader-date";
     public const string ReaderTo = "mail-reader-to";
+    public const string ReaderToAddress = "mail-reader-to-addr";
     public const string ReaderBadgesRow = "mail-reader-badges-row";
     public const string ReaderHistory = "mail-reader-history";
+    public const string ReaderActions = "mail-reader-actions";
     public const string ReaderBody = "mail-reader-body";
     public const string ReaderFrame = "mail-reader-frame";
     public const string ReaderPreview = "mail-reader-preview";
     public const string ReaderNoBody = "mail-reader-nobody";
+    public const string BodyLoading = "mail-body-loading";
+
+    public const string ReaderThread = "mail-reader-thread";
+    public const string ReaderThreadNav = "mail-reader-thread-nav";
+    public const string ReaderThreadCount = "mail-reader-thread-count";
+    public const string ThreadStep = "mail-thread-step";
+    public const string ThreadLine = "mail-thread-line";
+    public const string ThreadLineOpen = "mail-thread-line--open";
+    public const string ThreadLineDate = "mail-thread-line-date";
+    public const string ThreadLineSender = "mail-thread-line-sender";
+    public const string ThreadLineUnread = "mail-thread-line-unread";
+
+    public const string Empty = "mail-empty";
+    public const string EmptyIcon = "mail-empty-icon";
+    public const string EmptyText = "mail-empty-text";
+    public const string EmptyDetail = "mail-empty-detail";
+    public const string InboxZero = "mail-inbox-zero";
+    public const string InboxZeroHearts = "mail-inbox-zero-hearts";
+    public const string InboxZeroHeart = "mail-inbox-zero-heart";
+    public const string InboxZeroHeadline = "mail-inbox-zero-headline";
+    public const string InboxZeroTitle = "mail-inbox-zero-title";
+    public const string Rescue = "mail-rescue";
+
+    public const string SendGuard = "mail-send-guard";
+    public const string FromChip = "mail-from-chip";
+    public const string FromChipOn = "mail-from-chip--on";
+    public const string TextScale = "mail-text-scale";
+    public const string TextScaleStep = "mail-text-scale-step";
+
+    public const string PaneTabs = "mail-pane-tabs";
+    public const string PaneTab = "mail-pane-tab";
+    public const string PaneTabOn = "mail-pane-tab--on";
+
+    public const string PersonSheet = "mail-person-sheet";
+    public const string PersonHead = "mail-person-head";
+    public const string PersonName = "mail-person-name";
+    public const string PersonClose = "mail-person-close";
+    public const string PersonAddress = "mail-person-address";
+    public const string PersonStats = "mail-person-stats";
+    public const string PersonFolder = "mail-person-folder";
+    public const string PersonTags = "mail-person-tags";
+    public const string PersonActions = "mail-person-actions";
+
+    public const string RuleTrace = "mail-rule-trace";
+    public const string RuleStrip = "mail-rule-strip";
+    public const string RuleSummary = "mail-rule-summary";
+    public const string RuleRow = "mail-rule-row";
+    public const string RuleLead = "mail-rule-lead";
+    public const string RuleName = "mail-rule-name";
+    public const string RuleCount = "mail-rule-count";
+    public const string RuleCaret = "mail-rule-caret";
+    public const string RuleRows = "mail-rule-rows";
+    public const string AuthChip = "mail-auth-chip";
+
+    public const string Unsubscribe = "mail-unsubscribe";
+    public const string UnsubscribeChip = "mail-unsubscribe-chip";
+    public const string UnsubscribeChipBlocked = "mail-unsubscribe-chip--blocked";
+
+    public const string ComposeBtn = "mail-compose-button";
+    public const string ComposeCard = "mail-compose-card";
+    public const string ComposeFields = "mail-compose-fields";
+    public const string ComposeSaved = "mail-compose-saved";
+    public const string ComposeFrom = "mail-compose-from";
+    public const string ComposeBody = "mail-compose-body";
+    public const string ComposeDropzone = "mail-compose-dropzone";
+    public const string ComposeFileInput = "mail-compose-file-input";
+    public const string ComposeAttachments = "mail-compose-attachments";
+    public const string ComposeAttachmentChip = "mail-compose-attachment-chip";
+    public const string ComposeAttachmentRemove = "mail-compose-attachment-remove";
+    public const string ComposeError = "mail-compose-error";
+    public const string ComposeActions = "mail-compose-actions";
+    public const string QuotePicker = "mail-quote-picker";
+    public const string Contacts = "mail-contacts";
+
+    public const string UndoBar = "mail-undo-bar";
+    public const string UndoBarWarning = "mail-undo-bar--warning";
+    public const string UndoBarFailed = "mail-undo-bar--failed";
+    public const string UndoText = "mail-undo-text";
+    public const string UndoButton = "mail-undo-button";
+
+    public const string Attachments = "mail-attachments";
+    public const string AttachmentChip = "mail-attachment-chip";
+    public const string AttachmentChipAll = "mail-attachment-chip--all";
+    public const string AttachmentSize = "mail-attachment-size";
+    public const string ImageBanner = "mail-image-banner";
+    public const string SaveStatus = "mail-save-status";
+
+    public const string Source = "mail-source";
+    public const string SourceTabs = "mail-source-tabs";
+    public const string SourceHeaders = "mail-source-headers";
+    public const string SourceHeaderName = "mail-source-header-name";
+    public const string SourceHeaderValue = "mail-source-header-value";
+    public const string SourceRaw = "mail-source-raw";
+
+    public const string Shortcuts = "mail-shortcuts";
+    public const string ShortcutsTitle = "mail-shortcuts-title";
+    public const string ShortcutsRow = "mail-shortcuts-row";
+    public const string ShortcutsKeys = "mail-shortcuts-keys";
+    public const string ShortcutsAction = "mail-shortcuts-action";
+    public const string ShortcutGrid = "mail-shortcut-grid";
+    public const string ModalSectionTitle = "mail-modal-section-title";
+    public const string SnoozeWhen = "mail-snooze-when";
+
+    public const string WizardTest = "wizard-test";
+    public const string WizardTestFail = "wizard-test--fail";
 }

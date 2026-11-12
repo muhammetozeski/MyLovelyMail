@@ -27,6 +27,9 @@ namespace MyLovelyMail
         static extern bool IsIconic(IntPtr hWnd);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -42,7 +45,7 @@ namespace MyLovelyMail
         {
             if (Window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window winuiWindow) return;
             IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(winuiWindow);
-            if (hwnd != IntPtr.Zero && IsIconic(hwnd))
+            if (hwnd != IntPtr.Zero && (IsIconic(hwnd) || !IsWindowVisible(hwnd)))
             {
                 // Restore from minimized state without activating or stealing focus, and keep behind all windows.
                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);

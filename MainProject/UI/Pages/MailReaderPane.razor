@@ -4,29 +4,42 @@
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 @using System.IO
 
-    @* ---- Right: compose pane or reading pane ---- *@
-    <section class="mail-reader">
+    @* ---- Right: compose pane, person sheet, or reading pane ---- *@
+    <section class="@MailCssClasses.Reader">
         @if (View.PaneTabs.Count > 1)
         {
-            <div class="mail-pane-tabs">
+            <div class="@MailCssClasses.PaneTabs">
                 @foreach (var (occupant, label) in View.PaneTabs)
                 {
-                    <button class="mail-pane-tab @(MailUiState.ThirdPane == occupant ? "mail-pane-tab--on" : "")"
+                    <button class="@MailCssClasses.PaneTab @(MailUiState.ThirdPane == occupant ? MailCssClasses.PaneTabOn : "")"
                             @onclick="() => MailUiState.ShowPane(occupant)">@label</button>
                 }
             </div>
         }
-        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person && MailUiState.OpenPersonAddress is { } personAddress && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
+        @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Person
+             && MailUiState.OpenPersonAddress is { } personAddress
+             && PersonProfileService.Build(MailUiState.SelectedAccount?.Id ?? string.Empty, personAddress) is { } person)
         {
-            <div class="mail-person-sheet" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@person.Address" data-mouse5="menu"
-                 @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-                <div class="mail-person-head">
-                    <span class="mail-person-name">@(person.DisplayName.Length > 0 ? person.DisplayName : person.Address)</span>
-                    <button class="mail-person-close" title="Close" @onclick="MailUiState.ClosePerson">✕</button>
+            <div class="@MailCssClasses.PersonSheet"
+                 @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                     () => MouseActionService.RunAsync(MouseActionService.CopyAction, person.Address),
+                     () => { View.OpenAddressMenu(person.Address, e); return Task.CompletedTask; })"
+                 @onmouseup:stopPropagation="true"
+                 @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)"
+                 @oncontextmenu:preventDefault="true"
+                 @oncontextmenu:stopPropagation="true">
+                <div class="@MailCssClasses.PersonHead">
+                    <span class="@MailCssClasses.PersonName"
+                          @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)"
+                          @oncontextmenu:preventDefault="true"
+                          @oncontextmenu:stopPropagation="true">@(person.DisplayName.Length > 0 ? person.DisplayName : person.Address)</span>
+                    <button class="@MailCssClasses.PersonClose" title="Close" @onclick="MailUiState.ClosePerson">✕</button>
                 </div>
-                <div class="mail-person-address" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@person.Address" data-mouse5="menu"
-                     @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@person.Address</div>
-                <div class="mail-person-stats">
+                <div class="@MailCssClasses.PersonAddress"
+                     @oncontextmenu="e => View.OpenAddressMenu(person.Address, e)"
+                     @oncontextmenu:preventDefault="true"
+                     @oncontextmenu:stopPropagation="true">@person.Address</div>
+                <div class="@MailCssClasses.PersonStats">
                     <span>@person.MessageCount messages</span>
                     <span>@person.ReceivedCount received · @person.SentCount sent</span>
                     <span>@person.UnreadCount unread</span>
@@ -38,110 +51,129 @@
                 </div>
                 @foreach (var (folderName, count) in person.ByFolder.OrderByDescending(e => e.Value))
                 {
-                    <div class="mail-person-folder">@folderName — @count</div>
+                    <div class="@MailCssClasses.PersonFolder">@folderName — @count</div>
                 }
                 @if (person.Tags.Count > 0)
                 {
-                    <div class="mail-person-tags">
+                    <div class="@MailCssClasses.PersonTags">
                         @foreach (string tag in person.Tags)
                         {
-                            <span class="mail-tag-chip" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
-                                  data-context-menu="true" data-mouse4="copy" data-mouse4-value="@tag" data-mouse5="menu"
-                                  @oncontextmenu="e => View.OpenTagMenu(tag, null, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">@tag</span>
+                            <span class="@MailCssClasses.TagChip"
+                                  style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                  @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                      () => MouseActionService.RunAsync(MouseActionService.CopyAction, tag),
+                                      () => { View.OpenTagMenu(tag, null, e); return Task.CompletedTask; })"
+                                  @onmouseup:stopPropagation="true"
+                                  @oncontextmenu="e => View.OpenTagMenu(tag, null, e)"
+                                  @oncontextmenu:preventDefault="true"
+                                  @oncontextmenu:stopPropagation="true">@tag</span>
                         }
                     </div>
                 }
-                <div class="mail-person-actions">
-                    <PillButton OnClick="e => View.OpenAddressMenu(person.Address, e)">Actions ▾</PillButton>
-                    <PillButton OnClick='() => View.RunSavedSearch("from:" + person.Address)'>🔍 From them</PillButton>
-                    <PillButton OnClick='() => View.RunSavedSearch("to:" + person.Address)'>🔍 To them</PillButton>
-                    <PillButton OnClick="() => MouseActionService.RunAsync(MouseActionService.ComposeToAction, person.Address)">✏️ Write</PillButton>
-                </div>
+                <CustomizableActionBar SurfaceId="@UiSurfaceIds.PersonActionsBar"
+                                       PairedMenuSurfaceId="@UiSurfaceIds.SenderContextMenu"
+                                       DefaultActions="@View.BuildPersonActions(person)"
+                                       AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.PersonActionsBar, id, senderAddressContext: person.Address))"
+                                       Wrap="true"
+                                       CustomClass="@MailCssClasses.PersonActions" />
             </div>
         }
 
         @if (OutboxAttemptStore.HeldCount is > 0 and var heldCount)
         {
-            <div class="mail-undo-bar mail-undo-bar--failed">
-                <span class="mail-undo-text">⛔ @heldCount message(s) stopped after repeated send failures</span>
-                <button class="mail-undo-button" @onclick="View.RetryHeldOutbox">Try now</button>
+            <div class="@MailCssClasses.UndoBar @MailCssClasses.UndoBarFailed">
+                <span class="@MailCssClasses.UndoText">⛔ @heldCount message(s) stopped after repeated send failures</span>
+                <button class="@MailCssClasses.UndoButton" @onclick="View.RetryHeldOutbox">Try now</button>
             </div>
         }
 
         @if (OutboxService.LastFailure is { } failedSend)
         {
-            <div class="mail-undo-bar mail-undo-bar--failed">
-                <span class="mail-undo-text">❌ Send failed: "@(string.IsNullOrWhiteSpace(failedSend.Draft.Subject) ? "(no subject)" : failedSend.Draft.Subject)" — @failedSend.Reason</span>
-                <button class="mail-undo-button" @onclick="OutboxService.RetryFailed">🔁 Retry</button>
-                <button class="mail-undo-button" @onclick="Mail.EditFailedSend">✏️ Edit</button>
-                <button class="mail-undo-button" @onclick="OutboxService.DismissFailed">✕ Dismiss</button>
+            <div class="@MailCssClasses.UndoBar @MailCssClasses.UndoBarFailed">
+                <span class="@MailCssClasses.UndoText">❌ Send failed: "@(string.IsNullOrWhiteSpace(failedSend.Draft.Subject) ? "(no subject)" : failedSend.Draft.Subject)" — @failedSend.Reason</span>
+                <button class="@MailCssClasses.UndoButton" @onclick="OutboxService.RetryFailed">🔁 Retry</button>
+                <button class="@MailCssClasses.UndoButton" @onclick="Mail.EditFailedSend">✏️ Edit</button>
+                <button class="@MailCssClasses.UndoButton" @onclick="OutboxService.DismissFailed">✕ Dismiss</button>
             </div>
         }
         @if (OutboxService.Current is { } pendingSend)
         {
-            <div class="mail-undo-bar">
-                <span class="mail-undo-text">✉️ Sending "@(string.IsNullOrWhiteSpace(pendingSend.Draft.Subject) ? "(no subject)" : pendingSend.Draft.Subject)" in @(Mail.UndoSecondsLeft(pendingSend))s…</span>
-                <button class="mail-undo-button" @onclick="Mail.UndoPendingSend">↩️ Undo</button>
+            <div class="@MailCssClasses.UndoBar">
+                <span class="@MailCssClasses.UndoText">✉️ Sending "@(string.IsNullOrWhiteSpace(pendingSend.Draft.Subject) ? "(no subject)" : pendingSend.Draft.Subject)" in @(Mail.UndoSecondsLeft(pendingSend))s…</span>
+                <button class="@MailCssClasses.UndoButton" @onclick="Mail.UndoPendingSend">↩️ Undo</button>
             </div>
         }
         @if (MailUiState.ThirdPane == MailUiState.PaneOccupant.Compose && MailUiState.ActiveCompose is { } draft)
         {
-            <div class="mail-reader-top-row" data-context-menu="true" @oncontextmenu="e => View.OpenComposeMenu(e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+            <div class="@MailCssClasses.ReaderTopRow"
+                 data-context-menu="true"
+                 @oncontextmenu="e => View.OpenComposeMenu(e)"
+                 @oncontextmenu:preventDefault="true"
+                 @oncontextmenu:stopPropagation="true">
                 <BackButton OnClick="@View.SaveAndCloseCompose" />
-                <div class="mail-reader-subject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
+                <div class="@MailCssClasses.ReaderSubject">✏️ @(string.IsNullOrWhiteSpace(draft.Subject) ? "New message" : draft.Subject)</div>
                 @if (View.DraftSavedAt != null)
                 {
-                    <span class="mail-compose-saved">💾 @View.DraftSavedAt?.ToString("HH:mm:ss")</span>
+                    <span class="@MailCssClasses.ComposeSaved">💾 @View.DraftSavedAt?.ToString("HH:mm:ss")</span>
                 }
                 @if (draft.SourceUid > 0)
                 {
-                    <span class="mail-quote-picker">
-                        @foreach (var style in Enum.GetValues<QuoteStyle>())
-                        {
-                            <button class="mail-folder-action mail-text-scale-step" @onclick="() => View.RequoteDraft(draft, style)">@style</button>
-                        }
-                    </span>
+                    <CustomizableActionBar SurfaceId="@UiSurfaceIds.ComposeQuoteBar"
+                                           PairedMenuSurfaceId="@UiSurfaceIds.WorkspaceContextMenu"
+                                           DefaultActions="@View.BuildComposeQuoteActions(draft)"
+                                           AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.ComposeQuoteBar, id))"
+                                           Inline="true"
+                                           Compact="true"
+                                           CustomClass="@MailCssClasses.QuotePicker" />
                 }
             </div>
 
-            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-compose-card">
-                <div class="mail-compose-fields" @oninput="View.NoteComposeActivity">
-                <div class="mail-compose-from">
-                    From:
-                    @foreach (var sender in AccountStore.Accounts)
-                    {
-                        <button class="mail-from-chip @(draft.Account?.Id == sender.Id ? "mail-from-chip--on" : "")"
-                                style="background:@sender.ColorHex;color:@AppColors.InkOn(sender.ColorHex).ToRgbaHex(true)"
-                                @onclick="() => View.SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
-                    }
-                </div>
-                <datalist id="@Mail.ContactListId">
-                    @foreach (var contact in View.KnownContacts)
-                    {
-                        <option value="@contact.Suggestion"></option>
-                    }
-                </datalist>
-                <CoreInput Placeholder="To (comma separated)" Icon="👤" ListId="@Mail.ContactListId" @bind-Value="draft.To" />
-                <CoreInput Placeholder="Cc" Icon="👥" ListId="@Mail.ContactListId" @bind-Value="draft.Cc" />
-                <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
-                <textarea class="mail-compose-body" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="@MailCssClasses.ComposeCard">
+                <div class="@MailCssClasses.ComposeFields" @oninput="View.NoteComposeActivity">
+                    <div class="@MailCssClasses.ComposeFrom">
+                        From:
+                        @foreach (var sender in AccountStore.Accounts)
+                        {
+                            <button class="@MailCssClasses.FromChip @(draft.Account?.Id == sender.Id ? MailCssClasses.FromChipOn : "")"
+                                    style="background:@sender.ColorHex;color:@AppColors.InkOn(sender.ColorHex).ToRgbaHex(true)"
+                                    data-context-menu="true"
+                                    @oncontextmenu="e => View.OpenAccountMenu(sender, e)"
+                                    @oncontextmenu:preventDefault="true"
+                                    @oncontextmenu:stopPropagation="true"
+                                    @onclick="() => View.SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
+                        }
+                    </div>
+                    <datalist id="@Mail.ContactListId">
+                        @foreach (var contact in View.KnownContacts)
+                        {
+                            <option value="@contact.Suggestion"></option>
+                        }
+                    </datalist>
+                    <CoreInput Placeholder="To (comma separated)" Icon="👤" ListId="@Mail.ContactListId" @bind-Value="draft.To" />
+                    <CoreInput Placeholder="Cc" Icon="👥" ListId="@Mail.ContactListId" @bind-Value="draft.Cc" />
+                    <CoreInput Placeholder="Subject" Icon="🏷️" @bind-Value="draft.Subject" />
+                    <textarea class="@MailCssClasses.ComposeBody" placeholder="Write something lovely..." @bind="draft.Body" @bind:event="oninput"></textarea>
                 </div>
 
-                <label class="mail-compose-dropzone">
-                    <InputFile OnChange="View.OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                <label class="@MailCssClasses.ComposeDropzone">
+                    <InputFile OnChange="View.OnComposeFilesSelectedAsync" multiple class="@MailCssClasses.ComposeFileInput" />
                     📎 Attach files — click or drop them here
                 </label>
                 @if (draft.AttachmentPaths.Count > 0)
                 {
-                    <div class="mail-compose-attachments">
+                    <div class="@MailCssClasses.ComposeAttachments">
                         @foreach (var attachmentPath in draft.AttachmentPaths)
                         {
-                            <span class="mail-compose-attachment-chip" data-context-menu="true"
-                                  data-mouse4="click" data-mouse4-selector=".mail-compose-attachment-remove"
-                                  data-mouse5="copy" data-mouse5-value="@Path.GetFileName(attachmentPath)"
-                                  @oncontextmenu="e => View.OpenComposeAttachmentMenu(attachmentPath, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                            <span class="@MailCssClasses.ComposeAttachmentChip"
+                                  @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                      () => { View.RemoveComposeAttachment(attachmentPath); return Task.CompletedTask; },
+                                      () => MouseActionService.RunAsync(MouseActionService.CopyAction, Path.GetFileName(attachmentPath)))"
+                                  @onmouseup:stopPropagation="true"
+                                  @oncontextmenu="e => View.OpenComposeAttachmentMenu(attachmentPath, e)"
+                                  @oncontextmenu:preventDefault="true"
+                                  @oncontextmenu:stopPropagation="true">
                                 📎 @Path.GetFileName(attachmentPath)
-                                <button class="mail-compose-attachment-remove" title="Remove"
+                                <button class="@MailCssClasses.ComposeAttachmentRemove" title="Remove"
                                         @onclick="() => View.RemoveComposeAttachment(attachmentPath)">✕</button>
                             </span>
                         }
@@ -150,84 +182,99 @@
 
                 @if (View.SendError != null)
                 {
-                    <p class="mail-compose-error">❌ @View.SendError</p>
+                    <p class="@MailCssClasses.ComposeError">❌ @View.SendError</p>
                 }
 
                 @if (View.SendWarnings.Count > 0)
                 {
-                    <div class="mail-undo-bar mail-undo-bar--warning mail-send-guard">
+                    <div class="@MailCssClasses.UndoBar @MailCssClasses.UndoBarWarning @MailCssClasses.SendGuard">
                         @foreach (var warning in View.SendWarnings)
                         {
-                            <span class="mail-undo-text">⚠️ @warning.Text</span>
+                            <span class="@MailCssClasses.UndoText">⚠️ @warning.Text</span>
                             @if (warning.Code == SendGuardService.AttachmentCode)
                             {
-                                <label class="mail-undo-button">
-                                    <InputFile OnChange="View.OnComposeFilesSelectedAsync" multiple class="mail-compose-file-input" />
+                                <label class="@MailCssClasses.UndoButton">
+                                    <InputFile OnChange="View.OnComposeFilesSelectedAsync" multiple class="@MailCssClasses.ComposeFileInput" />
                                     Attach a file
                                 </label>
                             }
                         }
-                        <button class="mail-undo-button" @onclick="View.ForceQueueActiveDraftSend">Send anyway</button>
+                        <button class="@MailCssClasses.UndoButton" @onclick="View.ForceQueueActiveDraftSend">Send anyway</button>
                     </div>
                 }
 
-                <div class="mail-compose-actions">
-                    <SecondaryButton OnClick="@View.DiscardCompose">🗑️ Discard</SecondaryButton>
-                    <PrimaryButton OnClick="@View.QueueActiveDraftSend" Disabled="@(string.IsNullOrWhiteSpace(draft.To))">📨 Send</PrimaryButton>
-                </div>
+                <CustomizableActionBar SurfaceId="@UiSurfaceIds.ComposeFooterBar"
+                                       PairedMenuSurfaceId="@UiSurfaceIds.WorkspaceContextMenu"
+                                       DefaultActions="@View.BuildComposeFooterActions(draft)"
+                                       AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.ComposeFooterBar, id))"
+                                       Wrap="true"
+                                       CustomClass="@MailCssClasses.ComposeActions" />
             </GlassCard>
         }
         else if (MailUiState.OpenMessage is not { } open)
         {
-            <div class="mail-empty">
-                <div class="mail-empty-icon">💌</div>
-                <div class="mail-empty-text">Select a message to read it here</div>
+            <div class="@MailCssClasses.Empty">
+                <div class="@MailCssClasses.EmptyIcon">💌</div>
+                <div class="@MailCssClasses.EmptyText">Select a message to read it here</div>
             </div>
         }
         else
         {
             var readerTargets = View.MessageTargets(open);
             var readerPayload = JsonSerializer.Serialize(readerTargets);
-            bool isInTrash = View.ResolveFolderRole(open) == FolderRole.Trash;
-            string starIcon = open.Flags.HasFlag(MailFlags.Flagged) ? "⭐" : "☆";
-            string impIcon = open.Flags.HasFlag(MailFlags.Important) ? "❗" : "";
-            string tagCountBadge = open.Tags.Count > 0 ? $" · {open.Tags.Count}" : "";
+            string? openAccountId = View.MessageIdentityOf(open)?.AccountId;
 
-            <div class="mail-reader-content" @key="View.MessageIdentityOf(open)" data-context-menu="true"
-                 data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@readerPayload"
-                 data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@readerPayload"
+            <div class="@MailCssClasses.ReaderContent"
+                 @key="View.MessageIdentityOf(open)"
+                 @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                     () => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets),
+                     () => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, readerTargets))"
+                 @onmouseup:stopPropagation="true"
                  @oncontextmenu="e => View.OpenMessageMenu(readerTargets, e.ClientX, e.ClientY, primary: View.MessageIdentityOf(open))"
-                 @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                 @oncontextmenu:preventDefault="true"
+                 @oncontextmenu:stopPropagation="true">
 
-            @* Full-width stacked header: Back + Avatar + Subject sit inline on the top row, so every
-               line below (From/Date/To, history, badges, toolbar, body) utilizes the full column width
-               with zero empty space beneath Back or the avatar. *@
             <div class="@MailCssClasses.ReaderHeaderCard">
                 <div class="@MailCssClasses.ReaderTopRow">
                     <BackButton OnClick="@MailUiState.CloseMessage" />
-                    <button class="@MailCssClasses.ReaderAvatar" title="Everything known about this correspondent"
+                    <button class="@MailCssClasses.ReaderAvatar"
+                            title="Everything known about this correspondent (right-click for sender actions)"
                             style="background:@Mail.AvatarGradient(open)"
-                            data-context-menu="true" @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)"
-                            @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                            @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, openAccountId)"
+                            @oncontextmenu:preventDefault="true"
+                            @oncontextmenu:stopPropagation="true"
                             @onclick="() => MailUiState.OpenPerson(open.FromAddress)">@Mail.AvatarInitials(open)</button>
                     <div class="@MailCssClasses.ReaderSubject" title="@open.Subject">@(string.IsNullOrWhiteSpace(open.Subject) ? "(no subject)" : open.Subject)</div>
-                    <nav class="@MailCssClasses.ReaderListNav" aria-label="Navigate listed messages">
-                        <PillButton IsCompact="true" Title="Previous listed message" Disabled="@(View.ListedNavigationTarget(-1) == null)" OnClick="() => View.OpenListedMessage(-1)">←</PillButton>
-                        <PillButton IsCompact="true" Title="Next listed message" Disabled="@(View.ListedNavigationTarget(1) == null)" OnClick="() => View.OpenListedMessage(1)">→</PillButton>
-                        <PillButton IsCompact="true" Title="Next unread conversation" Disabled="@(View.ListedNavigationTarget(1, unreadOnly: true) == null)" OnClick="() => View.OpenListedMessage(1, unreadOnly: true)">📩→</PillButton>
-                    </nav>
+                    <CustomizableActionBar SurfaceId="@UiSurfaceIds.ReaderHeaderNav"
+                                           PairedMenuSurfaceId="@UiSurfaceIds.MessageContextMenu"
+                                           DefaultActions="@View.BuildReaderHeaderNavActions()"
+                                           AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.ReaderHeaderNav, id, messageContext: open, targetsContext: readerTargets))"
+                                           Inline="true"
+                                           Compact="true"
+                                           CustomClass="@MailCssClasses.ReaderListNav" />
                 </div>
 
                 <div class="@MailCssClasses.ReaderMetaRow">
                     <div class="@MailCssClasses.ReaderMetaLeft">
-                        <span class="mail-reader-from" data-context-menu="true" data-mouse4="copy" data-mouse4-value="@open.FromAddress" data-mouse5="menu"
-                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                        <span class="@MailCssClasses.ReaderFrom"
+                              @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                  () => MouseActionService.RunAsync(MouseActionService.CopyAction, open.FromAddress),
+                                  () => { View.OpenAddressMenu(open.FromAddress, e, openAccountId); return Task.CompletedTask; })"
+                              @onmouseup:stopPropagation="true"
+                              @onclick="() => MailUiState.OpenPerson(open.FromAddress)"
+                              @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, openAccountId)"
+                              @oncontextmenu:preventDefault="true"
+                              @oncontextmenu:stopPropagation="true">
                             @(string.IsNullOrWhiteSpace(open.FromName) ? open.FromAddress : $"{open.FromName} <{open.FromAddress}>")
                         </span>
-                        <span class="mail-reader-date">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
+                        <span class="@MailCssClasses.ReaderDate">@open.DateUtc.ToLocalTime().ToString(ContentConstants.DateFormats.UiBanner + " HH:mm")</span>
                         @if (View.HistoryOfOpenSender(open) is { } history)
                         {
-                            <button class="@MailCssClasses.ReaderHistory" title="Show everything from this sender"
+                            <button class="@MailCssClasses.ReaderHistory"
+                                    title="Show everything from this sender (right-click for sender actions)"
+                                    @oncontextmenu="e => View.OpenAddressMenu(open.FromAddress, e, openAccountId)"
+                                    @oncontextmenu:preventDefault="true"
+                                    @oncontextmenu:stopPropagation="true"
                                     @onclick="() => MailUiState.OpenPerson(open.FromAddress)">
                                 💌 @history.MessageCount@(history.UnreadCount > 0 ? $" ({history.UnreadCount} unread)" : "")
                             </button>
@@ -235,50 +282,82 @@
                     </div>
                     @if (!string.IsNullOrWhiteSpace(open.ToAddresses))
                     {
-                        <div class="@MailCssClasses.ReaderTo" title="to @open.ToAddresses">to @open.ToAddresses</div>
+                        var parsedRecipients = Mail.ParseRecipients(open.ToAddresses);
+                        <div class="@MailCssClasses.ReaderTo" title="to @open.ToAddresses">
+                            to
+                            @if (parsedRecipients.Count > 0)
+                            {
+                                @for (int ri = 0; ri < parsedRecipients.Count; ri++)
+                                {
+                                    var (rawRecip, recipAddr) = parsedRecipients[ri];
+                                    @if (ri > 0) { <text>, </text> }
+                                    <span class="@MailCssClasses.ReaderToAddress"
+                                          @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                              () => MouseActionService.RunAsync(MouseActionService.CopyAction, recipAddr),
+                                              () => { View.OpenAddressMenu(recipAddr, e, openAccountId); return Task.CompletedTask; })"
+                                          @onmouseup:stopPropagation="true"
+                                          @onclick="() => MailUiState.OpenPerson(recipAddr)"
+                                          @oncontextmenu="e => View.OpenAddressMenu(recipAddr, e, openAccountId)"
+                                          @oncontextmenu:preventDefault="true"
+                                          @oncontextmenu:stopPropagation="true">@rawRecip</span>
+                                }
+                            }
+                            else
+                            {
+                                @open.ToAddresses
+                            }
+                        </div>
                     }
                 </div>
 
                 @if (open.Tags.Count > 0 || View.authFindings.Count > 0 || View.ruleTraceLines.Count > 0 || View.unsubscribeTargets != null)
                 {
-                    <div class="mail-reader-badges-row">
+                    <div class="@MailCssClasses.ReaderBadgesRow">
                         @foreach (var tag in open.Tags)
                         {
-                            <button class="mail-tag-chip mail-tag-chip--action" style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
-                                    data-context-menu="true" data-mouse4="RemoveTag" data-mouse4-value="@JsonSerializer.Serialize(new MailMessageRequest { Messages = readerTargets, Argument = tag })"
-                                    @oncontextmenu="e => View.OpenTagMenu(tag, open, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
-                                    title="Search this tag" @onclick="() => View.SearchByTag(tag)">@tag</button>
+                            <button class="@MailCssClasses.TagChip @MailCssClasses.TagChipAction"
+                                    style="background:@TagStore.ColorOf(tag);color:@AppColors.InkOn(TagStore.ColorOf(tag)).ToRgbaHex(true)"
+                                    @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                        () => MouseActionService.RunMessagesAsync(MailMessageCommand.RemoveTag, readerTargets, tag))"
+                                    @onmouseup:stopPropagation="true"
+                                    @oncontextmenu="e => View.OpenTagMenu(tag, open, e)"
+                                    @oncontextmenu:preventDefault="true"
+                                    @oncontextmenu:stopPropagation="true"
+                                    title="Search this tag"
+                                    @onclick="() => View.SearchByTag(tag)">@tag</button>
                         }
                         @foreach (var finding in View.authFindings)
                         {
-                            <span class="mail-auth-chip" title="@finding.Code">⚠️ @finding.Text</span>
+                            <span class="@MailCssClasses.AuthChip" title="@finding.Code">⚠️ @finding.Text</span>
                         }
                         @if (View.ruleTraceLines.Count > 0)
                         {
-                            <div class="mail-rule-strip">
-                                <button class="mail-rule-trace mail-rule-summary" title="What the filter rules did to this message"
+                            <div class="@MailCssClasses.RuleStrip">
+                                <button class="@MailCssClasses.RuleTrace @MailCssClasses.RuleSummary"
+                                        title="What the filter rules did to this message"
                                         @onclick="() => View.ruleTraceExpanded = !View.ruleTraceExpanded">
                                     <span>🧭</span>
-                                    <span class="mail-rule-lead">@Mail.RuleTraceLabel(View.ruleTraceLines[0])</span>
+                                    <span class="@MailCssClasses.RuleLead">@Mail.RuleTraceLabel(View.ruleTraceLines[0])</span>
                                     @if (View.ruleTraceLines.Count > 1)
                                     {
-                                        <span class="mail-rule-count">+@(View.ruleTraceLines.Count - 1)</span>
+                                        <span class="@MailCssClasses.RuleCount">+@(View.ruleTraceLines.Count - 1)</span>
                                     }
-                                    <span class="mail-rule-name">@View.ruleTraceLines[0].RuleName</span>
-                                    <span class="mail-rule-caret">@(View.ruleTraceExpanded ? "▴" : "▾")</span>
+                                    <span class="@MailCssClasses.RuleName">@View.ruleTraceLines[0].RuleName</span>
+                                    <span class="@MailCssClasses.RuleCaret">@(View.ruleTraceExpanded ? "▴" : "▾")</span>
                                 </button>
                                 @if (View.ruleTraceExpanded)
                                 {
-                                    <div class="mail-rule-rows">
+                                    <div class="@MailCssClasses.RuleRows">
                                         @foreach (var line in View.ruleTraceLines)
                                         {
-                                            <button class="mail-rule-trace mail-rule-row" title="Open the filter rules"
+                                            <button class="@MailCssClasses.RuleTrace @MailCssClasses.RuleRow"
+                                                    title="Open the filter rules"
                                                     @onclick='() => Navigation.NavigateTo(FilterRules.RoutePath)'>
-                                                <span class="mail-rule-lead">@Mail.RuleTraceLabel(line)</span>
-                                                <span class="mail-rule-name">@line.RuleName</span>
+                                                <span class="@MailCssClasses.RuleLead">@Mail.RuleTraceLabel(line)</span>
+                                                <span class="@MailCssClasses.RuleName">@line.RuleName</span>
                                                 @if (line.Count > 1)
                                                 {
-                                                    <span class="mail-rule-count">×@line.Count</span>
+                                                    <span class="@MailCssClasses.RuleCount">×@line.Count</span>
                                                 }
                                             </button>
                                         }
@@ -290,18 +369,18 @@
                         {
                             @if (unsubscribe.HttpUrl is { } unsubscribeUrl && MailUiState.SelectedAccount is not { TorOnly: true })
                             {
-                                <button class="mail-unsubscribe-chip" title="@unsubscribeUrl"
+                                <button class="@MailCssClasses.UnsubscribeChip" title="@unsubscribeUrl"
                                         @onclick="() => View.OpenUnsubscribePage(unsubscribeUrl)">🚫 Unsubscribe on web</button>
                             }
                             else if (unsubscribe.HttpUrl != null)
                             {
-                                <span class="mail-unsubscribe-chip mail-unsubscribe-chip--blocked" title="@unsubscribe.HttpUrl">
+                                <span class="@MailCssClasses.UnsubscribeChip @MailCssClasses.UnsubscribeChipBlocked" title="@unsubscribe.HttpUrl">
                                     🛡️ Web unsubscribe blocked (Tor)
                                 </span>
                             }
                             @if (unsubscribe.MailtoAddress != null)
                             {
-                                <button class="mail-unsubscribe-chip" title="Prepares the mail; you still press Send"
+                                <button class="@MailCssClasses.UnsubscribeChip" title="Prepares the mail; you still press Send"
                                         @onclick="() => View.ComposeUnsubscribeMail(unsubscribe)">✉️ Unsubscribe by mail</button>
                             }
                         }
@@ -311,104 +390,77 @@
 
             @if (View.ThreadOfOpenMessage(open) is { } thread)
             {
-                <div class="mail-reader-thread">
-                    <div class="mail-reader-thread-nav">
-                        <button class="mail-thread-step" disabled="@(View.OpenThreadPosition(open) <= 1)"
+                <div class="@MailCssClasses.ReaderThread">
+                    <div class="@MailCssClasses.ReaderThreadNav">
+                        <button class="@MailCssClasses.ThreadStep" disabled="@(View.OpenThreadPosition(open) <= 1)"
                                 title="Previous in conversation (P)" @onclick="() => View.StepThread(-1)">◀</button>
-                        <span class="mail-reader-thread-count">@View.OpenThreadPosition(open) of @thread.Count</span>
-                        <button class="mail-thread-step" disabled="@(View.OpenThreadPosition(open) >= thread.Count)"
+                        <span class="@MailCssClasses.ReaderThreadCount">@View.OpenThreadPosition(open) of @thread.Count</span>
+                        <button class="@MailCssClasses.ThreadStep" disabled="@(View.OpenThreadPosition(open) >= thread.Count)"
                                 title="Next in conversation (N)" @onclick="() => View.StepThread(1)">▶</button>
                     </div>
                     @foreach (var step in thread)
                     {
-                        <button class="mail-thread-line @(step.Uid == open.Uid ? "mail-thread-line--open" : "")"
-                                data-context-menu="true" data-mouse4="@MouseActionService.TrashAction" data-mouse4-value="@JsonSerializer.Serialize(View.MessageTargets(step))"
-                                data-mouse5="@MouseActionService.ReadAction" data-mouse5-value="@JsonSerializer.Serialize(View.MessageTargets(step))"
-                                @oncontextmenu="e => View.OpenMessageMenu(View.MessageTargets(step), e.ClientX, e.ClientY, primary: View.MessageIdentityOf(step))"
-                                @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                        var stepTargets = View.MessageTargets(step);
+                        <button class="@MailCssClasses.ThreadLine @(step.Uid == open.Uid ? MailCssClasses.ThreadLineOpen : "")"
+                                @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                    () => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, stepTargets),
+                                    () => MouseActionService.RunMessagesAsync(MailMessageCommand.Read, stepTargets))"
+                                @onmouseup:stopPropagation="true"
+                                @oncontextmenu="e => View.OpenMessageMenu(stepTargets, e.ClientX, e.ClientY, primary: View.MessageIdentityOf(step))"
+                                @oncontextmenu:preventDefault="true"
+                                @oncontextmenu:stopPropagation="true"
                                 @onclick="() => View.OpenMessage(step)">
-                            <span class="mail-thread-line-date">@step.DateUtc.ToLocalTime().ToString("dd MMM HH:mm")</span>
-                            <span class="mail-thread-line-sender">@(string.IsNullOrWhiteSpace(step.FromName) ? step.FromAddress : step.FromName)</span>
+                            <span class="@MailCssClasses.ThreadLineDate">@step.DateUtc.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                            <span class="@MailCssClasses.ThreadLineSender"
+                                  @oncontextmenu="e => View.OpenAddressMenu(step.FromAddress, e, View.MessageIdentityOf(step)?.AccountId)"
+                                  @oncontextmenu:preventDefault="true"
+                                  @oncontextmenu:stopPropagation="true">@(string.IsNullOrWhiteSpace(step.FromName) ? step.FromAddress : step.FromName)</span>
                             @if (step.IsUnread)
                             {
-                                <span class="mail-thread-line-unread"></span>
+                                <span class="@MailCssClasses.ThreadLineUnread"></span>
                             }
                         </button>
                     }
                 </div>
             }
 
-            @* Unified Reader Action Bar:
-               - Single Read/Unread toggle
-               - Reply ▾ menu (Reply, Reply all, Forward, Forward as attachment)
-               - Labels modal button (Star, Important, Tags)
-               - Save modal button (.eml / .html with Save As + folder reveal)
-               - Message actions ▾ + Pinned Favorite Actions (middle-click or right-click to pin/unpin)
-               - Trash / Delete forever
-               - Text zoom scale *@
-            <div class="mail-reader-actions">
-                <PillButton OnClick="@(() => MouseActionService.RunMessagesAsync(open.IsUnread ? MailMessageCommand.Read : MailMessageCommand.Unread, readerTargets, includeSelection: false))">
-                    @(open.IsUnread ? "✅ Mark read" : "📩 Mark unread")
-                </PillButton>
-                <PillButton OnClick="e => View.OpenReplyMenu(open, e)">↩️ Reply ▾</PillButton>
-                <PillButton Title="Star, Importance & Tags" OnClick="() => View.OpenMarkersModal(open)">
-                    @starIcon@(impIcon) Labels@(tagCountBadge)
-                </PillButton>
-                <PillButton Title="Save as .eml or .html" OnClick="() => View.OpenSaveModal(open)">💾 Save</PillButton>
-                <PillButton Title="All message actions (middle-click or right-click any item to pin/unpin)" OnClick="e => View.OpenReaderActionsMenu(open, e)">⚡ Message actions ▾</PillButton>
-
-                @foreach (var pinned in View.GetPinnedReaderActions(open))
-                {
-                    <PillButton IsPinned="true"
-                                Title="@($"{pinned.Label} — middle-click or right-click to unpin from toolbar")"
-                                OnClick="@(() => pinned.Execute())"
-                                OnMouseUp="@(e => { if (e.Button == 1) View.ToggleReaderPinnedAction(pinned.PinId); })"
-                                OnContextMenu="@(() => View.ToggleReaderPinnedAction(pinned.PinId))"
-                                PreventContextMenuDefault="true"
-                                StopContextMenuPropagation="true">
-                        @pinned.ToolbarLabel
-                    </PillButton>
-                }
-
-                <PillButton OnClick="e => View.OpenAddressMenu(open.FromAddress, e, View.MessageIdentityOf(open)?.AccountId)">👤 Sender ▾</PillButton>
-                <DangerButton FontSize="@AppMeasures.Font.Small" Padding="@(AppMeasures.Space.Px4 + "px " + AppMeasures.Space.Px10 + "px")"
-                              OnClick="@(() => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: false))">
-                    @(isInTrash ? "🗑️ Delete forever" : "🗑️ Trash")
-                </DangerButton>
-
-                <span class="mail-text-scale">
-                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Smaller text (Ctrl+-)" @onclick="() => View.StepReaderTextScale(-1)">A-</button>
-                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Reset text size (Ctrl+0)" @onclick="() => View.StepReaderTextScale(0)">@GlobalSettings.ReaderTextScalePercent.Value%</button>
-                    <button class="@MailCssClasses.FolderAction mail-text-scale-step" title="Larger text (Ctrl+=)" @onclick="() => View.StepReaderTextScale(1)">A+</button>
-                </span>
-            </div>
+            <CustomizableActionBar SurfaceId="@UiSurfaceIds.ReaderToolbar"
+                                   PairedMenuSurfaceId="@UiSurfaceIds.MessageContextMenu"
+                                   DefaultActions="@View.BuildReaderToolbarActions(open, readerTargets)"
+                                   AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.ReaderToolbar, id, messageContext: open, targetsContext: readerTargets))"
+                                   Wrap="true"
+                                   CustomClass="@MailCssClasses.ReaderActions" />
 
             @if (View.OpenAttachments.Count > 0)
             {
-                <div class="mail-attachments">
+                <div class="@MailCssClasses.Attachments">
                     @foreach (var attachment in View.OpenAttachments)
                     {
-                        <button class="mail-attachment-chip" title="Save to Downloads"
-                                data-context-menu="true" data-mouse4="copy" data-mouse4-value="@attachment.FileName"
-                                @oncontextmenu="e => View.OpenAttachmentMenu(attachment, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
+                        <button class="@MailCssClasses.AttachmentChip" title="Save to Downloads"
+                                @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                                    () => MouseActionService.RunAsync(MouseActionService.CopyAction, attachment.FileName))"
+                                @onmouseup:stopPropagation="true"
+                                @oncontextmenu="e => View.OpenAttachmentMenu(attachment, e)"
+                                @oncontextmenu:preventDefault="true"
+                                @oncontextmenu:stopPropagation="true"
                                 @onclick="() => View.SaveAttachmentAsync(attachment.Index)">
                             @AttachmentService.IconFor(attachment) @attachment.FileName
                             @if (attachment.HumanSize.Length > 0)
                             {
-                                <span class="mail-attachment-size">@attachment.HumanSize</span>
+                                <span class="@MailCssClasses.AttachmentSize">@attachment.HumanSize</span>
                             }
                         </button>
                     }
                     @if (View.OpenAttachments.Count > 1)
                     {
-                        <button class="mail-attachment-chip mail-attachment-chip--all" @onclick="View.SaveAllAttachmentsAsync">📦 Save all</button>
+                        <button class="@MailCssClasses.AttachmentChip @MailCssClasses.AttachmentChipAll" @onclick="View.SaveAllAttachmentsAsync">📦 Save all</button>
                     }
                 </div>
             }
 
             @if (View.OpenBodyBlockedImages)
             {
-                <div class="mail-image-banner">
+                <div class="@MailCssClasses.ImageBanner">
                     @if (MailUiState.SelectedAccount is { TorOnly: true })
                     {
                         <span>🛡️ Remote images stay blocked — this account only talks through Tor.</span>
@@ -421,31 +473,36 @@
                 </div>
             }
 
-            <GlassCard Level="AcrylicLevel.Strong" CustomClass="mail-reader-body">
+            <GlassCard Level="AcrylicLevel.Strong" CustomClass="@MailCssClasses.ReaderBody">
                 @if (View.OpenBodyLoading)
                 {
-                    <div class="mail-body-loading">
+                    <div class="@MailCssClasses.BodyLoading">
                         <CoreSpinner />
                     </div>
                 }
                 else if (View.OpenBodyHtml != null)
                 {
-                    <iframe class="mail-reader-frame" scrolling="no" data-anonymous="@(MailUiState.SelectedAccount is { TorOnly: true } ? "true" : "false")" sandbox="@(MailUiState.SelectedAccount is { TorOnly: true } ? "allow-same-origin" : "allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation")" srcdoc="@View.OpenBodyHtml"
-                            data-message-targets="@readerPayload" data-message-primary="@JsonSerializer.Serialize(View.MessageIdentityOf(open))"></iframe>
+                    <iframe class="@MailCssClasses.ReaderFrame"
+                            scrolling="no"
+                            data-anonymous="@(MailUiState.SelectedAccount is { TorOnly: true } ? "true" : "false")"
+                            sandbox="@(MailUiState.SelectedAccount is { TorOnly: true } ? "allow-same-origin" : "allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation")"
+                            srcdoc="@View.OpenBodyHtml"
+                            data-message-targets="@readerPayload"
+                            data-message-primary="@JsonSerializer.Serialize(View.MessageIdentityOf(open))"></iframe>
                 }
                 else
                 {
                     @if (View.BodyError != null)
                     {
-                        <p class="mail-compose-error">❌ @View.BodyError</p>
+                        <p class="@MailCssClasses.ComposeError">❌ @View.BodyError</p>
                     }
                     @if (string.IsNullOrWhiteSpace(open.PreviewText))
                     {
-                        <p class="mail-reader-nobody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
+                        <p class="@MailCssClasses.ReaderNoBody">The full message is not cached yet. It will appear as soon as sync fetches it.</p>
                     }
                     else
                     {
-                        <p class="mail-reader-preview">@open.PreviewText</p>
+                        <p class="@MailCssClasses.ReaderPreview">@open.PreviewText</p>
                     }
                 }
             </GlassCard>

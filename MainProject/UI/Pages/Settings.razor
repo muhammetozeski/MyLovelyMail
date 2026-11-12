@@ -158,6 +158,17 @@
             </div>
         </div>
 
+        <div class="settings-row">
+            <div class="settings-row-text">
+                <span class="settings-row-label">Buttons, toolbars &amp; right-click menus</span>
+                <span class="settings-row-hint">Reorder, hide/show, move buttons into right-click menus, promote submenu items (tags, folders, snooze) to 1-click root menus, or drag menu items onto toolbars</span>
+            </div>
+            <div class="settings-finetune-controls">
+                <PrimaryButton OnClick="@OpenButtonAndMenuCustomizer">🎛️ Customize Buttons &amp; Menus…</PrimaryButton>
+                <SecondaryButton OnClick="@ResetAllButtonAndMenuLayouts" Disabled="@(!HasAnyCustomLayouts)">↺ Reset layouts</SecondaryButton>
+            </div>
+        </div>
+
         <div class="settings-migration-actions">
             <SecondaryButton OnClick="@ResetAllFineTuningDefaults">↺ Reset all fine-tuning to defaults</SecondaryButton>
         </div>
@@ -484,8 +495,12 @@
         {
             @foreach (var account in AccountStore.Accounts)
             {
-                <div class="settings-row" data-context-menu="true" data-mouse4="menu" data-mouse5="@MouseActionService.AccountSyncAction" data-mouse5-value="@account.Id"
-                     @oncontextmenu="e => ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), e.ClientX, e.ClientY)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                <div class="settings-row"
+                     @onmouseup="e => MouseActionService.HandleSideMouseUpAsync(e,
+                         () => { ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), e.ClientX, e.ClientY, UiSurfaceIds.AccountContextMenu); return Task.CompletedTask; },
+                         () => MouseActionService.RunAsync(MouseActionService.AccountSyncAction, account.Id))"
+                     @onmouseup:stopPropagation="true"
+                     @oncontextmenu="e => ContextMenuService.Open(this, account.EmailAddress, MailMenuItems.ForAccount(account), e.ClientX, e.ClientY, UiSurfaceIds.AccountContextMenu)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
                     <div class="settings-row-text">
                         <span class="settings-row-label">
                             <span class="settings-account-dot" style="background:@account.ColorHex"></span>

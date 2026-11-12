@@ -42,7 +42,9 @@
     static ModalSize ResolveModalSize(ModalDescriptor descriptor)
     {
         if (descriptor.Size != ModalSize.Workspace) return descriptor.Size;
-        if (descriptor.ComponentType == typeof(FastMailModal) || descriptor.ComponentType == typeof(MessageSourceModal))
+        if (descriptor.ComponentType == typeof(FastMailModal)
+            || descriptor.ComponentType == typeof(MessageSourceModal)
+            || descriptor.ComponentType == typeof(UiCustomizerModal))
             return ModalSize.Wide;
         if (descriptor.ComponentType == typeof(AccountFolderModal)
             || descriptor.ComponentType == typeof(AccountNoteModal)

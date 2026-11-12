@@ -34,6 +34,8 @@ namespace MyLovelyMail
             CredentialVault.Load();
             FilterRuleStore.Load();
             TagStore.Load();
+            UiCustomizationStore.Load();
+            ListViewState.Load();
             // Through the UI thread: the Windows clipboard is apartment-bound, so a copy started
             // from a background thread — a side-button click arriving over the debug API, an
             // action finishing on a task — failed with an empty exception message.

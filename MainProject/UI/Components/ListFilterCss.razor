@@ -41,6 +41,18 @@
         text-decoration: line-through;
     }
 
+    .@(ListFilterCssClasses.ItemDragging) {
+        opacity: @(AppMeasures.Opacity.Disabled);
+    }
+
+    .@(ListFilterCssClasses.ItemDropBefore) {
+        box-shadow: inset 0 @(AppMeasures.Border.Thick)px 0 0 @AppColors.Primary.ToRgbaHex(true);
+    }
+
+    .@(ListFilterCssClasses.ItemDropAfter) {
+        box-shadow: inset 0 -@(AppMeasures.Border.Thick)px 0 0 @AppColors.Primary.ToRgbaHex(true);
+    }
+
     .@(ListFilterCssClasses.ItemHeader) {
         display: flex;
         align-items: center;

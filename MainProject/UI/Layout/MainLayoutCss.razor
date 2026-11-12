@@ -66,7 +66,13 @@
         }
     }
 
-    .app-page {
+    .@(MainLayoutCssClasses.RootShell) {
+        min-height: @(AppMeasures.Viewport.Full)vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .@(MainLayoutCssClasses.Page) {
         display: flex;
         flex-direction: column;
         min-height: @(AppMeasures.Viewport.Full)vh;
@@ -75,7 +81,7 @@
         box-sizing: border-box;
     }
 
-        .app-page.has-bottom-nav {
+        .@(MainLayoutCssClasses.Page).@(MainLayoutCssClasses.HasBottomNav) {
             padding-bottom: @(AppMeasures.Space.Px90)px;
         }
 
@@ -85,7 +91,7 @@
         flex-direction: column;
     }
 
-    .content {
+    .@(MainLayoutCssClasses.Content) {
         flex: 1;
         position: relative;
         animation: pageFadeSlideIn @(AppMeasures.Duration.Normal)s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
@@ -98,16 +104,16 @@
         left: 0;
         width: @(AppMeasures.Percent.Full)%;
         position: fixed;
-        padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px20)px;
         display: none;
         z-index: @(AppMeasures.ZLayer.Toast);
     }
 
-        #blazor-error-ui .dismiss {
+        #blazor-error-ui .@(MainLayoutCssClasses.Dismiss) {
             cursor: pointer;
             position: absolute;
-            right: 0.75rem;
-            top: 0.5rem;
+            right: @(AppMeasures.Space.Px12)px;
+            top: @(AppMeasures.Space.Px8)px;
         }
 
     @@keyframes pageFadeSlideIn {

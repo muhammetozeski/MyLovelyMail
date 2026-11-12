@@ -23,6 +23,10 @@ namespace MyLovelyMail.MainProject.Diagnostics
     public static partial class DebugApi
     {
         public const string Prefix = "http://127.0.0.1:52539/";
+        static readonly int[] CandidatePorts = [52539, 48539, 48540];
+        static int activePort = 52539;
+        static string[] allowedHosts = ["127.0.0.1:52539", "[::1]:52539", "localhost:52539"];
+        public static string ActivePrefix => $"http://127.0.0.1:{activePort}/";
 
         static readonly JsonSerializerOptions Json = new()
         {
@@ -36,19 +40,36 @@ namespace MyLovelyMail.MainProject.Diagnostics
         public static void Start()
         {
             if (listener != null) return;
-            try
+            List<int> ports = [];
+            if (int.TryParse(Environment.GetEnvironmentVariable("MYLOVELYMAIL_DEBUG_PORT"), out int envPort) && envPort is > 1024 and < 65536)
+                ports.Add(envPort);
+            foreach (int p in CandidatePorts)
+                if (!ports.Contains(p)) ports.Add(p);
+
+            Exception? lastError = null;
+            foreach (int port in ports)
             {
-                listener = new HttpListener();
-                listener.Prefixes.Add(Prefix);
-                listener.Start();
-                _ = Task.Run(ListenLoopAsync);
-                Log($"DebugApi listening on {Prefix}");
+                string candidatePrefix = $"http://127.0.0.1:{port}/";
+                try
+                {
+                    var candidate = new HttpListener();
+                    candidate.Prefixes.Add(candidatePrefix);
+                    candidate.Start();
+                    listener = candidate;
+                    activePort = port;
+                    allowedHosts = [$"127.0.0.1:{port}", $"[::1]:{port}", $"localhost:{port}"];
+                    try { File.WriteAllText(Path.Combine(AppPaths.AppCache, "debug-api-port.txt"), port.ToString()); } catch { }
+                    _ = Task.Run(ListenLoopAsync);
+                    Log($"DebugApi listening on {candidatePrefix}");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
             }
-            catch (Exception ex)
-            {
-                Log($"DebugApi could not start: {ex.Message}", LogLevel.Error);
-                listener = null;
-            }
+            Log($"DebugApi could not start: {lastError?.Message}", LogLevel.Error);
+            listener = null;
         }
 
         static async Task ListenLoopAsync()
@@ -99,9 +120,6 @@ namespace MyLovelyMail.MainProject.Diagnostics
             context.Response.Close();
         }
 
-        /// <summary>The only Host values a request to this listener may carry. Anything else was addressed to some other name that resolved here.</summary>
-        static readonly string[] AllowedHosts = ["127.0.0.1:52539", "[::1]:52539", "localhost:52539"];
-
         /// <summary>Rejects browser-originated requests and non-loopback Host values. Loopback binding alone does not prevent a browser page from sending requests.</summary>
         static string? RefusalReason(HttpListenerRequest request)
         {
@@ -112,7 +130,7 @@ namespace MyLovelyMail.MainProject.Diagnostics
                 return $"a browser page sent this (Referer: {referer}). This API is for test scripts, not for pages.";
 
             string host = request.Headers["Host"] ?? string.Empty;
-            return AllowedHosts.Contains(host, StringComparer.OrdinalIgnoreCase)
+            return allowedHosts.Contains(host, StringComparer.OrdinalIgnoreCase)
                 ? null
                 : $"the request was addressed to '{host}', not to the loopback. Something resolved another name to this machine.";
         }
@@ -173,7 +191,7 @@ namespace MyLovelyMail.MainProject.Diagnostics
             var query = HttpUtility.ParseQueryString(request.Url?.Query ?? string.Empty);
             return path switch
             {
-                "/status" or "/select-folder" or "/notify/probe" or "/downloads/probe" or "/link/open" or "/dom" or "/exit" or "/run-lock" or "/navigate" or "/dom/script" or "/dom/click" or "/dom/mouse" or "/dom/drag" or "/dom/key" or "/input/mouse" or "/input/key" or "/screenshot" or "/mouse" or "/timings" or "/timings/clear" or "/logs" => await HandleApplicationAsync(request, query),
+                "/status" or "/select-folder" or "/notify/probe" or "/downloads/probe" or "/link/open" or "/dom" or "/exit" or "/run-lock" or "/navigate" or "/dom/script" or "/dom/click" or "/dom/mouse" or "/dom/drag" or "/dom/key" or "/input/mouse" or "/input/key" or "/screenshot" or "/mouse" or "/timings" or "/timings/clear" or "/logs" or "/seed/demo" or "/ui-layout" => await HandleApplicationAsync(request, query),
                 "/reader-scale" or "/motion" or "/settings" or "/settings/set" or "/settings/reset" or "/start-folder" or "/accounts" or "/accounts/order" or "/accounts/enabled" or "/accounts/tor-only" => await HandleSettingsAsync(request, query),
                 "/sync/folders" or "/connect-diagnose" or "/sync" or "/idle" or "/tls-choice" or "/tor" or "/tor/check" or "/tor/start" or "/tor/stop" or "/tor/connect-test" or "/health" or "/health/clear" or "/fastmail/providers" or "/fastmail/domains" or "/fastmail/provision" or "/direct-mx/resolve" or "/tests/fastmail" => await HandleConnectionsAsync(request, query),
                 "/folders/server" or "/folders/roles" or "/folders/roles/probe" or "/folder-why" or "/folder-why/act" or "/folder-tree" or "/folders" or "/folder/read-all" or "/backfill" or "/resync" or "/export/folder" or "/account-folders" => await HandleFoldersAsync(request, query),

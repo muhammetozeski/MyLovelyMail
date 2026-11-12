@@ -11,23 +11,20 @@
 }
 
 <style>
-    /* ---- Search tools and saved searches (compact 4px spacing per 7.png & 8.png) ---- */
-
-    .mail-search {
+    .@(MailCssClasses.Search) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-selection-tools {
+    .@(MailCssClasses.SelectionTools) {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
     }
 
-    /* Indeterminate sync line: a soft accent runner sweeping under the search bar while syncing. */
-    .mail-sync-line {
+    .@(MailCssClasses.SyncLine) {
         height: @(AppMeasures.Size.Px4)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
@@ -35,7 +32,7 @@
         position: relative;
     }
 
-    .mail-sync-line-runner {
+    .@(MailCssClasses.SyncLineRunner) {
         position: absolute;
         top: 0;
         bottom: 0;
@@ -50,13 +47,13 @@
         100% { left: @(AppMeasures.Percent.Full)%; }
     }
 
-    .mail-search-fold-row {
+    .@(MailCssClasses.SearchFoldRow) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-search-tools {
+    .@(MailCssClasses.SearchTools) {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px4)px;
@@ -75,7 +72,8 @@
         }
     }
 
-    .mail-search-toggle {
+    .@(MailCssClasses.SearchToggle),
+    .@(MailCssClasses.ActionBtn) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
         color: @textSecondary;
@@ -83,49 +81,62 @@
         border-radius: @(AppMeasures.Radius.Pill)px;
         cursor: pointer;
         font-size: @(AppMeasures.Font.Small)px;
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
         white-space: nowrap;
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-search-toggle:hover:not(:disabled) {
+        .@(MailCssClasses.SearchToggle):hover:not(:disabled),
+        .@(MailCssClasses.ActionBtn):hover:not(:disabled) {
             background: @surfaceTint;
             color: @textPrimary;
         }
 
-        .mail-search-toggle:disabled {
-            opacity: 0.45;
+        .@(MailCssClasses.SearchToggle):disabled,
+        .@(MailCssClasses.ActionBtn):disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
             cursor: not-allowed;
         }
 
-    .mail-search-toggle--icon {
+    .@(MailCssClasses.SearchToggleIcon) {
         padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-search-toggle--on {
+    .@(MailCssClasses.SearchToggleCompact) {
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .@(MailCssClasses.SearchToggleOn),
+    .@(MailCssClasses.ActionBtnActive) {
         background: linear-gradient(135deg, @primary, @AppColors.Accent.ToRgbaHex(true));
         color: @AppColors.TextOnAccent.ToRgbaHex(true);
         border-color: transparent;
     }
 
-    .mail-search-toggle--danger {
+    .@(MailCssClasses.SearchToggleDanger),
+    .@(MailCssClasses.ActionBtnDanger) {
         color: @danger;
         border-color: @AppColors.TextDanger.WithAlpha(0.35f).ToRgbaHex(true);
     }
 
-        .mail-search-toggle--danger:hover:not(:disabled) {
+        .@(MailCssClasses.SearchToggleDanger):hover:not(:disabled),
+        .@(MailCssClasses.ActionBtnDanger):hover:not(:disabled) {
             background: @AppColors.TextDanger.WithAlpha(0.14f).ToRgbaHex(true);
             color: @danger;
             border-color: @danger;
         }
 
-    .mail-saved-searches {
+    .@(MailCssClasses.SavedSearches) {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
         padding: 0 @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-saved-chip {
+    .@(MailCssClasses.SavedChip) {
         display: inline-flex;
         align-items: center;
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
@@ -134,8 +145,8 @@
         overflow: hidden;
     }
 
-    .mail-saved-run,
-    .mail-saved-remove {
+    .@(MailCssClasses.SavedRun),
+    .@(MailCssClasses.SavedRemove) {
         border: none;
         background: transparent;
         color: @textSecondary;
@@ -148,16 +159,15 @@
         white-space: nowrap;
     }
 
-        .mail-saved-run:hover,
-        .mail-saved-remove:hover {
+        .@(MailCssClasses.SavedRun):hover,
+        .@(MailCssClasses.SavedRemove):hover {
             background: @surfaceTint;
             color: @textPrimary;
         }
 
-    .mail-row-folder {
+    .@(MailCssClasses.RowFolder) {
         color: var(--account-accent, @primary);
         margin-right: @(AppMeasures.Space.Px6)px;
         font-weight: @(AppMeasures.Weight.Medium);
     }
-
 </style>

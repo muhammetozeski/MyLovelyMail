@@ -1,19 +1,20 @@
 @inherits ModalBase
+@using MyLovelyMail.MainProject.UI.Pages
 
-<div class="core-modal-header">
-    <span class="core-modal-title">📂 Move to Folder</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">📂 Move to Folder</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
 </div>
 
-<input class="mail-move-filter" style="width:100%;box-sizing:border-box;margin-bottom:@(AppMeasures.Space.Px8)px;"
+<input class="@MailCssClasses.MoveFilter" style="width:100%;box-sizing:border-box;margin-bottom:@(AppMeasures.Space.Px8)px;"
        placeholder="Filter folders…"
        @bind="FilterText" @bind:event="oninput" />
 
-<div style="display:flex;flex-direction:column;gap:2px;max-height:260px;overflow-y:auto;">
+<div style="display:flex;flex-direction:column;gap:@(AppMeasures.Space.Px2)px;max-height:@(AppMeasures.Size.Px260)px;overflow-y:auto;">
     @foreach (var node in FilteredFolders)
     {
-        <button class="mail-move-option"
-                style="padding-left:@(8 + node.Depth * 12)px"
+        <button class="@MailCssClasses.MoveOption"
+                style="padding-left:@(AppMeasures.Space.Px8 + node.Depth * AppMeasures.Space.Px12)px"
                 type="button"
                 @onclick="() => MoveToAsync(node.Folder.FullName)">
             @FolderIcon(node.Folder) @node.Folder.DisplayName
@@ -21,7 +22,7 @@
     }
     @if (FilteredFolders.Count == 0)
     {
-        <span style="font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextMuted.ToRgbaHex(true);padding:8px;">
+        <span style="font-size:@(AppMeasures.Font.Small)px;color:@AppColors.TextMuted.ToRgbaHex(true);padding:@(AppMeasures.Space.Px8)px;">
             No matching destination folders.
         </span>
     }

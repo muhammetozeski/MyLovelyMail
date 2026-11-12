@@ -251,9 +251,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>1-2 initials for the avatar circle: from the display name's words, else the address.</summary>
-        internal static string AvatarInitials(MailMessageSummary message)
+        internal static string AvatarInitials(MailMessageSummary message) =>
+            AvatarInitialsForText(message.FromName, message.FromAddress);
+
+        internal static string AvatarInitialsForText(string? displayName, string address)
         {
-            string source = string.IsNullOrWhiteSpace(message.FromName) ? message.FromAddress : message.FromName;
+            string source = string.IsNullOrWhiteSpace(displayName) ? address : displayName;
             var words = source.Split([' ', '.', '@', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
             return words.Length switch
             {
@@ -264,10 +267,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
         }
 
         /// <summary>Deterministic pastel gradient per sender: stable address hash into the theme's MonthGradients.</summary>
-        internal static string AvatarGradient(MailMessageSummary message)
+        internal static string AvatarGradient(MailMessageSummary message) =>
+            AvatarGradientForAddress(message.FromAddress);
+
+        internal static string AvatarGradientForAddress(string address)
         {
             var gradients = AppColors.MonthGradients;
-            var (start, end) = gradients[(int)(Pop3Service.Fnv1aHash(message.FromAddress.ToLowerInvariant()) % (uint)gradients.Length)];
+            var (start, end) = gradients[(int)(Pop3Service.Fnv1aHash((address ?? string.Empty).ToLowerInvariant()) % (uint)gradients.Length)];
             return $"linear-gradient(135deg, {start.ToRgbaHex(true)}, {end.ToRgbaHex(true)})";
         }
 

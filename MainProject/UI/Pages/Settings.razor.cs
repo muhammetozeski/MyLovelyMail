@@ -6,6 +6,8 @@ using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Services.Tor;
 using MyLovelyMail.MainProject.Stores;
+using MyLovelyMail.MainProject.UI.Components;
+using MyLovelyMail.MainProject.UI.Elements.Modals;
 using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings;
 
 namespace MyLovelyMail.MainProject.UI.Pages;
@@ -17,6 +19,7 @@ public partial class Settings
         base.OnInitialized();
         CredentialVault.OnVaultStateChanged += HandleVaultChanged;
         AccountStore.OnAccountsChanged += HandleVaultChanged;
+        UiCustomizationStore.OnChanged += HandleVaultChanged;
         _ = WatchTorBootstrapAsync();
     }
 
@@ -47,6 +50,7 @@ public partial class Settings
     {
         CredentialVault.OnVaultStateChanged -= HandleVaultChanged;
         AccountStore.OnAccountsChanged -= HandleVaultChanged;
+        UiCustomizationStore.OnChanged -= HandleVaultChanged;
         pageAlive.Cancel();
         pageAlive.Dispose();
     }
@@ -203,6 +207,20 @@ public partial class Settings
         Events.MainEvents.Trigger("OnStyleChanged");
     }
 
+    static bool HasAnyCustomLayouts =>
+        UiSurfaceIds.AllSurfaces.Any(UiCustomizationStore.IsSurfaceCustomized);
+
+    static void OpenButtonAndMenuCustomizer() =>
+        ModalService.Open<UiCustomizerModal>(
+            new Dictionary<string, object?> { ["InitialSurfaceId"] = UiSurfaceIds.ListToolbar },
+            ModalSize.Wide);
+
+    static void ResetAllButtonAndMenuLayouts()
+    {
+        UiCustomizationStore.ResetAll();
+        MouseActionService.ReportStatus("↺ Reset all button and menu layouts to defaults.");
+    }
+
     static void ResetAllFineTuningDefaults()
     {
         GlobalSettings.ScrollbarWidthPx.Set(GlobalSettings.DefaultScrollbarWidthPx);
@@ -210,6 +228,7 @@ public partial class Settings
         GlobalSettings.SidebarColumnPercent.Set(GlobalSettings.DefaultSidebarColumnPercent);
         GlobalSettings.ListColumnPercent.Set(GlobalSettings.DefaultListColumnPercent);
         GlobalSettings.ReaderColumnPercent.Set(GlobalSettings.DefaultReaderColumnPercent);
+        UiCustomizationStore.ResetAll();
         SettingsManager.SaveSettings();
         Events.MainEvents.Trigger("OnStyleChanged");
     }

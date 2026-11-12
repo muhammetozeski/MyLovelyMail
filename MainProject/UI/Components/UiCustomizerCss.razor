@@ -1,0 +1,198 @@
+@namespace MyLovelyMail.MainProject.UI.Components
+@inherits ThemedComponentBase
+
+<style>
+    .@(UiCustomizerCssClasses.Layout) {
+        display: grid;
+        grid-template-columns: @(AppMeasures.Size.Px220)px 1fr;
+        gap: @(AppMeasures.Space.Px14)px;
+        min-height: @(AppMeasures.Size.Px420)px;
+    }
+
+    .@(UiCustomizerCssClasses.Sidebar) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        max-height: @(AppMeasures.Viewport.ThreeQuarters)vh;
+        overflow-y: auto;
+        padding-right: @(AppMeasures.Space.Px4)px;
+        border-right: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+    }
+
+    .@(UiCustomizerCssClasses.GroupTitle) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px2)px;
+        letter-spacing: @(AppMeasures.Tracking.Normal)px;
+    }
+
+    .@(UiCustomizerCssClasses.SurfaceBtn) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px6)px;
+        border: @(AppMeasures.Border.Thin)px solid transparent;
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Small)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        cursor: pointer;
+        text-align: left;
+        transition: all @(AppMeasures.Duration.Instant)s ease;
+    }
+
+    .@(UiCustomizerCssClasses.SurfaceBtn):hover {
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+    }
+
+    .@(UiCustomizerCssClasses.SurfaceBtnActive) {
+        border-color: @AppColors.Primary.ToRgbaHex(true);
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Bold);
+    }
+
+    .@(UiCustomizerCssClasses.SurfaceBadge) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @AppColors.Primary.ToRgbaHex(true);
+        flex-shrink: 0;
+    }
+
+    .@(UiCustomizerCssClasses.Main) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px10)px;
+        min-width: 0;
+    }
+
+    .@(UiCustomizerCssClasses.TopBar) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
+    .@(UiCustomizerCssClasses.Columns) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: @(AppMeasures.Space.Px12)px;
+        min-width: 0;
+    }
+
+    .@(UiCustomizerCssClasses.ColumnCard) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        min-width: 0;
+    }
+
+    .@(UiCustomizerCssClasses.ColumnTitle) {
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(UiCustomizerCssClasses.ItemList) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        max-height: @(AppMeasures.Size.Px320)px;
+        overflow-y: auto;
+        padding-right: @(AppMeasures.Space.Px2)px;
+    }
+
+    .@(UiCustomizerCssClasses.Row) {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .@(UiCustomizerCssClasses.RowDragging) {
+        opacity: @(AppMeasures.Opacity.Disabled);
+    }
+
+    .@(UiCustomizerCssClasses.RowDropBefore)::before,
+    .@(UiCustomizerCssClasses.RowDropAfter)::after {
+        content: "";
+        position: absolute;
+        left: @(AppMeasures.Space.Px4)px;
+        right: @(AppMeasures.Space.Px4)px;
+        height: @(AppMeasures.Size.Px2)px;
+        background: @AppColors.Accent.ToRgbaHex(true);
+        box-shadow: @AppStyles.GetGlow(AppColors.Accent, 0.45f);
+        pointer-events: none;
+    }
+
+    .@(UiCustomizerCssClasses.RowDropBefore)::before {
+        top: -@(AppMeasures.Space.Px2)px;
+    }
+
+    .@(UiCustomizerCssClasses.RowDropAfter)::after {
+        bottom: -@(AppMeasures.Space.Px2)px;
+    }
+
+    .@(UiCustomizerCssClasses.RowLabel) {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .@(UiCustomizerCssClasses.RowMeta) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        margin-left: @(AppMeasures.Space.Px4)px;
+    }
+
+    .@(UiCustomizerCssClasses.RowTools) {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        flex-shrink: 0;
+    }
+
+    .@(UiCustomizerCssClasses.FilterInput) {
+        width: @(AppMeasures.Percent.Full)%;
+        box-sizing: border-box;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .@(UiCustomizerCssClasses.TagCreator) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(UiCustomizerCssClasses.EmptyHint) {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @AppColors.TextMuted.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px8)px;
+    }
+</style>

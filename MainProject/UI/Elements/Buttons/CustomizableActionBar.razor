@@ -1,0 +1,172 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Buttons
+@inherits ThemedComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Web
+@using MyLovelyMail.MainProject.Services
+@using MyLovelyMail.MainProject.Stores
+
+<div class="@BarClass"
+     style="@Style"
+     data-action-bar="@SurfaceId"
+     @onpointermove="HandleBarPointerMove"
+     @onpointerup="HandleBarPointerUp">
+    @{
+        var items = ResolvedItems;
+        var visibleIds = items.Select(static x => x.ActionId).ToList();
+    }
+
+    @for (int i = 0; i < items.Count; i++)
+    {
+        var item = items[i];
+        int idx = i;
+        <ActionSlot @key="item.ActionId"
+                    SurfaceId="@SurfaceId"
+                    PairedMenuSurfaceId="@EffectivePairedMenuId"
+                    Item="@item"
+                    Index="@idx"
+                    VisibleIds="@visibleIds"
+                    StopClickPropagation="@StopClickPropagation" />
+    }
+
+    @if (ShowInlineDragDocks)
+    {
+        @if (!string.IsNullOrWhiteSpace(EffectivePairedMenuId))
+        {
+            <span class="@MenuDockClass"
+                  data-dock-menu="@EffectivePairedMenuId"
+                  @onpointermove="HandleMenuDockMove"
+                  @onpointermove:stopPropagation="true"
+                  @onpointerup="HandleMenuDockUp"
+                  @onpointerup:stopPropagation="true">
+                📥 Right-Click
+            </span>
+        }
+        <span class="@HideDockClass"
+              data-dock-hide="@SurfaceId"
+              @onpointermove="HandleHideDockMove"
+              @onpointermove:stopPropagation="true"
+              @onpointerup="HandleHideDockUp"
+              @onpointerup:stopPropagation="true">
+            👁️ Hide
+        </span>
+    }
+
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string SurfaceId { get; set; } = string.Empty;
+    [Parameter] public string? PairedMenuSurfaceId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<UiActionModel> DefaultActions { get; set; } = [];
+    [Parameter] public Func<string, UiActionModel?>? AddedActionResolver { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter] public bool Wrap { get; set; }
+    [Parameter] public bool Inline { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool StopClickPropagation { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    string EffectivePairedMenuId => PairedMenuSurfaceId ?? UiSurfaceIds.PairedContextMenuOf(SurfaceId);
+
+    List<UiActionModel> ResolvedItems => UiCustomizationStore.ApplyLayout(
+        SurfaceId,
+        DefaultActions,
+        static a => a.ActionId,
+        static a => a.IsFixed,
+        AddedActionResolver);
+
+    bool ShowInlineDragDocks =>
+        ActionDragService.IsDragging
+        && !ActionDragService.SourceIsFixed
+        && ActionDragService.SourceSurfaceId.Equals(SurfaceId, StringComparison.OrdinalIgnoreCase)
+        && !Compact;
+
+    bool IsExternalDropReady =>
+        ActionDragService.IsDragging
+        && !ActionDragService.SourceSurfaceId.Equals(SurfaceId, StringComparison.OrdinalIgnoreCase)
+        && ActionDragService.CanAcceptDrop(SurfaceId);
+
+    bool IsExternalDropTargeted =>
+        IsExternalDropReady
+        && ActionDragService.HoverSurfaceId.Equals(SurfaceId, StringComparison.OrdinalIgnoreCase)
+        && !ActionDragService.HoverIsMenuDock;
+
+    string BarClass
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder(ActionBarCssClasses.Bar);
+            if (Wrap) sb.Append(' ').Append(ActionBarCssClasses.BarWrap);
+            if (Inline) sb.Append(' ').Append(ActionBarCssClasses.BarInline);
+            if (Compact) sb.Append(' ').Append(ActionBarCssClasses.BarCompact);
+            if (IsExternalDropTargeted) sb.Append(' ').Append(ActionBarCssClasses.BarDropTargeted);
+            else if (IsExternalDropReady) sb.Append(' ').Append(ActionBarCssClasses.BarDropReady);
+            if (!string.IsNullOrWhiteSpace(CustomClass)) sb.Append(' ').Append(CustomClass);
+            return sb.ToString();
+        }
+    }
+
+    string MenuDockClass => ActionDragService.HoverIsMenuDock && ActionDragService.HoverSurfaceId == EffectivePairedMenuId
+        ? $"{ActionBarCssClasses.DockPill} {ActionBarCssClasses.DockPillActive}"
+        : ActionBarCssClasses.DockPill;
+
+    string HideDockClass => ActionDragService.HoverHideZone
+        ? $"{ActionBarCssClasses.DockPill} {ActionBarCssClasses.DockPillDanger} {ActionBarCssClasses.DockPillDangerActive}"
+        : $"{ActionBarCssClasses.DockPill} {ActionBarCssClasses.DockPillDanger}";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        UiCustomizationStore.OnChanged += Refresh;
+        ActionDragService.OnStateChanged += Refresh;
+    }
+
+    void Refresh() => InvokeAsync(StateHasChanged);
+
+    void HandleBarPointerMove(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (!ActionDragService.IsDragging) return;
+        var visibleIds = ResolvedItems.Select(static x => x.ActionId).ToList();
+        ActionDragService.HoverSurfaceContainer(SurfaceId, null, visibleIds);
+    }
+
+    void HandleBarPointerUp(PointerEventArgs e)
+    {
+        if (!ActionDragService.IsDragging) return;
+        HandleBarPointerMove(e);
+        ActionDragService.CompleteDrop();
+    }
+
+    void HandleMenuDockMove(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        ActionDragService.HoverSendToMenuDock(EffectivePairedMenuId);
+    }
+
+    void HandleMenuDockUp(PointerEventArgs e)
+    {
+        HandleMenuDockMove(e);
+        ActionDragService.CompleteDrop();
+    }
+
+    void HandleHideDockMove(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        ActionDragService.HoverHideTarget();
+    }
+
+    void HandleHideDockUp(PointerEventArgs e)
+    {
+        HandleHideDockMove(e);
+        ActionDragService.CompleteDrop();
+    }
+
+    public new void Dispose()
+    {
+        base.Dispose();
+        UiCustomizationStore.OnChanged -= Refresh;
+        ActionDragService.OnStateChanged -= Refresh;
+    }
+}

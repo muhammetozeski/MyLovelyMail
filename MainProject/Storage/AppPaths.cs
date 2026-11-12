@@ -40,6 +40,10 @@ namespace MyLovelyMail.MainProject.Storage
 
         static string ResolveRoot()
         {
+#if DEBUG
+            if (Environment.GetEnvironmentVariable("MYLOVELYMAIL_DEBUG_ROOT") is { Length: > 0 } debugRoot)
+                return Path.GetFullPath(debugRoot);
+#endif
             string? platformRoot = null;
             ResolvePlatformRoot(ref platformRoot);
             if (platformRoot != null) return platformRoot;

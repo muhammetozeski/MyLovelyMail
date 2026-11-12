@@ -115,30 +115,37 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (wanted.Count == 0) return 0;
 
             using var fetchClient = await MailConnections.OpenImapAsync(account, cancellationToken);
-            var fetchFolder = await fetchClient.GetFolderAsync(folderFullName, cancellationToken);
-            await fetchFolder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
-
-            for (int i = 0; i < wanted.Count; i += ChunkSize)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var chunk = wanted.Skip(i).Take(ChunkSize).ToList();
+                var fetchFolder = await fetchClient.GetFolderAsync(folderFullName, cancellationToken);
+                await fetchFolder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
-                var fetched = await ResiliencePolicy.RunNetwork(
-                    ct => fetchFolder.FetchAsync(chunk, SummaryItems, ct),
-                    cancellationToken,
-                    account);
-
-                List<MailMessageSummary> older = [.. fetched.Where(static item => item.UniqueId.IsValid).Select(ToSummary)];
-                if (older.Count > 0)
+                for (int i = 0; i < wanted.Count; i += ChunkSize)
                 {
-                    MessageStore.UpsertSummaries(account.Id, folderFullName, older);
-                    cached.OldestFetchedUid = older.Min(static s => s.Uid);
-                    MessageStore.SaveFolder(cached);
-                    totalLanded += older.Count;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var chunk = wanted.Skip(i).Take(ChunkSize).ToList();
+
+                    var fetched = await ResiliencePolicy.RunNetwork(
+                        ct => fetchFolder.FetchAsync(chunk, SummaryItems, ct),
+                        cancellationToken,
+                        account);
+
+                    List<MailMessageSummary> older = [.. fetched.Where(static item => item.UniqueId.IsValid).Select(ToSummary)];
+                    if (older.Count > 0)
+                    {
+                        MessageStore.UpsertSummaries(account.Id, folderFullName, older);
+                        cached.OldestFetchedUid = older.Min(static s => s.Uid);
+                        MessageStore.SaveFolder(cached);
+                        totalLanded += older.Count;
+                    }
                 }
             }
+            finally
+            {
+                if (fetchClient.IsConnected)
+                    await fetchClient.DisconnectAsync(true, CancellationToken.None);
+            }
 
-            await fetchClient.DisconnectAsync(true, cancellationToken);
             return totalLanded;
         }
     }

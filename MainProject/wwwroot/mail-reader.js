@@ -1,6 +1,6 @@
-// Gives every reader iframe 110% of the message height inside it with overflow-y: hidden
-// and forwards mouse-wheel scrolling to the outer scroll container so the iframe never
-// shows its own inner vertical scrollbar.
+// Minimal DOM bridge for sandboxed <iframe srcdoc> mail bodies:
+// measures content scrollHeight so the iframe never shows a nested scrollbar,
+// and forwards vertical wheel events to the outer .mail-reader scroll container.
 (function () {
     "use strict";
 
@@ -35,7 +35,6 @@
                 }, { passive: true });
             }
         } catch (error) {
-            // Frame torn down mid-measure, or a document we may not read: the CSS height stands.
         }
     }
 
@@ -48,7 +47,6 @@
             watcher.observe(frame.contentDocument.body);
             resizeWatchers.set(frame, watcher);
         } catch (error) {
-            // No observer: the load-time measurement is still in place.
         }
     }
 
@@ -82,22 +80,4 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
 
     scan(document.documentElement);
-
-    window.mailReader = {
-        fit: function (frameId) {
-            var frame = frameId ? document.getElementById(frameId) : document.querySelector(SELECTOR);
-            if (frame) fit(frame);
-        },
-        print: function (frameId) {
-            var frame = frameId ? document.getElementById(frameId) : document.querySelector(SELECTOR);
-            if (frame && frame.contentWindow) {
-                try {
-                    frame.contentWindow.focus();
-                    frame.contentWindow.print();
-                    return;
-                } catch (e) { }
-            }
-            window.print();
-        }
-    };
 })();

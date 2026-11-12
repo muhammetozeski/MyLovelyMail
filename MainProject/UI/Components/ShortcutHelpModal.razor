@@ -1,11 +1,12 @@
 @inherits ModalBase
+@using MyLovelyMail.MainProject.UI.Pages
 
-<div class="core-modal-header">
-    <span class="core-modal-title">⌨️ Keyboard Shortcuts</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">⌨️ Keyboard Shortcuts</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
 </div>
 
-<div class="mail-shortcut-grid">
+<div class="@MailCssClasses.ShortcutGrid">
     <kbd>j</kbd><span>Focus next message</span>
     <kbd>k</kbd><span>Focus previous message</span>
     <kbd>Enter</kbd><span>Open focused message</span>
@@ -23,8 +24,8 @@
     <kbd>?</kbd><span>Show this sheet</span>
 </div>
 
-<div class="mail-modal-section-title" style="margin-top:14px;">Search operators</div>
-<div class="mail-shortcut-grid">
+<div class="@MailCssClasses.ModalSectionTitle" style="margin-top:@(AppMeasures.Space.Px14)px;">Search operators</div>
+<div class="@MailCssClasses.ShortcutGrid">
     <kbd>from:alice</kbd><span>Sender name or address</span>
     <kbd>to:bob</kbd><span>Mail you sent to Bob</span>
     <kbd>tag:work</kbd><span>Tagged with work</span>

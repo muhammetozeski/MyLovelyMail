@@ -45,6 +45,24 @@ Keyboard shortcuts are scoped to the mail list. Modified browser shortcuts do no
 triage. Escape dismisses tag, move and snooze pickers before clearing selection or closing the reader.
 All new layout rules remain in theme-aware `Css.razor` sections using shared spacing constants.
 
-The behavior above is established by source inspection of `Mail.razor.QuickActions.cs`, the selection
-and interaction partials and the existing command services. It does not assert native-device interaction
-verification. For menu ownership and identity rules, see [the development guide](DEVELOPMENT.md#shared-input-and-message-identity).
+## Universal pure-C# button and context-menu customization
+
+Every toolbar, hover action strip, and right-click menu surface (`UiSurfaceIds`) resolves its visible
+order, hidden items, and cross-surface additions through `UiCustomizationStore` (`UserData/ui-layout.json`).
+`CustomizableActionBar`, `ActionSlot`, and `AppContextMenu` coordinate pointer drag-and-drop in pure
+Blazor C# via `ActionDragService` (without custom DOM JavaScript):
+
+- Non-fixed buttons reorder inside their bar, hide, or drag into the inline `Right-Click` dock to
+  move onto their paired context menu.
+- Context-menu items and submenu entries (including dynamic commands such as `Msg.AddTag:<Tag>`,
+  `Msg.Move:<Folder>`, and sender rule presets) reorder, promote to the 1-click root context menu,
+  or drag directly onto screen toolbars (`BackdropPassThrough` lets pointer drags target underlying bars).
+- `UiCustomizerModal` (`WideModal`) inspects all 19 surfaces, supports inline tag creation (`+ Tag`),
+  and allows resetting individual surfaces or all customizations.
+- Sidebar account groups, folder-internal mail accounts, mailbox folders, and mail rows use pure-C#
+  pointer drag-and-drop (`WorkspaceDragService`), persisting sort orders atomically to
+  `account-folders.json`, `account.json`, `folder.json`, and `list-view.json`.
+
+Runtime interaction, screenshot rendering, and full restart persistence were verified through `DebugApi`
+(`GET /ui-layout`, `POST /input/mouse`, and `GET /screenshot`). For menu ownership and identity rules,
+see [the development guide](DEVELOPMENT.md#shared-input-and-message-identity).

@@ -333,6 +333,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                             {
                                 case MailMessageCommand.ToggleStar: ToggleFlagged(account, folder, message); break;
                                 case MailMessageCommand.ToggleImportant: ToggleImportant(account, folder, message); break;
+                                case MailMessageCommand.ToggleMute: ToggleMuted(account, folder, message); break;
                                 case MailMessageCommand.Snooze: SnoozeService.Snooze(account, folder, message, dueUtc ?? SnoozeService.Presets[0].DueUtc()); break;
                                 case MailMessageCommand.Wake when message.SnoozedUntilUtc != null: SnoozeService.Wake(account, folder, message); break;
                                 case MailMessageCommand.Wake: continue;

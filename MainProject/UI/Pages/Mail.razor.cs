@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
@@ -23,8 +22,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
     // search. The reader, compose and interaction members live in the sibling partials.
     public partial class Mail
     {
-        [Inject] IJSRuntime JS { get; set; } = default!;
-
         string _searchText = string.Empty;
 
         internal string SearchText
@@ -115,11 +112,12 @@ namespace MyLovelyMail.MainProject.UI.Pages
             double sb = dragStartSidebarPct;
             double ls = dragStartListPct;
 
+            double snap = GlobalSettings.SplitterSnapThresholdPercent;
             if (activeSplitter == 1)
             {
                 double totalFirstTwo = dragStartSidebarPct + dragStartListPct;
                 sb = Math.Clamp(dragStartSidebarPct + deltaPct, 12.0, Math.Min(38.0, totalFirstTwo - 16.0));
-                if (Math.Abs(sb - GlobalSettings.DefaultSidebarColumnPercent) <= 1.2 && (totalFirstTwo - GlobalSettings.DefaultSidebarColumnPercent) >= 16.0)
+                if (Math.Abs(sb - GlobalSettings.DefaultSidebarColumnPercent) <= snap && (totalFirstTwo - GlobalSettings.DefaultSidebarColumnPercent) >= 16.0)
                     sb = GlobalSettings.DefaultSidebarColumnPercent;
                 ls = Math.Clamp(totalFirstTwo - sb, 16.0, 58.0);
             }
@@ -127,9 +125,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             {
                 double maxList = Math.Max(16.0, 100.0 - sb - 22.0);
                 ls = Math.Clamp(dragStartListPct + deltaPct, 16.0, Math.Min(58.0, maxList));
-                if (Math.Abs(ls - GlobalSettings.DefaultListColumnPercent) <= 1.2 && ls <= maxList)
+                if (Math.Abs(ls - GlobalSettings.DefaultListColumnPercent) <= snap && ls <= maxList)
                     ls = GlobalSettings.DefaultListColumnPercent;
-                else if (Math.Abs((100.0 - sb - ls) - GlobalSettings.DefaultReaderColumnPercent) <= 1.2 && (100.0 - sb - GlobalSettings.DefaultReaderColumnPercent) >= 16.0)
+                else if (Math.Abs((100.0 - sb - ls) - GlobalSettings.DefaultReaderColumnPercent) <= snap && (100.0 - sb - GlobalSettings.DefaultReaderColumnPercent) >= 16.0)
                     ls = 100.0 - sb - GlobalSettings.DefaultReaderColumnPercent;
             }
 
@@ -142,8 +140,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
             FinishColumnSplitterDrag();
         }
 
+        internal Func<bool>? TryCancelSidebarDrag;
+
         internal void OnScreenKeyDown(KeyboardEventArgs e)
         {
+            if (e.Key == "Escape" && (WorkspaceDragService.Cancel() || TryCancelSidebarDrag?.Invoke() == true))
+                return;
+
             if (activeSplitter != 0 && e.Key == "Escape")
             {
                 activeSplitter = 0;
@@ -214,8 +217,11 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MouseActionService.MailMenuRequested = HandleNativeMailMenuAsync;
             MessageActions.OnMoveStateChanged += HandleMoveStateChanged;
             ModalService.OnChanged += HandleModalServiceChanged;
-            MailMenuItems.OnPinnedActionsChanged += HandleSyncStateChanged;
+            UiCustomizationStore.OnChanged += HandleSyncStateChanged;
+            TagStore.OnTagsChanged += HandleSyncStateChanged;
             ListViewState.OnChanged += HandleListViewStateChanged;
+            ActionDragService.SurfaceInspector = InspectUiSurface;
+            WorkspaceDragService.OnMailFoldersReordered = () => InvokeAsync(RefreshSidebarFolders);
 
             if (!TrySelectFirstAccount())
                 RefreshLists();
@@ -235,8 +241,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
             MouseActionService.MailMenuRequested = null;
             MessageActions.OnMoveStateChanged -= HandleMoveStateChanged;
             ModalService.OnChanged -= HandleModalServiceChanged;
-            MailMenuItems.OnPinnedActionsChanged -= HandleSyncStateChanged;
+            UiCustomizationStore.OnChanged -= HandleSyncStateChanged;
+            TagStore.OnTagsChanged -= HandleSyncStateChanged;
             ListViewState.OnChanged -= HandleListViewStateChanged;
+            if (ReferenceEquals(ActionDragService.SurfaceInspector?.Target, this))
+                ActionDragService.SurfaceInspector = null;
+            if (ReferenceEquals(WorkspaceDragService.OnMailFoldersReordered?.Target, this))
+                WorkspaceDragService.OnMailFoldersReordered = null;
             ContextMenuService.Close();
         }
 
@@ -522,7 +533,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
             return list;
         }
 
-        void SelectSender(SenderItem sender)
+        internal void OpenSenderPerson(SenderItem sender)
+        {
+            if (string.IsNullOrWhiteSpace(sender.Address)) return;
+            MailUiState.OpenPerson(sender.Address.Trim());
+        }
+
+        internal void SelectSender(SenderItem sender)
         {
             IsSenderListView = false;
             var account = MailUiState.SelectedAccount;
@@ -540,7 +557,6 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
             if (targets.Length > 0)
             {
-                MailUiState.SelectMessages(targets, replace: true);
                 var newest = MessageStore.GetSummary(account.Id, folder.FullName, targets[0].Uid);
                 if (newest != null)
                 {
@@ -615,7 +631,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
         void LoadOlder(MailFolderData folder)
         {
             if (AccountStore.GetById(folder.AccountId) is not { } account) return;
-            ImapSyncService.KickFolderSync(account, folder.FullName, backfillCount: BackfillBatchSize);
+            int batch = Math.Max(1, BackfillBatchSize);
+            BackfillBatchSize = batch;
+            ImapSyncService.KickFolderSync(account, folder.FullName, backfillCount: batch);
         }
 
         internal void ResyncFolder(MailFolderData folder)

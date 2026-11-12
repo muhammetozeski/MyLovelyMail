@@ -196,17 +196,15 @@ public static partial class DebugApi
 
                         await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
                             $"{{\"type\":\"mouseMoved\",\"x\":{invX},\"y\":{invY},\"button\":\"none\",\"buttons\":0}}");
-                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        string? cdpDown = await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
                             $"{{\"type\":\"mousePressed\",\"x\":{invX},\"y\":{invY},\"button\":\"{cdpButton}\",\"buttons\":{domButtons},\"clickCount\":1}}");
 
                         string? startInfo = await RenderedPageProbe.RunScriptAsync(
                             $"(function(){{var el=document.elementFromPoint({invX},{invY})||document.body;"
-                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
-                            + $"el.dispatchEvent(new PointerEvent('pointerdown',opts));"
-                            + $"el.dispatchEvent(new MouseEvent('mousedown',opts));"
-                            + $"var dragEl=el.closest('[draggable=\"true\"]');"
-                            + $"if(dragEl){{window.__debugDragEl=dragEl;window.__debugDataTransfer=new DataTransfer();dragEl.dispatchEvent(new DragEvent('dragstart',{{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},dataTransfer:window.__debugDataTransfer}}));}}"
-                            + $"else{{window.__debugDragEl=null;}}"
+                            + (cdpDown == null
+                                ? $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
+                                  + $"el.dispatchEvent(new PointerEvent('pointerdown',opts));el.dispatchEvent(new MouseEvent('mousedown',opts));"
+                                : "")
                             + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
 
                         for (int i = 1; i <= steps; i++)
@@ -215,52 +213,52 @@ public static partial class DebugApi
                             double curY = y + (toY - y) * i / steps;
                             string cx = curX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
                             string cy = curY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-                            await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                            string? cdpMove = await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
                                 $"{{\"type\":\"mouseMoved\",\"x\":{cx},\"y\":{cy},\"button\":\"{cdpButton}\",\"buttons\":{domButtons}}}");
-                            await RenderedPageProbe.RunScriptAsync(
-                                $"(function(){{var el=document.elementFromPoint({cx},{cy})||document.body;"
-                                + $"var opts={{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
-                                + $"el.dispatchEvent(new PointerEvent('pointermove',opts));"
-                                + $"el.dispatchEvent(new MouseEvent('mousemove',opts));"
-                                + $"window.dispatchEvent(new PointerEvent('pointermove',opts));"
-                                + $"window.dispatchEvent(new MouseEvent('mousemove',opts));"
-                                + $"if(window.__debugDragEl){{el.dispatchEvent(new DragEvent('dragenter',{{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},dataTransfer:window.__debugDataTransfer}}));"
-                                + $"el.dispatchEvent(new DragEvent('dragover',{{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},dataTransfer:window.__debugDataTransfer}}));}}"
-                                + $"return 'moved';}})()");
-                            await Task.Delay(12);
+                            if (cdpMove == null)
+                            {
+                                await RenderedPageProbe.RunScriptAsync(
+                                    $"(function(){{var el=document.elementFromPoint({cx},{cy})||document.body;"
+                                    + $"var opts={{bubbles:true,cancelable:true,clientX:{cx},clientY:{cy},button:{domButton},buttons:{domButtons},pointerId:1,isPrimary:true}};"
+                                    + $"el.dispatchEvent(new PointerEvent('pointermove',opts));el.dispatchEvent(new MouseEvent('mousemove',opts));"
+                                    + $"window.dispatchEvent(new PointerEvent('pointermove',opts));window.dispatchEvent(new MouseEvent('mousemove',opts));"
+                                    + $"return 'moved';}})()");
+                            }
+                            await Task.Delay(14);
                         }
 
                         string invToX = toX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
                         string invToY = toY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
                         string? endInfo = await RenderedPageProbe.RunScriptAsync(
                             $"(function(){{var el=document.elementFromPoint({invToX},{invToY})||document.body;"
-                            + $"if(window.__debugDragEl){{if(!window.__mailDragCancelled){{el.dispatchEvent(new DragEvent('drop',{{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},dataTransfer:window.__debugDataTransfer}}));}}"
-                            + $"window.__debugDragEl.dispatchEvent(new DragEvent('dragend',{{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},dataTransfer:window.__debugDataTransfer}}));window.__debugDragEl=null;}}"
-                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},button:{domButton},buttons:0,pointerId:1,isPrimary:true}};"
-                            + $"el.dispatchEvent(new PointerEvent('pointerup',opts));"
-                            + $"el.dispatchEvent(new MouseEvent('mouseup',opts));"
-                            + $"window.dispatchEvent(new PointerEvent('pointerup',opts));"
-                            + $"window.dispatchEvent(new MouseEvent('mouseup',opts));"
                             + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
 
-                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        string? cdpUp = await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
                             $"{{\"type\":\"mouseReleased\",\"x\":{invToX},\"y\":{invToY},\"button\":\"{cdpButton}\",\"buttons\":0,\"clickCount\":1}}");
+                        if (cdpUp == null)
+                        {
+                            await RenderedPageProbe.RunScriptAsync(
+                                $"(function(){{var el=document.elementFromPoint({invToX},{invToY})||document.body;"
+                                + $"var opts={{bubbles:true,cancelable:true,clientX:{invToX},clientY:{invToY},button:{domButton},buttons:0,pointerId:1,isPrimary:true}};"
+                                + $"el.dispatchEvent(new PointerEvent('pointerup',opts));el.dispatchEvent(new MouseEvent('mouseup',opts));"
+                                + $"window.dispatchEvent(new PointerEvent('pointerup',opts));window.dispatchEvent(new MouseEvent('mouseup',opts));"
+                                + $"return 'up';}})()");
+                        }
 
                         return new { action = "drag", from = new { x, y, element = startInfo }, to = new { x = toX, y = toY, element = endInfo }, steps };
                     }
 
                     if (action is "move" or "hover")
                     {
-                        await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
+                        string? cdpHover = await RenderedPageProbe.CallCdpAsync("Input.dispatchMouseEvent",
                             $"{{\"type\":\"mouseMoved\",\"x\":{invX},\"y\":{invY},\"button\":\"none\",\"buttons\":0}}");
                         string? hoverEl = await RenderedPageProbe.RunScriptAsync(
                             $"(function(){{var el=document.elementFromPoint({invX},{invY})||document.body;"
-                            + $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY}}};"
-                            + $"el.dispatchEvent(new PointerEvent('pointerover',opts));"
-                            + $"el.dispatchEvent(new PointerEvent('pointerenter',opts));"
-                            + $"el.dispatchEvent(new MouseEvent('mouseover',opts));"
-                            + $"el.dispatchEvent(new MouseEvent('mouseenter',opts));"
-                            + $"el.dispatchEvent(new MouseEvent('mousemove',opts));"
+                            + (cdpHover == null
+                                ? $"var opts={{bubbles:true,cancelable:true,clientX:{invX},clientY:{invY}}};"
+                                  + $"el.dispatchEvent(new PointerEvent('pointerover',opts));el.dispatchEvent(new PointerEvent('pointerenter',opts));"
+                                  + $"el.dispatchEvent(new MouseEvent('mouseover',opts));el.dispatchEvent(new MouseEvent('mouseenter',opts));el.dispatchEvent(new MouseEvent('mousemove',opts));"
+                                : "")
                             + $"return el.tagName+(el.className?'.'+String(el.className).trim().replace(/\\s+/g,'.'):'');}})()");
                         return new { action = "hover", x, y, element = hoverEl };
                     }
@@ -392,6 +390,212 @@ public static partial class DebugApi
                     if (!string.IsNullOrEmpty(filter))
                         lines = lines.Where(l => l.Contains(filter, StringComparison.OrdinalIgnoreCase));
                     return lines.TakeLast(ReadTake(query, 100)).ToArray();
+                }
+
+                case ("GET", "/ui-layout"):
+                {
+                    string? surfaceFilter = query["surface"];
+                    var surfaces = string.IsNullOrWhiteSpace(surfaceFilter)
+                        ? UiSurfaceIds.AllSurfaces
+                        : [surfaceFilter];
+                    return new
+                    {
+                        contextMenu = new
+                        {
+                            isOpen = ContextMenuService.IsOpen,
+                            title = ContextMenuService.Title,
+                            surfaceId = ContextMenuService.SurfaceId,
+                            isEditMode = ContextMenuService.IsEditMode,
+                            items = ContextMenuService.Items.Select(static i => new
+                            {
+                                id = i.EffectiveActionId,
+                                label = i.Label,
+                                hasChildren = i.HasChildren,
+                                children = i.Children?.Select(static c => new { id = c.EffectiveActionId, label = c.Label }).ToArray()
+                            }).ToArray()
+                        },
+                        accountFolders = AccountFolderStore.GetFlattenedTree().Select(static f => new
+                        {
+                            f.Folder.Id,
+                            f.Folder.Name,
+                            f.Folder.ParentFolderId,
+                            f.Folder.SortOrder,
+                            f.Folder.IsExpanded,
+                            f.Depth
+                        }).ToArray(),
+                        accounts = AccountStore.Accounts.Select(static a => new
+                        {
+                            a.Id,
+                            a.EmailAddress,
+                            a.FolderId,
+                            a.SortOrder
+                        }).ToArray(),
+                        selectedAccountMailFolders = MailUiState.SelectedAccount is { } selAcc
+                            ? FolderTreeService.Build(MessageStore.GetFolders(selAcc.Id)).Select(static n => new
+                            {
+                                n.Folder.FullName,
+                                n.Folder.DisplayName,
+                                n.Folder.SortOrder
+                            }).ToArray()
+                            : [],
+                        listView = new
+                        {
+                            mailSort = ListViewState.MailSort.ToString(),
+                            mailSortDir = ListViewState.MailSortDirection.ToString(),
+                            senderSort = ListViewState.SenderSort.ToString(),
+                            senderSortDir = ListViewState.SenderSortDirection.ToString(),
+                            filters = ListViewState.ActiveFilters.Select(static f => new { f.Id, f.Condition.Field, f.Condition.Operator, f.Condition.Value }).ToArray()
+                        },
+                        surfaces = surfaces.Select(static s =>
+                        {
+                            var snap = UiCustomizationStore.GetSnapshot(s);
+                            return new
+                            {
+                                surfaceId = s,
+                                customized = UiCustomizationStore.IsSurfaceCustomized(s),
+                                orderedIds = snap.OrderedIds,
+                                hiddenIds = snap.HiddenIds,
+                                addedIds = snap.AddedIds,
+                                submenus = snap.Submenus
+                            };
+                        }).ToArray()
+                    };
+                }
+
+                case ("POST", "/ui-layout"):
+                {
+                    if (string.Equals(query["reset"], "all", StringComparison.OrdinalIgnoreCase))
+                    {
+                        UiCustomizationStore.ResetAll();
+                        return new { reset = "all" };
+                    }
+                    if (query["reset"] is { Length: > 0 } resetSurface)
+                    {
+                        UiCustomizationStore.ResetSurface(resetSurface);
+                        return new { reset = resetSurface };
+                    }
+                    return new { ok = true };
+                }
+
+                case ("POST", "/seed/demo"):
+                {
+                    TagStore.ColorOf("JetTag");
+                    TagStore.ColorOf("Urgent");
+                    TagStore.ColorOf("Review");
+
+                    var workFolder = AccountFolderStore.Folders.FirstOrDefault(static f => string.Equals(f.Name, "Work", StringComparison.OrdinalIgnoreCase))
+                        ?? AccountFolderStore.CreateFolder("Work");
+
+                    MailAccountData EnsureAccount(string id, string email, string displayName, string folderId, string color, int sortOrder)
+                    {
+                        var existing = AccountStore.GetById(id);
+                        if (existing != null) return existing;
+                        var acc = new MailAccountData
+                        {
+                            Id = id,
+                            EmailAddress = email,
+                            DisplayName = displayName,
+                            FolderId = folderId,
+                            Protocol = IncomingProtocol.Imap,
+                            IncomingHost = "imap.demo.invalid",
+                            IncomingPort = 993,
+                            SmtpHost = "smtp.demo.invalid",
+                            SmtpPort = 465,
+                            Enabled = false,
+                            ColorHex = color,
+                            SortOrder = sortOrder
+                        };
+                        AccountStore.Save(acc);
+                        return acc;
+                    }
+
+                    var alice = EnsureAccount("demo-alice", "alice@lovely.test", "Alice Inbox", AccountFolderStore.DefaultFolderId, "#F472B6", 1);
+                    var bob = EnsureAccount("demo-bob", "bob@lovely.test", "Bob Secondary", AccountFolderStore.DefaultFolderId, "#38BDF8", 2);
+                    var gamma = EnsureAccount("demo-gamma", "gamma@lovely.test", "Gamma Backup", AccountFolderStore.DefaultFolderId, "#4ADE80", 3);
+                    var ops = EnsureAccount("demo-ops", "ops@work.test", "Work Ops", workFolder.Id, "#FBBF24", 4);
+
+                    string localProjects = MessageStore.LocalFolderPrefix + "Projects";
+                    var demoFolders = new[]
+                    {
+                        new MailFolderData { AccountId = alice.Id, FullName = MessageStore.InboxFullName, DisplayName = "Inbox", Role = FolderRole.Inbox, Selectable = true, TotalCount = 3, UnreadCount = 2, LastSyncedUtc = DateTime.UtcNow, SortOrder = 1 },
+                        new MailFolderData { AccountId = alice.Id, FullName = "Archive", DisplayName = "Archive", Role = FolderRole.Archive, Selectable = true, TotalCount = 0, UnreadCount = 0, LastSyncedUtc = DateTime.UtcNow, SortOrder = 2 },
+                        new MailFolderData { AccountId = alice.Id, FullName = localProjects, DisplayName = "Projects", Role = FolderRole.None, Selectable = true, TotalCount = 0, UnreadCount = 0, LastSyncedUtc = DateTime.UtcNow, SortOrder = 3 },
+                        new MailFolderData { AccountId = alice.Id, FullName = "Trash", DisplayName = "Trash", Role = FolderRole.Trash, Selectable = true, TotalCount = 0, UnreadCount = 0, LastSyncedUtc = DateTime.UtcNow, SortOrder = 4 }
+                    };
+                    foreach (var f in demoFolders)
+                        MessageStore.SaveFolder(f);
+
+                    MessageStore.SaveFolder(new MailFolderData
+                    {
+                        AccountId = bob.Id,
+                        FullName = MessageStore.InboxFullName,
+                        DisplayName = "Inbox",
+                        Role = FolderRole.Inbox,
+                        Selectable = true,
+                        TotalCount = 0,
+                        UnreadCount = 0,
+                        LastSyncedUtc = DateTime.UtcNow,
+                        SortOrder = 1
+                    });
+
+                    static byte[] BuildMime(string fromName, string fromAddr, string toAddr, string subject, string htmlBody, DateTime dateUtc)
+                    {
+                        var msg = new MimeMessage();
+                        msg.From.Add(new MailboxAddress(fromName, fromAddr));
+                        msg.To.Add(MailboxAddress.Parse(toAddr));
+                        msg.Subject = subject;
+                        msg.Date = new DateTimeOffset(dateUtc, TimeSpan.Zero);
+                        var builder = new BodyBuilder
+                        {
+                            TextBody = "Plain text fallback: " + subject,
+                            HtmlBody = htmlBody
+                        };
+                        msg.Body = builder.ToMessageBody();
+                        using var ms = new MemoryStream();
+                        msg.WriteTo(ms);
+                        return ms.ToArray();
+                    }
+
+                    DateTime now = DateTime.UtcNow;
+                    var seedMessages = new (uint Uid, string FromName, string FromAddr, string Subject, string Preview, bool Unread, string Html)[]
+                    {
+                        (101, "Ada Lovelace", "ada@analytical.org", "Analytical Engine Architecture Notes", "Reviewing the pure C# component hierarchy and layout tokens.", true, "<p>Hello Alice,</p><p>Here are the architecture notes for the Analytical Engine module.</p>"),
+                        (102, "Grace Hopper", "grace@compiler.org", "Compiler Verification Report", "Zero warnings and deterministic CSS class constants.", true, "<p>Hi Alice,</p><p>All compiler checks passed with zero warnings.</p>"),
+                        (103, "Alan Turing", "alan@enigma.org", "Cryptographic Vault Review", "AES-GCM bundle check completed cleanly.", false, "<p>Greetings,</p><p>The migration bundle encryption test finished.</p>")
+                    };
+
+                    var summaries = new List<MailMessageSummary>();
+                    foreach (var m in seedMessages)
+                    {
+                        byte[] raw = BuildMime(m.FromName, m.FromAddr, alice.EmailAddress, m.Subject, m.Html, now.AddMinutes(-(int)m.Uid));
+                        MessageStore.SaveFullMessage(alice.Id, MessageStore.InboxFullName, m.Uid, raw);
+                        summaries.Add(new MailMessageSummary
+                        {
+                            Uid = m.Uid,
+                            MessageId = $"<seed-{m.Uid}@lovely.test>",
+                            FromName = m.FromName,
+                            FromAddress = m.FromAddr,
+                            ToAddresses = alice.EmailAddress,
+                            Subject = m.Subject,
+                            PreviewText = m.Preview,
+                            DateUtc = now.AddMinutes(-(int)m.Uid),
+                            SizeBytes = raw.Length,
+                            Flags = m.Unread ? MailFlags.None : MailFlags.Seen,
+                            Tags = m.Uid == 101 ? ["Review"] : []
+                        });
+                    }
+                    MessageStore.UpsertSummaries(alice.Id, MessageStore.InboxFullName, summaries);
+
+                    MailUiState.SelectAccount(alice, restoreFolder: false);
+                    MailUiState.SelectFolder(demoFolders[0]);
+                    MailUiState.OpenMessageInReader(summaries[0], new MailMessageIdentity(alice.Id, MessageStore.InboxFullName, summaries[0].Uid));
+
+                    return new
+                    {
+                        seeded = true,
+                        accounts = AccountStore.Accounts.Select(static a => new { a.Id, a.EmailAddress, a.FolderId, a.SortOrder }).ToArray(),
+                        tags = TagStore.AllTags.ToArray()
+                    };
                 }
 
             default:

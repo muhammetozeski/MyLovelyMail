@@ -149,7 +149,7 @@ namespace MyLovelyMail.MainProject.UI.Pages
             draftAutosaveTimer.Start();
         }
 
-        void SaveActiveDraft()
+        internal void SaveActiveDraft()
         {
             if (MailUiState.ActiveCompose is not { } draft) return;
             if (draft.To.Length + draft.Subject.Length + draft.Body.Length == 0) return;

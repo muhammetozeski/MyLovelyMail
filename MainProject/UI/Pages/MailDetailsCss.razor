@@ -11,8 +11,7 @@
 }
 
 <style>
-    /* What a rule did to this message — the only trace a working rule leaves. */
-    .mail-rule-trace {
+    .@(MailCssClasses.RuleTrace) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: transparent;
         cursor: pointer;
@@ -23,14 +22,12 @@
         font-size: @(AppMeasures.Font.XSmall)px;
     }
 
-        .mail-rule-trace:hover {
+        .@(MailCssClasses.RuleTrace):hover {
             background: @surfaceTint;
             color: @textPrimary;
         }
 
-    /* The whole strip is one column so the expanded rows sit under the summary rather than
-       wrapping into the header and pushing the subject around. */
-    .mail-rule-strip {
+    .@(MailCssClasses.RuleStrip) {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
@@ -38,31 +35,29 @@
         margin-top: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-rule-summary,
-    .mail-rule-row {
+    .@(MailCssClasses.RuleSummary),
+    .@(MailCssClasses.RuleRow) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px6)px;
         margin-left: 0;
-        max-width: 100%;
+        max-width: @(AppMeasures.Percent.Full)%;
     }
 
-    .mail-rule-lead {
+    .@(MailCssClasses.RuleLead) {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    /* The rule's own name is context, not the headline: dimmer than what it did. */
-    .mail-rule-name {
+    .@(MailCssClasses.RuleName) {
         opacity: @AppMeasures.Opacity.Muted;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    /* "+3" collapsed, "×16" expanded — repetition is a number, never extra rows. */
-    .mail-rule-count {
+    .@(MailCssClasses.RuleCount) {
         padding: 0 @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
         background: @surfaceTint;
@@ -70,11 +65,11 @@
         font-variant-numeric: tabular-nums;
     }
 
-    .mail-rule-caret {
+    .@(MailCssClasses.RuleCaret) {
         opacity: @AppMeasures.Opacity.Muted;
     }
 
-    .mail-rule-rows {
+    .@(MailCssClasses.RuleRows) {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
@@ -82,8 +77,7 @@
         padding-left: @(AppMeasures.Space.Px12)px;
     }
 
-    /* Sender-trust chip: shown only when something is wrong, so it never becomes wallpaper. */
-    .mail-auth-chip {
+    .@(MailCssClasses.AuthChip) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
@@ -96,13 +90,11 @@
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
-    /* A muted conversation is present but not shouting. */
-    .mail-row-flag--muted {
+    .@(MailCssClasses.RowFlagMuted) {
         opacity: @(AppMeasures.Opacity.Muted);
     }
 
-    /* Conversation strip: the only route to the replies a grouped row stands for. */
-    .mail-reader-thread {
+    .@(MailCssClasses.ReaderThread) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px2)px;
@@ -110,19 +102,19 @@
         border-bottom: @(AppMeasures.Border.Thin)px solid @glassBorder;
     }
 
-    .mail-reader-thread-nav {
+    .@(MailCssClasses.ReaderThreadNav) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
         padding-bottom: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-reader-thread-count {
+    .@(MailCssClasses.ReaderThreadCount) {
         color: @textMuted;
         font-size: @(AppMeasures.Font.Small)px;
     }
 
-    .mail-thread-step {
+    .@(MailCssClasses.ThreadStep) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: transparent;
         cursor: pointer;
@@ -132,12 +124,12 @@
         font-size: @(AppMeasures.Font.Small)px;
     }
 
-        .mail-thread-step:disabled {
+        .@(MailCssClasses.ThreadStep):disabled {
             opacity: @(AppMeasures.Opacity.Disabled);
             cursor: not-allowed;
         }
 
-    .mail-thread-line {
+    .@(MailCssClasses.ThreadLine) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
@@ -151,29 +143,29 @@
         font-size: @(AppMeasures.Font.Small)px;
     }
 
-        .mail-thread-line:hover {
+        .@(MailCssClasses.ThreadLine):hover {
             background: @surfaceTint;
         }
 
-    .mail-thread-line--open {
+    .@(MailCssClasses.ThreadLineOpen) {
         background: @surfaceTint;
         color: @textPrimary;
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
-    .mail-thread-line-date {
+    .@(MailCssClasses.ThreadLineDate) {
         flex-shrink: 0;
         color: @textMuted;
     }
 
-    .mail-thread-line-sender {
+    .@(MailCssClasses.ThreadLineSender) {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-thread-line-unread {
+    .@(MailCssClasses.ThreadLineUnread) {
         flex-shrink: 0;
         width: @(AppMeasures.Size.Px8)px;
         height: @(AppMeasures.Size.Px8)px;
@@ -181,8 +173,7 @@
         background: var(--account-accent, @primary);
     }
 
-    /* Footer under the list when the server holds more than the cache does. */
-    .mail-backfill {
+    .@(MailCssClasses.Backfill) {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -190,12 +181,12 @@
         padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-backfill-text {
+    .@(MailCssClasses.BackfillText) {
         color: @textMuted;
         font-size: @(AppMeasures.Font.XSmall)px;
     }
 
-    .mail-backfill-button {
+    .@(MailCssClasses.BackfillButton) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: transparent;
         cursor: pointer;
@@ -210,11 +201,11 @@
         gap: @(AppMeasures.Space.Px4)px;
     }
 
-        .mail-backfill-button:hover {
+        .@(MailCssClasses.BackfillButton):hover {
             background: @surfaceTint;
         }
 
-    .mail-backfill-input {
+    .@(MailCssClasses.BackfillInput) {
         width: @(AppMeasures.Size.Px60)px;
         background: @surfaceTint;
         color: var(--account-accent, @primary);
@@ -227,8 +218,7 @@
         outline: none;
     }
 
-    /* Conversation count pill: how many messages the collapsed row stands for. */
-    .mail-row-thread-count {
+    .@(MailCssClasses.RowThreadCount) {
         flex-shrink: 0;
         padding: 0 @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
@@ -238,8 +228,7 @@
         font-weight: @(AppMeasures.Weight.Bold);
     }
 
-    /* Source modal: parsed headers table and the raw MIME, both read from the cached .eml. */
-    .mail-source {
+    .@(MailCssClasses.Source) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px12)px;
@@ -248,40 +237,40 @@
         text-align: left;
     }
 
-    .mail-source-tabs {
+    .@(MailCssClasses.SourceTabs) {
         display: flex;
         gap: @(AppMeasures.Space.Px6)px;
         flex-wrap: wrap;
     }
 
-    .mail-source-headers {
+    .@(MailCssClasses.SourceHeaders) {
         display: grid;
-        grid-template-columns: minmax(140px, auto) 1fr;
+        grid-template-columns: minmax(@(AppMeasures.Size.Px140)px, auto) 1fr;
         gap: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px16)px;
         padding: @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         background: @AppColors.SurfaceDarken.ToRgbaHex(true);
-        max-height: 68vh;
+        max-height: @(AppMeasures.Viewport.ThreeQuarters)vh;
         overflow: auto;
         font-size: @(AppMeasures.Font.Small)px;
         text-align: left;
     }
 
-    .mail-source-header-name {
+    .@(MailCssClasses.SourceHeaderName) {
         font-weight: @(AppMeasures.Weight.Bold);
         color: @textSecondary;
         white-space: nowrap;
     }
 
-    .mail-source-header-value {
+    .@(MailCssClasses.SourceHeaderValue) {
         color: @AppColors.TextPrimary.ToRgbaHex(true);
         word-break: break-all;
     }
 
-    .mail-source-raw {
+    .@(MailCssClasses.SourceRaw) {
         margin: 0;
         overflow: auto;
-        max-height: 68vh;
+        max-height: @(AppMeasures.Viewport.ThreeQuarters)vh;
         padding: @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         background: @AppColors.SurfaceDarken.ToRgbaHex(true);
@@ -292,19 +281,18 @@
         text-align: left;
     }
 
-    /* Inbox Zero: the reward state for an emptied inbox — hearts drift up behind the headline. */
-    .mail-inbox-zero {
+    .@(MailCssClasses.InboxZero) {
         position: relative;
         overflow: hidden;
     }
 
-    .mail-inbox-zero-hearts {
+    .@(MailCssClasses.InboxZeroHearts) {
         position: absolute;
         inset: 0;
         pointer-events: none;
     }
 
-    .mail-inbox-zero-heart {
+    .@(MailCssClasses.InboxZeroHeart) {
         position: absolute;
         bottom: -@(AppMeasures.Space.Px32)px;
         opacity: 0;
@@ -318,37 +306,34 @@
         100% { transform: translateY(-@(AppMeasures.Size.Px300)px) scale(1.1); opacity: 0; }
     }
 
-    .mail-inbox-zero-headline {
+    .@(MailCssClasses.InboxZeroHeadline) {
         position: relative;
         font-size: @(AppMeasures.Font.Hero)px;
         font-weight: @(AppMeasures.Weight.Bold);
     }
 
-    .mail-inbox-zero-title {
+    .@(MailCssClasses.InboxZeroTitle) {
         background: linear-gradient(135deg, var(--account-accent, @primary), @AppColors.Accent.ToRgbaHex(true));
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
-    .mail-empty-icon {
+    .@(MailCssClasses.EmptyIcon) {
         font-size: @(AppMeasures.Font.Mega)px;
         opacity: @(AppMeasures.Opacity.Soft);
     }
 
-    .mail-empty-text {
+    .@(MailCssClasses.EmptyText) {
         font-size: @(AppMeasures.Font.Normal)px;
     }
 
-    /* The sentence under the headline: the evidence for it (an error, a server count, a
-       timestamp). Wrapped and width-capped because an IMAP error message can be a paragraph. */
-    .mail-empty-detail {
+    .@(MailCssClasses.EmptyDetail) {
         font-size: @(AppMeasures.Font.Small)px;
         opacity: @(AppMeasures.Opacity.Soft);
         max-width: @(AppMeasures.Size.Px360)px;
         text-align: center;
-        line-height: 1.5;
+        line-height: @(AppMeasures.LineHeight.Normal);
         word-break: break-word;
     }
-
 </style>

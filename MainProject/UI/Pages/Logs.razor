@@ -4,7 +4,8 @@
 @inject NavigationManager Navigation
 <PageTitle>Logs — My Lovely Mail</PageTitle>
 
-<div class="logs-screen" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle"
+<div class="logs-screen" data-context-menu="true"
+     @onmouseup="OnLogsMouseUp"
      @oncontextmenu="OpenLogsMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
     <div class="logs-header">
         <BackButton OnClick="@(() => Navigation.NavigateTo(NavigationConstants.Settings.Link))" />
@@ -22,17 +23,17 @@
         <div class="logs-levels">
             @foreach (var level in Levels)
             {
-                <button class="mail-search-toggle @(ActiveLevel == level ? "mail-search-toggle--on" : "")"
-                        @onclick="() => ActiveLevel = ActiveLevel == level ? null : level">@level</button>
+                <PillButton IsActive="@(ActiveLevel == level)"
+                            OnClick="@(() => ActiveLevel = ActiveLevel == level ? null : level)">@level</PillButton>
             }
         </div>
     </div>
 
     @if (FilteredLines.Count == 0)
     {
-        <div class="mail-empty">
-            <div class="mail-empty-icon">🧾</div>
-            <div class="mail-empty-text">@(Logger.ActivateLogging ? "No log lines match" : "Logging is disabled in Settings")</div>
+        <div class="@MailCssClasses.Empty">
+            <div class="@MailCssClasses.EmptyIcon">🧾</div>
+            <div class="@MailCssClasses.EmptyText">@(Logger.ActivateLogging ? "No log lines match" : "Logging is disabled in Settings")</div>
         </div>
     }
     else
@@ -103,6 +104,12 @@
     ], pointer.ClientX, pointer.ClientY);
 
     static void ClearLogs() => Logger.ClearAllLogs();
+
+    Task OnLogsMouseUp(MouseEventArgs e) =>
+        MouseActionService.HandleSideMouseUpAsync(
+            e,
+            onMouse4: () => { Navigation.NavigateTo(NavigationConstants.Settings.Link); return Task.CompletedTask; },
+            onMouse5: () => { SetAutoRefresh(!AutoRefresh); return Task.CompletedTask; });
 
     public void Dispose() => refreshTimer?.Dispose();
 }

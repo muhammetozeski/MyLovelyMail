@@ -3,7 +3,6 @@
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 
 @{
-    // Row metrics follow the density setting: Cozy = roomy + 2 preview lines, Compact = tight single line.
     (int rowPaddingY, int previewLines, int rowGap) = GlobalSettings.MessageListDensity.Value switch
     {
         "Cozy" => (AppMeasures.Space.Px14, 2, AppMeasures.Space.Px8),
@@ -20,42 +19,68 @@
 }
 
 <style>
-    .mail-selection-tools { display: flex; flex-wrap: wrap; gap: @(AppMeasures.Space.Px6)px; }
-    .mail-row-shell { position: relative; }
-    .mail-row-quick-actions {
+    .@(MailCssClasses.RowShell) {
+        position: relative;
+    }
+
+    .@(MailCssClasses.RowQuickActions),
+    .@(MailCssClasses.RowQuickActions).@(MyLovelyMail.MainProject.UI.Elements.Buttons.ActionBarCssClasses.Bar) {
         position: absolute;
         right: @(AppMeasures.Space.Px6)px;
         bottom: @(AppMeasures.Space.Px4)px;
-        display: flex;
+        display: none;
         gap: @(AppMeasures.Space.Px4)px;
         justify-content: flex-end;
         padding: 0;
+        z-index: @(AppMeasures.ZLayer.Raised);
     }
-    .mail-row-shell .mail-row-subject, .mail-row-shell .mail-row-preview { padding-right: @(AppMeasures.Size.Px100)px; }
-    .mail-row-quick-actions button {
-        border: 0;
+
+    .@(MailCssClasses.RowShell):hover .@(MailCssClasses.RowQuickActions),
+    .@(MailCssClasses.RowShell):focus-within .@(MailCssClasses.RowQuickActions),
+    .@(MailCssClasses.RowQuickActions).@(MyLovelyMail.MainProject.UI.Elements.Buttons.ActionBarCssClasses.BarDropReady) {
+        display: flex;
+    }
+
+    .@(MailCssClasses.RowShell) .@(MailCssClasses.RowSubject),
+    .@(MailCssClasses.RowShell) .@(MailCssClasses.RowPreview) {
+        padding-right: @(AppMeasures.Size.Px100)px;
+    }
+
+    .@(MailCssClasses.RowQuickActions) button,
+    .@(MailCssClasses.RowQuickBtn) {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         border-radius: @(AppMeasures.Radius.Small)px;
-        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
         color: @textPrimary;
         cursor: pointer;
-        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px3)px @(AppMeasures.Space.Px8)px;
         font-size: @(AppMeasures.Font.Small)px;
     }
-    .mail-row-quick-actions button:hover, .mail-row-quick-actions button:focus-visible { background: @surfaceTint; }
+
+    .@(MailCssClasses.RowQuickActions) button:hover,
+    .@(MailCssClasses.RowQuickActions) button:focus-visible,
+    .@(MailCssClasses.RowQuickBtn):hover {
+        background: @surfaceTint;
+    }
+
+    .@(MailCssClasses.RowQuickBtnDanger):hover {
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+        border-color: @AppColors.TextDanger.ToRgbaHex(true);
+    }
+
     /* ---- Message list ---- */
 
-    .mail-list {
+    .@(MailCssClasses.List) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px8)px;
         min-height: 0;
-        /* Pinned beside the growing reader, exactly like the sidebar. */
         position: sticky;
         top: @(AppMeasures.Space.Medium)px;
         height: @paneHeight;
     }
 
-    .mail-rows {
+    .@(MailCssClasses.Rows) {
         overflow-y: auto;
         min-height: 0;
         display: flex;
@@ -64,7 +89,7 @@
         padding-right: @(AppMeasures.Space.Px2)px;
     }
 
-    .mail-row {
+    .@(MailCssClasses.Row) {
         display: flex;
         align-items: flex-start;
         gap: @(AppMeasures.Space.Px8)px;
@@ -80,76 +105,94 @@
         box-sizing: border-box;
     }
 
-        .mail-row:hover {
+        .@(MailCssClasses.Row):hover {
             background: @surfaceTint;
             transform: translateY(-@(AppMeasures.Size.Px1)px);
         }
 
-    .mail-row--active {
+    .@(MailCssClasses.RowActive) {
         background: @surfaceTint;
         border-color: var(--account-accent, @primary);
     }
 
-    /* Keyboard-focused row: a soft accent outline distinct from the opened (active) row. */
-    .mail-row--focused {
+    .@(MailCssClasses.RowFocused) {
         outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
         outline-offset: -@(AppMeasures.Border.Medium)px;
     }
 
-    /* The app-state ring (.mail-row--focused) tracks MailUiState.FocusedMessage, which stays lit
-       while the keyboard is somewhere else entirely. These rules follow real DOM focus, and only
-       for keyboard focus, so clicking does not light everything up. */
-    .mail-rows:focus-visible,
-    .mail-account:focus-visible,
-    .mail-folder:focus-visible,
-    .mail-folder-action:focus-visible,
-    .mail-search-toggle:focus-visible,
-    .mail-row:focus-visible,
-    .mail-move-option:focus-visible,
-    .mail-attachment-chip:focus-visible,
-    .mail-tag-chip:focus-visible,
-    .mail-backfill-button:focus-visible,
-    .mail-saved-run:focus-visible,
-    .mail-saved-remove:focus-visible {
+    .@(MailCssClasses.Rows):focus-visible,
+    .@(MailCssClasses.Account):focus-visible,
+    .@(MailCssClasses.Folder):focus-visible,
+    .@(MailCssClasses.FolderAction):focus-visible,
+    .@(MailCssClasses.SearchToggle):focus-visible,
+    .@(MailCssClasses.Row):focus-visible,
+    .@(MailCssClasses.MoveOption):focus-visible,
+    .@(MailCssClasses.AttachmentChip):focus-visible,
+    .@(MailCssClasses.TagChip):focus-visible,
+    .@(MailCssClasses.BackfillButton):focus-visible,
+    .@(MailCssClasses.SavedRun):focus-visible,
+    .@(MailCssClasses.SavedRemove):focus-visible {
         outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
         outline-offset: @(AppMeasures.Border.Thin)px;
     }
 
-    .mail-rows:focus:not(:focus-visible) {
+    .@(MailCssClasses.Rows):focus:not(:focus-visible) {
         outline: none;
     }
 
-    .mail-shortcuts {
+    .@(MailCssClasses.Shortcuts) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px8)px;
         text-align: left;
     }
 
-    .mail-shortcuts-title {
+    .@(MailCssClasses.ShortcutsTitle) {
         font-size: @(AppMeasures.Font.Large)px;
         font-weight: @(AppMeasures.Weight.Bold);
         margin-bottom: @(AppMeasures.Space.Px8)px;
         text-align: center;
     }
 
-    .mail-shortcuts-row {
+    .@(MailCssClasses.ShortcutsRow) {
         display: flex;
         justify-content: space-between;
         gap: @(AppMeasures.Space.Px16)px;
     }
 
-    .mail-shortcuts-keys {
+    .@(MailCssClasses.ShortcutsKeys) {
         font-weight: @(AppMeasures.Weight.Heavy);
         color: @primary;
         min-width: @(AppMeasures.Size.Px80)px;
     }
 
-    .mail-shortcuts-action {
+    .@(MailCssClasses.ShortcutsAction) {
         color: @textSecondary;
     }
 
-    .mail-bulk-bar {
+    .@(MailCssClasses.ShortcutGrid) {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px12)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        align-items: center;
+    }
+
+    .@(MailCssClasses.ModalSectionTitle) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textMuted;
+        margin-bottom: @(AppMeasures.Space.Px6)px;
+        text-transform: uppercase;
+        letter-spacing: @(AppMeasures.Tracking.Normal)px;
+    }
+
+    .@(MailCssClasses.SnoozeWhen) {
+        font-size: @(AppMeasures.Font.XSmall)px;
+        color: @textMuted;
+    }
+
+    .@(MailCssClasses.BulkBar) {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
@@ -160,12 +203,11 @@
         background: @surfaceTint;
     }
 
-    /* Move popover anchors to its wrapper span so it opens right under the Move button. */
-    .mail-bulk-move {
+    .@(MailCssClasses.BulkMove) {
         position: relative;
     }
 
-    .mail-move-popover {
+    .@(MailCssClasses.MovePopover) {
         position: absolute;
         top: @(AppMeasures.Percent.Full)%;
         left: 0;
@@ -183,7 +225,7 @@
         box-shadow: @AppStyles.ShadowMedium;
     }
 
-    .mail-move-divider {
+    .@(MailCssClasses.MoveDivider) {
         padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px2)px;
         margin-top: @(AppMeasures.Space.Px4)px;
         border-top: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
@@ -191,7 +233,7 @@
         color: @AppColors.TextMuted.ToRgbaHex(true);
     }
 
-    .mail-move-option {
+    .@(MailCssClasses.MoveOption) {
         border: none;
         background: transparent;
         color: @AppColors.TextPrimary.ToRgbaHex(true);
@@ -205,18 +247,28 @@
         text-overflow: ellipsis;
     }
 
-        .mail-move-option:hover {
+        .@(MailCssClasses.MoveOption):hover {
             background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
         }
 
-    .mail-bulk-count {
+    .@(MailCssClasses.MoveFilter) {
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @textPrimary;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        outline: none;
+    }
+
+    .@(MailCssClasses.BulkCount) {
         font-size: @(AppMeasures.Font.Small)px;
         font-weight: @(AppMeasures.Weight.Heavy);
         color: var(--account-accent, @primary);
         margin-right: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-row-check {
+    .@(MailCssClasses.RowCheck) {
         font-size: @(AppMeasures.Font.Medium)px;
         color: @textMuted;
         flex-shrink: 0;
@@ -224,16 +276,15 @@
         line-height: @(AppMeasures.LineHeight.None);
     }
 
-        .mail-row-check:hover {
+        .@(MailCssClasses.RowCheck):hover {
             color: @textPrimary;
         }
 
-    .mail-row-check--on {
+    .@(MailCssClasses.RowCheckOn) {
         color: var(--account-accent, @primary);
     }
 
-    /* Reader twin of the row avatar, one size up since it identifies the message being read. */
-    .mail-reader-avatar {
+    .@(MailCssClasses.ReaderAvatar) {
         width: @(AppMeasures.Size.Px44)px;
         height: @(AppMeasures.Size.Px44)px;
         border-radius: @(AppMeasures.Radius.Circular)%;
@@ -245,9 +296,10 @@
         font-weight: @(AppMeasures.Weight.Heavy);
         flex-shrink: 0;
         box-shadow: @AppStyles.ShadowSoft;
+        cursor: context-menu;
     }
 
-    .mail-row-snoozed {
+    .@(MailCssClasses.RowSnoozed) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: @surfaceTint;
         color: @textSecondary;
@@ -259,14 +311,14 @@
         white-space: nowrap;
     }
 
-    .mail-unsubscribe {
+    .@(MailCssClasses.Unsubscribe) {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
         margin-top: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-unsubscribe-chip {
+    .@(MailCssClasses.UnsubscribeChip) {
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px10)px;
         border-radius: @(AppMeasures.Radius.Pill)px;
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
@@ -277,16 +329,13 @@
         white-space: nowrap;
     }
 
-        .mail-unsubscribe-chip:hover {
+        .@(MailCssClasses.UnsubscribeChip):hover {
             color: @AppColors.TextDanger.ToRgbaHex(true);
             border-color: @AppColors.TextDanger.ToRgbaHex(true);
         }
 
-        /* Not a button: it says why the action is absent, so it must not look pressable.
-           After the base rule and the hover rule on purpose — same specificity, so order decides
-           which cursor and which colour win. */
-        .mail-unsubscribe-chip--blocked,
-        .mail-unsubscribe-chip--blocked:hover {
+        .@(MailCssClasses.UnsubscribeChipBlocked),
+        .@(MailCssClasses.UnsubscribeChipBlocked):hover {
             cursor: default;
             opacity: @(AppMeasures.Opacity.Soft);
             display: inline-block;
@@ -294,7 +343,7 @@
             border-color: @glassBorder;
         }
 
-    .mail-reader-history {
+    .@(MailCssClasses.ReaderHistory) {
         align-self: flex-start;
         margin-top: @(AppMeasures.Space.Px4)px;
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px10)px;
@@ -307,12 +356,12 @@
         white-space: nowrap;
     }
 
-        .mail-reader-history:hover {
+        .@(MailCssClasses.ReaderHistory):hover {
             color: @AppColors.TextPrimary.ToRgbaHex(true);
             border-color: var(--account-accent, @primary);
         }
 
-    .mail-row-avatar {
+    .@(MailCssClasses.RowAvatar) {
         width: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
         height: @(GlobalSettings.MessageListDensity.Value == "Compact" ? AppMeasures.Size.Px24 : AppMeasures.Size.Px32)px;
         border-radius: @(AppMeasures.Radius.Circular)%;
@@ -326,13 +375,12 @@
         box-shadow: @AppStyles.ShadowSoft;
     }
 
-    /* Unread: an accent ring around the avatar reinforces the dot without shouting. */
-    .mail-row-avatar--unread {
+    .@(MailCssClasses.RowAvatarUnread) {
         outline: @(AppMeasures.Border.Medium)px solid var(--account-accent, @primary);
         outline-offset: @(AppMeasures.Border.Thin)px;
     }
 
-    .mail-row-dot {
+    .@(MailCssClasses.RowDot) {
         width: @(AppMeasures.Size.Px5)px;
         height: @(AppMeasures.Size.Px5)px;
         margin-top: @(AppMeasures.Space.Px6)px;
@@ -341,12 +389,11 @@
         background: transparent;
     }
 
-    .mail-row--unread .mail-row-dot {
+    .@(MailCssClasses.RowUnread) .@(MailCssClasses.RowDot) {
         background: var(--account-accent, @primary);
     }
 
-    /* One-shot arrival bloom: the row unfolds from slightly small with a petal-like accent glow. */
-    .mail-row--bloom {
+    .@(MailCssClasses.RowBloom) {
         animation: mail-bloom @(AppMeasures.Duration.Slow)s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -369,12 +416,12 @@
         }
     }
 
-    .mail-row--unread .mail-row-from,
-    .mail-row--unread .mail-row-subject {
+    .@(MailCssClasses.RowUnread) .@(MailCssClasses.RowFrom),
+    .@(MailCssClasses.RowUnread) .@(MailCssClasses.RowSubject) {
         font-weight: @(AppMeasures.Weight.Heavy);
     }
 
-    .mail-row-main {
+    .@(MailCssClasses.RowMain) {
         flex: 1;
         min-width: 0;
         display: flex;
@@ -382,37 +429,37 @@
         gap: @(AppMeasures.Space.Px2)px;
     }
 
-    .mail-row-top {
+    .@(MailCssClasses.RowTop) {
         display: flex;
         justify-content: space-between;
         gap: @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-row-from {
+    .@(MailCssClasses.RowFrom) {
         font-size: @(AppMeasures.Font.Normal)px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-row-date {
+    .@(MailCssClasses.RowDate) {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textMuted;
         flex-shrink: 0;
     }
 
-    .mail-row-subject {
+    .@(MailCssClasses.RowSubject) {
         font-size: @(AppMeasures.Font.Normal)px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-row-flag {
+    .@(MailCssClasses.RowFlag) {
         margin-right: @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-row-preview {
+    .@(MailCssClasses.RowPreview) {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textMuted;
         overflow: hidden;
@@ -430,8 +477,7 @@
         }
     }
 
-    .mail-row-attach {
+    .@(MailCssClasses.RowAttach) {
         margin-right: @(AppMeasures.Space.Px4)px;
     }
-
 </style>

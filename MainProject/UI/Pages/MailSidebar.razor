@@ -1,8 +1,7 @@
 @namespace MyLovelyMail.MainProject.UI.Pages
 @inherits MailPageSection
-@implements IAsyncDisposable
+@implements IDisposable
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 @using System.IO
 @using MyLovelyMail.MainProject.DataModels.Mail
@@ -12,46 +11,50 @@
 @using MyLovelyMail.MainProject.Stores
 
     @* ---- Left: accounts + folders ---- *@
-    <aside class="mail-sidebar">
-        <div class="mail-logo">
-            💌<span class="mail-logo-text">My Lovely Mail</span>
-            <button class="mail-folder-action mail-account-folder-action" title="New account folder"
-                    @onclick="() => ModalService.OpenCreateFolder()">📁+</button>
+    <aside class="@MailCssClasses.Sidebar" tabindex="-1" @onkeydown="HandleSidebarKeyDown">
+        <div class="@MailCssClasses.Logo">
+            💌<span class="@MailCssClasses.LogoText">My Lovely Mail</span>
             <SyncHeart />
         </div>
+
+        <CustomizableActionBar SurfaceId="@UiSurfaceIds.SidebarTop"
+                               PairedMenuSurfaceId="@UiSurfaceIds.AccountContextMenu"
+                               DefaultActions="@View.BuildSidebarTopActions()"
+                               AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.SidebarTop, id))"
+                               Wrap="true" />
+
         @if (quickMailError != null)
         {
-            <p class="wizard-test wizard-test--fail" role="alert">@quickMailError</p>
+            <p class="@MailCssClasses.WizardTest @MailCssClasses.WizardTestFail" role="alert">@quickMailError</p>
         }
 
-        @if (IsAnyDragActive)
+        @if (WorkspaceDragService.IsDragging)
         {
-            <div class="mail-drag-escape-banner">
-                <span>🎯 Drop on target — press <kbd>Esc</kbd> to cancel</span>
-                <button type="button" class="mail-folder-action" title="Cancel drag (Esc)" @onclick="CancelActiveDrag">✕</button>
+            <div class="@MailCssClasses.DragEscapeBanner">
+                <span>🎯 @WorkspaceDragService.TargetHint — <kbd>Esc</kbd></span>
+                <button type="button" class="@MailCssClasses.FolderAction" title="Cancel drag (Esc)" @onclick="() => WorkspaceDragService.Cancel()">✕</button>
             </div>
-        }
-
-        @if (MailUiState.SelectedAccount != null)
-        {
-            <PrimaryButton IsFullWidth="true" OnClick="@(() => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty))" CustomClass="mail-compose-button">✏️ Compose</PrimaryButton>
         }
 
         @if (Mail.SavedSearchList.Count > 0)
         {
-            <div class="mail-saved-searches">
+            <div class="@MailCssClasses.SavedSearches">
                 @foreach (var saved in Mail.SavedSearchList)
                 {
-                    <span class="mail-saved-chip" data-context-menu="true" data-mouse4="click" data-mouse4-selector=".mail-saved-remove" data-mouse5="click" data-mouse5-selector=".mail-saved-run"
-                          @oncontextmenu="e => View.OpenSavedSearchMenu(saved, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
-                        <button class="mail-saved-run" @onclick="() => View.RunSavedSearch(saved)">🔎 @saved</button>
-                        <button class="mail-saved-remove" @onclick="() => Mail.RemoveSavedSearch(saved)">✕</button>
+                    <span class="@MailCssClasses.SavedChip"
+                          @onmouseup="e => HandleSavedSearchSideMouse(saved, e)"
+                          @onmouseup:stopPropagation="true"
+                          @oncontextmenu="e => View.OpenSavedSearchMenu(saved, e)"
+                          @oncontextmenu:preventDefault="true"
+                          @oncontextmenu:stopPropagation="true">
+                        <button class="@MailCssClasses.SavedRun" @onclick="() => View.RunSavedSearch(saved)">🔎 @saved</button>
+                        <button class="@MailCssClasses.SavedRemove" @onclick="() => Mail.RemoveSavedSearch(saved)">✕</button>
                     </span>
                 }
             </div>
         }
 
-        <nav class="mail-sidebar-nav">
+        <nav class="@MailCssClasses.SidebarNav">
             @foreach (var rootFolder in AccountFolderStore.GetRootFolders())
             {
                 @RenderAccountFolderTree(rootFolder, 0)
@@ -60,10 +63,10 @@
 
         @if (AccountStore.Accounts.Count == 0)
         {
-            <GlassCard Level="AcrylicLevel.Normal" CustomClass="mail-welcome-card">
-                <div class="mail-welcome-icon">🌸</div>
-                <div class="mail-welcome-title">Welcome!</div>
-                <p class="mail-welcome-text">Add your first mail account and your inbox will bloom here.</p>
+            <GlassCard Level="AcrylicLevel.Normal" CustomClass="@MailCssClasses.WelcomeCard">
+                <div class="@MailCssClasses.WelcomeIcon">🌸</div>
+                <div class="@MailCssClasses.WelcomeTitle">Welcome!</div>
+                <p class="@MailCssClasses.WelcomeText">Add your first mail account and your inbox will bloom here.</p>
                 <PrimaryButton IsFullWidth="true" OnClick="@(() => ModalService.OpenAddAccount(AccountFolderStore.DefaultFolderId))">
                     ➕ Add account
                 </PrimaryButton>
@@ -72,39 +75,54 @@
 
         @if (View.FolderActionStatus != null)
         {
-            <div class="mail-sidebar-status">@View.FolderActionStatus</div>
+            <div class="@MailCssClasses.SidebarStatus">@View.FolderActionStatus</div>
         }
     </aside>
 
 @code {
     readonly HashSet<string> quickMailPending = [];
     string? quickMailError;
-    DotNetObjectReference<MailSidebar>? dotNetRef;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (firstRender)
-        {
-            try
-            {
-                dotNetRef = DotNetObjectReference.Create(this);
-                await JS.InvokeVoidAsync("myLovelyMailSidebarDrag.register", dotNetRef);
-            }
-            catch
-            {
-                // Ignore if page is tearing down.
-            }
-        }
+        base.OnInitialized();
+        View.TryCancelSidebarDrag = WorkspaceDragService.Cancel;
+        WorkspaceDragService.OnStateChanged += HandleDragStateChanged;
     }
 
-    public async ValueTask DisposeAsync()
+    void HandleDragStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
     {
-        try
-        {
-            await JS.InvokeVoidAsync("myLovelyMailSidebarDrag.unregister");
-        }
-        catch { }
-        dotNetRef?.Dispose();
+        WorkspaceDragService.OnStateChanged -= HandleDragStateChanged;
+        if (View?.TryCancelSidebarDrag == WorkspaceDragService.Cancel)
+            View.TryCancelSidebarDrag = null;
+    }
+
+    static void HandleSidebarKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            WorkspaceDragService.Cancel();
+    }
+
+    void HandleSavedSearchSideMouse(string saved, MouseEventArgs e)
+    {
+        if (e.Button == 3) Mail.RemoveSavedSearch(saved);
+        else if (e.Button == 4) View.RunSavedSearch(saved);
+    }
+
+    Task HandleAccountSideMouseAsync(MailAccountData account, MouseEventArgs e)
+    {
+        if (e.Button == 3) { View.OpenAccountMenu(account, e); return Task.CompletedTask; }
+        if (e.Button == 4) return MouseActionService.RunAsync(MouseActionService.AccountSyncAction, account.Id);
+        return Task.CompletedTask;
+    }
+
+    Task HandleFolderSideMouseAsync(MailFolderData folder, MouseEventArgs e)
+    {
+        if (e.Button == 3) { View.OpenFolderMenu(folder, e); return Task.CompletedTask; }
+        if (e.Button == 4) return MouseActionService.ReadFolderAsync(folder);
+        return Task.CompletedTask;
     }
 
     async Task CreateQuickMailAsync(string folderId)
@@ -125,148 +143,93 @@
         finally { quickMailPending.Remove(folderId); }
     }
 
-    string? draggedAccountId;
-    string? draggedFolderId;
-    string? draggedMailFolderFullName;
-    string? dragOverFolderId;
-    string? dragOverAccountId;
-    string? dragOverMailFolderFullName;
-    bool dragCancelledByEscape;
-
-    bool IsAnyDragActive => !dragCancelledByEscape && (
-        draggedAccountId != null ||
-        draggedFolderId != null ||
-        draggedMailFolderFullName != null ||
-        View.DraggedMessages.Length > 0);
-
-    [JSInvokable]
-    public void CancelActiveDragFromJs() => CancelActiveDrag();
-
-    void CancelActiveDrag()
+    static string DropClassOf(WorkspaceDropPosition pos) => pos switch
     {
-        dragCancelledByEscape = true;
-        draggedAccountId = null;
-        draggedFolderId = null;
-        draggedMailFolderFullName = null;
-        dragOverFolderId = null;
-        dragOverAccountId = null;
-        dragOverMailFolderFullName = null;
-        View.EndMessageDrag();
-        MouseActionService.ReportStatus("Drag cancelled.");
-        StateHasChanged();
+        WorkspaceDropPosition.Before => MailCssClasses.DropBefore,
+        WorkspaceDropPosition.After => MailCssClasses.DropAfter,
+        WorkspaceDropPosition.Into => MailCssClasses.DropTarget,
+        _ => string.Empty
+    };
+
+    static void BeginAccountFolderPointerDown(AccountFolderData folder, PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        WorkspaceDragService.BeginAccountFolderCandidate(folder, e.ClientX, e.ClientY);
     }
 
-    void StartAccountDrag(string accountId)
+    static void MoveAccountFolderPointer(AccountFolderData folder, PointerEventArgs e)
     {
-        dragCancelledByEscape = false;
-        draggedAccountId = accountId;
-        draggedFolderId = null;
-        draggedMailFolderFullName = null;
+        WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (WorkspaceDragService.IsDragging)
+            WorkspaceDragService.HoverAccountFolder(folder, e.OffsetY);
     }
 
-    void StartFolderDrag(string folderId)
+    static Task EndAccountFolderPointerAsync(AccountFolderData folder, PointerEventArgs e)
     {
-        dragCancelledByEscape = false;
-        draggedFolderId = folderId;
-        draggedAccountId = null;
-        draggedMailFolderFullName = null;
+        if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
+        WorkspaceDragService.HoverAccountFolder(folder, e.OffsetY);
+        return WorkspaceDragService.CompleteDropAsync();
     }
 
-    void StartMailFolderDrag(string folderFullName)
+    static void BeginAccountPointerDown(MailAccountData account, PointerEventArgs e)
     {
-        dragCancelledByEscape = false;
-        draggedMailFolderFullName = folderFullName;
-        draggedAccountId = null;
-        draggedFolderId = null;
+        if (e.Button != 0) return;
+        WorkspaceDragService.BeginAccountCandidate(account, e.ClientX, e.ClientY);
     }
 
-    void EndDrag()
+    static void MoveAccountPointer(MailAccountData account, PointerEventArgs e)
     {
-        dragCancelledByEscape = false;
-        draggedAccountId = null;
-        draggedFolderId = null;
-        draggedMailFolderFullName = null;
-        dragOverFolderId = null;
-        dragOverAccountId = null;
-        dragOverMailFolderFullName = null;
+        WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (WorkspaceDragService.IsDragging)
+            WorkspaceDragService.HoverAccount(account, e.OffsetY);
     }
 
-    void DropOnFolder(AccountFolderData targetFolder)
+    static Task EndAccountPointerAsync(MailAccountData account, PointerEventArgs e)
     {
-        if (dragCancelledByEscape)
-        {
-            EndDrag();
-            return;
-        }
-        string? acct = draggedAccountId;
-        string? fld = draggedFolderId;
-        EndDrag();
-
-        if (!string.IsNullOrWhiteSpace(acct))
-        {
-            AccountFolderStore.SetExpanded(targetFolder.Id, true);
-            AccountStore.MoveToFolder(acct, targetFolder.Id);
-            MouseActionService.ReportStatus($"Moved account into '{targetFolder.Name}'.");
-        }
-        else if (!string.IsNullOrWhiteSpace(fld) && !string.Equals(fld, targetFolder.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            AccountFolderStore.SetExpanded(targetFolder.Id, true);
-            AccountFolderStore.MoveFolder(fld, targetFolder.Id);
-            MouseActionService.ReportStatus($"Moved folder into '{targetFolder.Name}'.");
-        }
+        if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
+        WorkspaceDragService.HoverAccount(account, e.OffsetY);
+        return WorkspaceDragService.CompleteDropAsync();
     }
 
-    void DropOnAccount(MailAccountData targetAccount)
+    static void HandleAccountClick(MailAccountData account)
     {
-        if (dragCancelledByEscape)
-        {
-            EndDrag();
-            return;
-        }
-        string? acct = draggedAccountId;
-        string? fld = draggedFolderId;
-        EndDrag();
-
-        if (!string.IsNullOrWhiteSpace(acct) && !string.Equals(acct, targetAccount.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            AccountStore.MoveToFolder(acct, targetAccount.FolderId, insertBeforeAccountId: targetAccount.Id);
-            MouseActionService.ReportStatus($"Reordered account before '{targetAccount.EmailAddress}'.");
-        }
-        else if (!string.IsNullOrWhiteSpace(fld))
-        {
-            AccountFolderStore.MoveFolder(fld, targetAccount.FolderId);
-        }
+        if (WorkspaceDragService.ConsumeSuppressedClick()) return;
+        MailUiState.SelectAccount(account, restoreFolder: true);
     }
 
-    async Task DropOnMailFolderAsync(MailFolderData targetMailFolder)
+    static void HandleAccountFolderClick(string folderId)
     {
-        if (dragCancelledByEscape)
-        {
-            EndDrag();
-            View.EndMessageDrag();
-            return;
-        }
-        string? srcMailFolder = draggedMailFolderFullName;
-        var draggedMsgs = View.DraggedMessages;
-        EndDrag();
-        View.EndMessageDrag();
-
-        if (draggedMsgs.Length > 0 && targetMailFolder.Selectable)
-        {
-            await MouseActionService.RunMessagesAsync(MailMessageCommand.Move, draggedMsgs, targetMailFolder.FullName, includeSelection: false);
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(srcMailFolder)
-            && !string.Equals(srcMailFolder, targetMailFolder.FullName, StringComparison.OrdinalIgnoreCase))
-        {
-            MessageStore.ReorderFolder(targetMailFolder.AccountId, srcMailFolder, targetMailFolder.FullName);
-            View.RefreshSidebarFolders();
-            MouseActionService.ReportStatus($"Reordered '{targetMailFolder.DisplayName}'.");
-        }
+        if (WorkspaceDragService.ConsumeSuppressedClick()) return;
+        AccountFolderStore.ToggleExpanded(folderId);
     }
 
-    int OrdinalOfAccount(MailAccountData account)
+    static void BeginMailFolderPointerDown(MailFolderData folder, PointerEventArgs e)
+    {
+        if (e.Button != 0) return;
+        WorkspaceDragService.BeginMailFolderCandidate(folder, e.ClientX, e.ClientY);
+    }
+
+    static void MoveMailFolderPointer(MailFolderData folder, PointerEventArgs e)
+    {
+        WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (WorkspaceDragService.IsDragging)
+            WorkspaceDragService.HoverMailFolder(folder, e.OffsetY);
+    }
+
+    static Task EndMailFolderPointerAsync(MailFolderData folder, PointerEventArgs e)
+    {
+        if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
+        WorkspaceDragService.HoverMailFolder(folder, e.OffsetY);
+        return WorkspaceDragService.CompleteDropAsync();
+    }
+
+    static void HandleMailFolderClick(MailFolderData folder)
+    {
+        if (WorkspaceDragService.ConsumeSuppressedClick()) return;
+        MailUiState.SelectFolder(folder);
+    }
+
+    static int OrdinalOfAccount(MailAccountData account)
     {
         for (int i = 0; i < AccountStore.Accounts.Count; i++)
         {
@@ -280,47 +243,35 @@
     {
         var childFolders = AccountFolderStore.GetChildFolders(accFolder.Id);
         var folderAccounts = AccountStore.GetAccountsInFolder(accFolder.Id);
-        bool isDropTarget = dragOverFolderId == accFolder.Id;
+        string folderDropClass = DropClassOf(WorkspaceDragService.GetAccountFolderDropIndicator(accFolder.Id));
 
-        <div class="mail-account-folder-row @(isDropTarget ? "mail-drop-target" : "")"
+        <div class="@MailCssClasses.AccountFolderRow @folderDropClass"
+             data-account-folder-id="@accFolder.Id"
              style="--acc-folder-depth:@depth"
-             draggable="true"
-             @ondragstart="() => StartFolderDrag(accFolder.Id)"
-             @ondragstart:stopPropagation="true"
-             @ondragend="EndDrag"
-             @ondragover="() => dragOverFolderId = accFolder.Id"
-             @ondragover:preventDefault="true"
-             @ondrop="() => DropOnFolder(accFolder)"
-             @ondrop:stopPropagation="true"
-             data-context-menu="true"
+             @onpointerdown="e => BeginAccountFolderPointerDown(accFolder, e)"
+             @onpointerdown:stopPropagation="true"
+             @onpointermove="e => MoveAccountFolderPointer(accFolder, e)"
+             @onpointerup="e => EndAccountFolderPointerAsync(accFolder, e)"
              @oncontextmenu="e => View.OpenAccountFolderMenu(accFolder, e)"
              @oncontextmenu:preventDefault="true"
              @oncontextmenu:stopPropagation="true">
 
-            <button class="mail-account-folder-toggle"
-                    title="@(accFolder.IsExpanded ? "Collapse folder" : "Expand folder")"
-                    @onclick="() => AccountFolderStore.ToggleExpanded(accFolder.Id)">
-                <span class="mail-account-folder-chevron">@(accFolder.IsExpanded ? "▾" : "▸")</span>
-                <span class="mail-account-folder-icon">@(accFolder.IsExpanded ? "📂" : "📁")</span>
-                <span class="mail-account-folder-name">@accFolder.Name</span>
+            <button class="@MailCssClasses.AccountFolderToggle"
+                    type="button"
+                    title="@(accFolder.IsExpanded ? "Collapse folder (drag to reorder)" : "Expand folder (drag to reorder)")"
+                    @onclick="() => HandleAccountFolderClick(accFolder.Id)">
+                <span class="@MailCssClasses.AccountFolderChevron">@(accFolder.IsExpanded ? "▾" : "▸")</span>
+                <span class="@MailCssClasses.AccountFolderIcon">@(accFolder.IsExpanded ? "📂" : "📁")</span>
+                <span class="@MailCssClasses.AccountFolderName">@accFolder.Name</span>
             </button>
 
-            <span class="mail-folder-hover-actions">
-                <button class="mail-folder-action mail-account-folder-action"
-                        title="Add account to @accFolder.Name"
-                        @onclick="() => ModalService.OpenAddAccount(accFolder.Id)">➕</button>
-
-                <button class="mail-folder-action mail-account-folder-action" type="button"
-                        title="@(quickMailError ?? "Create a Mail.tm account here")" aria-label="Create a Mail.tm account here"
-                        disabled="@quickMailPending.Contains(accFolder.Id)" @onclick="() => CreateQuickMailAsync(accFolder.Id)">
-                    @if (quickMailPending.Contains(accFolder.Id)) { <CoreSpinner SizePx="16" BorderWidthPx="2" Color="@AppColors.TextPrimary" /> }
-                    else { <FastMailAddIcon /> }
-                </button>
-
-                <button class="mail-folder-action mail-account-folder-action"
-                        title="Folder options"
-                        @onclick="e => View.OpenAccountFolderMenu(accFolder, e)">⋯</button>
-            </span>
+            <CustomizableActionBar SurfaceId="@UiSurfaceIds.SidebarAccountFolderHover"
+                                   PairedMenuSurfaceId="@UiSurfaceIds.AccountFolderContextMenu"
+                                   DefaultActions="@View.BuildSidebarAccountFolderHoverActions(accFolder, () => CreateQuickMailAsync(accFolder.Id), quickMailPending.Contains(accFolder.Id), quickMailError)"
+                                   AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.SidebarAccountFolderHover, id, accountFolderContext: accFolder))"
+                                   Compact="true"
+                                   StopClickPropagation="true"
+                                   CustomClass="@MailCssClasses.FolderHoverActions" />
         </div>
 
         @if (accFolder.IsExpanded)
@@ -333,43 +284,44 @@
             @foreach (var account in folderAccounts)
             {
                 int accountIndex = OrdinalOfAccount(account);
-                bool isAccountDropTarget = dragOverAccountId == account.Id;
+                string accountDropClass = DropClassOf(WorkspaceDragService.GetAccountDropIndicator(account.Id));
 
-                <button class="mail-account @(MailUiState.SelectedAccount?.Id == account.Id ? "mail-account--active" : "") @(account.Enabled ? "" : "mail-account--paused") @(isAccountDropTarget ? "mail-drop-target" : "")"
+                <button class="@MailCssClasses.Account @(MailUiState.SelectedAccount?.Id == account.Id ? MailCssClasses.AccountActive : "") @(account.Enabled ? "" : MailCssClasses.AccountPaused) @accountDropClass"
+                        type="button"
+                        data-account-id="@account.Id"
                         style="padding-left: calc(12px + @(depth + 1) * 12px);"
                         title="@Mail.SyncHealthTooltip(account)"
-                        draggable="true"
-                        @ondragstart="() => StartAccountDrag(account.Id)"
-                        @ondragstart:stopPropagation="true"
-                        @ondragend="EndDrag"
-                        @ondragover="() => dragOverAccountId = account.Id"
-                        @ondragover:preventDefault="true"
-                        @ondrop="() => DropOnAccount(account)"
-                        @ondrop:stopPropagation="true"
-                        data-context-menu="true" @oncontextmenu="e => View.OpenAccountMenu(account, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true"
-                        data-mouse4="menu" data-mouse5="@MouseActionService.AccountSyncAction" data-mouse5-value="@account.Id"
-                        @onclick="() => MailUiState.SelectAccount(account, restoreFolder: true)">
-                    <span class="mail-account-dot" style="background:@account.ColorHex"></span>
+                        @onpointerdown="e => BeginAccountPointerDown(account, e)"
+                        @onpointerdown:stopPropagation="true"
+                        @onpointermove="e => MoveAccountPointer(account, e)"
+                        @onpointerup="e => EndAccountPointerAsync(account, e)"
+                        @onmouseup="e => HandleAccountSideMouseAsync(account, e)"
+                        @onmouseup:stopPropagation="true"
+                        @oncontextmenu="e => View.OpenAccountMenu(account, e)"
+                        @oncontextmenu:preventDefault="true"
+                        @oncontextmenu:stopPropagation="true"
+                        @onclick="() => HandleAccountClick(account)">
+                    <span class="@MailCssClasses.AccountDot" style="background:@account.ColorHex"></span>
                     @if (account.Protocol == IncomingProtocol.FastMail)
                     {
-                        <span class="mail-account-paused" title="Fast Mail (Tor-only)">⚡</span>
+                        <span class="@MailCssClasses.AccountPausedIcon" title="Fast Mail (Tor-only)">⚡</span>
                     }
                     @if (!account.Enabled)
                     {
-                        <span class="mail-account-paused" title="Paused — not syncing">⏸️</span>
+                        <span class="@MailCssClasses.AccountPausedIcon" title="Paused — not syncing">⏸️</span>
                     }
                     @if (SyncHealthService.For(account.Id).IsFailing)
                     {
-                        <span class="mail-account-failing" title="@Mail.SyncHealthTooltip(account)">⚠️</span>
+                        <span class="@MailCssClasses.AccountFailing" title="@Mail.SyncHealthTooltip(account)">⚠️</span>
                     }
                     @if (accountIndex < 9)
                     {
-                        <span class="mail-account-ordinal">@(accountIndex + 1)</span>
+                        <span class="@MailCssClasses.AccountOrdinal">@(accountIndex + 1)</span>
                     }
-                    <span class="mail-account-name">@(string.IsNullOrWhiteSpace(account.DisplayName) ? (string.IsNullOrWhiteSpace(account.Title) ? account.EmailAddress : $"{account.Title} ({account.EmailAddress})") : account.DisplayName)</span>
+                    <span class="@MailCssClasses.AccountName">@(string.IsNullOrWhiteSpace(account.DisplayName) ? (string.IsNullOrWhiteSpace(account.Title) ? account.EmailAddress : $"{account.Title} ({account.EmailAddress})") : account.DisplayName)</span>
                     @if (GlobalSettings.ShowUnreadBadge.Value && Mail.AccountUnreadCount(account.Id) is > 0 and var accountUnread)
                     {
-                        <span class="mail-account-unread" style="background:@account.ColorHex;color:@AppColors.InkOn(account.ColorHex).ToRgbaHex(true)">@accountUnread</span>
+                        <span class="@MailCssClasses.AccountUnread" style="background:@account.ColorHex;color:@AppColors.InkOn(account.ColorHex).ToRgbaHex(true)">@accountUnread</span>
                     }
                 </button>
 
@@ -378,28 +330,27 @@
                     @foreach (var node in View.Folders)
                     {
                         var folder = node.Folder;
-                        bool isMailFolderDrop = dragOverMailFolderFullName == folder.FullName;
+                        string mailFolderDropClass = DropClassOf(WorkspaceDragService.GetMailFolderDropIndicator(folder.AccountId, folder.FullName));
                         bool isMuted = FolderSettingsStore.IsMuted(folder);
-                        <div class="mail-folder-row @(isMailFolderDrop ? "mail-drop-target" : "")"
+                        <div class="@MailCssClasses.FolderRow @mailFolderDropClass"
+                             data-mail-folder="@folder.FullName"
                              style="--folder-depth:@(node.Depth + depth + 1)"
-                             draggable="true"
-                             @ondragstart="() => StartMailFolderDrag(folder.FullName)"
-                             @ondragstart:stopPropagation="true"
-                             @ondragend="EndDrag"
-                             @ondragover="() => dragOverMailFolderFullName = folder.FullName"
-                             @ondragover:preventDefault="true"
-                             @ondrop="() => DropOnMailFolderAsync(folder)"
-                             @ondrop:stopPropagation="true"
-                             data-context-menu="true"
-                             data-mouse4="menu" data-mouse5="@MouseActionService.FolderReadAction"
-                             data-mouse5-value="@JsonSerializer.Serialize(new MailMessageIdentity(folder.AccountId, folder.FullName, 0))"
-                             @oncontextmenu="e => View.OpenFolderMenu(folder, e)" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
+                             @onpointerdown="e => BeginMailFolderPointerDown(folder, e)"
+                             @onpointerdown:stopPropagation="true"
+                             @onpointermove="e => MoveMailFolderPointer(folder, e)"
+                             @onpointerup="e => EndMailFolderPointerAsync(folder, e)"
+                             @onmouseup="e => HandleFolderSideMouseAsync(folder, e)"
+                             @onmouseup:stopPropagation="true"
+                             @oncontextmenu="e => View.OpenFolderMenu(folder, e)"
+                             @oncontextmenu:preventDefault="true"
+                             @oncontextmenu:stopPropagation="true">
 
-                            <span class="mail-folder-gutter">
+                            <span class="@MailCssClasses.FolderGutter">
                                 @if (node.HasChildren)
                                 {
-                                    <button type="button" class="mail-folder-chevron"
+                                    <button type="button" class="@MailCssClasses.FolderChevron"
                                             title="@(node.IsExpanded ? "Collapse subfolders" : "Expand subfolders")"
+                                            @onpointerdown:stopPropagation="true"
                                             @onclick="() => View.ToggleMailFolderExpanded(folder)"
                                             @onclick:stopPropagation="true">
                                         @(node.IsExpanded ? "▾" : "▸")
@@ -407,18 +358,17 @@
                                 }
                                 @if (isMuted)
                                 {
-                                    <span class="mail-folder-muted-gutter" title="New-mail notifications muted" aria-label="New-mail notifications muted">🔕</span>
+                                    <span class="@MailCssClasses.FolderMutedGutter" title="New-mail notifications muted" aria-label="New-mail notifications muted">🔕</span>
                                 }
                             </span>
 
-                            <button class="mail-folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? "mail-folder--active" : "")"
-                                    data-mouse5="@MouseActionService.FolderReadAction"
-                                    data-mouse5-value="@JsonSerializer.Serialize(new MailMessageIdentity(folder.AccountId, folder.FullName, 0))"
+                            <button class="@MailCssClasses.Folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? MailCssClasses.FolderActive : "")"
+                                    type="button"
                                     disabled="@(!folder.Selectable)"
                                     title="@(folder.Selectable ? Mail.FolderFreshness(folder) : "This folder only holds other folders")"
-                                    @onclick="() => MailUiState.SelectFolder(folder)">
-                                <span class="mail-folder-icon">@Mail.FolderIcon(folder)</span>
-                                <span class="mail-folder-name">@Mail.FolderLabel(folder)</span>
+                                    @onclick="() => HandleMailFolderClick(folder)">
+                                <span class="@MailCssClasses.FolderIcon">@Mail.FolderIcon(folder)</span>
+                                <span class="@MailCssClasses.FolderName">@Mail.FolderLabel(folder)</span>
                                 @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value && FolderSettingsStore.ShowsUnreadCount(folder))
                                 {
                                     <CoreChip Text="@folder.UnreadCount.ToString()"
@@ -429,22 +379,13 @@
                                 }
                             </button>
 
-                            <span class="mail-folder-hover-actions">
-                                @if (folder.UnreadCount > 0 && folder.Role != FolderRole.Trash)
-                                {
-                                    <button class="mail-folder-action" title="Mark all @folder.UnreadCount as read"
-                                            @onclick="() => MouseActionService.ReadFolderAsync(folder)">✓✓</button>
-                                }
-                                <button class="mail-folder-action" title="Export this folder as one .mbox file"
-                                        @onclick="() => View.ExportFolderMailbox(folder)">📦</button>
-                                @if (!folder.IsLocal && account.Protocol != IncomingProtocol.FastMail)
-                                {
-                                    <button class="mail-folder-action" title="Redownload this folder (newest 300 messages)"
-                                            @onclick="() => View.ResyncFolder(folder)">🔄</button>
-                                }
-                                <button class="mail-folder-action mail-folder-menu-trigger" title="Folder actions" aria-label="Folder actions" aria-haspopup="menu"
-                                        @onclick="e => View.OpenFolderMenu(folder, e)">⋯</button>
-                            </span>
+                            <CustomizableActionBar SurfaceId="@UiSurfaceIds.SidebarFolderHover"
+                                                   PairedMenuSurfaceId="@UiSurfaceIds.FolderContextMenu"
+                                                   DefaultActions="@View.BuildSidebarFolderHoverActions(account, folder)"
+                                                   AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.SidebarFolderHover, id, folderContext: folder))"
+                                                   Compact="true"
+                                                   StopClickPropagation="true"
+                                                   CustomClass="@MailCssClasses.FolderHoverActions" />
                         </div>
                     }
                 }

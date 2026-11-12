@@ -15,111 +15,153 @@ public partial class Mail
     {
         accountId ??= MailUiState.SelectedAccount?.Id;
         if (accountId == null || string.IsNullOrWhiteSpace(address)) return;
-        ContextMenuService.Open(this, address, SenderMenuItems(accountId, address.Trim()), pointer.ClientX, pointer.ClientY);
+        string trimmed = address.Trim();
+        ContextMenuService.Open(
+            this,
+            trimmed,
+            SenderMenuItems(accountId, trimmed),
+            pointer.ClientX,
+            pointer.ClientY,
+            UiSurfaceIds.SenderContextMenu,
+            id => ResolveMenuAddedItem(UiSurfaceIds.SenderContextMenu, id, senderAccountId: accountId, senderAddress: trimmed));
     }
 
-    IReadOnlyList<ContextMenuItem> SenderMenuItems(string accountId, string address)
+    /// <summary>Opens the sender context menu from a Sender List row in Column 2.</summary>
+    internal void OpenSenderRowMenu(SenderItem sender, MouseEventArgs pointer)
+    {
+        var account = MailUiState.SelectedAccount;
+        if (account == null || string.IsNullOrWhiteSpace(sender.Address)) return;
+        string trimmed = sender.Address.Trim();
+        string title = string.Equals(sender.DisplayName, trimmed, StringComparison.OrdinalIgnoreCase)
+            ? trimmed
+            : $"{sender.DisplayName} <{trimmed}>";
+
+        List<ContextMenuItem> items =
+        [
+            new("✉️ Show mails in folder", () => SelectSender(sender), actionId: "Sender.OpenFolderMail"),
+            .. SenderMenuItems(account.Id, trimmed)
+        ];
+
+        ContextMenuService.Open(
+            this,
+            title,
+            items,
+            pointer.ClientX,
+            pointer.ClientY,
+            UiSurfaceIds.SenderContextMenu,
+            id => ResolveMenuAddedItem(UiSurfaceIds.SenderContextMenu, id, senderAccountId: account.Id, senderAddress: trimmed));
+    }
+
+    internal IReadOnlyList<ContextMenuItem> SenderMenuItems(string accountId, string address)
     {
         var account = AccountStore.GetById(accountId);
         if (account == null) return [];
         var cached = SenderMessages(accountId, address);
         var profile = PersonProfileService.Build(accountId, address);
         string domain = address.Contains('@') ? address[(address.LastIndexOf('@') + 1)..] : string.Empty;
-        ContextMenuItem Search(string label, string query) => new(label, () => SearchSender(accountId, query));
-        ContextMenuItem Past(string label, MailMessageCommand command, string? argument = null,
-            Func<MailMessageSummary, bool>? predicate = null) => new(label,
-                () => RunSenderCommandAsync(accountId, address, command, argument, predicate), cached.Length > 0);
+
+        ContextMenuItem Search(string label, string query, string actionId) =>
+            new(label, () => SearchSender(accountId, query), actionId: actionId);
+
+        ContextMenuItem Past(string label, MailMessageCommand command, string actionId, string? argument = null,
+            Func<MailMessageSummary, bool>? predicate = null) =>
+            new(label, () => RunSenderCommandAsync(accountId, address, command, argument, predicate), cached.Length > 0, ActionId: actionId);
+
         var destinations = SenderMoveTargets(account, cached);
         var notification = SenderRuleAction(accountId, address, FilterActionType.Mute, FilterActionType.Unmute);
         List<ContextMenuItem> items =
         [
-            new("✏️ Write to this person", () => ComposeToSender(accountId, address)),
-            new("👤 Person details", () => { SelectSenderAccount(accountId); MailUiState.OpenPerson(address); }),
+            new("✏️ Write to this person", () => ComposeToSender(accountId, address), actionId: "Sender.Write"),
+            new("👤 Person details", () => { SelectSenderAccount(accountId); MailUiState.OpenPerson(address); }, actionId: "Sender.OpenPerson"),
             new("🔔 Future notifications", Children:
             [
-                new(notification == FilterActionType.Mute ? "✓ Mute this sender" : "Mute this sender", () => SetSenderNotifications(accountId, address, true)),
-                new(notification == FilterActionType.Unmute ? "✓ Notify for this sender" : "Notify for this sender", () => SetSenderNotifications(accountId, address, false)),
-                new("Use inherited notification settings", () => ResetSenderNotifications(accountId, address))
-            ]),
+                new(notification == FilterActionType.Mute ? "✓ Mute this sender" : "Mute this sender", () => SetSenderNotifications(accountId, address, true), actionId: "Sender.NotifyMute"),
+                new(notification == FilterActionType.Unmute ? "✓ Notify for this sender" : "Notify for this sender", () => SetSenderNotifications(accountId, address, false), actionId: "Sender.NotifyUnmute"),
+                new("Use inherited notification settings", () => ResetSenderNotifications(accountId, address), actionId: "Sender.NotifyInherit")
+            ], ActionId: "Sender.NotificationsGroup"),
             new("📂 Move past and future mail to", Enabled: destinations.Count > 0,
                 Children: [.. destinations.Select(folder => new ContextMenuItem(FolderLabel(folder),
-                    () => MoveSenderMailAsync(accountId, address, folder.FullName, includePast: true)))]),
+                    () => MoveSenderMailAsync(accountId, address, folder.FullName, includePast: true), ActionId: $"Sender.MovePastAndFuture:{folder.FullName}"))],
+                ActionId: "Sender.MovePastFutureGroup"),
             new($"📚 Cached mail from this sender ({cached.Length})", Children:
             [
-                Past("Mark all read", MailMessageCommand.Read),
-                Past("Mark all unread", MailMessageCommand.Unread),
-                Past("Star all", MailMessageCommand.ToggleStar, predicate: message => !message.Flags.HasFlag(MailFlags.Flagged)),
-                Past("Remove all stars", MailMessageCommand.ToggleStar, predicate: message => message.Flags.HasFlag(MailFlags.Flagged)),
-                Past("Mark all important", MailMessageCommand.ToggleImportant, predicate: message => !message.Flags.HasFlag(MailFlags.Important)),
-                Past("Clear importance", MailMessageCommand.ToggleImportant, predicate: message => message.Flags.HasFlag(MailFlags.Important)),
-                Past("Archive all", MailMessageCommand.Archive),
-                Past("Move all to Trash", MailMessageCommand.Trash),
-                Past("Move all to Spam", MailMessageCommand.Spam),
-                Past("Restore all to Inbox", MailMessageCommand.Restore),
+                Past("Mark all read", MailMessageCommand.Read, "Sender.MarkAllRead"),
+                Past("Mark all unread", MailMessageCommand.Unread, "Sender.MarkAllUnread"),
+                Past("Star all", MailMessageCommand.ToggleStar, "Sender.StarAll", predicate: message => !message.Flags.HasFlag(MailFlags.Flagged)),
+                Past("Remove all stars", MailMessageCommand.ToggleStar, "Sender.UnstarAll", predicate: message => message.Flags.HasFlag(MailFlags.Flagged)),
+                Past("Mark all important", MailMessageCommand.ToggleImportant, "Sender.ImportantAll", predicate: message => !message.Flags.HasFlag(MailFlags.Important)),
+                Past("Clear importance", MailMessageCommand.ToggleImportant, "Sender.UnimportantAll", predicate: message => message.Flags.HasFlag(MailFlags.Important)),
+                Past("Archive all", MailMessageCommand.Archive, "Sender.ArchiveAll"),
+                Past("Move all to Trash", MailMessageCommand.Trash, "Sender.TrashAll"),
+                Past("Move all to Spam", MailMessageCommand.Spam, "Sender.SpamAll"),
+                Past("Restore all to Inbox", MailMessageCommand.Restore, "Sender.RestoreAll"),
                 new("Move existing mail to", Enabled: destinations.Count > 0, Children: [.. destinations.Select(folder =>
-                    Past(FolderLabel(folder), MailMessageCommand.Move, folder.FullName))]),
-                new("Add tag to all", Enabled: TagStore.AllTags.Count > 0, Children: [.. TagStore.AllTags.Select(tag => Past(tag, MailMessageCommand.AddTag, tag))]),
-                new("Remove tag from all", Enabled: profile.Tags.Count > 0, Children: [.. profile.Tags.Select(tag => Past(tag, MailMessageCommand.RemoveTag, tag))]),
+                    Past(FolderLabel(folder), MailMessageCommand.Move, $"Sender.MoveAll:{folder.FullName}", folder.FullName))], ActionId: "Sender.MoveAllGroup"),
+                new("Add tag to all", Enabled: TagStore.AllTags.Count > 0, Children: [.. TagStore.AllTags.Select(tag =>
+                    Past($"🏷️ {tag}", MailMessageCommand.AddTag, $"Sender.TagAll:{tag}", tag))], ActionId: "Sender.TagAllGroup"),
+                new("Remove tag from all", Enabled: profile.Tags.Count > 0, Children: [.. profile.Tags.Select(tag =>
+                    Past(tag, MailMessageCommand.RemoveTag, $"Sender.RemoveTagAll:{tag}", tag))], ActionId: "Sender.RemoveTagAllGroup"),
                 new("Snooze all", Enabled: cached.Length > 0, Children: [.. SnoozeService.Presets.Select(preset =>
-                    new ContextMenuItem(preset.Label, () => RunSenderSnoozeAsync(accountId, address, preset.DueUtc())))]),
-                Past("Wake snoozed mail now", MailMessageCommand.Wake, predicate: message => message.SnoozedUntilUtc != null),
-                new("Select all cached mail from this sender", () => SelectSenderMessages(accountId, address), cached.Length > 0),
-                new("Open newest received message", () => OpenSenderMessage(accountId, address, newest: true), cached.Length > 0),
-                new("Open oldest received message", () => OpenSenderMessage(accountId, address, newest: false), cached.Length > 0)
-            ]),
+                    new ContextMenuItem(preset.Label, () => RunSenderSnoozeAsync(accountId, address, preset.DueUtc()), ActionId: $"Sender.SnoozeAll:{preset.Label}"))], ActionId: "Sender.SnoozeAllGroup"),
+                Past("Wake snoozed mail now", MailMessageCommand.Wake, "Sender.WakeAll", predicate: message => message.SnoozedUntilUtc != null),
+                new("Select all cached mail from this sender", () => SelectSenderMessages(accountId, address), cached.Length > 0, actionId: "Sender.SelectAll"),
+                new("Open newest received message", () => OpenSenderMessage(accountId, address, newest: true), cached.Length > 0, actionId: "Sender.OpenNewest"),
+                new("Open oldest received message", () => OpenSenderMessage(accountId, address, newest: false), cached.Length > 0, actionId: "Sender.OpenOldest")
+            ], ActionId: "Sender.CachedMailGroup"),
             new("🔎 Find", Children:
             [
-                Search("Mail from this sender", "from:" + address),
-                Search("Mail sent to this person", "to:" + address),
-                Search("Unread from this sender", "from:" + address + " is:unread"),
-                Search("Attachments from this sender", "from:" + address + " has:attachment"),
-                Search("Starred from this sender", "from:" + address + " is:starred"),
-                Search("Important from this sender", "from:" + address + " is:important"),
-                Search("Recent mail from this sender", "from:" + address + " newer_than:7d"),
-                Search("Mail from this domain", "from:@" + domain),
-                new("Save sender search", () => SaveSenderSearch(address))
-            ]),
+                Search("Mail from this sender", "from:" + address, "Sender.FindFrom"),
+                Search("Mail sent to this person", "to:" + address, "Sender.FindTo"),
+                Search("Unread from this sender", "from:" + address + " is:unread", "Sender.FindUnread"),
+                Search("Attachments from this sender", "from:" + address + " has:attachment", "Sender.FindAttachments"),
+                Search("Starred from this sender", "from:" + address + " is:starred", "Sender.FindStarred"),
+                Search("Important from this sender", "from:" + address + " is:important", "Sender.FindImportant"),
+                Search("Recent mail from this sender", "from:" + address + " newer_than:7d", "Sender.FindRecent"),
+                Search("Mail from this domain", "from:@" + domain, "Sender.FindDomain"),
+                new("Save sender search", () => SaveSenderSearch(address), actionId: "Sender.SaveSearch")
+            ], ActionId: "Sender.FindGroup"),
             new("⧉ Copy", Children:
             [
-                new("Address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, address)),
-                new("Display name", () => MouseActionService.RunAsync(MouseActionService.CopyAction, profile.DisplayName), profile.DisplayName.Length > 0),
-                new("Name and address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, new Contact(address, profile.DisplayName).Suggestion)),
-                new("Domain", () => MouseActionService.RunAsync(MouseActionService.CopyAction, domain), domain.Length > 0)
-            ]),
-            new("⚙️ Future mail rules", Children: SenderFutureRuleItems(account, address)),
+                new("Address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, address), ActionId: "Sender.CopyAddress"),
+                new("Display name", () => MouseActionService.RunAsync(MouseActionService.CopyAction, profile.DisplayName), profile.DisplayName.Length > 0, ActionId: "Sender.CopyName"),
+                new("Name and address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, new Contact(address, profile.DisplayName).Suggestion), ActionId: "Sender.CopyFull"),
+                new("Domain", () => MouseActionService.RunAsync(MouseActionService.CopyAction, domain), domain.Length > 0, ActionId: "Sender.CopyDomain")
+            ], ActionId: "Sender.CopyGroup"),
+            new("⚙️ Future mail rules", Children: SenderFutureRuleItems(account, address), ActionId: "Sender.RulesGroup"),
         ];
         return items;
     }
 
     IReadOnlyList<ContextMenuItem> SenderFutureRuleItems(MailAccountData account, string address)
     {
-        ContextMenuItem Set(string label, FilterActionType type, string argument = "") => new(label, () =>
+        ContextMenuItem Set(string label, FilterActionType type, string actionId, string argument = "") => new(label, () =>
         {
             FilterRuleStore.UpsertSenderActionRule(account.Id, address, new FilterAction { Type = type, Argument = argument });
             MouseActionService.ReportStatus("Future mail rule saved for this sender in this account.");
-        });
+        }, actionId: actionId);
+
         var folders = MessageStore.GetFolders(account.Id).Where(folder => folder.Selectable && folder.Role is not (FolderRole.Drafts or FolderRole.Outbox)
             && (folder.IsLocal || account.Protocol == IncomingProtocol.Imap)).ToList();
         return
         [
             new("Move future mail only to", Enabled: folders.Count > 0, Children: [.. folders.Select(folder =>
-                new ContextMenuItem(FolderLabel(folder), () => MoveSenderMailAsync(account.Id, address, folder.FullName, includePast: false)))]),
-            new("Stop automatic filing", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MoveToRemoteFolder)),
-            Set("Mark future mail read", FilterActionType.MarkRead),
-            new("Stop automatic read marking", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MarkRead)),
-            Set("Star future mail", FilterActionType.Flag),
-            new("Stop automatic stars", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.Flag)),
-            Set("Mark future mail important", FilterActionType.MarkImportant),
-            new("Stop automatic importance", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MarkImportant)),
-            new("Tag future mail", Enabled: TagStore.AllTags.Count > 0, Children: [.. TagStore.AllTags.Select(tag => Set(tag, FilterActionType.AddTag, tag))]),
-            new("Stop automatic tagging", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.AddTag)),
-            Set("Silence future notification sounds", FilterActionType.SetNotificationSound, NotificationService.SilentSoundName),
-            new("Use inherited notification sound", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.SetNotificationSound)),
-            new("Edit sender rules", () => Navigation.NavigateTo(FilterRules.LinkFor(accountId: account.Id, senderAddress: address)))
+                new ContextMenuItem(FolderLabel(folder), () => MoveSenderMailAsync(account.Id, address, folder.FullName, includePast: false), ActionId: $"Sender.RuleMoveFuture:{folder.FullName}"))], ActionId: "Sender.RuleMoveFutureGroup"),
+            new("Stop automatic filing", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MoveToRemoteFolder), actionId: "Sender.RuleStopMove"),
+            Set("Mark future mail read", FilterActionType.MarkRead, "Sender.RuleMarkRead"),
+            new("Stop automatic read marking", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MarkRead), actionId: "Sender.RuleStopMarkRead"),
+            Set("Star future mail", FilterActionType.Flag, "Sender.RuleFlag"),
+            new("Stop automatic stars", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.Flag), actionId: "Sender.RuleStopFlag"),
+            Set("Mark future mail important", FilterActionType.MarkImportant, "Sender.RuleImportant"),
+            new("Stop automatic importance", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.MarkImportant), actionId: "Sender.RuleStopImportant"),
+            new("Tag future mail", Enabled: TagStore.AllTags.Count > 0, Children: [.. TagStore.AllTags.Select(tag => Set($"🏷️ {tag}", FilterActionType.AddTag, $"Sender.RuleTag:{tag}", tag))], ActionId: "Sender.RuleTagGroup"),
+            new("Stop automatic tagging", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.AddTag), actionId: "Sender.RuleStopTag"),
+            Set("Silence future notification sounds", FilterActionType.SetNotificationSound, "Sender.RuleSilentSound", NotificationService.SilentSoundName),
+            new("Use inherited notification sound", () => FilterRuleStore.RemoveSenderActionRule(account.Id, address, FilterActionType.SetNotificationSound), actionId: "Sender.RuleInheritSound"),
+            new("Edit sender rules", () => Navigation.NavigateTo(FilterRules.LinkFor(accountId: account.Id, senderAddress: address)), actionId: "Sender.EditRules")
         ];
     }
 
-    static MailMessageIdentity[] SenderMessages(string accountId, string address,
+    internal static MailMessageIdentity[] SenderMessages(string accountId, string address,
         Func<MailMessageSummary, bool>? predicate = null) =>
         [.. MessageStore.GetFolders(accountId).SelectMany(folder => MessageStore.GetSummaries(accountId, folder.FullName)
             .Where(message => message.FromAddress.Equals(address, StringComparison.OrdinalIgnoreCase)
@@ -146,9 +188,9 @@ public partial class Mail
         if (MailUiState.SelectedAccount?.Id != accountId) MailUiState.SelectAccount(account, restoreFolder: true);
     }
 
-    void SearchSender(string accountId, string query) { SelectSenderAccount(accountId); RunSavedSearch(query); }
+    internal void SearchSender(string accountId, string query) { SelectSenderAccount(accountId); RunSavedSearch(query); }
 
-    static void ComposeToSender(string accountId, string address)
+    internal static void ComposeToSender(string accountId, string address)
     {
         var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("The account no longer exists.");
         var draft = ComposeService.BuildNew(account);
@@ -156,19 +198,19 @@ public partial class Mail
         MailUiState.OpenCompose(draft);
     }
 
-    static void SetSenderNotifications(string accountId, string address, bool muted)
+    internal static void SetSenderNotifications(string accountId, string address, bool muted)
     {
         FilterRuleStore.UpsertSenderMuteRule(accountId, address, muted);
         MouseActionService.ReportStatus(muted ? "Future notifications muted for this sender in this account." : "Future notifications enabled for this sender in this account.");
     }
 
-    static void ResetSenderNotifications(string accountId, string address)
+    internal static void ResetSenderNotifications(string accountId, string address)
     {
         FilterRuleStore.RemoveSenderActionRule(accountId, address, FilterActionType.Mute);
         MouseActionService.ReportStatus("This sender now inherits notification settings.");
     }
 
-    async Task RunSenderCommandAsync(string accountId, string address, MailMessageCommand command, string? argument = null,
+    internal async Task RunSenderCommandAsync(string accountId, string address, MailMessageCommand command, string? argument = null,
         Func<MailMessageSummary, bool>? predicate = null)
     {
         var keys = SenderMessages(accountId, address, predicate);
@@ -216,10 +258,10 @@ public partial class Mail
         await MouseActionService.RunMessagesAsync(command, keys, argument);
     }
 
-    Task RunSenderSnoozeAsync(string accountId, string address, DateTime dueUtc) =>
+    internal Task RunSenderSnoozeAsync(string accountId, string address, DateTime dueUtc) =>
         MouseActionService.RunMessagesAsync(MailMessageCommand.Snooze, SenderMessages(accountId, address), dueUtc: dueUtc);
 
-    async Task MoveSenderMailAsync(string accountId, string address, string folderFullName, bool includePast)
+    internal async Task MoveSenderMailAsync(string accountId, string address, string folderFullName, bool includePast)
     {
         var account = AccountStore.GetById(accountId) ?? throw new InvalidOperationException("The account no longer exists.");
         var keys = SenderMessages(accountId, address);
@@ -257,20 +299,20 @@ public partial class Mail
         MouseActionService.ReportStatus("Future sender filing rule saved in this account." + (includePast ? " " + pastResult : string.Empty));
     }
 
-    void SelectSenderMessages(string accountId, string address)
+    internal void SelectSenderMessages(string accountId, string address)
     {
         SearchSender(accountId, "from:" + address);
         MailUiState.SelectMessages(SenderMessages(accountId, address), replace: true);
     }
 
-    void OpenSenderMessage(string accountId, string address, bool newest)
+    internal void OpenSenderMessage(string accountId, string address, bool newest)
     {
         var keys = SenderMessages(accountId, address).OrderBy(key => MessageStore.GetSummary(accountId, key.FolderFullName, key.Uid)?.DateUtc);
         var snapshot = keys.ToArray();
         if (snapshot.Length > 0) OpenMessage(ResolveMenuMessage(newest ? snapshot[^1] : snapshot[0]));
     }
 
-    static void SaveSenderSearch(string address)
+    internal static void SaveSenderSearch(string address)
     {
         string query = "from:" + address;
         var saved = SavedSearchList;

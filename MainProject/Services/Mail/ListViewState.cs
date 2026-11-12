@@ -1,4 +1,7 @@
+using System.Text.Json;
 using MyLovelyMail.MainProject.DataModels.Mail;
+using MyLovelyMail.MainProject.Storage;
+using MyLovelyMail.MainProject.Stores;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
@@ -25,12 +28,27 @@ namespace MyLovelyMail.MainProject.Services.Mail
         Descending
     }
 
+    public sealed class PersistedListViewSnapshot
+    {
+        public MailSortField MailSort { get; set; } = MailSortField.Date;
+        public SortDirection MailSortDirection { get; set; } = SortDirection.Descending;
+        public SenderSortField SenderSort { get; set; } = SenderSortField.LatestDate;
+        public SortDirection SenderSortDirection { get; set; } = SortDirection.Descending;
+        public List<FilterConditionEntry> ActiveFilters { get; set; } = [];
+        public double WindowRightPx { get; set; } = 16.0;
+        public double WindowTopPx { get; set; } = 80.0;
+    }
+
     /// <summary>
-    /// Shared runtime state for mail/sender sorting, active advanced filter stack,
-    /// and the floating filter window position.
+    /// Shared state for mail/sender sorting, active advanced filter stack,
+    /// and the floating filter window position, persisted to <c>UserData/list-view.json</c>.
     /// </summary>
     public static class ListViewState
     {
+        public const string FileName = "list-view.json";
+
+        static bool persistenceEnabled;
+
         public static MailSortField MailSort { get; private set; } = MailSortField.Date;
         public static SortDirection MailSortDirection { get; private set; } = SortDirection.Descending;
 
@@ -46,6 +64,72 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         public static event Action? OnChanged;
 
+        static string FilePath => Path.Combine(AppPaths.UserData, FileName);
+
+        public static void Load()
+        {
+            persistenceEnabled = true;
+            activeFilters.Clear();
+            MailSort = MailSortField.Date;
+            MailSortDirection = SortDirection.Descending;
+            SenderSort = SenderSortField.LatestDate;
+            SenderSortDirection = SortDirection.Descending;
+            WindowRightPx = 16.0;
+            WindowTopPx = 80.0;
+
+            string path = FilePath;
+            if (!File.Exists(path)) return;
+
+            try
+            {
+                var snap = JsonSerializer.Deserialize<PersistedListViewSnapshot>(File.ReadAllText(path), JsonDefaults.Indented);
+                if (snap == null) return;
+                MailSort = snap.MailSort;
+                MailSortDirection = snap.MailSortDirection;
+                SenderSort = snap.SenderSort;
+                SenderSortDirection = snap.SenderSortDirection;
+                WindowRightPx = Math.Max(8.0, snap.WindowRightPx);
+                WindowTopPx = Math.Max(40.0, snap.WindowTopPx);
+                if (snap.ActiveFilters != null)
+                {
+                    foreach (var entry in snap.ActiveFilters)
+                    {
+                        if (entry?.Condition == null) continue;
+                        FilterFieldInfo.NormalizeCondition(entry.Condition);
+                        activeFilters.Add(entry);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Corrupt list-view.json '{path}': {ex.Message}", LogLevel.Warning);
+            }
+        }
+
+        static void SaveIfEnabled()
+        {
+            if (!persistenceEnabled) return;
+            try
+            {
+                Directory.CreateDirectory(AppPaths.UserData);
+                var snap = new PersistedListViewSnapshot
+                {
+                    MailSort = MailSort,
+                    MailSortDirection = MailSortDirection,
+                    SenderSort = SenderSort,
+                    SenderSortDirection = SenderSortDirection,
+                    ActiveFilters = [.. activeFilters],
+                    WindowRightPx = WindowRightPx,
+                    WindowTopPx = WindowTopPx
+                };
+                AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(snap, JsonDefaults.Indented));
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not save list-view.json: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
         public static int ActiveFilterCount =>
             ListFilterService.Resolve(activeFilters).Count(f => f.Status != FilterConditionStatus.Overridden);
 
@@ -56,6 +140,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             MailSort = field;
             MailSortDirection = direction;
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -72,6 +157,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     ? SortDirection.Ascending
                     : SortDirection.Descending;
             }
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -79,6 +165,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             SenderSort = field;
             SenderSortDirection = direction;
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -95,6 +182,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     ? SortDirection.Ascending
                     : SortDirection.Descending;
             }
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -102,6 +190,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             FilterFieldInfo.NormalizeCondition(condition);
             activeFilters.Add(new FilterConditionEntry { Condition = condition });
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -109,6 +198,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             if (activeFilters.RemoveAll(f => f.Id == id) > 0)
             {
+                SaveIfEnabled();
                 OnChanged?.Invoke();
             }
         }
@@ -118,6 +208,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (activeFilters.Count > 0)
             {
                 activeFilters.Clear();
+                SaveIfEnabled();
                 OnChanged?.Invoke();
             }
         }
@@ -129,6 +220,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             var item = activeFilters[fromIndex];
             activeFilters.RemoveAt(fromIndex);
             activeFilters.Insert(toIndex, item);
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 
@@ -154,6 +246,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             WindowRightPx = Math.Max(8.0, right);
             WindowTopPx = Math.Max(40.0, top);
+            SaveIfEnabled();
             OnChanged?.Invoke();
         }
 

@@ -42,52 +42,63 @@ public partial class Mail
         MouseActionService.ReportStatus($"Permanently deleted {removed:N0} message(s) from '{folder.DisplayName}'.");
     }
 
-    internal void OpenFolderMenu(MailFolderData folder, MouseEventArgs pointer)
+    internal IReadOnlyList<ContextMenuItem> BuildFolderMenuItems(MailFolderData folder)
     {
         var account = AccountStore.GetById(folder.AccountId);
         bool remote = folder.Selectable && !folder.IsLocal && account?.Protocol == IncomingProtocol.Imap;
         int cachedCount = MessageStore.CountSummaries(folder.AccountId, folder.FullName);
 
-        ContextMenuItem Action(string label, FolderMenuAction action, bool enabled = true) =>
-            new(label, () => RunFolderMenuAction(folder, action), enabled);
+        ContextMenuItem Action(string label, FolderMenuAction action, string actionId, bool enabled = true) =>
+            new(label, () => RunFolderMenuAction(folder, action), enabled, actionId: actionId);
 
-        List<ContextMenuItem> items = [Action("📂 Open folder", FolderMenuAction.Open, folder.Selectable)];
+        List<ContextMenuItem> items = [Action("📂 Open folder", FolderMenuAction.Open, "Folder.Open", folder.Selectable)];
 
         if (folder.Role is FolderRole.Trash or FolderRole.Junk && account != null)
         {
             items.Add(new(
                 folder.Role == FolderRole.Trash ? "🗑️ Empty Trash permanently…" : "🧹 Empty Spam permanently…",
                 () => EmptyFolderWithConfirmationAsync(account, folder),
-                Enabled: cachedCount > 0));
+                Enabled: cachedCount > 0,
+                ActionId: "Folder.Empty"));
         }
 
         if (folder.Role == FolderRole.Trash)
-            items.Add(new("🔕 Trash notifications are always off", Enabled: false));
+            items.Add(new("🔕 Trash notifications are always off", Enabled: false, ActionId: "Folder.MuteTrashInfo"));
         else
         {
             bool muted = FolderSettingsStore.IsMuted(folder);
             List<ContextMenuItem> durations = [.. FolderSettingsPanel.MutePeriods.Select(period =>
-                new ContextMenuItem($"Mute for {period.Label}", () => SetFolderMute(folder, period.Minutes)))];
-            durations.Add(new("Mute forever", () => SetFolderMute(folder)));
-            items.Add(new(muted ? "🔔 Unmute" : "🔕 Mute", () => { SetFolderMute(folder, unmute: muted); return Task.CompletedTask; }, Children: durations));
-            items.Add(new(FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName)), Enabled: false));
-            items.Add(Action(FolderSettingsStore.ShowsUnreadCount(folder) ? "Hide unread badges" : "Show unread badges", FolderMenuAction.ToggleUnreadBadge));
+                new ContextMenuItem($"Mute for {period.Label}", () => SetFolderMute(folder, period.Minutes), actionId: $"Folder.MuteMinutes:{period.Minutes}"))];
+            durations.Add(new("Mute forever", () => SetFolderMute(folder), actionId: "Folder.MuteForever"));
+            items.Add(new(muted ? "🔔 Unmute" : "🔕 Mute", () => { SetFolderMute(folder, unmute: muted); return Task.CompletedTask; }, Children: durations, ActionId: "Folder.MuteGroup"));
+            items.Add(new(FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName)), Enabled: false, ActionId: "Folder.MuteStatus"));
+            items.Add(Action(FolderSettingsStore.ShowsUnreadCount(folder) ? "Hide unread badges" : "Show unread badges", FolderMenuAction.ToggleUnreadBadge, "Folder.ToggleBadge"));
         }
         items.AddRange([
-            Action("🔄 Check for new mail", FolderMenuAction.Sync, remote),
-            Action("⬇️ Download older mail", FolderMenuAction.Backfill, remote),
-            Action("♻️ Redownload folder", FolderMenuAction.Resync, remote),
-            new("✓✓ Mark all cached mail read", () => MouseActionService.ReadFolderAsync(folder), folder.Selectable),
-            Action("🔎 Find unread mail", FolderMenuAction.SearchUnread, folder.Selectable),
-            Action("📦 Export folder as .mbox", FolderMenuAction.Export, folder.Selectable),
-            Action("🪄 Filters for this folder", FolderMenuAction.Filters, folder.Selectable),
-            Action("⚙️ Folder settings", FolderMenuAction.Settings),
-            Action("👤 Account settings", FolderMenuAction.AccountSettings),
-            Action("🌐 Global folder defaults", FolderMenuAction.GlobalSettings),
-            Action("↺ Reset folder to global defaults", FolderMenuAction.ResetPreferences, folder.Role != FolderRole.Trash)
+            Action("🔄 Check for new mail", FolderMenuAction.Sync, "Folder.Sync", remote),
+            Action("⬇️ Download older mail", FolderMenuAction.Backfill, "Folder.Backfill", remote),
+            Action("♻️ Redownload folder", FolderMenuAction.Resync, "Folder.Resync", remote),
+            new("✓✓ Mark all cached mail read", () => MouseActionService.ReadFolderAsync(folder), folder.Selectable, ActionId: "Folder.ReadAll"),
+            Action("🔎 Find unread mail", FolderMenuAction.SearchUnread, "Folder.SearchUnread", folder.Selectable),
+            Action("📦 Export folder as .mbox", FolderMenuAction.Export, "Folder.Export", folder.Selectable),
+            Action("🪄 Filters for this folder", FolderMenuAction.Filters, "Folder.Filters", folder.Selectable),
+            Action("⚙️ Folder settings", FolderMenuAction.Settings, "Folder.Settings"),
+            Action("👤 Account settings", FolderMenuAction.AccountSettings, "Folder.AccountSettings"),
+            Action("🌐 Global folder defaults", FolderMenuAction.GlobalSettings, "Folder.GlobalSettings"),
+            Action("↺ Reset folder to global defaults", FolderMenuAction.ResetPreferences, "Folder.ResetPrefs", folder.Role != FolderRole.Trash)
         ]);
-        ContextMenuService.Open(this, FolderLabel(folder), items, pointer.ClientX, pointer.ClientY);
+        return items;
     }
+
+    internal void OpenFolderMenu(MailFolderData folder, MouseEventArgs pointer) =>
+        ContextMenuService.Open(
+            this,
+            FolderLabel(folder),
+            BuildFolderMenuItems(folder),
+            pointer.ClientX,
+            pointer.ClientY,
+            UiSurfaceIds.FolderContextMenu,
+            id => ResolveMenuAddedItem(UiSurfaceIds.FolderContextMenu, id, folderContext: folder));
 
     internal void SetFolderMute(MailFolderData folder, int? minutes = null, bool unmute = false)
     {
@@ -114,7 +125,7 @@ public partial class Mail
                 case FolderMenuAction.Backfill:
                     if (AccountStore.GetById(folder.AccountId) is { } account)
                         ImapSyncService.KickFolderSync(account, folder.FullName,
-                            backfillCount: action == FolderMenuAction.Backfill ? BackfillBatchSize : null);
+                            backfillCount: action == FolderMenuAction.Backfill ? Math.Max(1, BackfillBatchSize) : null);
                     break;
                 case FolderMenuAction.Resync: ResyncFolder(folder); break;
                 case FolderMenuAction.Export: ExportFolderMailbox(folder); break;

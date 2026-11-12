@@ -10,6 +10,9 @@ public static class ListFilterCssClasses
     public const string Stack = "list-filter-stack";
     public const string Item = "list-filter-item";
     public const string ItemOverridden = "list-filter-item--overridden";
+    public const string ItemDragging = "list-filter-item--dragging";
+    public const string ItemDropBefore = "list-filter-item--drop-before";
+    public const string ItemDropAfter = "list-filter-item--drop-after";
     public const string ItemHeader = "list-filter-item-header";
     public const string ItemBadge = "list-filter-item-badge";
     public const string ItemBadgeActive = "list-filter-item-badge--active";

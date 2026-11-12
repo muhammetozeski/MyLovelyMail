@@ -9,7 +9,7 @@ public readonly record struct MailMessageIdentity(string AccountId, string Folde
 /// <summary>Commands shared by mail toolbars, context menus and mouse side buttons.</summary>
 public enum MailMessageCommand
 {
-    Read, Unread, Trash, Archive, Spam, Restore, ToggleStar, ToggleImportant,
+    Read, Unread, Trash, Archive, Spam, Restore, ToggleStar, ToggleImportant, ToggleMute,
     AddTag, RemoveTag, Snooze, Wake, Move
 }
 

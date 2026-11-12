@@ -1,31 +1,65 @@
 @inherits LayoutComponentBase
 @inject NavigationManager NavManager
 @implements IDisposable
+@implements IHandleEvent
 
-<div class="app-page has-bottom-nav">
-    <main>
-        <article class="content">
-            <AppErrorBoundary @ref="mainErrorBoundary" Title="An unexpected error occurred in this view" RetryText="Try Again" ShowReload="true">
-                @Body
-            </AppErrorBoundary>
-        </article>
-    </main>
+<div class="@MainLayoutCssClasses.RootShell"
+     @onpointermove="HandleGlobalPointerMove"
+     @onpointerup="HandleGlobalPointerUpAsync"
+     @onkeydown="HandleGlobalKeyDown">
+    <div class="@MainLayoutCssClasses.Page @MainLayoutCssClasses.HasBottomNav">
+        <main>
+            <article class="@MainLayoutCssClasses.Content">
+                <AppErrorBoundary @ref="mainErrorBoundary" Title="An unexpected error occurred in this view" RetryText="Try Again" ShowReload="true">
+                    @Body
+                </AppErrorBoundary>
+            </article>
+        </main>
 
-    <AppBottomNav />
+        <AppBottomNav />
+    </div>
+
+    <VaultUnlockOverlay />
+    <AppModalHost />
+    <AppContextMenu />
+    <ActionDragGhost />
 </div>
 
-<VaultUnlockOverlay />
-<AppModalHost />
-<AppContextMenu />
+<ActionBarCss />
 <MainLayoutCss />
 
 @code {
     protected override void OnInitialized()
     {
         Events.MainEvents.OnDataChanged += HandleDataChanged;
-        // The layout outlives every page, so it is the right owner of the app-wide navigator.
         Services.NavigationBridge.Navigator = route => InvokeAsync(() => NavManager.NavigateTo(route));
         NavManager.LocationChanged += HandleLocationChanged;
+    }
+
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem callback, object? arg) =>
+        callback.InvokeAsync(arg);
+
+    static void HandleGlobalPointerMove(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
+    }
+
+    static Task HandleGlobalPointerUpAsync(PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        ActionDragService.CompleteDrop();
+        WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
+        return WorkspaceDragService.CompleteDropAsync();
+    }
+
+    static void HandleGlobalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            ActionDragService.Cancel();
+            WorkspaceDragService.Cancel();
+        }
     }
 
     void HandleDataChanged(string eventName, object? data)
@@ -46,10 +80,10 @@
     AppErrorBoundary? mainErrorBoundary;
 
     /// <summary>Drops captured menu targets when navigating to a different page.</summary>
-    /// <param name="sender">Navigation source.</param>
-    /// <param name="args">New route.</param>
     void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
+        ActionDragService.Cancel();
+        WorkspaceDragService.Cancel();
         ContextMenuService.Close();
         mainErrorBoundary?.Recover();
     }

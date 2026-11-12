@@ -22,7 +22,7 @@
         --col-list-pct: @(listPct)%;
         --col-reader-pct: @(readerPct)%;
         display: grid;
-        grid-template-columns: minmax(180px, var(--col-sidebar-pct)) @(AppMeasures.Space.Medium)px minmax(260px, var(--col-list-pct)) @(AppMeasures.Space.Medium)px minmax(280px, 1fr);
+        grid-template-columns: minmax(@(AppMeasures.Size.Px180)px, var(--col-sidebar-pct)) @(AppMeasures.Space.Medium)px minmax(@(AppMeasures.Size.Px260)px, var(--col-list-pct)) @(AppMeasures.Space.Medium)px minmax(@(AppMeasures.Size.Px280)px, 1fr);
         gap: 0;
         padding: @(AppMeasures.Space.Medium)px;
         box-sizing: border-box;
@@ -48,7 +48,7 @@
         justify-content: center;
         background: transparent;
         user-select: none;
-        z-index: 15;
+        z-index: @(AppMeasures.ZLayer.Dropdown + AppMeasures.Size.Px5);
     }
 
     .@(MailCssClasses.ColumnSplitterGrip) {
@@ -57,24 +57,24 @@
 
     .@(MailCssClasses.ColumnSplitter)::after {
         content: "";
-        width: 3px;
+        width: @(AppMeasures.Border.Thick)px;
         background: @splitterColor;
         opacity: 0;
-        border-radius: 999px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
         transition: opacity @(AppMeasures.Duration.Fast)s ease, width @(AppMeasures.Duration.Fast)s ease, box-shadow @(AppMeasures.Duration.Fast)s ease;
     }
 
     .@(MailCssClasses.ColumnSplitter):hover::after,
     .@(MailCssClasses.ColumnSplitter):active::after,
     .@(MailCssClasses.ColumnSplitterDragging)::after {
-        opacity: 0.9;
-        width: 4px;
-        box-shadow: 0 0 8px @splitterColor;
+        opacity: @(AppMeasures.Opacity.Bright);
+        width: @(AppMeasures.Size.Px4)px;
+        box-shadow: 0 0 @(AppMeasures.Space.Px8)px @splitterColor;
     }
 
     /* ---- Sidebar ---- */
 
-    .mail-sidebar {
+    .@(MailCssClasses.Sidebar) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px4)px;
@@ -85,11 +85,11 @@
         height: @paneHeight;
     }
 
-    .mail-sidebar-nav {
+    .@(MailCssClasses.SidebarNav) {
         display: contents;
     }
 
-    .mail-logo {
+    .@(MailCssClasses.Logo) {
         display: flex;
         align-items: center;
         flex-wrap: nowrap;
@@ -100,47 +100,52 @@
         padding: @(AppMeasures.Space.Px12)px @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-logo-text {
+    .@(MailCssClasses.LogoText) {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-    .mail-drag-escape-banner {
+    .@(MailCssClasses.DragEscapeBanner) {
+        position: fixed;
+        left: @(AppMeasures.Space.Px16)px;
+        bottom: @(AppMeasures.Size.BottomNavHeight + AppMeasures.Space.Px10)px;
+        z-index: @(AppMeasures.ZLayer.Toast);
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: @(AppMeasures.Space.Px6)px;
-        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
-        background: @surfaceTint;
+        background: @AppColors.TooltipBackground.ToRgbaHex(true);
         border: @(AppMeasures.Border.Thin)px dashed @primary;
+        box-shadow: @AppStyles.ShadowMedium;
         font-size: @(AppMeasures.Font.XSmall)px;
         color: @textPrimary;
     }
 
-    .mail-welcome-card {
+    .@(MailCssClasses.WelcomeCard) {
         text-align: center;
     }
 
-    .mail-welcome-icon {
+    .@(MailCssClasses.WelcomeIcon) {
         font-size: @(AppMeasures.Font.Giant)px;
     }
 
-    .mail-welcome-title {
+    .@(MailCssClasses.WelcomeTitle) {
         font-size: @(AppMeasures.Font.Large)px;
         font-weight: @(AppMeasures.Weight.Bold);
         margin: @(AppMeasures.Space.Px8)px 0;
     }
 
-    .mail-welcome-text {
+    .@(MailCssClasses.WelcomeText) {
         color: @textSecondary;
         font-size: @(AppMeasures.Font.Normal)px;
         line-height: @(AppMeasures.LineHeight.Relaxed);
         margin: 0 0 @(AppMeasures.Space.Px16)px 0;
     }
 
-    .mail-account {
+    .@(MailCssClasses.Account) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
@@ -155,33 +160,33 @@
         transition: background @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-account:hover,
-        .mail-account--active {
+        .@(MailCssClasses.Account):hover,
+        .@(MailCssClasses.AccountActive) {
             background: @surfaceTint;
         }
 
-    .mail-account-dot {
+    .@(MailCssClasses.AccountDot) {
         width: @(AppMeasures.Size.Px12)px;
         height: @(AppMeasures.Size.Px12)px;
         border-radius: @(AppMeasures.Radius.Circular)%;
         flex-shrink: 0;
     }
 
-    .mail-account--paused {
+    .@(MailCssClasses.AccountPaused) {
         opacity: @(AppMeasures.Opacity.Muted);
     }
 
-        .mail-account--paused .mail-account-dot {
+        .@(MailCssClasses.AccountPaused) .@(MailCssClasses.AccountDot) {
             filter: grayscale(1);
         }
 
-    .mail-account-failing,
-    .mail-account-paused {
+    .@(MailCssClasses.AccountFailing),
+    .@(MailCssClasses.AccountPausedIcon) {
         flex-shrink: 0;
         font-size: @(AppMeasures.Font.Small)px;
     }
 
-    .mail-account-ordinal {
+    .@(MailCssClasses.AccountOrdinal) {
         flex-shrink: 0;
         min-width: @(AppMeasures.Size.Px16)px;
         text-align: center;
@@ -193,14 +198,14 @@
         padding: 0 @(AppMeasures.Space.Px2)px;
     }
 
-    .mail-account-name {
+    .@(MailCssClasses.AccountName) {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-account-unread {
+    .@(MailCssClasses.AccountUnread) {
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Heavy);
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
@@ -208,8 +213,7 @@
         flex-shrink: 0;
     }
 
-    /* Folder row with left indentation gutter (chevron + muted bell) and zero-width-until-hovered action strip (2.png fix). */
-    .mail-folder-row {
+    .@(MailCssClasses.FolderRow) {
         display: flex;
         align-items: center;
         padding-left: calc(@(AppMeasures.Space.Px6)px + var(--folder-depth, 0) * @(AppMeasures.Space.Px12)px);
@@ -217,60 +221,62 @@
         transition: background @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-folder-row:hover {
+        .@(MailCssClasses.FolderRow):hover {
             background: @surfaceTint;
         }
 
-    .mail-folder-gutter {
+    .@(MailCssClasses.FolderGutter) {
         display: inline-flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 2px;
+        gap: @(AppMeasures.Space.Px2)px;
         min-width: @(AppMeasures.Size.Px16)px;
         flex-shrink: 0;
     }
 
-    .mail-folder-chevron {
+    .@(MailCssClasses.FolderChevron) {
         border: none;
         background: transparent;
         color: @textMuted;
         cursor: pointer;
-        padding: 0 2px;
+        padding: 0 @(AppMeasures.Space.Px2)px;
         font-size: @(AppMeasures.Font.XSmall)px;
-        line-height: 1;
+        line-height: @(AppMeasures.LineHeight.None);
     }
 
-        .mail-folder-chevron:hover {
+        .@(MailCssClasses.FolderChevron):hover {
             color: @primary;
         }
 
-    .mail-folder-muted-gutter {
+    .@(MailCssClasses.FolderMutedGutter) {
         font-size: @(AppMeasures.Font.XSmall)px;
-        line-height: 1;
+        line-height: @(AppMeasures.LineHeight.None);
         flex-shrink: 0;
     }
 
-    .mail-folder-row > .mail-folder {
+    .@(MailCssClasses.FolderRow) > .@(MailCssClasses.Folder) {
         flex: 1;
         min-width: 0;
         padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px4)px;
     }
 
-    .mail-folder-hover-actions {
+    .@(MailCssClasses.FolderHoverActions),
+    .@(MailCssClasses.FolderHoverActions).@(MyLovelyMail.MainProject.UI.Elements.Buttons.ActionBarCssClasses.Bar) {
         display: none;
         align-items: center;
-        gap: 2px;
+        gap: @(AppMeasures.Space.Px2)px;
         flex-shrink: 0;
     }
 
-    .mail-folder-row:hover .mail-folder-hover-actions,
-    .mail-folder-row:focus-within .mail-folder-hover-actions,
-    .mail-account-folder-row:hover .mail-folder-hover-actions,
-    .mail-account-folder-row:focus-within .mail-folder-hover-actions {
+    .@(MailCssClasses.FolderRow):hover .@(MailCssClasses.FolderHoverActions),
+    .@(MailCssClasses.FolderRow):focus-within .@(MailCssClasses.FolderHoverActions),
+    .@(MailCssClasses.AccountFolderRow):hover .@(MailCssClasses.FolderHoverActions),
+    .@(MailCssClasses.AccountFolderRow):focus-within .@(MailCssClasses.FolderHoverActions),
+    .@(MailCssClasses.FolderHoverActions).@(MyLovelyMail.MainProject.UI.Elements.Buttons.ActionBarCssClasses.BarDropReady) {
         display: inline-flex;
     }
 
-    .mail-folder-action {
+    .@(MailCssClasses.FolderAction) {
         flex-shrink: 0;
         border: none;
         background: transparent;
@@ -283,13 +289,13 @@
         transition: opacity @(AppMeasures.Duration.Fast)s ease, background @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-folder-action:hover {
+        .@(MailCssClasses.FolderAction):hover {
             opacity: 1;
             color: @textPrimary;
             background: @surfaceTint;
         }
 
-    .mail-folder {
+    .@(MailCssClasses.Folder) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
@@ -304,21 +310,21 @@
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-folder:hover {
+        .@(MailCssClasses.Folder):hover {
             color: @textPrimary;
         }
 
-    .mail-folder--active {
+    .@(MailCssClasses.FolderActive) {
         background: @surfaceTint;
         color: var(--account-accent, @primary);
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
-    .mail-folder-icon {
+    .@(MailCssClasses.FolderIcon) {
         flex-shrink: 0;
     }
 
-    .mail-folder-name {
+    .@(MailCssClasses.FolderName) {
         flex: 1;
         min-width: 0;
         overflow: hidden;
@@ -326,7 +332,7 @@
         white-space: nowrap;
     }
 
-    .mail-account-folder-row {
+    .@(MailCssClasses.AccountFolderRow) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
@@ -335,11 +341,11 @@
         transition: background @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-account-folder-row:hover {
+        .@(MailCssClasses.AccountFolderRow):hover {
             background: @surfaceTint;
         }
 
-    .mail-account-folder-toggle {
+    .@(MailCssClasses.AccountFolderToggle) {
         flex: 1;
         min-width: 0;
         display: flex;
@@ -355,27 +361,42 @@
         text-align: left;
     }
 
-    .mail-account-folder-chevron {
+    .@(MailCssClasses.AccountFolderChevron) {
         font-size: @(AppMeasures.Font.XSmall)px;
         color: @textMuted;
         width: @(AppMeasures.Size.Px12)px;
         text-align: center;
     }
 
-    .mail-account-folder-name {
+    .@(MailCssClasses.AccountFolderName) {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-account-folder-action {
+    .@(MailCssClasses.AccountFolderAction) {
         opacity: @(AppMeasures.Opacity.Muted);
     }
 
-    .mail-drop-target {
+    .@(MailCssClasses.Account) > span,
+    .@(MailCssClasses.Folder) > span,
+    .@(MailCssClasses.AccountFolderToggle) > span {
+        pointer-events: none;
+    }
+
+    .@(MailCssClasses.DropTarget) {
         outline: @(AppMeasures.Border.Medium)px dashed @primary;
         background: @surfaceTint;
     }
 
+    .@(MailCssClasses.DropBefore) {
+        box-shadow: inset 0 @(AppMeasures.Border.Thick)px 0 0 @primary;
+        background: @surfaceTint;
+    }
+
+    .@(MailCssClasses.DropAfter) {
+        box-shadow: inset 0 -@(AppMeasures.Border.Thick)px 0 0 @primary;
+        background: @surfaceTint;
+    }
 </style>

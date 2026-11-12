@@ -5,14 +5,19 @@
     .@(AppContextMenuCssClasses.Backdrop) {
         position: fixed;
         inset: 0;
-        z-index: @(AppMeasures.ZLayer.Modal + 20);
+        z-index: @(AppMeasures.ZLayer.Modal + AppMeasures.Size.Px20);
         background: transparent;
+    }
+
+    .@(AppContextMenuCssClasses.BackdropPassThrough) {
+        pointer-events: none;
     }
 
     .@(AppContextMenuCssClasses.Panel) {
         position: fixed;
-        width: @(AppMeasures.Size.Px240)px;
-        max-height: @(AppMeasures.Percent.ThreeQuarters)vh;
+        pointer-events: auto;
+        width: @(AppMeasures.Size.Px260)px;
+        max-height: @(AppMeasures.Viewport.ThreeQuarters)vh;
         overflow-y: auto;
         padding: @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Large)px;
@@ -21,15 +26,22 @@
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px2)px;
-        z-index: @(AppMeasures.ZLayer.Modal + 21);
+        z-index: @(AppMeasures.ZLayer.Modal + AppMeasures.Size.Px22);
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .@(AppContextMenuCssClasses.PanelDropTarget) {
+        outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
+        outline-offset: @(AppMeasures.Space.Px2)px;
     }
 
     .@(AppContextMenuCssClasses.PanelSub) {
-        z-index: @(AppMeasures.ZLayer.Modal + 22);
+        z-index: @(AppMeasures.ZLayer.Modal + AppMeasures.Size.Px24);
     }
 
     .@(AppContextMenuCssClasses.PanelGrand) {
-        z-index: @(AppMeasures.ZLayer.Modal + 23);
+        z-index: @(AppMeasures.ZLayer.Modal + AppMeasures.Size.Px26);
     }
 
     .@(AppContextMenuCssClasses.Title) {
@@ -43,9 +55,39 @@
         align-items: center;
         justify-content: space-between;
         gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(AppContextMenuCssClasses.TitleText) {
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .@(AppContextMenuCssClasses.TitleTools) {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        flex-shrink: 0;
+    }
+
+    .@(AppContextMenuCssClasses.TitleToolBtn) {
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Px6)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px6)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        cursor: pointer;
+        line-height: @(AppMeasures.LineHeight.Tight);
+        transition: all @(AppMeasures.Duration.Instant)s ease;
+    }
+
+    .@(AppContextMenuCssClasses.TitleToolBtn):hover,
+    .@(AppContextMenuCssClasses.TitleToolBtnActive) {
+        border-color: @AppColors.Primary.ToRgbaHex(true);
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        color: @AppColors.Primary.ToRgbaHex(true);
     }
 
     .@(AppContextMenuCssClasses.PinHint) {
@@ -56,11 +98,50 @@
     }
 
     .@(AppContextMenuCssClasses.ItemWrap) {
+        position: relative;
         display: flex;
         flex-direction: column;
     }
 
+    .@(AppContextMenuCssClasses.ItemWrapDragging) {
+        opacity: @(AppMeasures.Opacity.Disabled);
+    }
+
+    .@(AppContextMenuCssClasses.ItemWrapHidden) {
+        opacity: @(AppMeasures.Opacity.Disabled);
+    }
+
+    .@(AppContextMenuCssClasses.ItemWrapDropBefore)::before,
+    .@(AppContextMenuCssClasses.ItemWrapDropAfter)::after {
+        content: "";
+        position: absolute;
+        left: @(AppMeasures.Space.Px6)px;
+        right: @(AppMeasures.Space.Px6)px;
+        height: @(AppMeasures.Size.Px2)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        background: @AppColors.Accent.ToRgbaHex(true);
+        box-shadow: @AppStyles.GetGlow(AppColors.Accent, 0.45f);
+        pointer-events: none;
+        z-index: @(AppMeasures.ZLayer.Dropdown);
+    }
+
+    .@(AppContextMenuCssClasses.ItemWrapDropBefore)::before {
+        top: -@(AppMeasures.Space.Px1)px;
+    }
+
+    .@(AppContextMenuCssClasses.ItemWrapDropAfter)::after {
+        bottom: -@(AppMeasures.Space.Px1)px;
+    }
+
+    .@(AppContextMenuCssClasses.ItemRow) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px2)px;
+    }
+
     .@(AppContextMenuCssClasses.Item) {
+        flex: 1;
+        min-width: 0;
         width: @(AppMeasures.Percent.Full)%;
         border: none;
         background: transparent;
@@ -73,7 +154,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: @(AppMeasures.Space.Px10)px;
+        gap: @(AppMeasures.Space.Px8)px;
         transition: background @(AppMeasures.Duration.Fast)s ease;
     }
 
@@ -92,8 +173,39 @@
         flex-shrink: 0;
     }
 
+    .@(AppContextMenuCssClasses.EditTools) {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px2)px;
+        flex-shrink: 0;
+    }
+
+    .@(AppContextMenuCssClasses.MiniActionBtn) {
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Px6)px;
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px5)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        cursor: pointer;
+        transition: all @(AppMeasures.Duration.Instant)s ease;
+    }
+
+    .@(AppContextMenuCssClasses.MiniActionBtn):hover {
+        border-color: @AppColors.Primary.ToRgbaHex(true);
+        color: @AppColors.Primary.ToRgbaHex(true);
+    }
+
+    .@(AppContextMenuCssClasses.MiniActionBtnDanger):hover {
+        border-color: @AppColors.Error.ToRgbaHex(true);
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+    }
+
     .@(AppContextMenuCssClasses.PinPopover) {
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px4)px;
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px2)px;
     }
 
     .@(AppContextMenuCssClasses.PinButton) {
@@ -109,20 +221,30 @@
         text-align: left;
     }
 
-        .@(AppContextMenuCssClasses.Item):hover:not(:disabled),
-        .@(AppContextMenuCssClasses.ItemOpen) {
-            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
-            color: @AppColors.Primary.ToRgbaHex(true);
-        }
+    .@(AppContextMenuCssClasses.Item):hover:not(:disabled),
+    .@(AppContextMenuCssClasses.ItemOpen) {
+        background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+        color: @AppColors.Primary.ToRgbaHex(true);
+    }
 
-        .@(AppContextMenuCssClasses.Item):disabled {
-            opacity: @AppMeasures.Opacity.Disabled;
-            cursor: not-allowed;
-        }
+    .@(AppContextMenuCssClasses.Item):disabled {
+        opacity: @AppMeasures.Opacity.Disabled;
+        cursor: not-allowed;
+    }
 
     .@(AppContextMenuCssClasses.Arrow) {
         color: @AppColors.TextMuted.ToRgbaHex(true);
         font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .@(AppContextMenuCssClasses.FooterBar) {
+        margin-top: @(AppMeasures.Space.Px2)px;
+        padding-top: @(AppMeasures.Space.Px4)px;
+        border-top: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px4)px;
     }
 
     .@(AppContextMenuCssClasses.InputStatus) {
@@ -130,7 +252,7 @@
         right: @(AppMeasures.Space.Medium)px;
         bottom: @(AppMeasures.Space.Px90)px;
         z-index: @(AppMeasures.ZLayer.Toast);
-        max-width: min(@(AppMeasures.Size.Px420)px, calc(100vw - @(AppMeasures.Space.Px32)px));
+        max-width: min(@(AppMeasures.Size.Px420)px, calc(@(AppMeasures.Viewport.Full)vw - @(AppMeasures.Space.Px32)px));
         padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         @((MarkupString)AppStyles.BuildAcrylicStyle(AcrylicLevel.Strong, AppMeasures.Blur.Normal))

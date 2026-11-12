@@ -1,7 +1,8 @@
 @* One editable row for any ISetting, picking the control from the value's runtime type. Both the
    account overrides card and the Settings catch-all card render through this, so a setting type
    gains an editor in one place instead of two. *@
-<div class="settings-row" data-context-menu="true" data-mouse4="menu" data-mouse5="click" data-mouse5-selector=".core-toggle,select,input"
+<div class="settings-row" data-context-menu="true"
+     @onmouseup="OnRowMouseUp"
      @oncontextmenu="OpenMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
     <div class="settings-row-text">
         <span class="settings-row-label">
@@ -89,4 +90,10 @@
         Setting.ResetToDefault();
         await OnSaved.InvokeAsync();
     }
+
+    Task OnRowMouseUp(MouseEventArgs e) =>
+        MouseActionService.HandleSideMouseUpAsync(
+            e,
+            onMouse4: () => Setting.IsDefault ? Task.CompletedTask : Reset(),
+            onMouse5: () => Setting.Value is bool b ? Commit((!b).ToString()) : Task.CompletedTask);
 }

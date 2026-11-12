@@ -11,15 +11,11 @@
 }
 
 <style>
-    /* ---- Compose ---- */
-
-    .mail-compose-button {
+    .@(MailCssClasses.ComposeBtn) {
         margin-bottom: @(AppMeasures.Space.Px8)px;
     }
 
-    /* Grows to fill the pane but never shrinks below its content: in the phone's full-screen
-       compose a shrinking card clipped the Discard and Send buttons, and the overlay scrolls instead. */
-    .mail-compose-card {
+    .@(MailCssClasses.ComposeCard) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
@@ -27,28 +23,26 @@
         flex: 1 0 auto;
     }
 
-    /* No min-height: 0 here, for the same reason: with it the 200px body slid under the attachment
-       dropzone. */
-    .mail-compose-fields {
+    .@(MailCssClasses.ComposeFields) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px10)px;
         flex: 1;
     }
 
-    .mail-compose-saved {
+    .@(MailCssClasses.ComposeSaved) {
         font-size: @(AppMeasures.Font.XSmall)px;
         color: @textMuted;
         margin-left: auto;
         flex-shrink: 0;
     }
 
-    .mail-compose-from {
+    .@(MailCssClasses.ComposeFrom) {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;
     }
 
-    .mail-compose-body {
+    .@(MailCssClasses.ComposeBody) {
         flex: 1;
         min-height: @(AppMeasures.Size.Px200)px;
         resize: vertical;
@@ -64,8 +58,7 @@
         box-sizing: border-box;
     }
 
-    /* Undo-send bar: slides in above the reader while a queued send counts down. */
-    .mail-undo-bar {
+    .@(MailCssClasses.UndoBar) {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -79,31 +72,30 @@
         animation: reader-open @(AppMeasures.Duration.Normal)s ease;
     }
 
-    .mail-undo-bar--warning {
+    .@(MailCssClasses.UndoBarWarning) {
         background: @AppColors.Warning.WithAlpha(0.18f).ToRgbaHex(true);
         border-color: @AppColors.Warning.ToRgbaHex(true);
     }
 
-        /* The attach control is a label wrapping a hidden input, so it needs the button's own layout. */
-        .mail-undo-bar--warning label.mail-undo-button {
+        .@(MailCssClasses.UndoBarWarning) label.@(MailCssClasses.UndoButton) {
             position: relative;
             display: inline-flex;
             align-items: center;
             overflow: hidden;
         }
 
-    .mail-undo-bar--failed {
+    .@(MailCssClasses.UndoBarFailed) {
         background: @AppColors.Error.WithAlpha(0.18f).ToRgbaHex(true);
         border-color: @AppColors.Error.ToRgbaHex(true);
     }
 
-    .mail-undo-text {
+    .@(MailCssClasses.UndoText) {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-undo-button {
+    .@(MailCssClasses.UndoButton) {
         border: none;
         border-radius: @(AppMeasures.Radius.Pill)px;
         padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px16)px;
@@ -115,13 +107,11 @@
         transition: transform @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-undo-button:hover {
+        .@(MailCssClasses.UndoButton):hover {
             transform: scale(1.05);
         }
 
-    /* Attachment dropzone: the invisible file input stretches over the whole label so both
-       clicking anywhere and dropping files onto it reach the same input. */
-    .mail-compose-dropzone {
+    .@(MailCssClasses.ComposeDropzone) {
         position: relative;
         display: flex;
         align-items: center;
@@ -136,25 +126,25 @@
         transition: border-color @(AppMeasures.Duration.Fast)s ease, color @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-compose-dropzone:hover {
+        .@(MailCssClasses.ComposeDropzone):hover {
             border-color: @AppColors.Primary.ToRgbaHex(true);
             color: @AppColors.TextSecondary.ToRgbaHex(true);
         }
 
-    .mail-compose-file-input {
+    .@(MailCssClasses.ComposeFileInput) {
         position: absolute;
         inset: 0;
         opacity: 0;
         cursor: pointer;
     }
 
-    .mail-compose-attachments {
+    .@(MailCssClasses.ComposeAttachments) {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
     }
 
-    .mail-compose-attachment-chip {
+    .@(MailCssClasses.ComposeAttachmentChip) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
@@ -170,7 +160,7 @@
         white-space: nowrap;
     }
 
-    .mail-compose-attachment-remove {
+    .@(MailCssClasses.ComposeAttachmentRemove) {
         border: none;
         background: transparent;
         color: @AppColors.TextMuted.ToRgbaHex(true);
@@ -179,36 +169,46 @@
         padding: 0 @(AppMeasures.Space.Px2)px;
     }
 
-        .mail-compose-attachment-remove:hover {
+        .@(MailCssClasses.ComposeAttachmentRemove):hover {
             color: @AppColors.TextDanger.ToRgbaHex(true);
         }
 
-    .mail-compose-error {
+    .@(MailCssClasses.ComposeError) {
         margin: 0;
         color: @AppColors.TextDanger.ToRgbaHex(true);
         font-size: @(AppMeasures.Font.Small)px;
         word-break: break-word;
     }
 
-    .mail-compose-actions {
+    .@(MailCssClasses.ComposeActions) {
         display: flex;
         justify-content: flex-end;
+        align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-reader-actions {
+    .@(MailCssClasses.QuotePicker) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+    }
+
+    .@(MailCssClasses.ReaderActions) {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(MailCssClasses.Attachments) {
         display: flex;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px8)px;
     }
 
-    .mail-attachments {
-        display: flex;
-        flex-wrap: wrap;
-        gap: @(AppMeasures.Space.Px8)px;
-    }
-
-    .mail-attachment-chip {
+    .@(MailCssClasses.AttachmentChip) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px6)px;
@@ -226,26 +226,25 @@
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-attachment-chip:hover {
+        .@(MailCssClasses.AttachmentChip):hover {
             background: @surfaceTint;
             transform: translateY(-@(AppMeasures.Size.Px1)px);
         }
 
-    .mail-attachment-chip--all {
+    .@(MailCssClasses.AttachmentChipAll) {
         border-color: var(--account-accent, @primary);
         color: var(--account-accent, @primary);
         font-weight: @(AppMeasures.Weight.Medium);
     }
 
-    .mail-attachment-size {
+    .@(MailCssClasses.AttachmentSize) {
         color: @textMuted;
         font-size: @(AppMeasures.Font.XSmall)px;
     }
 
-    .mail-tag-chip {
+    .@(MailCssClasses.TagChip) {
         display: inline-flex;
         align-items: center;
-        /* Ink comes from the inline style (AppColors.InkOn), which measures contrast against the actual chip color. */
         font-size: @(AppMeasures.Font.XSmall)px;
         font-weight: @(AppMeasures.Weight.Medium);
         padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
@@ -255,27 +254,35 @@
         white-space: nowrap;
     }
 
-    .mail-tag-chip--action {
+    .@(MailCssClasses.TagChipAction) {
         cursor: pointer;
         transition: transform @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .mail-tag-chip--action:hover {
+        .@(MailCssClasses.TagChipAction):hover {
             transform: translateY(-@(AppMeasures.Size.Px1)px);
         }
 
-    .mail-tag-chip--off {
+    .@(MailCssClasses.TagChipOff) {
         opacity: @(AppMeasures.Opacity.Disabled);
     }
 
-    .mail-tag-picker {
+    .@(MailCssClasses.TagDot) {
+        width: @(AppMeasures.Size.Px8)px;
+        height: @(AppMeasures.Size.Px8)px;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .@(MailCssClasses.TagPicker) {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: @(AppMeasures.Space.Px6)px;
     }
 
-    .mail-tag-input {
+    .@(MailCssClasses.TagInput) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
         color: @textPrimary;
@@ -286,7 +293,7 @@
         width: @(AppMeasures.Size.Px120)px;
     }
 
-    .mail-image-banner {
+    .@(MailCssClasses.ImageBanner) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
@@ -298,10 +305,9 @@
         padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
     }
 
-    .mail-save-status {
+    .@(MailCssClasses.SaveStatus) {
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;
         word-break: break-all;
     }
-
 </style>

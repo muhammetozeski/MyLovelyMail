@@ -1,9 +1,14 @@
 # Sender actions and notification precedence
 
-The sender's context menu is also reachable through **Sender actions** in the reader and **Actions**
-in the person sheet. `Mail.razor.Senders.cs` captures the exact address and account before opening
-the menu. Later commands resolve that captured account rather than whichever account is selected
-when a callback runs. Composing opens a draft in that account; it does not send it.
+The sender's context menu (`UiSurfaceIds.SenderContextMenu`) opens directly on right-click across all
+sender UI elements with `@oncontextmenu:stopPropagation="true"` so events never bubble to workspace or
+message context menus: listed sender rows (`SenderList` in Column 2), the `Person` sheet in Column 3,
+sender avatars and names on mail rows (`.mail-row-avatar`, `.mail-row-from`), and sender/recipient/thread
+chips in `MailReaderPane` (`.mail-reader-avatar`, `.mail-reader-from`, `.mail-reader-history`,
+`.mail-reader-to-addr`, `.mail-thread-line-sender`). It is also reachable through **Sender actions** in
+the reader and **Actions** in the person sheet. `Mail.razor.Senders.cs` captures the exact address and
+account before opening the menu. Later commands resolve that captured account rather than whichever
+account is selected when a callback runs. Composing opens a draft in that account; it does not send it.
 
 ## Filing old and new mail
 

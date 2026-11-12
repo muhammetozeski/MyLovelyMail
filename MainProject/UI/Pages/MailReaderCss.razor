@@ -10,16 +10,14 @@
 }
 
 <style>
-    /* ---- Reader ---- */
-
-    .mail-reader {
+    .@(MailCssClasses.Reader) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Small)px;
         min-height: @paneHeight;
     }
 
-    .mail-reader-header-card {
+    .@(MailCssClasses.ReaderHeaderCard) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Px6)px;
@@ -28,14 +26,14 @@
         border-bottom: @(AppMeasures.Border.Medium)px solid;
     }
 
-    .mail-reader-top-row {
+    .@(MailCssClasses.ReaderTopRow) {
         display: flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px8)px;
         min-width: 0;
     }
 
-    .mail-reader-list-nav {
+    .@(MailCssClasses.ReaderListNav) {
         display: inline-flex;
         align-items: center;
         gap: @(AppMeasures.Space.Px4)px;
@@ -43,7 +41,7 @@
         flex-shrink: 0;
     }
 
-    .mail-reader-meta-row {
+    .@(MailCssClasses.ReaderMetaRow) {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -54,7 +52,7 @@
         min-width: 0;
     }
 
-    .mail-reader-meta-left {
+    .@(MailCssClasses.ReaderMetaLeft) {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
@@ -62,15 +60,24 @@
         min-width: 0;
     }
 
-    .mail-reader-badges-row {
+    .@(MailCssClasses.ReaderFrom) {
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+        cursor: context-menu;
+    }
+
+    .@(MailCssClasses.ReaderDate) {
+        color: @textMuted;
+    }
+
+    .@(MailCssClasses.ReaderBadgesRow) {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: @(AppMeasures.Space.Px6)px;
     }
 
-    /* Remounted per message via @@key, so the open animation replays on every switch. */
-    .mail-reader-content {
+    .@(MailCssClasses.ReaderContent) {
         display: flex;
         flex-direction: column;
         gap: @(AppMeasures.Space.Small)px;
@@ -91,7 +98,7 @@
         }
     }
 
-    .mail-reader-subject {
+    .@(MailCssClasses.ReaderSubject) {
         flex: 1;
         min-width: 0;
         font-size: @(AppMeasures.Font.Large)px;
@@ -103,28 +110,36 @@
         white-space: nowrap;
     }
 
-    .mail-reader-to {
+    .@(MailCssClasses.ReaderTo) {
         margin-left: auto;
         font-size: @(AppMeasures.Font.Small)px;
         color: @textMuted;
         text-align: right;
-        max-width: 48%;
+        max-width: @(AppMeasures.Percent.Half)%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mail-search-toggle--pinned {
+    .@(MailCssClasses.ReaderToAddress) {
+        cursor: context-menu;
+    }
+
+    .@(MailCssClasses.ReaderToAddress):hover {
+        color: @textPrimary;
+        text-decoration: underline;
+    }
+
+    .@(MailCssClasses.SearchTogglePinned) {
         border-color: @AppColors.PrimarySoftBorder.ToRgbaHex(true);
         background: @AppColors.PrimaryBadgeTint.ToRgbaHex(true);
     }
 
-    /* Grows to fill the window when the message is short, never shrinks below it when it is not. */
-    .mail-reader-body {
+    .@(MailCssClasses.ReaderBody) {
         flex: 1 0 auto;
     }
 
-    .mail-reader-frame {
+    .@(MailCssClasses.ReaderFrame) {
         width: @(AppMeasures.Percent.Full)%;
         flex: 1 0 auto;
         height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Size.Px320)px);
@@ -135,7 +150,7 @@
         overflow-y: hidden;
     }
 
-    .mail-body-loading {
+    .@(MailCssClasses.BodyLoading) {
         flex: 1;
         display: flex;
         align-items: center;
@@ -143,8 +158,8 @@
         min-height: @(AppMeasures.Size.Px200)px;
     }
 
-    .mail-reader-preview,
-    .mail-reader-nobody {
+    .@(MailCssClasses.ReaderPreview),
+    .@(MailCssClasses.ReaderNoBody) {
         margin: 0;
         text-align: left;
         font-size: @(AppMeasures.Font.Medium)px;
@@ -154,9 +169,8 @@
         word-break: break-word;
     }
 
-    .mail-reader-nobody {
+    .@(MailCssClasses.ReaderNoBody) {
         color: @textMuted;
         font-style: italic;
     }
-
 </style>

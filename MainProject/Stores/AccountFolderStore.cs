@@ -291,9 +291,13 @@ public static class AccountFolderStore
 
     /// <summary>
     /// Moves <paramref name="draggedFolderId"/> either inside <paramref name="targetParentFolderId"/>
-    /// or before <paramref name="insertBeforeFolderId"/> among its siblings.
+    /// or before/after <paramref name="insertBeforeFolderId"/> among its siblings.
     /// </summary>
-    public static void MoveFolder(string draggedFolderId, string? targetParentFolderId, string? insertBeforeFolderId = null)
+    public static void MoveFolder(
+        string draggedFolderId,
+        string? targetParentFolderId,
+        string? insertBeforeFolderId = null,
+        bool insertAfter = false)
     {
         var dragged = folders.FirstOrDefault(f => string.Equals(f.Id, draggedFolderId, StringComparison.OrdinalIgnoreCase));
         if (dragged == null) return;
@@ -308,16 +312,18 @@ public static class AccountFolderStore
             .Where(f => string.Equals(f.ParentFolderId ?? string.Empty, newParent ?? string.Empty, StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(f.Id, dragged.Id, StringComparison.OrdinalIgnoreCase))
             .OrderBy(f => f.SortOrder)
+            .ThenBy(f => IsDefaultFolder(f.Id) ? 0 : 1)
+            .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         int insertIndex = siblings.Count;
         if (!string.IsNullOrWhiteSpace(insertBeforeFolderId))
         {
             int found = siblings.FindIndex(f => string.Equals(f.Id, insertBeforeFolderId, StringComparison.OrdinalIgnoreCase));
-            if (found >= 0) insertIndex = found;
+            if (found >= 0) insertIndex = insertAfter ? found + 1 : found;
         }
 
-        siblings.Insert(insertIndex, dragged);
+        siblings.Insert(Math.Clamp(insertIndex, 0, siblings.Count), dragged);
         for (int i = 0; i < siblings.Count; i++)
             siblings[i].SortOrder = i + 1;
 

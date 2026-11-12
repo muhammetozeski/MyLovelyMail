@@ -1,8 +1,8 @@
 @inherits ModalBase
 
-<div class="core-modal-header">
-    <span class="core-modal-title">@Title</span>
-    <button class="core-modal-close" type="button" title="Close (Esc)" @onclick="Cancel">✕</button>
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">@Title</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Cancel">✕</button>
 </div>
 
 <div style="font-size:@(AppMeasures.Font.Normal)px;color:@AppColors.TextSecondary.ToRgbaHex(true);line-height:@(AppMeasures.LineHeight.Relaxed);margin-bottom:@(AppMeasures.Space.Px16)px;white-space:pre-wrap;">

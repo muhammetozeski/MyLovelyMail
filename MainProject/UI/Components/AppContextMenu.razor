@@ -1,109 +1,255 @@
 @implements IDisposable
 @using StoreSettings = MyLovelyMail.MainProject.Stores.Settings
 @using MyLovelyMail.MainProject.Constants.ThemeConstants
+@using MyLovelyMail.MainProject.Services
+@using MyLovelyMail.MainProject.Stores
 
 @if (ContextMenuService.IsOpen)
 {
-    <div class="@AppContextMenuCssClasses.Backdrop"
+    var rootItems = ContextMenuService.Items;
+    var rootVisibleIds = rootItems.Select(static x => x.EffectiveActionId).ToList();
+
+    <div class="@BackdropClass"
          @onclick="Close"
          @oncontextmenu="Close"
          @oncontextmenu:preventDefault="true">
-        <div class="@AppContextMenuCssClasses.Panel" role="menu" aria-label="@ContextMenuService.Title"
+        <div class="@RootPanelClass" role="menu" aria-label="@ContextMenuService.Title"
+             data-menu-surface="@ContextMenuService.SurfaceId"
              style="@RootPanelStyle"
              @onclick:stopPropagation="true"
              @oncontextmenu:stopPropagation="true"
-             @oncontextmenu:preventDefault="true">
-            @if (!string.IsNullOrWhiteSpace(ContextMenuService.Title))
+             @oncontextmenu:preventDefault="true"
+             @onpointermove="e => HandlePanelPointerMove(null, rootVisibleIds, e)"
+             @onpointerup="e => HandlePanelPointerUp(null, rootVisibleIds, e)">
+            @if (!string.IsNullOrWhiteSpace(ContextMenuService.Title) || ContextMenuService.IsCustomizable)
             {
                 <div class="@AppContextMenuCssClasses.Title">
-                    <span>@ContextMenuService.Title</span>
-                    @if (ContextMenuService.Items.Any(static i => i.PinActionId != null))
+                    <span class="@AppContextMenuCssClasses.TitleText">@ContextMenuService.Title</span>
+                    @if (ContextMenuService.IsCustomizable)
                     {
-                        <span class="@AppContextMenuCssClasses.PinHint" title="Right-click or middle-click an item to pin/unpin it to the reader toolbar">📌 middle/right-click to pin</span>
-                    }
-                </div>
-            }
-            @foreach (var item in ContextMenuService.Items)
-            {
-                bool open = ReferenceEquals(ActiveParent, item);
-                bool pinned = item.PinActionId != null && MailMenuItems.IsActionPinned(item.PinActionId);
-                bool showPinOption = ReferenceEquals(PinOptionItem, item) && item.PinActionId != null;
-                <div class="@AppContextMenuCssClasses.ItemWrap">
-                    <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
-                            type="button"
-                            disabled="@(!item.Enabled)"
-                            title="@(item.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
-                            @onmouseenter="() => HoverParent(item)"
-                            @onmouseup="e => HandleItemMouseUp(item, e)"
-                            @oncontextmenu="e => HandleItemRightClick(item, e)"
-                            @oncontextmenu:preventDefault="true"
-                            @oncontextmenu:stopPropagation="true"
-                            @onclick="() => ActivateRootAsync(item)">
-                        <span class="@AppContextMenuCssClasses.ItemLabel">
-                            @if (pinned)
-                            {
-                                <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
-                            }
-                            <span>@item.Label</span>
-                        </span>
-                        @if (item.HasChildren)
-                        {
-                            <span class="@AppContextMenuCssClasses.Arrow">▸</span>
-                        }
-                    </button>
-                    @if (showPinOption && item.PinActionId is { } pinId)
-                    {
-                        <div class="@AppContextMenuCssClasses.PinPopover">
-                            <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(pinId, item.Label)">
-                                @(pinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
+                        <span class="@AppContextMenuCssClasses.TitleTools">
+                            <button type="button"
+                                    class="@AppContextMenuCssClasses.TitleToolBtn @(ContextMenuService.IsEditMode ? AppContextMenuCssClasses.TitleToolBtnActive : "")"
+                                    title="Edit menu items (reorder, hide/show, promote submenu items to 1-click)"
+                                    data-menu-tool="edit"
+                                    @onclick="ContextMenuService.ToggleEditMode">
+                                ✎
                             </button>
-                        </div>
+                            <button type="button"
+                                    class="@AppContextMenuCssClasses.TitleToolBtn"
+                                    title="Open full Button &amp; Menu Customizer"
+                                    data-menu-tool="customize"
+                                    @onclick="OpenFullCustomizer">
+                                🎛️
+                            </button>
+                        </span>
                     }
                 </div>
             }
-        </div>
 
-        @if (ActiveParent?.Children is { Count: > 0 } children)
-        {
-            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ActiveParent.Label"
-                 style="@Sub1PanelStyle"
-                 @onclick:stopPropagation="true"
-                 @oncontextmenu:stopPropagation="true"
-                 @oncontextmenu:preventDefault="true">
-                <div class="@AppContextMenuCssClasses.Title">@ActiveParent.Label</div>
-                @foreach (var child in children)
-                {
-                    bool open = ReferenceEquals(ActiveGrandParent, child);
-                    bool childPinned = child.PinActionId != null && MailMenuItems.IsActionPinned(child.PinActionId);
-                    bool showChildPinOption = ReferenceEquals(PinOptionItem, child) && child.PinActionId != null;
-                    <div class="@AppContextMenuCssClasses.ItemWrap">
+            @for (int i = 0; i < rootItems.Count; i++)
+            {
+                var item = rootItems[i];
+                int idx = i;
+                string actionId = item.EffectiveActionId;
+                bool open = ReferenceEquals(ActiveParent, item) || (ActiveParent != null && ActiveParent.EffectiveActionId == actionId);
+                bool isHidden = ContextMenuService.IsCustomizable && UiCustomizationStore.IsHidden(ContextMenuService.SurfaceId, actionId);
+                bool isAdded = ContextMenuService.IsCustomizable && UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, actionId);
+                bool showQuickMenu = QuickOptionActionId == actionId;
+
+                <div class="@GetItemWrapClass(null, actionId, isHidden)"
+                     data-menu-item-id="@actionId"
+                     @onpointerdown="e => BeginMenuDrag(null, item, rootVisibleIds, e)"
+                     @onpointerdown:stopPropagation="true"
+                     @onpointermove="e => MoveMenuDrag(null, item, idx, rootVisibleIds, e)"
+                     @onpointermove:stopPropagation="true"
+                     @onpointerup="e => EndMenuDrag(null, item, idx, rootVisibleIds, e)"
+                     @onpointerup:stopPropagation="true">
+                    <div class="@AppContextMenuCssClasses.ItemRow">
                         <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
                                 type="button"
-                                disabled="@(!child.Enabled)"
-                                title="@(child.PinActionId != null ? "Left-click: run · Middle-click: pin/unpin to toolbar · Right-click: pin options" : "")"
-                                @onmouseenter="() => HoverChild(child)"
-                                @onmouseup="e => HandleItemMouseUp(child, e)"
-                                @oncontextmenu="e => HandleItemRightClick(child, e)"
+                                disabled="@(!item.Enabled && !ContextMenuService.IsEditMode)"
+                                title="@(ContextMenuService.IsCustomizable ? "Click to run · Drag to reorder or place onto toolbar · Right-click for options" : "")"
+                                @onpointerenter="e => HoverParent(item, e)"
+                                @onmouseup="e => HandleItemMiddleClick(item, e)"
+                                @oncontextmenu="e => ToggleQuickOptions(actionId, e)"
                                 @oncontextmenu:preventDefault="true"
                                 @oncontextmenu:stopPropagation="true"
-                                @onclick="() => ActivateChildAsync(child)">
+                                @onclick="() => ActivateRootAsync(item)">
                             <span class="@AppContextMenuCssClasses.ItemLabel">
-                                @if (childPinned)
+                                @if (isAdded)
                                 {
-                                    <span class="@AppContextMenuCssClasses.PinBadge" title="Pinned to reader toolbar">📌</span>
+                                    <span class="@AppContextMenuCssClasses.PinBadge" title="Promoted / added item">⚡</span>
                                 }
-                                <span>@child.Label</span>
+                                <span>@item.Label</span>
                             </span>
-                            @if (child.HasChildren)
+                            @if (item.HasChildren)
                             {
                                 <span class="@AppContextMenuCssClasses.Arrow">▸</span>
                             }
                         </button>
-                        @if (showChildPinOption && child.PinActionId is { } cPinId)
+
+                        @if (ContextMenuService.IsEditMode && ContextMenuService.IsCustomizable)
+                        {
+                            <span class="@AppContextMenuCssClasses.EditTools">
+                                @if (!item.HasChildren)
+                                {
+                                    <button type="button"
+                                            class="@AppContextMenuCssClasses.MiniActionBtn"
+                                            title="Place onto screen toolbar"
+                                            data-menu-send-toolbar="@actionId"
+                                            @onclick="() => SendMenuItemToToolbar(item)">
+                                        📤
+                                    </button>
+                                }
+                                @if (!item.IsFixed)
+                                {
+                                    <button type="button"
+                                            class="@AppContextMenuCssClasses.MiniActionBtn @AppContextMenuCssClasses.MiniActionBtnDanger"
+                                            title="@(isHidden ? "Show item" : "Hide item")"
+                                            data-menu-toggle-vis="@actionId"
+                                            @onclick="() => ToggleMenuVisibility(null, actionId, isHidden, rootVisibleIds)">
+                                        @(isHidden ? "➕" : "👁️")
+                                    </button>
+                                }
+                            </span>
+                        }
+                    </div>
+
+                    @if (showQuickMenu && ContextMenuService.IsCustomizable)
+                    {
+                        <div class="@AppContextMenuCssClasses.PinPopover">
+                            @if (!item.HasChildren)
+                            {
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => SendMenuItemToToolbar(item)">
+                                    📤 Place onto @UiSurfaceIds.DisplayNameOf(UiSurfaceIds.DefaultPairedToolbarOf(ContextMenuService.SurfaceId))
+                                </button>
+                            }
+                            @if (!item.IsFixed)
+                            {
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => ToggleMenuVisibility(null, actionId, isHidden, rootVisibleIds)">
+                                    @(isHidden ? "➕ Restore item to menu" : "👁️ Hide from this menu")
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ContextMenuService.IsEditMode && ContextMenuService.IsCustomizable && UiCustomizationStore.IsSurfaceCustomized(ContextMenuService.SurfaceId))
+            {
+                <div class="@AppContextMenuCssClasses.FooterBar">
+                    <button type="button"
+                            class="@AppContextMenuCssClasses.TitleToolBtn"
+                            @onclick="ResetCurrentMenu">
+                        ↺ Reset menu to default
+                    </button>
+                </div>
+            }
+        </div>
+
+        @if (ResolvedActiveParent?.Children is { Count: > 0 } children)
+        {
+            string parentId = ResolvedActiveParent.EffectiveActionId;
+            var sub1Ids = children.Select(static x => x.EffectiveActionId).ToList();
+
+            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelSub" role="menu" aria-label="@ResolvedActiveParent.Label"
+                 data-submenu-parent="@parentId"
+                 style="@Sub1PanelStyle"
+                 @onclick:stopPropagation="true"
+                 @oncontextmenu:stopPropagation="true"
+                 @oncontextmenu:preventDefault="true"
+                 @onpointermove="e => HandlePanelPointerMove(parentId, sub1Ids, e)"
+                 @onpointerup="e => HandlePanelPointerUp(parentId, sub1Ids, e)">
+                <div class="@AppContextMenuCssClasses.Title">
+                    <span class="@AppContextMenuCssClasses.TitleText">@ResolvedActiveParent.Label</span>
+                </div>
+                @for (int i = 0; i < children.Count; i++)
+                {
+                    var child = children[i];
+                    int cIdx = i;
+                    string cId = child.EffectiveActionId;
+                    bool open = ResolvedActiveGrandParent != null && ResolvedActiveGrandParent.EffectiveActionId == cId;
+                    bool isHidden = ContextMenuService.IsCustomizable && UiCustomizationStore.IsHidden(ContextMenuService.SurfaceId, cId, parentId);
+                    bool alreadyRoot = ContextMenuService.IsCustomizable && UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, cId);
+                    bool showSubQuick = QuickOptionActionId == cId;
+
+                    <div class="@GetItemWrapClass(parentId, cId, isHidden)"
+                         data-menu-item-id="@cId"
+                         @onpointerdown="e => BeginMenuDrag(parentId, child, sub1Ids, e)"
+                         @onpointerdown:stopPropagation="true"
+                         @onpointermove="e => MoveMenuDrag(parentId, child, cIdx, sub1Ids, e)"
+                         @onpointermove:stopPropagation="true"
+                         @onpointerup="e => EndMenuDrag(parentId, child, cIdx, sub1Ids, e)"
+                         @onpointerup:stopPropagation="true">
+                        <div class="@AppContextMenuCssClasses.ItemRow">
+                            <button class="@AppContextMenuCssClasses.Item @(open ? AppContextMenuCssClasses.ItemOpen : "")"
+                                    type="button"
+                                    disabled="@(!child.Enabled && !ContextMenuService.IsEditMode)"
+                                    title="Click to run · Drag to root menu for 1-click access or drag onto screen toolbar · Right-click for options"
+                                    @onpointerenter="e => HoverChild(child, e)"
+                                    @onmouseup="e => HandleItemMiddleClick(child, e)"
+                                    @oncontextmenu="e => ToggleQuickOptions(cId, e)"
+                                    @oncontextmenu:preventDefault="true"
+                                    @oncontextmenu:stopPropagation="true"
+                                    @onclick="() => ActivateChildAsync(child)">
+                                <span class="@AppContextMenuCssClasses.ItemLabel">
+                                    @if (alreadyRoot)
+                                    {
+                                        <span class="@AppContextMenuCssClasses.PinBadge" title="Promoted to 1-click root menu">⚡</span>
+                                    }
+                                    <span>@child.Label</span>
+                                </span>
+                                @if (child.HasChildren)
+                                {
+                                    <span class="@AppContextMenuCssClasses.Arrow">▸</span>
+                                }
+                            </button>
+
+                            @if (ContextMenuService.IsCustomizable && (ContextMenuService.IsEditMode || !child.HasChildren))
+                            {
+                                @if (ContextMenuService.IsEditMode)
+                                {
+                                    <span class="@AppContextMenuCssClasses.EditTools">
+                                        @if (!child.HasChildren)
+                                        {
+                                            <button type="button"
+                                                    class="@AppContextMenuCssClasses.MiniActionBtn"
+                                                    title="@(alreadyRoot ? "Remove from 1-click root menu" : "Promote to 1-click root menu")"
+                                                    data-menu-promote-root="@cId"
+                                                    @onclick="() => TogglePromoteToRoot(child, rootVisibleIds)">
+                                                ⚡
+                                            </button>
+                                            <button type="button"
+                                                    class="@AppContextMenuCssClasses.MiniActionBtn"
+                                                    title="Place onto screen toolbar"
+                                                    data-menu-send-toolbar="@cId"
+                                                    @onclick="() => SendMenuItemToToolbar(child)">
+                                                📤
+                                            </button>
+                                        }
+                                        @if (!child.IsFixed)
+                                        {
+                                            <button type="button"
+                                                    class="@AppContextMenuCssClasses.MiniActionBtn @AppContextMenuCssClasses.MiniActionBtnDanger"
+                                                    title="@(isHidden ? "Show item" : "Hide item")"
+                                                    @onclick="() => ToggleMenuVisibility(parentId, cId, isHidden, sub1Ids)">
+                                                @(isHidden ? "➕" : "👁️")
+                                            </button>
+                                        }
+                                    </span>
+                                }
+                            }
+                        </div>
+
+                        @if (showSubQuick && ContextMenuService.IsCustomizable && !child.HasChildren)
                         {
                             <div class="@AppContextMenuCssClasses.PinPopover">
-                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePinFromOption(cPinId, child.Label)">
-                                    @(childPinned ? "📌 Remove from reader toolbar" : "📌 Add to reader toolbar")
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePromoteToRoot(child, rootVisibleIds)">
+                                    @(alreadyRoot ? "⚡ Remove from 1-click root menu" : "⚡ Promote to 1-click root menu")
+                                </button>
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => SendMenuItemToToolbar(child)">
+                                    📤 Place onto @UiSurfaceIds.DisplayNameOf(UiSurfaceIds.DefaultPairedToolbarOf(ContextMenuService.SurfaceId))
                                 </button>
                             </div>
                         }
@@ -112,22 +258,88 @@
             </div>
         }
 
-        @if (ActiveGrandParent?.Children is { Count: > 0 } grandChildren)
+        @if (ResolvedActiveGrandParent?.Children is { Count: > 0 } grandChildren)
         {
-            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelGrand" role="menu" aria-label="@ActiveGrandParent.Label"
+            string grandParentId = ResolvedActiveGrandParent.EffectiveActionId;
+            var sub2Ids = grandChildren.Select(static x => x.EffectiveActionId).ToList();
+
+            <div class="@AppContextMenuCssClasses.Panel @AppContextMenuCssClasses.PanelGrand" role="menu" aria-label="@ResolvedActiveGrandParent.Label"
+                 data-submenu-parent="@grandParentId"
                  style="@Sub2PanelStyle"
                  @onclick:stopPropagation="true"
                  @oncontextmenu:stopPropagation="true"
-                 @oncontextmenu:preventDefault="true">
-                <div class="@AppContextMenuCssClasses.Title">@ActiveGrandParent.Label</div>
-                @foreach (var leaf in grandChildren)
+                 @oncontextmenu:preventDefault="true"
+                 @onpointermove="e => HandlePanelPointerMove(grandParentId, sub2Ids, e)"
+                 @onpointerup="e => HandlePanelPointerUp(grandParentId, sub2Ids, e)">
+                <div class="@AppContextMenuCssClasses.Title">
+                    <span class="@AppContextMenuCssClasses.TitleText">@ResolvedActiveGrandParent.Label</span>
+                </div>
+                @for (int i = 0; i < grandChildren.Count; i++)
                 {
-                    <button class="@AppContextMenuCssClasses.Item"
-                            type="button"
-                            disabled="@(!leaf.Enabled)"
-                            @onclick="() => ContextMenuService.InvokeAsync(leaf)">
-                        <span>@leaf.Label</span>
-                    </button>
+                    var leaf = grandChildren[i];
+                    int lIdx = i;
+                    string lId = leaf.EffectiveActionId;
+                    bool isHidden = ContextMenuService.IsCustomizable && UiCustomizationStore.IsHidden(ContextMenuService.SurfaceId, lId, grandParentId);
+                    bool alreadyRoot = ContextMenuService.IsCustomizable && UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, lId);
+                    bool showLeafQuick = QuickOptionActionId == lId;
+
+                    <div class="@GetItemWrapClass(grandParentId, lId, isHidden)"
+                         data-menu-item-id="@lId"
+                         @onpointerdown="e => BeginMenuDrag(grandParentId, leaf, sub2Ids, e)"
+                         @onpointerdown:stopPropagation="true"
+                         @onpointermove="e => MoveMenuDrag(grandParentId, leaf, lIdx, sub2Ids, e)"
+                         @onpointermove:stopPropagation="true"
+                         @onpointerup="e => EndMenuDrag(grandParentId, leaf, lIdx, sub2Ids, e)"
+                         @onpointerup:stopPropagation="true">
+                        <div class="@AppContextMenuCssClasses.ItemRow">
+                            <button class="@AppContextMenuCssClasses.Item"
+                                    type="button"
+                                    disabled="@(!leaf.Enabled && !ContextMenuService.IsEditMode)"
+                                    title="Click to run · Drag to root menu for 1-click access or drag onto screen toolbar · Right-click for options"
+                                    @oncontextmenu="e => ToggleQuickOptions(lId, e)"
+                                    @oncontextmenu:preventDefault="true"
+                                    @oncontextmenu:stopPropagation="true"
+                                    @onclick="() => ActivateLeafAsync(leaf)">
+                                <span class="@AppContextMenuCssClasses.ItemLabel">
+                                    @if (alreadyRoot)
+                                    {
+                                        <span class="@AppContextMenuCssClasses.PinBadge">⚡</span>
+                                    }
+                                    <span>@leaf.Label</span>
+                                </span>
+                            </button>
+                            @if (ContextMenuService.IsEditMode && ContextMenuService.IsCustomizable)
+                            {
+                                <span class="@AppContextMenuCssClasses.EditTools">
+                                    <button type="button"
+                                            class="@AppContextMenuCssClasses.MiniActionBtn"
+                                            title="Promote to 1-click root menu"
+                                            data-menu-promote-root="@lId"
+                                            @onclick="() => TogglePromoteToRoot(leaf, rootVisibleIds)">
+                                        ⚡
+                                    </button>
+                                    <button type="button"
+                                            class="@AppContextMenuCssClasses.MiniActionBtn"
+                                            title="Place onto screen toolbar"
+                                            @onclick="() => SendMenuItemToToolbar(leaf)">
+                                        📤
+                                    </button>
+                                </span>
+                            }
+                        </div>
+
+                        @if (showLeafQuick && ContextMenuService.IsCustomizable)
+                        {
+                            <div class="@AppContextMenuCssClasses.PinPopover">
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => TogglePromoteToRoot(leaf, rootVisibleIds)">
+                                    @(alreadyRoot ? "⚡ Remove from 1-click root menu" : "⚡ Promote to 1-click root menu")
+                                </button>
+                                <button class="@AppContextMenuCssClasses.PinButton" type="button" @onclick="() => SendMenuItemToToolbar(leaf)">
+                                    📤 Place onto @UiSurfaceIds.DisplayNameOf(UiSurfaceIds.DefaultPairedToolbarOf(ContextMenuService.SurfaceId))
+                                </button>
+                            </div>
+                        }
+                    </div>
                 }
             </div>
         }
@@ -148,97 +360,100 @@
 @code {
     ContextMenuItem? ActiveParent { get; set; }
     ContextMenuItem? ActiveGrandParent { get; set; }
-    ContextMenuItem? PinOptionItem { get; set; }
+    string? QuickOptionActionId { get; set; }
 
     int RootX { get; set; }
     int RootY { get; set; }
+    int Sub1Y { get; set; }
+    int Sub2Y { get; set; }
 
-    int PanelWidth => AppMeasures.Size.Px240;
+    int PanelWidth => AppMeasures.Size.Px260;
     int Gap => AppMeasures.Space.Px6;
     int Pad => AppMeasures.Space.Px12;
 
+    ContextMenuItem? ResolvedActiveParent =>
+        ActiveParent == null
+            ? null
+            : ContextMenuService.Items.FirstOrDefault(i => i.EffectiveActionId == ActiveParent.EffectiveActionId) ?? ActiveParent;
+
+    ContextMenuItem? ResolvedActiveGrandParent =>
+        ActiveGrandParent == null || ResolvedActiveParent?.Children == null
+            ? null
+            : ResolvedActiveParent.Children.FirstOrDefault(c => c.EffectiveActionId == ActiveGrandParent.EffectiveActionId) ?? ActiveGrandParent;
+
+    string BackdropClass => ActionDragService.IsDragging
+        ? $"{AppContextMenuCssClasses.Backdrop} {AppContextMenuCssClasses.BackdropPassThrough}"
+        : AppContextMenuCssClasses.Backdrop;
+
+    string RootPanelClass =>
+        ActionDragService.IsDragging
+        && ActionDragService.HoverSurfaceId == ContextMenuService.SurfaceId
+        && string.IsNullOrEmpty(ActionDragService.HoverSubmenuParentId)
+        && !string.IsNullOrEmpty(ActionDragService.SourceSubmenuParentId)
+            ? $"{AppContextMenuCssClasses.Panel} {AppContextMenuCssClasses.PanelDropTarget}"
+            : AppContextMenuCssClasses.Panel;
+
     string RootPanelStyle => $"left:{RootX}px;top:{RootY}px;";
-    string Sub1PanelStyle => $"left:{GetSub1X()}px;top:{RootY}px;";
-    string Sub2PanelStyle => $"left:{GetSub2X()}px;top:{RootY}px;";
+    string Sub1PanelStyle => $"left:{GetSub1X()}px;top:{Sub1Y}px;";
+    string Sub2PanelStyle => $"left:{GetSub2X()}px;top:{Sub2Y}px;";
+
+    int EffectiveWindowWidth => StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1280;
+    int EffectiveWindowHeight => StoreSettings.WindowHeight.Value > 300 ? StoreSettings.WindowHeight.Value : 800;
+
+    int ClampSubY(double pointerY)
+    {
+        int winH = EffectiveWindowHeight;
+        int maxSubH = winH * AppMeasures.Percent.ThreeQuarters / 100;
+        int raw = (int)Math.Round(pointerY) - AppMeasures.Space.Px20;
+        return Math.Clamp(raw, Pad, Math.Max(Pad, winH - maxSubH - Pad));
+    }
 
     int GetSub1X()
     {
-        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
-
+        int winW = EffectiveWindowWidth;
         if (RootX + PanelWidth + Gap + PanelWidth + Pad <= winW)
-        {
             return RootX + PanelWidth + Gap;
-        }
-
         if (RootX - Gap - PanelWidth >= Pad)
-        {
             return RootX - Gap - PanelWidth;
-        }
-
         return RootX;
     }
 
     int GetSub2X()
     {
-        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
+        int winW = EffectiveWindowWidth;
         int sub1X = GetSub1X();
-
         if (sub1X > RootX)
         {
             if (sub1X + PanelWidth + Gap + PanelWidth + Pad <= winW)
-            {
                 return sub1X + PanelWidth + Gap;
-            }
             if (RootX - Gap - PanelWidth >= Pad)
-            {
                 return RootX - Gap - PanelWidth;
-            }
             return sub1X;
         }
-        else if (sub1X < RootX)
+        if (sub1X < RootX)
         {
             if (sub1X - Gap - PanelWidth >= Pad)
-            {
                 return sub1X - Gap - PanelWidth;
-            }
             if (RootX + PanelWidth + Gap + PanelWidth + Pad <= winW)
-            {
                 return RootX + PanelWidth + Gap;
-            }
             return sub1X;
         }
-        else
-        {
-            if (sub1X + PanelWidth + Gap + PanelWidth + Pad <= winW)
-            {
-                return sub1X + PanelWidth + Gap;
-            }
-            if (sub1X - Gap - PanelWidth >= Pad)
-            {
-                return sub1X - Gap - PanelWidth;
-            }
-            return sub1X;
-        }
+        return sub1X + PanelWidth + Gap <= winW ? sub1X + PanelWidth + Gap : Pad;
     }
 
     void CalculateRootPosition()
     {
-        int winW = StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1200;
-        int winH = StoreSettings.WindowHeight.Value > 300 ? StoreSettings.WindowHeight.Value : 800;
+        int winW = EffectiveWindowWidth;
+        int winH = EffectiveWindowHeight;
 
         int clickX = (int)Math.Round(ContextMenuService.X);
         int clickY = (int)Math.Round(ContextMenuService.Y);
 
         if (clickX + PanelWidth + Pad > winW)
         {
-            if (clickX - PanelWidth >= Pad)
-            {
-                RootX = clickX - PanelWidth;
-            }
-            else
-            {
-                RootX = Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
-            }
+            RootX = clickX - PanelWidth >= Pad
+                ? clickX - PanelWidth
+                : Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
         }
         else
         {
@@ -247,12 +462,38 @@
 
         int maxMenuH = winH * AppMeasures.Percent.ThreeQuarters / 100;
         RootY = Math.Clamp(clickY, Pad, Math.Max(Pad, winH - maxMenuH - Pad));
+        Sub1Y = RootY;
+        Sub2Y = RootY;
+    }
+
+    string GetItemWrapClass(string? submenuParentId, string actionId, bool isHidden)
+    {
+        var sb = new System.Text.StringBuilder(AppContextMenuCssClasses.ItemWrap);
+        if (isHidden) sb.Append(' ').Append(AppContextMenuCssClasses.ItemWrapHidden);
+        if (ActionDragService.IsDragging
+            && ActionDragService.SourceSurfaceId == ContextMenuService.SurfaceId
+            && string.Equals(ActionDragService.SourceSubmenuParentId ?? string.Empty, submenuParentId ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && ActionDragService.SourceActionId.Equals(actionId, StringComparison.OrdinalIgnoreCase))
+        {
+            sb.Append(' ').Append(AppContextMenuCssClasses.ItemWrapDragging);
+        }
+        if (ActionDragService.IsDragging
+            && ActionDragService.HoverSurfaceId == ContextMenuService.SurfaceId
+            && string.Equals(ActionDragService.HoverSubmenuParentId ?? string.Empty, submenuParentId ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && ActionDragService.HoverTargetActionId.Equals(actionId, StringComparison.OrdinalIgnoreCase))
+        {
+            sb.Append(' ').Append(ActionDragService.HoverInsertAfter
+                ? AppContextMenuCssClasses.ItemWrapDropAfter
+                : AppContextMenuCssClasses.ItemWrapDropBefore);
+        }
+        return sb.ToString();
     }
 
     protected override void OnInitialized()
     {
         ContextMenuService.OnChanged += HandleMenuChanged;
         MouseActionService.OnStatus += HandleStatusChanged;
+        ActionDragService.OnStateChanged += HandleDragStateChanged;
         if (ContextMenuService.IsOpen)
         {
             CalculateRootPosition();
@@ -261,10 +502,13 @@
 
     void HandleMenuChanged()
     {
-        ActiveParent = null;
-        ActiveGrandParent = null;
-        PinOptionItem = null;
-        if (ContextMenuService.IsOpen)
+        if (!ContextMenuService.IsOpen)
+        {
+            ActiveParent = null;
+            ActiveGrandParent = null;
+            QuickOptionActionId = null;
+        }
+        else if (ActiveParent == null)
         {
             CalculateRootPosition();
         }
@@ -272,62 +516,210 @@
     }
 
     void HandleStatusChanged(string _) => InvokeAsync(StateHasChanged);
+    void HandleDragStateChanged() => InvokeAsync(StateHasChanged);
 
-    void HoverParent(ContextMenuItem item)
+    void HoverParent(ContextMenuItem item, PointerEventArgs e)
     {
+        if (ActionDragService.IsDragging) return;
         ActiveParent = item.HasChildren ? item : null;
         ActiveGrandParent = null;
+        if (item.HasChildren)
+            Sub1Y = ClampSubY(e.ClientY);
     }
 
-    void HoverChild(ContextMenuItem item) => ActiveGrandParent = item.HasChildren ? item : null;
-
-    void HandleItemMouseUp(ContextMenuItem item, MouseEventArgs e)
+    void HoverChild(ContextMenuItem item, PointerEventArgs e)
     {
-        if (e.Button == 1 && item.PinActionId is { } pinId)
+        if (ActionDragService.IsDragging) return;
+        ActiveGrandParent = item.HasChildren ? item : null;
+        if (item.HasChildren)
+            Sub2Y = ClampSubY(e.ClientY);
+    }
+
+    void BeginMenuDrag(string? submenuParentId, ContextMenuItem item, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        if (e.Button != 0 || !ContextMenuService.IsCustomizable) return;
+        ActionDragService.BeginCandidate(
+            ContextMenuService.SurfaceId,
+            submenuParentId,
+            item.EffectiveActionId,
+            item.Label,
+            item.IsFixed,
+            visibleIds,
+            e.ClientX,
+            e.ClientY);
+    }
+
+    void MoveMenuDrag(string? submenuParentId, ContextMenuItem item, int slotIndex, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (!ActionDragService.IsDragging || !ContextMenuService.IsCustomizable) return;
+
+        bool sameBucket = ActionDragService.SourceSurfaceId.Equals(ContextMenuService.SurfaceId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(ActionDragService.SourceSubmenuParentId ?? string.Empty, submenuParentId ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        bool insertAfter;
+        if (sameBucket)
         {
-            TogglePinFromOption(pinId, item.Label);
+            int srcIdx = -1;
+            for (int i = 0; i < visibleIds.Count; i++)
+            {
+                if (visibleIds[i].Equals(ActionDragService.SourceActionId, StringComparison.OrdinalIgnoreCase))
+                {
+                    srcIdx = i;
+                    break;
+                }
+            }
+            insertAfter = srcIdx >= 0 && srcIdx < slotIndex;
+        }
+        else
+        {
+            insertAfter = e.OffsetY > 14;
+        }
+
+        ActionDragService.HoverSlot(ContextMenuService.SurfaceId, submenuParentId, item.EffectiveActionId, slotIndex, visibleIds, insertAfter);
+    }
+
+    void EndMenuDrag(string? submenuParentId, ContextMenuItem item, int slotIndex, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        if (!ActionDragService.IsDragging) return;
+        MoveMenuDrag(submenuParentId, item, slotIndex, visibleIds, e);
+        ActionDragService.CompleteDrop();
+    }
+
+    void HandlePanelPointerMove(string? submenuParentId, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
+        if (!ActionDragService.IsDragging || !ContextMenuService.IsCustomizable) return;
+        ActionDragService.HoverSurfaceContainer(ContextMenuService.SurfaceId, submenuParentId, visibleIds);
+    }
+
+    void HandlePanelPointerUp(string? submenuParentId, IReadOnlyList<string> visibleIds, PointerEventArgs e)
+    {
+        if (!ActionDragService.IsDragging) return;
+        HandlePanelPointerMove(submenuParentId, visibleIds, e);
+        ActionDragService.CompleteDrop();
+    }
+
+    void HandleItemMiddleClick(ContextMenuItem item, MouseEventArgs e)
+    {
+        if (e.Button != 1 || !ContextMenuService.IsCustomizable || item.HasChildren) return;
+        SendMenuItemToToolbar(item);
+    }
+
+    void ToggleQuickOptions(string actionId, MouseEventArgs e)
+    {
+        if (!ContextMenuService.IsCustomizable) return;
+        QuickOptionActionId = QuickOptionActionId == actionId ? null : actionId;
+        StateHasChanged();
+    }
+
+    void ToggleMenuVisibility(string? submenuParentId, string actionId, bool currentlyHidden, IReadOnlyList<string> visibleIds)
+    {
+        QuickOptionActionId = null;
+        UiCustomizationStore.SetVisible(
+            ContextMenuService.SurfaceId,
+            actionId,
+            visible: currentlyHidden,
+            currentVisibleIds: visibleIds,
+            submenuParentId: submenuParentId);
+    }
+
+    void TogglePromoteToRoot(ContextMenuItem item, IReadOnlyList<string> rootVisibleIds)
+    {
+        QuickOptionActionId = null;
+        string id = item.EffectiveActionId;
+        bool alreadyRoot = UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, id);
+        if (alreadyRoot)
+        {
+            UiCustomizationStore.SetVisible(ContextMenuService.SurfaceId, id, visible: false, currentVisibleIds: rootVisibleIds);
+            MouseActionService.ReportStatus($"Removed '{item.Label}' from 1-click root menu");
+        }
+        else
+        {
+            UiCustomizationStore.SetVisible(
+                ContextMenuService.SurfaceId,
+                id,
+                visible: true,
+                currentVisibleIds: rootVisibleIds,
+                insertIndex: 0,
+                markAsAddedWhenShown: true);
+            MouseActionService.ReportStatus($"⚡ Promoted '{item.Label}' to 1-click root menu");
         }
     }
 
-    void HandleItemRightClick(ContextMenuItem item, MouseEventArgs e)
+    void SendMenuItemToToolbar(ContextMenuItem item)
     {
-        if (item.PinActionId == null) return;
-        PinOptionItem = ReferenceEquals(PinOptionItem, item) ? null : item;
-        StateHasChanged();
+        QuickOptionActionId = null;
+        string targetToolbar = UiSurfaceIds.DefaultPairedToolbarOf(ContextMenuService.SurfaceId);
+        var visibleOnToolbar = ActionDragService.GetEffectiveVisibleIds(targetToolbar);
+        string id = item.EffectiveActionId;
+        bool wasAddedOnMenu = UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, id);
+        UiCustomizationStore.TransferAction(
+            ContextMenuService.SurfaceId,
+            null,
+            targetToolbar,
+            null,
+            id,
+            visibleOnToolbar,
+            visibleOnToolbar.Count,
+            hideFromSource: wasAddedOnMenu);
+        ContextMenuService.Close();
+        MouseActionService.ReportStatus($"📤 Placed '{item.Label}' onto {UiSurfaceIds.DisplayNameOf(targetToolbar)}");
     }
 
-    void TogglePinFromOption(string actionId, string label)
+    void OpenFullCustomizer()
     {
-        bool nowPinned = MailMenuItems.TogglePinAction(actionId);
-        PinOptionItem = null;
-        MouseActionService.ReportStatus(nowPinned
-            ? $"📌 Pinned '{label}' next to Message actions."
-            : $"Unpinned '{label}' from reader toolbar.");
-        StateHasChanged();
+        string surface = ContextMenuService.SurfaceId;
+        ContextMenuService.Close();
+        ModalService.Open<UiCustomizerModal>(
+            new Dictionary<string, object?> { ["InitialSurfaceId"] = surface },
+            ModalSize.Wide);
+    }
+
+    void ResetCurrentMenu()
+    {
+        string surface = ContextMenuService.SurfaceId;
+        UiCustomizationStore.ResetSurface(surface);
+        MouseActionService.ReportStatus($"↺ Reset {UiSurfaceIds.DisplayNameOf(surface)} to defaults");
     }
 
     Task ActivateRootAsync(ContextMenuItem item)
     {
+        if (ActionDragService.ConsumeSuppressedClick()) return Task.CompletedTask;
         if (item.HasChildren)
         {
             ActiveParent = item;
             ActiveGrandParent = null;
             return Task.CompletedTask;
         }
+        if (!item.Enabled) return Task.CompletedTask;
         return ContextMenuService.InvokeAsync(item);
     }
 
     Task ActivateChildAsync(ContextMenuItem item)
     {
+        if (ActionDragService.ConsumeSuppressedClick()) return Task.CompletedTask;
         if (item.HasChildren)
         {
             ActiveGrandParent = item;
             return Task.CompletedTask;
         }
+        if (!item.Enabled) return Task.CompletedTask;
         return ContextMenuService.InvokeAsync(item);
     }
 
-    static void Close() => ContextMenuService.Close();
+    Task ActivateLeafAsync(ContextMenuItem item)
+    {
+        if (ActionDragService.ConsumeSuppressedClick()) return Task.CompletedTask;
+        if (!item.Enabled) return Task.CompletedTask;
+        return ContextMenuService.InvokeAsync(item);
+    }
+
+    static void Close()
+    {
+        if (ActionDragService.IsDragging) return;
+        ContextMenuService.Close();
+    }
 
     static void DismissStatus() => MouseActionService.ReportStatus(null, 0);
 
@@ -335,5 +727,6 @@
     {
         ContextMenuService.OnChanged -= HandleMenuChanged;
         MouseActionService.OnStatus -= HandleStatusChanged;
+        ActionDragService.OnStateChanged -= HandleDragStateChanged;
     }
 }
