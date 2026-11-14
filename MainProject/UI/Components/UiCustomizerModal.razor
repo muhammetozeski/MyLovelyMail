@@ -51,6 +51,8 @@
                 : UiSurfaceIds.PairedContextMenuOf(SelectedSurfaceId);
         }
 
+        <div @onpointermove="OnModalContainerPointerMove"
+             @onpointerup="e => EndModalRowDrag(visibleIds, e)">
         <div class="@UiCustomizerCssClasses.TopBar">
             <div>
                 <strong>@UiSurfaceIds.DisplayNameOf(SelectedSurfaceId)</strong>
@@ -107,7 +109,9 @@
                             <span class="@UiCustomizerCssClasses.RowLabel" title="@entry.ActionId">
                                 ⠿ @entry.Label
                             </span>
-                            <span class="@UiCustomizerCssClasses.RowTools">
+                            <span class="@UiCustomizerCssClasses.RowTools"
+                                  @onpointerdown:stopPropagation="true"
+                                  @onpointerup:stopPropagation="true">
                                 <PillButton IsCompact="true"
                                             Disabled="@(idx == 0)"
                                             Title="Move up"
@@ -201,6 +205,7 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
 </div>
 
@@ -243,6 +248,8 @@
     int? modalDraggingIndex;
     int? modalHoverIndex;
     bool modalHoverAfter;
+    bool modalDragActivated;
+    double modalDragStartY;
 
     protected override void OnInitialized()
     {
@@ -259,6 +266,7 @@
         SelectedSurfaceId = surfaceId;
         modalDraggingIndex = null;
         modalHoverIndex = null;
+        modalDragActivated = false;
     }
 
     SurfaceInspectionSnapshot GetCurrentSnapshot()
@@ -291,8 +299,8 @@
     string GetModalRowClass(int index)
     {
         var sb = new System.Text.StringBuilder(UiCustomizerCssClasses.Row);
-        if (modalDraggingIndex == index) sb.Append(' ').Append(UiCustomizerCssClasses.RowDragging);
-        if (modalDraggingIndex.HasValue && modalHoverIndex == index && modalDraggingIndex != index)
+        if (modalDragActivated && modalDraggingIndex == index) sb.Append(' ').Append(UiCustomizerCssClasses.RowDragging);
+        if (modalDragActivated && modalDraggingIndex.HasValue && modalHoverIndex == index && modalDraggingIndex != index)
         {
             sb.Append(' ').Append(modalHoverAfter
                 ? UiCustomizerCssClasses.RowDropAfter
@@ -306,11 +314,30 @@
         if (e.Button != 0) return;
         modalDraggingIndex = index;
         modalHoverIndex = index;
+        modalDragActivated = false;
+        modalDragStartY = e.ClientY;
+    }
+
+    void OnModalContainerPointerMove(PointerEventArgs e)
+    {
+        if (!modalDraggingIndex.HasValue) return;
+        if ((e.Buttons & 1) == 0)
+        {
+            modalDraggingIndex = null;
+            modalHoverIndex = null;
+            modalDragActivated = false;
+            return;
+        }
+        if (!modalDragActivated && Math.Abs(e.ClientY - modalDragStartY) >= 5.0)
+            modalDragActivated = true;
     }
 
     void MoveModalRowDrag(int index, IReadOnlyList<string> visibleIds, PointerEventArgs e)
     {
         if (!modalDraggingIndex.HasValue) return;
+        if (!modalDragActivated && Math.Abs(e.ClientY - modalDragStartY) >= 5.0)
+            modalDragActivated = true;
+        if (!modalDragActivated) return;
         modalHoverIndex = index;
         modalHoverAfter = modalDraggingIndex.Value < index;
     }
@@ -321,10 +348,12 @@
         int from = modalDraggingIndex.Value;
         int? to = modalHoverIndex;
         bool after = modalHoverAfter;
+        bool activated = modalDragActivated;
         modalDraggingIndex = null;
         modalHoverIndex = null;
+        modalDragActivated = false;
 
-        if (to.HasValue && from != to.Value && from >= 0 && from < visibleIds.Count)
+        if (activated && to.HasValue && from != to.Value && from >= 0 && from < visibleIds.Count)
         {
             int insertIdx = after ? to.Value + 1 : to.Value;
             UiCustomizationStore.Reorder(SelectedSurfaceId, visibleIds, visibleIds[from], insertIdx);

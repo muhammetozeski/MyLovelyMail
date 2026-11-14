@@ -157,6 +157,7 @@ public static class AccountFolderStore
             .Where(f => string.IsNullOrEmpty(f.ParentFolderId))
             .OrderBy(f => f.SortOrder)
             .ThenBy(f => IsDefaultFolder(f.Id) ? 0 : 1)
+            .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
     public static IReadOnlyList<AccountFolderData> GetChildFolders(string parentFolderId) =>

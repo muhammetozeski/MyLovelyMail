@@ -232,13 +232,16 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 FullName = folder.FullName,
                 DisplayName = folder.Name,
                 Role = cached?.Role ?? (folder.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase) ? FolderRole.Inbox : FolderRole.None),
+                Selectable = cached?.Selectable ?? !folder.Attributes.HasFlag(FolderAttributes.NoSelect),
                 Delimiter = folder.DirectorySeparator,
                 UidValidity = folder.UidValidity,
                 LastSeenUid = maxUid,
                 OldestFetchedUid = oldestFetchedUid,
                 LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = folder.Count,
-                UnreadCount = folder.Unread
+                UnreadCount = folder.Unread,
+                SortOrder = cached?.SortOrder ?? 0,
+                IsExpanded = cached?.IsExpanded ?? true
             });
 
             if (arrived.Count > 0 && !backgroundRefresh)

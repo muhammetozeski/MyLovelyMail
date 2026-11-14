@@ -84,11 +84,29 @@ public static class ActionDragService
         if (SourceIsFixed && !SourceIsContextMenu) return false;
 
         // Submenu items inside a context menu can always be promoted onto the root of that same context menu
-        // OR dragged out onto any screen toolbar!
+        // OR dragged out onto a compatible screen toolbar!
         if (SourceIsContextMenu && targetSurfaceId.Equals(SourceSurfaceId, StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(targetSubmenuParentId))
             return true;
 
-        // Any context menu item can be dragged onto any screen toolbar, and any non-fixed toolbar item can be dragged into a context menu or another toolbar.
+        // Compact per-row hover bars only accept drops from their paired context menu or matching domain actions,
+        // preventing accidental cross-domain drops while moving the cursor across sidebar/list rows.
+        if (targetSurfaceId is UiSurfaceIds.SidebarFolderHover or UiSurfaceIds.SidebarAccountFolderHover or UiSurfaceIds.MailRowHover or UiSurfaceIds.SenderRowHover)
+        {
+            string pairedMenu = UiSurfaceIds.PairedContextMenuOf(targetSurfaceId);
+            if (SourceSurfaceId.Equals(pairedMenu, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return targetSurfaceId switch
+            {
+                UiSurfaceIds.SidebarFolderHover => SourceActionId.StartsWith("Folder.", StringComparison.OrdinalIgnoreCase),
+                UiSurfaceIds.SidebarAccountFolderHover => SourceActionId.StartsWith("AccGroup.", StringComparison.OrdinalIgnoreCase),
+                UiSurfaceIds.MailRowHover => SourceActionId.StartsWith("Msg.", StringComparison.OrdinalIgnoreCase),
+                UiSurfaceIds.SenderRowHover => SourceActionId.StartsWith("Sender.", StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
+        }
+
+        // Any context menu item can be dragged onto any main toolbar, and any non-fixed toolbar item can be dragged into a context menu or another toolbar.
         return true;
     }
 
@@ -167,6 +185,33 @@ public static class ActionDragService
             if (!IsDragging) return;
         }
         if (!CanAcceptDrop(targetSurfaceId, targetSubmenuParentId)) return;
+
+        bool sameItem = SourceSurfaceId.Equals(targetSurfaceId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(SourceSubmenuParentId ?? string.Empty, targetSubmenuParentId ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && SourceActionId.Equals(targetActionId, StringComparison.OrdinalIgnoreCase);
+
+        if (sameItem)
+        {
+            if (HoverSurfaceId == targetSurfaceId
+                && HoverSubmenuParentId == targetSubmenuParentId
+                && string.IsNullOrEmpty(HoverTargetActionId)
+                && HoverInsertIndex == slotIndex
+                && !HoverIsMenuDock
+                && !HoverHideZone)
+            {
+                return;
+            }
+            HoverSurfaceId = targetSurfaceId;
+            HoverSubmenuParentId = targetSubmenuParentId;
+            HoverTargetActionId = string.Empty;
+            HoverInsertIndex = slotIndex;
+            HoverInsertAfter = false;
+            HoverIsMenuDock = false;
+            HoverHideZone = false;
+            HoverVisibleIds = targetVisibleIds;
+            OnStateChanged?.Invoke();
+            return;
+        }
 
         int computedIndex = insertAfter ? slotIndex + 1 : slotIndex;
         if (HoverSurfaceId == targetSurfaceId

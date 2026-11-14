@@ -23,21 +23,24 @@ namespace MyLovelyMail.MainProject.Storage
 
         /// <summary>Whether this folder exists only on this machine, and therefore cannot be re-fetched.</summary>
         public static bool IsLocalFolder(string folderFullName) =>
-            folderFullName.StartsWith(LocalFolderPrefix, StringComparison.Ordinal);
+            !string.IsNullOrEmpty(folderFullName) && folderFullName.StartsWith(LocalFolderPrefix, StringComparison.Ordinal);
 
         /// <summary>The two roots a folder can live under, newest-first for callers that scan both.</summary>
         public static IEnumerable<string> AccountRoots(string accountId) =>
-        [
-            Path.Combine(AppPaths.UserData, AccountsFolderName, accountId),
-            Path.Combine(AppPaths.UserCache, AccountsFolderName, accountId)
-        ];
+            string.IsNullOrWhiteSpace(accountId)
+                ? []
+                :
+                [
+                    Path.Combine(AppPaths.UserData, AccountsFolderName, accountId),
+                    Path.Combine(AppPaths.UserCache, AccountsFolderName, accountId)
+                ];
 
         /// <summary>UserData for a folder with no server copy, UserCache for one that re-syncs.</summary>
         static string AccountRootFor(string accountId, string folderFullName) =>
-            Path.Combine(IsLocalFolder(folderFullName) ? AppPaths.UserData : AppPaths.UserCache, AccountsFolderName, accountId);
+            Path.Combine(IsLocalFolder(folderFullName) ? AppPaths.UserData : AppPaths.UserCache, AccountsFolderName, accountId ?? string.Empty);
 
         public static string FolderCachePath(string accountId, string folderFullName) =>
-            Path.Combine(AccountRootFor(accountId, folderFullName), FoldersFolderName, ToSafeName(folderFullName));
+            Path.Combine(AccountRootFor(accountId, folderFullName), FoldersFolderName, ToSafeName(folderFullName ?? string.Empty));
 
         public static string MessagePath(string accountId, string folderFullName, uint uid) =>
             Path.Combine(FolderCachePath(accountId, folderFullName), MessagesFolderName, uid + MessageExtension);
@@ -45,6 +48,7 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>Encodes server folder names for disk, including dot-only names and trailing dots or spaces that Windows normalizes. Leading dots remain valid, so existing Maildir caches keep their paths.</summary>
         internal static string ToSafeName(string folderFullName)
         {
+            if (string.IsNullOrEmpty(folderFullName)) return string.Empty;
             var sb = new StringBuilder(folderFullName.Length);
             foreach (char c in folderFullName)
             {
@@ -70,7 +74,8 @@ namespace MyLovelyMail.MainProject.Storage
         }
 
         /// <summary>Canonical account+folder key — the single place this pairing is ever built.</summary>
-        public static string FolderKey(string accountId, string folderFullName) => accountId + '\u001F' + folderFullName;
+        public static string FolderKey(string accountId, string folderFullName) =>
+            (accountId ?? string.Empty) + '\u001F' + (folderFullName ?? string.Empty);
 
         #endregion
 

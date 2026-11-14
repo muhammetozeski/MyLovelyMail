@@ -56,6 +56,9 @@ else
 
     async Task HandleRecover()
     {
+        ActionDragService.Cancel();
+        WorkspaceDragService.Cancel();
+        ContextMenuService.Close();
         Recover();
         if (OnRecover.HasDelegate)
         {
@@ -65,6 +68,13 @@ else
 
     void HandleReload()
     {
-        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        ActionDragService.Cancel();
+        WorkspaceDragService.Cancel();
+        ContextMenuService.Close();
+        ModalService.CloseAll();
+        MyLovelyMail.MainProject.Services.Mail.ListViewState.CloseFilterWindow();
+        MailUiState.ResetTransientFailureState();
+        Recover();
+        Navigation.NavigateTo(NavigationConstants.Mail.Link, forceLoad: true);
     }
 }

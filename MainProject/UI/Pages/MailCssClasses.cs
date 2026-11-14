@@ -15,6 +15,7 @@ public static class MailCssClasses
     public const string ColumnSplitterGrip = "mail-column-splitter-grip";
 
     public const string Sidebar = "mail-sidebar";
+    public const string SidebarWorkspaceDragging = "mail-sidebar--workspace-dragging";
     public const string SidebarNav = "mail-sidebar-nav";
     public const string SidebarStatus = "mail-sidebar-status";
     public const string Logo = "mail-logo";

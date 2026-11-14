@@ -4,7 +4,10 @@ namespace MyLovelyMail.MainProject.DataModels.Mail;
 /// <param name="AccountId">Owning account.</param>
 /// <param name="FolderFullName">Exact server or local folder path.</param>
 /// <param name="Uid">Message number within that folder.</param>
-public readonly record struct MailMessageIdentity(string AccountId, string FolderFullName, uint Uid);
+public readonly record struct MailMessageIdentity(string AccountId, string FolderFullName, uint Uid)
+{
+    public bool IsValid => !string.IsNullOrWhiteSpace(AccountId) && !string.IsNullOrWhiteSpace(FolderFullName) && Uid > 0;
+}
 
 /// <summary>Commands shared by mail toolbars, context menus and mouse side buttons.</summary>
 public enum MailMessageCommand

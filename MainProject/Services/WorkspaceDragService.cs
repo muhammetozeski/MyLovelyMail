@@ -136,7 +136,7 @@ public static class WorkspaceDragService
         OnGhostMoved?.Invoke();
     }
 
-    public static void HoverAccount(MailAccountData target, double offsetY, double approxHeight = 38.0)
+    public static void HoverAccount(MailAccountData target, double offsetY, double approxHeight = 36.0)
     {
         if (!EnsureActiveDrag()) return;
         if (Kind == WorkspaceDragKind.Account)
@@ -146,7 +146,28 @@ public static class WorkspaceDragService
                 ClearHoverAndNotify();
                 return;
             }
-            var pos = offsetY > approxHeight * 0.5 ? WorkspaceDropPosition.After : WorkspaceDropPosition.Before;
+
+            WorkspaceDropPosition pos = offsetY > approxHeight * 0.5 ? WorkspaceDropPosition.After : WorkspaceDropPosition.Before;
+            var dragged = AccountStore.GetById(DraggedAccountId);
+            if (dragged != null && string.Equals(
+                AccountFolderStore.NormalizeFolderId(dragged.FolderId),
+                AccountFolderStore.NormalizeFolderId(target.FolderId),
+                StringComparison.OrdinalIgnoreCase))
+            {
+                var siblings = AccountStore.GetAccountsInFolder(target.FolderId);
+                int srcIdx = -1, targetIdx = -1;
+                for (int i = 0; i < siblings.Count; i++)
+                {
+                    if (string.Equals(siblings[i].Id, DraggedAccountId, StringComparison.OrdinalIgnoreCase)) srcIdx = i;
+                    if (string.Equals(siblings[i].Id, target.Id, StringComparison.OrdinalIgnoreCase)) targetIdx = i;
+                }
+                if (srcIdx >= 0 && targetIdx >= 0)
+                {
+                    if (srcIdx == targetIdx - 1) pos = WorkspaceDropPosition.After;
+                    else if (srcIdx == targetIdx + 1) pos = WorkspaceDropPosition.Before;
+                }
+            }
+
             SetHover(WorkspaceDragKind.Account, target.Id, target.FolderId, target.EmailAddress, pos);
         }
         else if (Kind == WorkspaceDragKind.AccountFolder)
@@ -161,7 +182,7 @@ public static class WorkspaceDragService
         }
     }
 
-    public static void HoverAccountFolder(AccountFolderData target, double offsetY, double approxHeight = 34.0)
+    public static void HoverAccountFolder(AccountFolderData target, double offsetY, double approxHeight = 28.0)
     {
         if (!EnsureActiveDrag()) return;
 
@@ -180,12 +201,34 @@ public static class WorkspaceDragService
             }
 
             WorkspaceDropPosition pos;
-            if (offsetY < approxHeight * 0.28)
+            if (offsetY < approxHeight * 0.34)
                 pos = WorkspaceDropPosition.Before;
-            else if (offsetY > approxHeight * 0.72)
+            else if (offsetY > approxHeight * 0.66)
                 pos = WorkspaceDropPosition.After;
             else
                 pos = WorkspaceDropPosition.Into;
+
+            if (pos != WorkspaceDropPosition.Into)
+            {
+                var dragged = AccountFolderStore.Folders.FirstOrDefault(f => string.Equals(f.Id, DraggedAccountFolderId, StringComparison.OrdinalIgnoreCase));
+                if (dragged != null && string.Equals(dragged.ParentFolderId ?? string.Empty, target.ParentFolderId ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                {
+                    var siblings = string.IsNullOrEmpty(target.ParentFolderId)
+                        ? AccountFolderStore.GetRootFolders()
+                        : AccountFolderStore.GetChildFolders(target.ParentFolderId);
+                    int srcIdx = -1, targetIdx = -1;
+                    for (int i = 0; i < siblings.Count; i++)
+                    {
+                        if (string.Equals(siblings[i].Id, DraggedAccountFolderId, StringComparison.OrdinalIgnoreCase)) srcIdx = i;
+                        if (string.Equals(siblings[i].Id, target.Id, StringComparison.OrdinalIgnoreCase)) targetIdx = i;
+                    }
+                    if (srcIdx >= 0 && targetIdx >= 0)
+                    {
+                        if (srcIdx == targetIdx - 1 && pos == WorkspaceDropPosition.Before) pos = WorkspaceDropPosition.After;
+                        else if (srcIdx == targetIdx + 1 && pos == WorkspaceDropPosition.After) pos = WorkspaceDropPosition.Before;
+                    }
+                }
+            }
 
             string? candidateParent = pos == WorkspaceDropPosition.Into ? target.Id : target.ParentFolderId;
             if (AccountFolderStore.CreatesCycle(DraggedAccountFolderId, candidateParent))
@@ -221,7 +264,25 @@ public static class WorkspaceDragService
                 ClearHoverAndNotify();
                 return;
             }
-            var pos = offsetY > approxHeight * 0.5 ? WorkspaceDropPosition.After : WorkspaceDropPosition.Before;
+
+            var allFolders = MessageStore.GetFolders(target.AccountId);
+            var siblings = FolderTreeService.GetOrderedSiblings(allFolders, DraggedMailFolderFullName);
+            int srcIdx = siblings.FindIndex(f => string.Equals(f.FullName, DraggedMailFolderFullName, StringComparison.Ordinal));
+            int targetIdx = siblings.FindIndex(f => string.Equals(f.FullName, target.FullName, StringComparison.Ordinal));
+            if (srcIdx < 0 || targetIdx < 0)
+            {
+                ClearHoverAndNotify();
+                return;
+            }
+
+            WorkspaceDropPosition pos;
+            if (srcIdx == targetIdx - 1)
+                pos = WorkspaceDropPosition.After;
+            else if (srcIdx == targetIdx + 1)
+                pos = WorkspaceDropPosition.Before;
+            else
+                pos = offsetY > approxHeight * 0.5 ? WorkspaceDropPosition.After : WorkspaceDropPosition.Before;
+
             SetHover(WorkspaceDragKind.MailFolder, target.FullName, target.AccountId, target.DisplayName, pos);
         }
     }

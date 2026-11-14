@@ -11,7 +11,7 @@
 @using MyLovelyMail.MainProject.Stores
 
     @* ---- Left: accounts + folders ---- *@
-    <aside class="@MailCssClasses.Sidebar" tabindex="-1" @onkeydown="HandleSidebarKeyDown">
+    <aside class="@MailCssClasses.Sidebar @(WorkspaceDragService.IsDragging ? MailCssClasses.SidebarWorkspaceDragging : "")" tabindex="-1" @onkeydown="HandleSidebarKeyDown">
         <div class="@MailCssClasses.Logo">
             💌<span class="@MailCssClasses.LogoText">My Lovely Mail</span>
             <SyncHeart />
@@ -159,6 +159,11 @@
 
     static void MoveAccountFolderPointer(AccountFolderData folder, PointerEventArgs e)
     {
+        if ((e.Buttons & 1) == 0)
+        {
+            WorkspaceDragService.Cancel();
+            return;
+        }
         WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
         if (WorkspaceDragService.IsDragging)
             WorkspaceDragService.HoverAccountFolder(folder, e.OffsetY);
@@ -167,7 +172,6 @@
     static Task EndAccountFolderPointerAsync(AccountFolderData folder, PointerEventArgs e)
     {
         if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
-        WorkspaceDragService.HoverAccountFolder(folder, e.OffsetY);
         return WorkspaceDragService.CompleteDropAsync();
     }
 
@@ -179,6 +183,11 @@
 
     static void MoveAccountPointer(MailAccountData account, PointerEventArgs e)
     {
+        if ((e.Buttons & 1) == 0)
+        {
+            WorkspaceDragService.Cancel();
+            return;
+        }
         WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
         if (WorkspaceDragService.IsDragging)
             WorkspaceDragService.HoverAccount(account, e.OffsetY);
@@ -187,7 +196,6 @@
     static Task EndAccountPointerAsync(MailAccountData account, PointerEventArgs e)
     {
         if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
-        WorkspaceDragService.HoverAccount(account, e.OffsetY);
         return WorkspaceDragService.CompleteDropAsync();
     }
 
@@ -211,6 +219,11 @@
 
     static void MoveMailFolderPointer(MailFolderData folder, PointerEventArgs e)
     {
+        if ((e.Buttons & 1) == 0)
+        {
+            WorkspaceDragService.Cancel();
+            return;
+        }
         WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
         if (WorkspaceDragService.IsDragging)
             WorkspaceDragService.HoverMailFolder(folder, e.OffsetY);
@@ -219,7 +232,6 @@
     static Task EndMailFolderPointerAsync(MailFolderData folder, PointerEventArgs e)
     {
         if (!WorkspaceDragService.IsDragging) return Task.CompletedTask;
-        WorkspaceDragService.HoverMailFolder(folder, e.OffsetY);
         return WorkspaceDragService.CompleteDropAsync();
     }
 

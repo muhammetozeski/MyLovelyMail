@@ -115,6 +115,16 @@ namespace MyLovelyMail.MainProject.Storage
 
         public static void SaveFolder(MailFolderData folder)
         {
+            if (folder == null || string.IsNullOrWhiteSpace(folder.AccountId) || string.IsNullOrWhiteSpace(folder.FullName))
+                return;
+
+            var existingList = GetFolders(folder.AccountId);
+            var existing = existingList.FirstOrDefault(f => string.Equals(f.FullName, folder.FullName, StringComparison.Ordinal));
+            if (existing != null && folder.SortOrder == 0 && existing.SortOrder > 0)
+            {
+                folder.SortOrder = existing.SortOrder;
+            }
+
             string dir = FolderCachePath(folder.AccountId, folder.FullName);
             Directory.CreateDirectory(dir);
             AtomicFile.WriteAllText(Path.Combine(dir, FolderInfoFileName), JsonSerializer.Serialize(folder, JsonDefaults.Indented));
@@ -144,29 +154,51 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>Reorders a mail folder before or after another mail folder in the sidebar and persists the order across restarts.</summary>
         public static void ReorderFolder(string accountId, string draggedFullName, string targetFullName, bool insertAfter = false)
         {
-            if (string.IsNullOrWhiteSpace(draggedFullName) || string.IsNullOrWhiteSpace(targetFullName)
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(draggedFullName) || string.IsNullOrWhiteSpace(targetFullName)
                 || string.Equals(draggedFullName, targetFullName, StringComparison.Ordinal))
                 return;
 
             var allFolders = GetFolders(accountId);
-            var ordered = FolderTreeService.Build(allFolders).Select(static n => n.Folder).ToList();
-            var dragged = ordered.FirstOrDefault(f => string.Equals(f.FullName, draggedFullName, StringComparison.Ordinal));
-            var target = ordered.FirstOrDefault(f => string.Equals(f.FullName, targetFullName, StringComparison.Ordinal));
-            if (dragged == null || target == null) return;
+            if (!FolderTreeService.HaveSameParent(allFolders, draggedFullName, targetFullName))
+                return;
 
-            ordered.Remove(dragged);
-            int targetIdx = ordered.IndexOf(target);
+            var nodes = FolderTreeService.Build(allFolders, respectCollapsed: false);
+            int draggedStart = nodes.FindIndex(n => string.Equals(n.Folder.FullName, draggedFullName, StringComparison.Ordinal));
+            int targetCheck = nodes.FindIndex(n => string.Equals(n.Folder.FullName, targetFullName, StringComparison.Ordinal));
+            if (draggedStart < 0 || targetCheck < 0) return;
+
+            int draggedDepth = nodes[draggedStart].Depth;
+            int draggedEnd = draggedStart + 1;
+            while (draggedEnd < nodes.Count && nodes[draggedEnd].Depth > draggedDepth)
+                draggedEnd++;
+
+            // Cannot reorder a parent folder relative to one of its own descendants.
+            if (targetCheck >= draggedStart && targetCheck < draggedEnd)
+                return;
+
+            var movedSubtree = nodes.GetRange(draggedStart, draggedEnd - draggedStart);
+            nodes.RemoveRange(draggedStart, draggedEnd - draggedStart);
+
+            int targetIdx = nodes.FindIndex(n => string.Equals(n.Folder.FullName, targetFullName, StringComparison.Ordinal));
             if (targetIdx < 0) return;
-            if (insertAfter) targetIdx++;
-            ordered.Insert(Math.Clamp(targetIdx, 0, ordered.Count), dragged);
 
-            for (int i = 0; i < ordered.Count; i++)
+            if (insertAfter)
+            {
+                int targetDepth = nodes[targetIdx].Depth;
+                targetIdx++;
+                while (targetIdx < nodes.Count && nodes[targetIdx].Depth > targetDepth)
+                    targetIdx++;
+            }
+
+            nodes.InsertRange(Math.Clamp(targetIdx, 0, nodes.Count), movedSubtree);
+
+            for (int i = 0; i < nodes.Count; i++)
             {
                 int desiredOrder = i + 1;
-                if (ordered[i].SortOrder != desiredOrder)
+                if (nodes[i].Folder.SortOrder != desiredOrder)
                 {
-                    ordered[i].SortOrder = desiredOrder;
-                    SaveFolder(ordered[i]);
+                    nodes[i].Folder.SortOrder = desiredOrder;
+                    SaveFolder(nodes[i].Folder);
                 }
             }
             OnFolderChanged?.Invoke(accountId, draggedFullName);

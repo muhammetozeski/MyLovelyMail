@@ -179,5 +179,47 @@ namespace MyLovelyMail.MainProject.Services
             ThirdPane = SurvivingOccupant();
             OnSelectionChanged?.Invoke();
         }
+
+        /// <summary>
+        /// Clears transient pane, selection, and stale account/folder references after an unexpected UI error
+        /// so recovering or reloading always opens a clean, working Mail workspace without losing unsent drafts.
+        /// </summary>
+        public static void ResetTransientFailureState()
+        {
+            if (ActiveCompose is { } draft)
+            {
+                try { ComposeService.SaveDraft(draft); }
+                catch (Exception ex) { Log($"Could not autosave draft during UI recovery: {ex.Message}", LogLevel.Warning); }
+            }
+
+            ActiveCompose = null;
+            OpenMessage = null;
+            OpenMessageKey = null;
+            FocusedMessage = null;
+            FocusedMessageKey = null;
+            OpenPersonAddress = null;
+            ThirdPane = null;
+            SelectedMessages.Clear();
+
+            var validAccount = SelectedAccount != null ? AccountStore.GetById(SelectedAccount.Id) : null;
+            validAccount ??= AccountStore.Accounts.FirstOrDefault();
+            SelectedAccount = validAccount;
+
+            if (validAccount != null)
+            {
+                var folders = MessageStore.GetFolders(validAccount.Id);
+                var validFolder = SelectedFolder != null
+                    ? folders.FirstOrDefault(f => string.Equals(f.FullName, SelectedFolder.FullName, StringComparison.Ordinal))
+                    : null;
+                validFolder ??= FolderMemoryStore.ResolveStartFolder(FolderMemoryStore.FolderOf(validAccount.Id), folders);
+                SelectedFolder = validFolder;
+            }
+            else
+            {
+                SelectedFolder = null;
+            }
+
+            OnSelectionChanged?.Invoke();
+        }
     }
 }

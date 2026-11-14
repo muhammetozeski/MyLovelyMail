@@ -12,7 +12,9 @@
       @onpointerdown="HandlePointerDown"
       @onpointerdown:stopPropagation="true"
       @onpointermove="HandlePointerMove"
+      @onpointermove:stopPropagation="@ActionDragService.IsDragging"
       @onpointerup="HandlePointerUp"
+      @onpointerup:stopPropagation="@ActionDragService.IsDragging"
       @onmouseup="HandleSideMouseUpAsync">
     @if (Item.VisualKind == ActionVisualKind.Pill)
     {
@@ -188,7 +190,6 @@
     {
         if (ActionDragService.IsDragging)
         {
-            HandlePointerMove(e);
             ActionDragService.CompleteDrop();
         }
     }

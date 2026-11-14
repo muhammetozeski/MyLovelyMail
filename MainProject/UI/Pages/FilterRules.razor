@@ -1,5 +1,6 @@
 ﻿@attribute [Route(RoutePath)]
 @inherits MyLovelyMail.MainProject.UI.Layout.Architecture.PageBase
+@implements IDisposable
 @inject NavigationManager Navigation
 <PageTitle>Filters — My Lovely Mail</PageTitle>
 
@@ -451,6 +452,19 @@
             Preview = null;
         }
     }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        FilterRuleStore.OnRulesChanged += HandleRulesChanged;
+    }
+
+    public void Dispose()
+    {
+        FilterRuleStore.OnRulesChanged -= HandleRulesChanged;
+    }
+
+    void HandleRulesChanged() => InvokeAsync(StateHasChanged);
 
     protected override void OnParametersSet()
     {

@@ -41,6 +41,12 @@
 
     static void HandleGlobalPointerMove(PointerEventArgs e)
     {
+        if ((e.Buttons & 1) == 0)
+        {
+            ActionDragService.Cancel();
+            WorkspaceDragService.Cancel();
+            return;
+        }
         ActionDragService.UpdatePointer(e.ClientX, e.ClientY);
         WorkspaceDragService.UpdatePointer(e.ClientX, e.ClientY);
     }

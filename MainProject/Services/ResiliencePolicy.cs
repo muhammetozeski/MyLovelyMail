@@ -94,6 +94,7 @@ namespace MyLovelyMail.MainProject.Services
         static bool IsWorthRetrying(Exception exception) => exception switch
         {
             OperationCanceledException => false,
+            UnauthorizedAccessException => false,
             MailKit.Security.AuthenticationException => false,
             MailKit.ServiceNotAuthenticatedException => false,
             // "No tor executable exists" and "auto-start is off" are answers, not hiccups; six

@@ -141,7 +141,7 @@
                     }
                     else
                     {
-                        <Virtualize Items="senders" Context="sender" ItemSize="76">
+                        <Virtualize @key="@($"{MailUiState.SelectedAccount?.Id}:{MailUiState.SelectedFolder?.FullName}:{ListViewState.SenderSort}:{ListViewState.SenderSortDirection}")" Items="senders" Context="sender" ItemSize="76">
                             @{
                                 bool senderOpen = MailUiState.ThirdPane == MailUiState.PaneOccupant.Person
                                     && string.Equals(MailUiState.OpenPersonAddress, sender.Address, StringComparison.OrdinalIgnoreCase);
@@ -199,7 +199,7 @@
             else
             {
                 <div class="@MailCssClasses.Rows" tabindex="0" @onkeydown="HandleListKeyDown">
-                <Virtualize Items="Rows" Context="row" ItemSize="76">
+                <Virtualize @key="@($"{MailUiState.SelectedAccount?.Id}:{MailUiState.SelectedFolder?.FullName}:{ListViewState.MailSort}:{ListViewState.MailSortDirection}:{ConversationMode}")" Items="Rows" Context="row" ItemSize="76">
                     @{
                         var message = row.Message;
                         bool rowUnread = row.UnreadCount > 0;

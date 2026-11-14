@@ -379,9 +379,15 @@
         opacity: @(AppMeasures.Opacity.Muted);
     }
 
-    .@(MailCssClasses.Account) > span,
-    .@(MailCssClasses.Folder) > span,
-    .@(MailCssClasses.AccountFolderToggle) > span {
+    .@(MailCssClasses.Account) *,
+    .@(MailCssClasses.Folder) *,
+    .@(MailCssClasses.AccountFolderToggle) *,
+    .@(MailCssClasses.FolderMutedGutter) {
+        pointer-events: none;
+    }
+
+    .@(MailCssClasses.SidebarWorkspaceDragging) .@(MailCssClasses.FolderHoverActions) {
+        display: none;
         pointer-events: none;
     }
 

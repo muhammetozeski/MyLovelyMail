@@ -27,7 +27,8 @@
                      title="Drag to reorder filter priority"
                      @onpointerdown="e => BeginFilterDrag(index, e)"
                      @onpointermove="e => HoverFilterItem(index, e)"
-                     @onpointerup="e => DropFilterItem(index, e)">
+                     @onpointerup="e => DropFilterItem(index, e)"
+                     @onpointerup:stopPropagation="true">
                     <div class="@ListFilterCssClasses.ItemHeader">
                         <span class="@ListFilterCssClasses.ItemBadge @(item.Status == FilterConditionStatus.Active ? ListFilterCssClasses.ItemBadgeActive : ListFilterCssClasses.ItemBadgeOverridden)">
                             ⠿ #@item.Index · @(item.Status == FilterConditionStatus.Active ? "Active" : "Overridden")

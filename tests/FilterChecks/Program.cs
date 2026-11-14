@@ -10,7 +10,9 @@ using MyLovelyMail.MainProject.UI.Pages;
 using Settings = MyLovelyMail.MainProject.Stores.Settings;
 
 // Check the executable location before initializing any file-backed application service.
-string expectedRoot = Path.GetFullPath(@"C:\C\TorAnonymity\FilterChecks") + Path.DirectorySeparatorChar;
+string expectedRoot = args.Length >= 1 && !string.IsNullOrWhiteSpace(args[0])
+    ? Path.GetFullPath(args[0]).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar
+    : Path.GetFullPath(@"C:\C\TorAnonymity\FilterChecks") + Path.DirectorySeparatorChar;
 if (!Path.GetFullPath(AppContext.BaseDirectory).StartsWith(expectedRoot, StringComparison.OrdinalIgnoreCase))
     throw new InvalidOperationException("Run this check project from its temporary artifacts folder.");
 if (!Path.GetFullPath(AppPaths.Root).StartsWith(expectedRoot, StringComparison.OrdinalIgnoreCase))
@@ -243,5 +245,44 @@ testMsg.DateUtc = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc);
 Check(ListFilterService.MatchesAllActive(testMsg, resolvedRange), "test message inside active range matches");
 testMsg.DateUtc = new DateTime(2025, 12, 15, 0, 0, 0, DateTimeKind.Utc);
 Check(!ListFilterService.MatchesAllActive(testMsg, resolvedRange), "test message outside active range does not match");
+
+// Crash & sorting regression checks
+MailMessageIdentity defaultId = default;
+Check(!defaultId.IsValid, "default MailMessageIdentity is marked invalid");
+Check(MessageStore.GetSummary("", "", 0) == null && MessageStore.GetSummaries("", "").Count == 0, "MessageStore handles empty account/folder keys without throwing");
+
+MailUiState.ClearSelection();
+MailUiState.ResetTransientFailureState();
+var mailView = new Mail();
+var resolveToolbar = typeof(Mail).GetMethod("ResolveToolbarAddedAction", BindingFlags.NonPublic | BindingFlags.Instance)!;
+var resolvedCopyEmail = resolveToolbar.Invoke(mailView, [UiSurfaceIds.SidebarFolderHover, "Account.CopyEmail", null, null, null, null, inbox, null, null]);
+Check(resolvedCopyEmail != null, "SidebarFolderHover resolves Account.CopyEmail without NullReferenceException when no message is selected");
+var resolvedMsgRead = resolveToolbar.Invoke(mailView, [UiSurfaceIds.SidebarFolderHover, "Msg.ToggleRead", null, null, null, null, inbox, null, null]);
+Check(resolvedMsgRead != null, "SidebarFolderHover resolves Msg.* action safely when WorkspaceTargets is empty");
+
+MessageStore.ReorderFolder(account.Id, "Other", "Archive", insertAfter: false);
+var orderedBeforeSync = FolderTreeService.Build(MessageStore.GetFolders(account.Id));
+Check(orderedBeforeSync.FindIndex(n => n.Folder.FullName == "Other") < orderedBeforeSync.FindIndex(n => n.Folder.FullName == "Archive"),
+    "ReorderFolder places Other before Archive");
+
+MessageStore.SaveFolder(new MailFolderData { AccountId = account.Id, FullName = "Other", DisplayName = "Other", Selectable = true, SortOrder = 0 });
+var orderedAfterSync = FolderTreeService.Build(MessageStore.GetFolders(account.Id));
+Check(orderedAfterSync.FindIndex(n => n.Folder.FullName == "Other") < orderedAfterSync.FindIndex(n => n.Folder.FullName == "Archive"),
+    "SaveFolder with SortOrder=0 preserves user's custom folder SortOrder across sync updates");
+
+UiCustomizationStore.Load();
+UiCustomizationStore.Reorder("TestSurface", ["A", "ConditionalX", "B", "C"], "C", 0);
+UiCustomizationStore.Reorder("TestSurface", ["C", "A", "B"], "B", 1);
+var snapOrder = UiCustomizationStore.GetSnapshot("TestSurface").OrderedIds;
+Check(snapOrder.SequenceEqual(["C", "B", "A", "ConditionalX"]) == false && snapOrder.IndexOf("B") < snapOrder.IndexOf("A") && snapOrder.Contains("ConditionalX"),
+    "UiCustomizationStore.Reorder preserves absent conditional action slots without dropping them to the tail");
+
+var accountC = new MailAccountData { Id = "filter-check-c", EmailAddress = "c@example.invalid", FolderId = child.Id };
+AccountStore.Save(accountC);
+var beforeAcctMove = AccountStore.GetAccountsInFolder(child.Id);
+Check(beforeAcctMove[0].Id == account.Id && beforeAcctMove[1].Id == accountC.Id, "initial sibling account order in child folder");
+AccountStore.Move(accountC.Id, -1);
+var afterAcctMove = AccountStore.GetAccountsInFolder(child.Id);
+Check(afterAcctMove[0].Id == accountC.Id && afterAcctMove[1].Id == account.Id, "AccountStore.Move(-1) reorders siblings within the same folder across intervening accounts");
 
 Console.WriteLine($"Completed {passed} filter checks. Data: {AppPaths.Root}");

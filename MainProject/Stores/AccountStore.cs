@@ -120,6 +120,28 @@ namespace MyLovelyMail.MainProject.Stores
         /// </summary>
         public static void Move(string accountId, int delta)
         {
+            var account = GetById(accountId);
+            if (account == null || delta == 0) return;
+
+            var siblings = GetAccountsInFolder(account.FolderId);
+            int sibIndex = -1;
+            for (int i = 0; i < siblings.Count; i++)
+            {
+                if (siblings[i].Id == accountId)
+                {
+                    sibIndex = i;
+                    break;
+                }
+            }
+
+            int sibTarget = sibIndex + (delta > 0 ? 1 : -1);
+            if (sibIndex >= 0 && sibTarget >= 0 && sibTarget < siblings.Count)
+            {
+                MoveToFolder(accountId, account.FolderId, insertBeforeAccountId: siblings[sibTarget].Id, insertAfter: delta > 0);
+                Log($"Account rail reordered within folder '{account.FolderId}': {account.EmailAddress}.");
+                return;
+            }
+
             int index = accounts.FindIndex(a => a.Id == accountId);
             int target = index + delta;
             if (index < 0 || target < 0 || target >= accounts.Count) return;

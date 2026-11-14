@@ -89,6 +89,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 NotificationService.NotifyNewMessages(account, InboxFullName, notificationCandidates);
             }
 
+            var cachedInbox = MessageStore.GetFolders(account.Id).FirstOrDefault(static f => f.FullName == InboxFullName);
             MessageStore.SaveFolder(new MailFolderData
             {
                 AccountId = account.Id,
@@ -97,7 +98,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 Role = FolderRole.Inbox,
                 LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = uids.Count,
-                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
+                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread),
+                SortOrder = cachedInbox?.SortOrder ?? 0,
+                IsExpanded = cachedInbox?.IsExpanded ?? true
             });
 
             await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken, account);

@@ -68,6 +68,7 @@ namespace MyLovelyMail.MainProject.Storage
         /// <summary>All summaries of a folder, newest first. Uses an in-memory sorted cache so repeated reads on large folders are O(1).</summary>
         public static List<MailMessageSummary> GetSummaries(string accountId, string folderFullName)
         {
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(folderFullName)) return [];
             var index = GetIndex(accountId, folderFullName);
             var cached = index.SortedCache;
             if (cached != null) return [.. cached];
@@ -87,6 +88,7 @@ namespace MyLovelyMail.MainProject.Storage
         public static int CountSummaries(string accountId, string folderFullName,
             Func<MailMessageSummary, bool>? predicate = null)
         {
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(folderFullName)) return 0;
             var summaries = GetIndex(accountId, folderFullName).Summaries;
             return predicate == null ? summaries.Count : summaries.Values.Count(predicate);
         }
@@ -127,7 +129,10 @@ namespace MyLovelyMail.MainProject.Storage
         }
 
         public static MailMessageSummary? GetSummary(string accountId, string folderFullName, uint uid) =>
-            GetIndex(accountId, folderFullName).Summaries.TryGetValue(uid, out var summary) ? summary : null;
+            !string.IsNullOrWhiteSpace(accountId) && !string.IsNullOrWhiteSpace(folderFullName) && uid > 0
+            && GetIndex(accountId, folderFullName).Summaries.TryGetValue(uid, out var summary)
+                ? summary
+                : null;
 
         /// <summary>
         /// Messages whose local flag change is still on its way to the server, as

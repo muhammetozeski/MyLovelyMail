@@ -417,7 +417,15 @@ public static class UiCustomizationStore
             foreach (string addedId in addedIds)
             {
                 if (map.ContainsKey(addedId)) continue;
-                var resolved = resolveAdded(addedId);
+                T? resolved = default;
+                try
+                {
+                    resolved = resolveAdded(addedId);
+                }
+                catch (Exception ex)
+                {
+                    Log($"Failed to resolve custom UI action '{addedId}' on '{surfaceId}': {ex.Message}", LogLevel.Warning);
+                }
                 if (resolved != null)
                 {
                     map[addedId] = resolved;
@@ -512,17 +520,74 @@ public static class UiCustomizationStore
             if (!string.IsNullOrWhiteSpace(submenuParentId))
             {
                 var sub = GetOrCreateSubmenuLocked(surfaceId, submenuParentId);
-                sub.OrderedIds = list;
+                sub.OrderedIds = MergeOrderedIds(sub.OrderedIds, list);
             }
             else
             {
                 var surface = GetOrCreateSurfaceLocked(surfaceId);
-                surface.OrderedIds = list;
+                surface.OrderedIds = MergeOrderedIds(surface.OrderedIds, list);
             }
 
             SaveLocked();
         }
         OnChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Merges a newly reordered list of currently visible items with existing <c>OrderedIds</c> so
+    /// conditional items not currently visible (e.g. Restore when not in Trash, Wake when not Snoozed)
+    /// retain their relative position instead of being dropped to the end on the next state change.
+    /// </summary>
+    static List<string> MergeOrderedIds(IReadOnlyList<string> existingOrdered, IReadOnlyList<string> nextVisibleOrder)
+    {
+        if (existingOrdered.Count == 0)
+            return [.. nextVisibleOrder];
+
+        var nextSet = new HashSet<string>(nextVisibleOrder, StringComparer.OrdinalIgnoreCase);
+        var beforeAnchor = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var trailing = new List<string>();
+        var seenAbsent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < existingOrdered.Count; i++)
+        {
+            string id = existingOrdered[i];
+            if (string.IsNullOrWhiteSpace(id) || nextSet.Contains(id) || !seenAbsent.Add(id))
+                continue;
+
+            string? anchor = null;
+            for (int j = i + 1; j < existingOrdered.Count; j++)
+            {
+                if (nextSet.Contains(existingOrdered[j]))
+                {
+                    anchor = existingOrdered[j];
+                    break;
+                }
+            }
+
+            if (anchor != null)
+            {
+                if (!beforeAnchor.TryGetValue(anchor, out var bucket))
+                {
+                    bucket = [];
+                    beforeAnchor[anchor] = bucket;
+                }
+                bucket.Add(id);
+            }
+            else
+            {
+                trailing.Add(id);
+            }
+        }
+
+        var merged = new List<string>(nextVisibleOrder.Count + seenAbsent.Count);
+        foreach (string v in nextVisibleOrder)
+        {
+            if (beforeAnchor.TryGetValue(v, out var bucket))
+                merged.AddRange(bucket);
+            merged.Add(v);
+        }
+        merged.AddRange(trailing);
+        return merged;
     }
 
     public static void SetVisible(
@@ -571,8 +636,9 @@ public static class UiCustomizationStore
                         .ToList();
                     int idx = Math.Clamp(insertIndex ?? nextOrder.Count, 0, nextOrder.Count);
                     nextOrder.Insert(idx, actionId);
+                    var merged = MergeOrderedIds(ordered, nextOrder);
                     ordered.Clear();
-                    ordered.AddRange(nextOrder);
+                    ordered.AddRange(merged);
                 }
                 else if (insertIndex.HasValue)
                 {
@@ -675,8 +741,9 @@ public static class UiCustomizationStore
             int clamped = Math.Clamp(targetIndex, 0, nextOrder.Count);
             nextOrder.Insert(clamped, actionId);
 
+            var merged = MergeOrderedIds(toOrdered, nextOrder);
             toOrdered.Clear();
-            toOrdered.AddRange(nextOrder);
+            toOrdered.AddRange(merged);
 
             SaveLocked();
         }

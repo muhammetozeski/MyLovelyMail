@@ -36,7 +36,43 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 .OrderBy(static f => f.SortOrder > 0 ? 0 : 1)
                 .ThenBy(static f => f.SortOrder)
                 .ThenBy(f => isRoot ? RoleRank(f.Role) : 0)
-                .ThenBy(static f => f.DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ThenBy(static f => f.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static f => f.FullName, StringComparer.OrdinalIgnoreCase);
+
+        static Dictionary<string, MailFolderData> BuildPathLookup(List<MailFolderData> folders)
+        {
+            var byPath = new Dictionary<string, MailFolderData>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in folders)
+            {
+                if (f != null && !string.IsNullOrWhiteSpace(f.FullName))
+                    byPath.TryAdd(f.FullName, f);
+            }
+            return byPath;
+        }
+
+        public static bool HaveSameParent(List<MailFolderData> folders, string fullNameA, string fullNameB)
+        {
+            var byPath = BuildPathLookup(folders);
+            if (!byPath.TryGetValue(fullNameA, out var folderA) || !byPath.TryGetValue(fullNameB, out var folderB))
+                return false;
+
+            string? parentA = ParentPathOf(folderA, byPath);
+            string? parentB = ParentPathOf(folderB, byPath);
+            return string.Equals(parentA, parentB, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static List<MailFolderData> GetOrderedSiblings(List<MailFolderData> folders, string fullName)
+        {
+            var byPath = BuildPathLookup(folders);
+            if (!byPath.TryGetValue(fullName, out var target))
+                return [];
+
+            string? parentPath = ParentPathOf(target, byPath);
+            var sameParent = folders.Where(f =>
+                f != null && !string.IsNullOrWhiteSpace(f.FullName)
+                && string.Equals(ParentPathOf(f, byPath), parentPath, StringComparison.OrdinalIgnoreCase));
+            return [.. OrderSiblings(sameParent, isRoot: parentPath == null)];
+        }
 
         /// <summary>
         /// The folders in display order, each with its depth and child indicator. Local folders stay one flat group:
@@ -46,8 +82,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static List<FolderNode> Build(List<MailFolderData> folders, bool respectCollapsed = true)
         {
             List<FolderNode> nodes = [];
-            var byPath = folders.ToDictionary(f => f.FullName, StringComparer.OrdinalIgnoreCase);
-            var children = folders.ToLookup(folder => ParentPathOf(folder, byPath), StringComparer.Ordinal);
+            var byPath = BuildPathLookup(folders);
+            var children = byPath.Values.ToLookup(folder => ParentPathOf(folder, byPath), StringComparer.OrdinalIgnoreCase);
 
             foreach (var root in OrderSiblings(children[null], isRoot: true))
             {
@@ -86,7 +122,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (cut <= 0) return null;
 
             string parent = folder.FullName[..cut];
-            return byPath.ContainsKey(parent) ? parent : null;
+            return byPath.TryGetValue(parent, out var parentFolder) ? parentFolder.FullName : null;
         }
     }
 }

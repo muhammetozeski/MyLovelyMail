@@ -376,20 +376,20 @@ namespace MyLovelyMail.MainProject.UI.Pages
             query = ListViewState.MailSort switch
             {
                 MailSortField.Sender => ListViewState.MailSortDirection == SortDirection.Ascending
-                    ? query.OrderBy(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc)
-                    : query.OrderByDescending(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc),
+                    ? query.OrderBy(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid)
+                    : query.OrderByDescending(r => r.SenderText, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid),
                 MailSortField.Subject => ListViewState.MailSortDirection == SortDirection.Ascending
-                    ? query.OrderBy(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc)
-                    : query.OrderByDescending(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc),
+                    ? query.OrderBy(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid)
+                    : query.OrderByDescending(r => r.Message.Subject, StringComparer.OrdinalIgnoreCase).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid),
                 MailSortField.Size => ListViewState.MailSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc)
-                    : query.OrderBy(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc),
+                    ? query.OrderByDescending(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid)
+                    : query.OrderBy(r => r.Messages.Sum(m => m.SizeBytes)).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid),
                 MailSortField.Unread => ListViewState.MailSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc)
-                    : query.OrderBy(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc),
+                    ? query.OrderByDescending(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid)
+                    : query.OrderBy(r => r.UnreadCount).ThenByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid),
                 _ => ListViewState.MailSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(r => r.Message.DateUtc)
-                    : query.OrderBy(r => r.Message.DateUtc)
+                    ? query.OrderByDescending(r => r.Message.DateUtc).ThenByDescending(r => r.Message.Uid)
+                    : query.OrderBy(r => r.Message.DateUtc).ThenBy(r => r.Message.Uid)
             };
 
             Rows = [.. query];
@@ -480,11 +480,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
             var folder = MailUiState.SelectedFolder;
             if (account == null || folder == null) return [];
 
+            var resolvedFilters = ListViewState.GetResolvedFilters();
+            DateTime nowUtc = DateTime.UtcNow;
             var groups = new Dictionary<string, (string Name, int Count, int Unread, DateTime Latest)>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var summary in MessageStore.GetSummaries(account.Id, folder.FullName))
             {
                 if (string.IsNullOrWhiteSpace(summary.FromAddress)) continue;
+                if (MessageActions.IsMoving(account.Id, folder.FullName, summary.Uid)) continue;
+                if (summary.SnoozedUntilUtc is { } snoozed && snoozed > nowUtc) continue;
+                if (!ListFilterService.MatchesAllActive(summary, resolvedFilters)) continue;
+
                 string addr = summary.FromAddress.Trim();
                 string name = string.IsNullOrWhiteSpace(summary.FromName) ? addr : summary.FromName.Trim();
 
@@ -508,17 +514,17 @@ namespace MyLovelyMail.MainProject.UI.Pages
             query = ListViewState.SenderSort switch
             {
                 SenderSortField.MessageCount => ListViewState.SenderSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc)
-                    : query.OrderBy(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc),
+                    ? query.OrderByDescending(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(s => s.MessageCount).ThenByDescending(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase),
                 SenderSortField.UnreadCount => ListViewState.SenderSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc)
-                    : query.OrderBy(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc),
+                    ? query.OrderByDescending(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(s => s.UnreadCount).ThenByDescending(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase),
                 SenderSortField.Name => ListViewState.SenderSortDirection == SortDirection.Ascending
-                    ? query.OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    : query.OrderByDescending(s => s.DisplayName, StringComparer.OrdinalIgnoreCase),
+                    ? query.OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderByDescending(s => s.DisplayName, StringComparer.OrdinalIgnoreCase).ThenByDescending(s => s.Address, StringComparer.OrdinalIgnoreCase),
                 _ => ListViewState.SenderSortDirection == SortDirection.Descending
-                    ? query.OrderByDescending(s => s.LatestDateUtc)
-                    : query.OrderBy(s => s.LatestDateUtc)
+                    ? query.OrderByDescending(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase)
+                    : query.OrderBy(s => s.LatestDateUtc).ThenBy(s => s.Address, StringComparer.OrdinalIgnoreCase)
             };
 
             var list = query.ToList();

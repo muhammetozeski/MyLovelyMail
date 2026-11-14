@@ -123,6 +123,7 @@ public static partial class FastMailSyncService
             }
 
             int totalInInbox = MessageStore.GetSummaries(account.Id, InboxFullName).Count;
+            var cachedInbox = MessageStore.GetFolders(account.Id).FirstOrDefault(static f => f.FullName == InboxFullName);
             MessageStore.SaveFolder(new MailFolderData
             {
                 AccountId = account.Id,
@@ -131,7 +132,9 @@ public static partial class FastMailSyncService
                 Role = FolderRole.Inbox,
                 LastSyncedUtc = DateTime.UtcNow,
                 TotalCount = Math.Max(totalInInbox, remoteItems.Count),
-                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread)
+                UnreadCount = MessageStore.CountSummaries(account.Id, InboxFullName, static s => s.IsUnread),
+                SortOrder = cachedInbox?.SortOrder ?? 0,
+                IsExpanded = cachedInbox?.IsExpanded ?? true
             });
 
             Log($"FastMail sync finished: {account.EmailAddress}, {allNew.Count} new of {remoteItems.Count} on server, elapsed={sw.ElapsedMilliseconds}ms.", Run: IsLogEnabled);

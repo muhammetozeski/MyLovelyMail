@@ -231,7 +231,7 @@ public sealed class MailTmProvider : IFastMailProvider
         }
         catch (Exception ex)
         {
-            Log($"MailTm.ListMessagesAsync failed for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            Log($"MailTm.ListMessagesAsync transient/attempt failure for '{account.EmailAddress}' after {sw.ElapsedMilliseconds}ms: {ex.Message}", LogLevel.Warning, Run: IsLogEnabled);
             throw;
         }
     }
@@ -339,7 +339,7 @@ public sealed class MailTmProvider : IFastMailProvider
         }
         catch (Exception ex)
         {
-            Log($"MailTm.DownloadMessageAsync failed for '{account.EmailAddress}', remoteId='{remoteId}' after {sw.ElapsedMilliseconds}ms:\n{ex}", LogLevel.Error, Run: IsLogEnabled);
+            Log($"MailTm.DownloadMessageAsync transient/attempt failure for '{account.EmailAddress}', remoteId='{remoteId}' after {sw.ElapsedMilliseconds}ms: {ex.Message}", LogLevel.Warning, Run: IsLogEnabled);
             throw;
         }
     }
@@ -381,29 +381,52 @@ public sealed class MailTmProvider : IFastMailProvider
         string token,
         CancellationToken cancellationToken)
     {
-        using var req = new HttpRequestMessage(method, url) { Content = content };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
+        string? contentBytes = content != null ? await content.ReadAsStringAsync(cancellationToken) : null;
+        string contentMediaType = content?.Headers.ContentType?.MediaType ?? "application/json";
 
+        static HttpRequestMessage BuildRequest(HttpMethod m, string u, string bearer, string? body, string mediaType)
+        {
+            var r = new HttpRequestMessage(m, u);
+            if (body != null)
+                r.Content = new StringContent(body, Encoding.UTF8, mediaType);
+            r.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+            r.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
+            return r;
+        }
+
+        using var req = BuildRequest(method, url, token, contentBytes, contentMediaType);
         var resp = await client.SendAsync(req, cancellationToken);
+
+        if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            TimeSpan delay = GetRetryAfterDelay(resp);
+            resp.Dispose();
+            Log($"MailTm.SendAuthorizedAsync: 429 TooManyRequests on '{url}', waiting {delay.TotalMilliseconds:0}ms before retry.", LogLevel.Warning, Run: IsLogEnabled);
+            await Task.Delay(delay, cancellationToken);
+            using var rateRetryReq = BuildRequest(method, url, token, contentBytes, contentMediaType);
+            resp = await client.SendAsync(rateRetryReq, cancellationToken);
+        }
+
         if (resp.StatusCode == HttpStatusCode.Unauthorized)
         {
             resp.Dispose();
             Log($"MailTm.SendAuthorizedAsync: 401 on '{url}', refreshing bearer token for '{account.EmailAddress}'", LogLevel.Warning, Run: IsLogEnabled);
             string refreshed = await EnsureBearerTokenAsync(client, account, forceRefresh: true, cancellationToken);
-            using var retryReq = new HttpRequestMessage(method, url);
-            if (content != null)
-            {
-                string bytes = await content.ReadAsStringAsync(cancellationToken);
-                retryReq.Content = new StringContent(bytes, Encoding.UTF8, content.Headers.ContentType?.MediaType ?? "application/json");
-            }
-            retryReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", refreshed);
-            retryReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/ld+json"));
+            using var retryReq = BuildRequest(method, url, refreshed, contentBytes, contentMediaType);
             resp = await client.SendAsync(retryReq, cancellationToken);
         }
 
         resp.EnsureSuccessStatusCode();
         return resp;
+    }
+
+    static TimeSpan GetRetryAfterDelay(HttpResponseMessage response)
+    {
+        if (response.Headers.RetryAfter?.Delta is { } delta)
+            return TimeSpan.FromSeconds(Math.Clamp(delta.TotalSeconds, 1.0, 6.0));
+        if (response.Headers.RetryAfter?.Date is { } date)
+            return TimeSpan.FromSeconds(Math.Clamp((date - DateTimeOffset.UtcNow).TotalSeconds, 1.0, 6.0));
+        return TimeSpan.FromSeconds(2.0);
     }
 
     /// <summary>A new bearer token for this one operation; tokens are never cached across operations.</summary>
@@ -428,24 +451,45 @@ public sealed class MailTmProvider : IFastMailProvider
         };
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        using var resp = await client.SendAsync(req, cancellationToken);
-        if (!resp.IsSuccessStatusCode)
+        var resp = await client.SendAsync(req, cancellationToken);
+        try
         {
-            string err = await resp.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException(resp.StatusCode == HttpStatusCode.Unauthorized
-                ? $"Mail.tm authentication failed for '{email}' (address already registered with a different password, or invalid credentials)."
-                : $"Mail.tm token request failed ({(int)resp.StatusCode}): {ExtractErrorMessage(err)}");
+            if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                TimeSpan delay = GetRetryAfterDelay(resp);
+                resp.Dispose();
+                Log($"MailTm.ObtainTokenAsync: 429 TooManyRequests for '{email}', waiting {delay.TotalMilliseconds:0}ms before retry.", LogLevel.Warning, Run: IsLogEnabled);
+                await Task.Delay(delay, cancellationToken);
+                using var retryReq = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/token")
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json")
+                };
+                retryReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                resp = await client.SendAsync(retryReq, cancellationToken);
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                string err = await resp.Content.ReadAsStringAsync(cancellationToken);
+                if (resp.StatusCode == HttpStatusCode.Unauthorized)
+                    throw new UnauthorizedAccessException($"Mail.tm authentication failed for '{email}' (invalid credentials).");
+                throw new InvalidOperationException($"Mail.tm token request failed ({(int)resp.StatusCode}): {ExtractErrorMessage(err)}");
+            }
+
+            string json = await resp.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(json);
+            string token = ReadString(doc.RootElement, "token");
+            string remoteId = ReadString(doc.RootElement, "id");
+
+            if (string.IsNullOrWhiteSpace(token))
+                throw new InvalidOperationException("Mail.tm returned an empty authentication token.");
+
+            return new TokenEntry(token, remoteId, DateTime.UtcNow);
         }
-
-        string json = await resp.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(json);
-        string token = ReadString(doc.RootElement, "token");
-        string remoteId = ReadString(doc.RootElement, "id");
-
-        if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Mail.tm returned an empty authentication token.");
-
-        return new TokenEntry(token, remoteId, DateTime.UtcNow);
+        finally
+        {
+            resp.Dispose();
+        }
     }
 
     public static string GenerateSecurePassword() => FastMailCredentials.GeneratePassword();
