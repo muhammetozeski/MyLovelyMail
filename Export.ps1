@@ -1,4 +1,4 @@
-# Publishes the Windows app into the STABLE deploy root so user data survives updates.
+﻿# Publishes the Windows app into the STABLE deploy root so user data survives updates.
 # Layout produced (and kept stable across versions):
 #   <DeployRoot>\MyLovelyMail.exe    launcher (applies pending updates, migrates data, starts the app)
 #   <DeployRoot>\AppData\            the running application (replaced in place when not locked)
@@ -103,8 +103,17 @@ if (Test-DeployedAppRunning $DeployRoot) {
 }
 
 # ── Build the launcher (applies pending updates, migrates old vNNN user data once, starts the app) ──
-$iconSourceExe = if (Test-Path "$liveAppData\MyLovelyMail.exe") { "$liveAppData\MyLovelyMail.exe" } else { Join-Path $versionsDir "$versionTag\AppData\MyLovelyMail.exe" }
-& (Join-Path $SlnDir "BuildLauncher.ps1") -Root $DeployRoot -IconSourceExe $iconSourceExe -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
+$launcherCsproj = Join-Path $SlnDir "Launcher\Launcher.csproj"
+$launcherStage = Join-Path $env:TEMP ("MyLovelyMailLauncher_" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $launcherStage -Force | Out-Null
+Write-Host "Publishing Launcher\Launcher.csproj..." -ForegroundColor Cyan
+dotnet publish $launcherCsproj -c Release -r $Rid --self-contained false -o $launcherStage | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed." }
+try {
+    Copy-Item -LiteralPath (Join-Path $launcherStage "MyLovelyMail.exe") -Destination (Join-Path $DeployRoot "MyLovelyMail.exe") -Force
+} catch {
+    Write-Host "Launcher exe is locked at $DeployRoot - kept the existing one." -ForegroundColor Yellow
+}
 & 'C:\E\kp\aaBenimProgramlarim\Imza\Imzala.ps1' (Join-Path $DeployRoot 'MyLovelyMail.exe')
 if ($LASTEXITCODE -ne 0 -or (Get-AuthenticodeSignature -LiteralPath (Join-Path $DeployRoot 'MyLovelyMail.exe')).Status -ne 'Valid') {
     throw 'The Windows launcher signature is invalid.'

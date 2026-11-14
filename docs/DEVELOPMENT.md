@@ -7,6 +7,7 @@ The MAUI head builds Windows and Android from the same application. `MainProject
 | Change | Starting point |
 | --- | --- |
 | Application startup and native integration | [MauiProgram](../MyLovelyMail/MauiProgram.cs), then the matching `Platforms/Windows` or `Platforms/Android` implementation |
+| Windows root launcher and staged update swap | [Launcher](../Launcher/Program.cs) (`Launcher/Launcher.csproj`) |
 | Message list, search or account selection | [Mail page](../MainProject/UI/Pages/Mail.razor) and [page logic](../MainProject/UI/Pages/Mail.razor.cs) |
 | Folder/account presentation | [MailSidebar](../MainProject/UI/Pages/MailSidebar.razor), [AccountFolderStore](../MainProject/Stores/AccountFolderStore.cs) |
 | Modals and modal navigation history | [ModalService](../MainProject/Services/ModalService.cs), [ModalBase](../MainProject/UI/Elements/Modals/ModalBase.cs), [CoreModal](../MainProject/UI/Elements/Core/CoreModal.razor), [DialogModal](../MainProject/UI/Elements/Modals/DialogModal.razor), [WorkspaceModal](../MainProject/UI/Elements/Modals/WorkspaceModal.razor), [WideModal](../MainProject/UI/Elements/Modals/WideModal.razor), and [AppModalHost](../MainProject/UI/Components/AppModalHost.razor) |

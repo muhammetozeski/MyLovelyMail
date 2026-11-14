@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>MyLovelyMail</AssemblyName>
+    <RootNamespace>MyLovelyMail.Launcher</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Product>MyLovelyMail Launcher</Product>
+    <ApplicationIcon Condition="'$(ApplicationIcon)' == '' and Exists('..\MyLovelyMail\Resources\Raw\trayicon.ico')">..\MyLovelyMail\Resources\Raw\trayicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+</Project>

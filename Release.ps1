@@ -1,4 +1,4 @@
-# Publishes the framework-dependent Windows package and Android APK to GitHub.
+﻿# Publishes the framework-dependent Windows package and Android APK to GitHub.
 # Version comes from the newest existing release tag, bumped by -Bump (patch|minor|major).
 # The release notes are the commit subjects since that tag, so they describe what actually changed.
 param(
@@ -132,7 +132,7 @@ foreach ($stage in $stages) {
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($stage.Name)." }
     if (-not (Test-Path "$appData\$ProjectName.exe")) { throw "Published exe missing in $appData." }
 
-    & (Join-Path $SlnDir "BuildLauncher.ps1") -Root $stageRoot -IconSourceExe "$appData\$ProjectName.exe" -IconFile (Join-Path $SlnDir "MyLovelyMail\Resources\Raw\trayicon.ico") -Rid $Rid
+    dotnet publish (Join-Path $SlnDir "Launcher\Launcher.csproj") -c Release -r $Rid --self-contained false -o $stageRoot | Out-Null
     if (-not (Test-Path "$stageRoot\$ProjectName.exe")) { throw "Launcher exe missing in $stageRoot." }
 
     # Signed BEFORE zipping: an exe signed after it is packaged is not the exe in the package, and

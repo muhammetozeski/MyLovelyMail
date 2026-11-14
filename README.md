@@ -204,6 +204,7 @@ MainProject\           shared library: all UI (Blazor) and services
 MyLovelyMail\          MAUI head: window, tray, toasts, startup wiring; MauiProgram's per-platform
                        steps live in Platforms\Windows and Platforms\Android
 MyLovelyMail.Web\      ASP.NET Core head for browser preview during development
+Launcher\              standalone Windows launcher shim: applies PendingUpdate\AppData and starts AppData\MyLovelyMail.exe
 Generators\            incremental source generator for navigation constants
 tools\ThemeStudio\    standalone theme editor, outside the application build
 ```
