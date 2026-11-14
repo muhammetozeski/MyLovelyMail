@@ -1,4 +1,13 @@
 @inherits ThemedComponentBase
+@using MyLovelyMail.MainProject.UI.Pages
+@{
+    string pillTextPrimary = AppColors.TextPrimary.ToRgbaHex(true);
+    string pillTextSecondary = AppColors.TextSecondary.ToRgbaHex(true);
+    string pillPrimary = AppColors.Primary.ToRgbaHex(true);
+    string pillDanger = AppColors.TextDanger.ToRgbaHex(true);
+    string pillSurfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+    string pillGlassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
+}
 <style>
     .core-btn {
         border: none;
@@ -15,7 +24,7 @@
         min-width: 0;
         max-width: @(AppMeasures.Percent.Full)%;
         white-space: normal;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
         flex-wrap: wrap;
     }
 
@@ -39,5 +48,56 @@
         .core-btn:focus-visible {
             outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
             outline-offset: @(AppMeasures.Border.Thin)px;
+        }
+
+    .@(MailCssClasses.SearchToggle) {
+        border: @(AppMeasures.Border.Thin)px solid @pillGlassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+        color: @pillTextSecondary;
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px10)px;
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        cursor: pointer;
+        font-size: @(AppMeasures.Font.Small)px;
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px4)px;
+        white-space: nowrap;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+    }
+
+        .@(MailCssClasses.SearchToggle):hover:not(:disabled) {
+            background: @pillSurfaceTint;
+            color: @pillTextPrimary;
+        }
+
+        .@(MailCssClasses.SearchToggle):disabled {
+            opacity: @(AppMeasures.Opacity.Disabled);
+            cursor: not-allowed;
+        }
+
+    .@(MailCssClasses.SearchToggleIcon) {
+        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
+    }
+
+    .@(MailCssClasses.SearchToggleCompact) {
+        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
+        font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .@(MailCssClasses.SearchToggleOn) {
+        background: linear-gradient(135deg, @pillPrimary, @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        border-color: transparent;
+    }
+
+    .@(MailCssClasses.SearchToggleDanger) {
+        color: @pillDanger;
+        border-color: @AppColors.TextDanger.WithAlpha(0.35f).ToRgbaHex(true);
+    }
+
+        .@(MailCssClasses.SearchToggleDanger):hover:not(:disabled) {
+            background: @AppColors.TextDanger.WithAlpha(0.14f).ToRgbaHex(true);
+            color: @pillDanger;
+            border-color: @pillDanger;
         }
 </style>

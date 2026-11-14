@@ -14,6 +14,8 @@ namespace MyLovelyMail.MainProject.Services
     {
         public static MailAccountData? SelectedAccount { get; private set; }
         public static MailFolderData? SelectedFolder { get; private set; }
+        public static bool IsViewingDeletedFolders { get; private set; }
+        public static string? DeletedFoldersAccountFilter { get; private set; }
         public static MailMessageSummary? OpenMessage { get; private set; }
         /// <summary>Reader identity survives a search change that removes the opened message from the visible hits.</summary>
         public static MailMessageIdentity? OpenMessageKey { get; private set; }
@@ -101,6 +103,8 @@ namespace MyLovelyMail.MainProject.Services
         {
             SelectedAccount = account;
             SelectedFolder = null;
+            IsViewingDeletedFolders = false;
+            DeletedFoldersAccountFilter = null;
             OpenMessage = null;
             OpenMessageKey = null;
             // The pane must not keep pointing at a message that is no longer listed.
@@ -116,6 +120,8 @@ namespace MyLovelyMail.MainProject.Services
         public static void SelectFolder(MailFolderData? folder)
         {
             SelectedFolder = folder;
+            IsViewingDeletedFolders = false;
+            DeletedFoldersAccountFilter = null;
             OpenMessage = null;
             OpenMessageKey = null;
             ThirdPane = SurvivingOccupant();
@@ -184,8 +190,24 @@ namespace MyLovelyMail.MainProject.Services
         /// Clears transient pane, selection, and stale account/folder references after an unexpected UI error
         /// so recovering or reloading always opens a clean, working Mail workspace without losing unsent drafts.
         /// </summary>
+        public static void SelectDeletedFoldersBin(string? accountIdFilter = null)
+        {
+            SelectedFolder = null;
+            IsViewingDeletedFolders = true;
+            DeletedFoldersAccountFilter = accountIdFilter;
+            OpenMessage = null;
+            OpenMessageKey = null;
+            ThirdPane = SurvivingOccupant();
+            FocusedMessage = null;
+            FocusedMessageKey = null;
+            SelectedMessages.Clear();
+            OnSelectionChanged?.Invoke();
+        }
+
         public static void ResetTransientFailureState()
         {
+            IsViewingDeletedFolders = false;
+            DeletedFoldersAccountFilter = null;
             if (ActiveCompose is { } draft)
             {
                 try { ComposeService.SaveDraft(draft); }

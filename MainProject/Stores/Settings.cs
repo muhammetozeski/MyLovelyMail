@@ -165,6 +165,26 @@ namespace MyLovelyMail.MainProject.Stores
         /// <summary>What happens when the user deletes a message.</summary>
         public static readonly Setting<DeleteBehavior> DeleteAction = new(DeleteBehavior.MoveToTrash);
 
+        // ---- Trash & Deleted Folder Retention ----
+
+        /// <summary>Default number of days deleted folders stay in the Folder Trash bin before permanent deletion.</summary>
+        public const int DefaultDeletedFolderRetentionDays = 2;
+
+        /// <summary>Default number of days messages stay in Trash before automatic permanent deletion.</summary>
+        public const int DefaultTrashRetentionDays = 30;
+
+        /// <summary>Automatically purge folders from the Deleted Folders Trash bin after <see cref="DeletedFolderRetentionDays"/> days.</summary>
+        public static readonly Setting<bool> AutoPurgeDeletedFolders = new(true);
+
+        /// <summary>Days a deleted folder stays in the Deleted Folders Trash bin before permanent deletion (default 2).</summary>
+        public static readonly Setting<int> DeletedFolderRetentionDays = new(DefaultDeletedFolderRetentionDays);
+
+        /// <summary>Automatically delete messages in Trash folders older than <see cref="TrashRetentionDays"/> days.</summary>
+        public static readonly Setting<bool> AutoEmptyTrash = new(true);
+
+        /// <summary>Days messages remain in Trash before permanent deletion (default 30).</summary>
+        public static readonly Setting<int> TrashRetentionDays = new(DefaultTrashRetentionDays);
+
         // ---- Reading ----
 
         /// <summary>Text size inside the reader as a percentage of the design size (clamped 70-200).</summary>

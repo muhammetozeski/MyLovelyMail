@@ -9,7 +9,7 @@
     @Message
 </div>
 
-<div style="display:flex;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;">
+<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:@(AppMeasures.Space.Px8)px;">
     @if (!IsAlertOnly)
     {
         <SecondaryButton OnClick="@Cancel">@CancelLabel</SecondaryButton>

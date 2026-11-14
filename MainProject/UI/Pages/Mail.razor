@@ -45,7 +45,7 @@
                 <div class="@MailCssClasses.SyncLine"><span class="@MailCssClasses.SyncLineRunner"></span></div>
             }
 
-            @if (ShowSearchTools)
+            @if (ShowSearchTools && !MailUiState.IsViewingDeletedFolders)
             {
                 <CustomizableActionBar SurfaceId="@UiSurfaceIds.QuickFiltersBar"
                                        PairedMenuSurfaceId="@UiSurfaceIds.WorkspaceContextMenu"
@@ -56,7 +56,99 @@
             }
         </div>
 
-        @if (MailUiState.SelectedFolder == null)
+        @if (!MailUiState.IsViewingDeletedFolders && MailUiState.SelectedFolder is { Role: FolderRole.Trash } selectedTrash)
+        {
+            <div class="@MailCssClasses.TrashPolicyBanner">
+                <span class="@MailCssClasses.TrashPolicyText">
+                    🗑️ @TrashRetentionService.BuildTrashHeaderDescription(selectedTrash)
+                </span>
+                <div class="@MailCssClasses.TrashPolicyActions">
+                    <PillButton IsCompact="true"
+                                OnClick="@(() => ModalService.OpenMailTrashRetention(selectedTrash.AccountId, selectedTrash.FullName))">
+                        ⏱️ Auto-delete
+                    </PillButton>
+                    @if (CachedCount > 0 && MailUiState.SelectedAccount is { } trashAcc)
+                    {
+                        <PillButton IsDanger="true"
+                                    IsCompact="true"
+                                    OnClick="@(() => EmptyFolderWithConfirmationAsync(trashAcc, selectedTrash))">
+                            🧹 Empty Trash
+                        </PillButton>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (MailUiState.IsViewingDeletedFolders)
+        {
+            string? delAccId = MailUiState.DeletedFoldersAccountFilter;
+            var (delAuto, delDays) = TrashRetentionService.ResolveDeletedFoldersPolicy(delAccId);
+            var deletedEntries = GetVisibleDeletedFolderEntries();
+
+            <div class="@MailCssClasses.TrashPolicyBanner">
+                <span class="@MailCssClasses.TrashPolicyText">
+                    🗑️ Deleted Folders Trash · @(delAuto ? $"Auto-delete — App: {delDays} day(s)" : "Auto-delete — App: Off")
+                </span>
+                <div class="@MailCssClasses.TrashPolicyActions">
+                    <PillButton IsCompact="true"
+                                OnClick="@(() => ModalService.OpenDeletedFoldersRetention(delAccId))">
+                        ⏱️ Auto-delete (@(delAuto ? $"{delDays}d" : "Off"))
+                    </PillButton>
+                    @if (deletedEntries.Count > 0)
+                    {
+                        <PillButton IsDanger="true"
+                                    IsCompact="true"
+                                    OnClick="@(() => EmptyDeletedFoldersWithConfirmationAsync(delAccId))">
+                            🧹 Empty Folder Trash
+                        </PillButton>
+                    }
+                </div>
+            </div>
+
+            @if (deletedEntries.Count == 0)
+            {
+                <div class="@MailCssClasses.Empty">
+                    <div class="@MailCssClasses.EmptyIcon">🕊️</div>
+                    <div class="@MailCssClasses.EmptyText">No deleted folders match your search</div>
+                </div>
+            }
+            else
+            {
+                <div class="@MailCssClasses.Rows" tabindex="0">
+                    @foreach (var entry in deletedEntries)
+                    {
+                        bool entryBusy = IsDeletedFolderBusy(entry.Id);
+                        <div class="@MailCssClasses.DeletedFolderCard" @key="entry.Id" data-deleted-entry="@entry.Id">
+                            <div class="@MailCssClasses.DeletedFolderMain">
+                                <span class="@MailCssClasses.DeletedFolderTitle">
+                                    @(entry.Kind == DeletedFolderKind.AccountGroup ? "📂" : "📁") @entry.DisplayName
+                                </span>
+                                <span class="@MailCssClasses.DeletedFolderMeta">
+                                    @(entry.Kind == DeletedFolderKind.AccountGroup
+                                        ? $"Account group · {entry.ReassignedAccountIds.Count:N0} account(s)"
+                                        : $"{entry.AccountEmail} · {entry.FullPathLabel} · {entry.TotalMessageCount:N0} message(s)")
+                                    · Deleted @FormatDate(entry.DeletedAtUtc) · @TrashRetentionService.FormatRemainingForDeletedFolder(entry)
+                                </span>
+                            </div>
+                            <div class="@MailCssClasses.DeletedFolderActions">
+                                <PillButton IsCompact="true"
+                                            Disabled="@entryBusy"
+                                            OnClick="@(() => RestoreDeletedFolderEntryAsync(entry))">
+                                    @(entryBusy ? "⏳ Restoring…" : "♻️ Restore")
+                                </PillButton>
+                                <PillButton IsDanger="true"
+                                            IsCompact="true"
+                                            Disabled="@entryBusy"
+                                            OnClick="@(() => PurgeDeletedFolderEntryWithConfirmationAsync(entry))">
+                                    🗑️ Delete forever
+                                </PillButton>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (MailUiState.SelectedFolder == null)
         {
             <div class="@MailCssClasses.Empty">
                 <div class="@MailCssClasses.EmptyIcon">📭</div>

@@ -60,9 +60,13 @@ public static partial class MessageStore
         if (local && !GetFolders(accountId).Any(folder => folder.FullName == targetFullName))
             SaveFolder(new MailFolderData { AccountId = accountId, FullName = targetFullName,
                 DisplayName = targetFullName[LocalFolderPrefix.Length..], IsLocal = true });
+        var targetFolder = GetFolders(accountId).FirstOrDefault(folder => folder.FullName == targetFullName);
+        bool targetIsTrash = targetFolder?.Role == FolderRole.Trash
+            || string.Equals(targetFullName, LocalFolderPrefix + "Trash", StringComparison.OrdinalIgnoreCase);
         var moved = JsonSerializer.Deserialize<MailMessageSummary>(JsonSerializer.SerializeToUtf8Bytes(source, JsonDefaults.SingleLine), JsonDefaults.SingleLine)
             ?? throw new InvalidOperationException("Could not copy the cached message metadata.");
         moved.Uid = confirmedServerUid ?? FreeLocalUid(accountId, targetFullName, source);
+        moved.TrashedAtUtc = targetIsTrash ? DateTime.UtcNow : null;
         if (TryLoadFullMessage(accountId, fromFolderFullName, uid) is { } mime)
             SaveFullMessage(accountId, targetFullName, moved.Uid, mime);
         UpsertSummaries(accountId, targetFullName, [moved]);

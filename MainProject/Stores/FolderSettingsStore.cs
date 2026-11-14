@@ -9,6 +9,8 @@ public sealed record FolderPreferences
 {
     public DateTimeOffset? MutedUntilUtc { get; init; }
     public bool? ShowUnreadBadge { get; init; }
+    public bool? AutoEmptyTrash { get; init; }
+    public int? TrashRetentionDays { get; init; }
 }
 
 /// <summary>
@@ -22,6 +24,8 @@ public static class FolderSettingsStore
     static readonly object SyncRoot = new();
     static FolderSettingsDocument? Document;
     static Exception? LoadError;
+
+    public static event Action? OnChanged;
 
     /// <summary>The common server roles offered in global settings; custom folders have account settings only.</summary>
     public static IReadOnlyList<FolderRole> StandardRoles { get; } = Array.AsReadOnly<FolderRole>(
@@ -136,8 +140,9 @@ public static class FolderSettingsStore
                 AtomicFile.WriteAllText(Path.Combine(AppPaths.UserData, FileName), JsonSerializer.Serialize(next, JsonDefaults.Indented));
                 Document = next;
                 Log($"Folder settings saved: account={accountId ?? "global"}; folder={fullName ?? role.ToString()}; preferences={preferences}", Run: IsLogEnabled);
-                return true;
             }
+            OnChanged?.Invoke();
+            return true;
         }
         catch (Exception exception)
         {

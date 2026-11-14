@@ -78,6 +78,37 @@ public static class ModalService
             [nameof(AccountFolderModal.IsRename)] = true
         }, ModalSize.Dialog);
 
+    public static void OpenCreateMailFolder(string accountId, string? parentFullName = null) =>
+        Open<MailboxFolderModal>(new Dictionary<string, object?>
+        {
+            [nameof(MailboxFolderModal.AccountId)] = accountId,
+            [nameof(MailboxFolderModal.IsRename)] = false,
+            [nameof(MailboxFolderModal.InitialParentFullName)] = parentFullName
+        }, ModalSize.Dialog);
+
+    public static void OpenRenameMailFolder(string accountId, string folderFullName) =>
+        Open<MailboxFolderModal>(new Dictionary<string, object?>
+        {
+            [nameof(MailboxFolderModal.AccountId)] = accountId,
+            [nameof(MailboxFolderModal.IsRename)] = true,
+            [nameof(MailboxFolderModal.TargetFolderFullName)] = folderFullName
+        }, ModalSize.Dialog);
+
+    public static void OpenMailTrashRetention(string? accountId = null, string? folderFullName = null) =>
+        Open<TrashRetentionModal>(new Dictionary<string, object?>
+        {
+            [nameof(TrashRetentionModal.IsDeletedFoldersBin)] = false,
+            [nameof(TrashRetentionModal.AccountId)] = accountId,
+            [nameof(TrashRetentionModal.FolderFullName)] = folderFullName
+        }, ModalSize.Dialog);
+
+    public static void OpenDeletedFoldersRetention(string? accountId = null) =>
+        Open<TrashRetentionModal>(new Dictionary<string, object?>
+        {
+            [nameof(TrashRetentionModal.IsDeletedFoldersBin)] = true,
+            [nameof(TrashRetentionModal.AccountId)] = accountId
+        }, ModalSize.Dialog);
+
     public static void Close() => GoBack();
 
     /// <summary>Opens a unified confirmation modal (replacing browser confirm) and awaits the user's decision.</summary>

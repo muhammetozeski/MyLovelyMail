@@ -219,7 +219,7 @@
                 <SettingEditorRow Setting="@setting"
                                   BadgeText="@(setting.IsDefault ? "inherited" : "overridden")"
                                   ResetTitle="Reset to inherited"
-                                  OnSaved="@(() => AccountSettingsOf.Save())" />
+                                  OnSaved="@(() => { AccountSettingsOf.Save(); Services.Mail.TrashRetentionService.NotifySettingsUpdated(AccountId); })" />
             }
         </GlassCard>
     }

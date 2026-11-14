@@ -59,6 +59,24 @@
             {
                 @RenderAccountFolderTree(rootFolder, 0)
             }
+            @if (DeletedFolderStore.GetAccountGroups() is { Count: > 0 } deletedGroups)
+            {
+                bool groupBinActive = MailUiState.IsViewingDeletedFolders && MailUiState.DeletedFoldersAccountFilter == null;
+                <div class="@MailCssClasses.AccountFolderRow @MailCssClasses.DeletedFoldersBin @(groupBinActive ? MailCssClasses.DeletedFoldersBinActive : "")"
+                     data-deleted-account-groups="true"
+                     @oncontextmenu="e => View.OpenDeletedFoldersMenu(null, e)"
+                     @oncontextmenu:preventDefault="true"
+                     @oncontextmenu:stopPropagation="true">
+                    <button class="@MailCssClasses.AccountFolderToggle"
+                            type="button"
+                            title="Deleted account group folders — right-click for auto-delete settings"
+                            @onclick="() => MailUiState.SelectDeletedFoldersBin(null)">
+                        <span class="@MailCssClasses.AccountFolderIcon">🗑️</span>
+                        <span class="@MailCssClasses.AccountFolderName">Group Trash (@deletedGroups.Count)</span>
+                        <span class="@MailCssClasses.FolderRetentionTag">@TrashRetentionService.BuildDeletedFoldersBadge()</span>
+                    </button>
+                </div>
+            }
         </nav>
 
         @if (AccountStore.Accounts.Count == 0)
@@ -88,6 +106,9 @@
         base.OnInitialized();
         View.TryCancelSidebarDrag = WorkspaceDragService.Cancel;
         WorkspaceDragService.OnStateChanged += HandleDragStateChanged;
+        DeletedFolderStore.OnChanged += HandleDragStateChanged;
+        TrashRetentionService.OnRetentionChanged += HandleDragStateChanged;
+        FolderSettingsStore.OnChanged += HandleDragStateChanged;
     }
 
     void HandleDragStateChanged() => InvokeAsync(StateHasChanged);
@@ -95,6 +116,9 @@
     public void Dispose()
     {
         WorkspaceDragService.OnStateChanged -= HandleDragStateChanged;
+        DeletedFolderStore.OnChanged -= HandleDragStateChanged;
+        TrashRetentionService.OnRetentionChanged -= HandleDragStateChanged;
+        FolderSettingsStore.OnChanged -= HandleDragStateChanged;
         if (View?.TryCancelSidebarDrag == WorkspaceDragService.Cancel)
             View.TryCancelSidebarDrag = null;
     }
@@ -374,13 +398,17 @@
                                 }
                             </span>
 
-                            <button class="@MailCssClasses.Folder @(MailUiState.SelectedFolder?.FullName == folder.FullName ? MailCssClasses.FolderActive : "")"
+                            <button class="@MailCssClasses.Folder @(!MailUiState.IsViewingDeletedFolders && MailUiState.SelectedFolder?.FullName == folder.FullName ? MailCssClasses.FolderActive : "")"
                                     type="button"
                                     disabled="@(!folder.Selectable)"
                                     title="@(folder.Selectable ? Mail.FolderFreshness(folder) : "This folder only holds other folders")"
                                     @onclick="() => HandleMailFolderClick(folder)">
                                 <span class="@MailCssClasses.FolderIcon">@Mail.FolderIcon(folder)</span>
                                 <span class="@MailCssClasses.FolderName">@Mail.FolderLabel(folder)</span>
+                                @if (folder.Role == FolderRole.Trash)
+                                {
+                                    <span class="@MailCssClasses.FolderRetentionTag">@TrashRetentionService.BuildSidebarTrashBadge(folder)</span>
+                                }
                                 @if (folder.UnreadCount > 0 && GlobalSettings.ShowUnreadBadge.Value && FolderSettingsStore.ShowsUnreadCount(folder))
                                 {
                                     <CoreChip Text="@folder.UnreadCount.ToString()"
@@ -398,6 +426,32 @@
                                                    Compact="true"
                                                    StopClickPropagation="true"
                                                    CustomClass="@MailCssClasses.FolderHoverActions" />
+                        </div>
+                    }
+
+                    @if (DeletedFolderStore.GetForAccount(account.Id) is { Count: > 0 } deletedMailFolders)
+                    {
+                        bool binActive = MailUiState.IsViewingDeletedFolders && MailUiState.DeletedFoldersAccountFilter == account.Id;
+                        <div class="@MailCssClasses.FolderRow @MailCssClasses.DeletedFoldersBin"
+                             data-deleted-folders-bin="@account.Id"
+                             style="--folder-depth:@(depth + 1)"
+                             @oncontextmenu="e => View.OpenDeletedFoldersMenu(account.Id, e)"
+                             @oncontextmenu:preventDefault="true"
+                             @oncontextmenu:stopPropagation="true">
+                            <span class="@MailCssClasses.FolderGutter"></span>
+                            <button class="@MailCssClasses.Folder @(binActive ? MailCssClasses.FolderActive : "")"
+                                    type="button"
+                                    title="Deleted mail folders for @account.EmailAddress — right-click for auto-delete settings"
+                                    @onclick="() => MailUiState.SelectDeletedFoldersBin(account.Id)">
+                                <span class="@MailCssClasses.FolderIcon">🗑️</span>
+                                <span class="@MailCssClasses.FolderName">Folder Trash</span>
+                                <span class="@MailCssClasses.FolderRetentionTag">@TrashRetentionService.BuildDeletedFoldersBadge(account.Id)</span>
+                                <CoreChip Text="@deletedMailFolders.Count.ToString()"
+                                          Background="@AppColors.SurfaceStrong"
+                                          TextColor="@AppColors.TextSecondary"
+                                          FontSize="@AppMeasures.Font.XSmall"
+                                          PaddingX="7" PaddingY="2" />
+                            </button>
                         </div>
                     }
                 }

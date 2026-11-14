@@ -299,10 +299,13 @@ public partial class Mail
         List<UiActionModel> list =
         [
             UiActionModel.CreateSync("Sidebar.NewAccountFolder", "📁+ Group", () => ModalService.OpenCreateFolder(),
-                title: "New account folder"),
+                title: "New account group folder"),
         ];
-        if (MailUiState.SelectedAccount != null)
+        if (MailUiState.SelectedAccount is { } selectedAcc)
         {
+            list.Add(UiActionModel.CreateSync("Account.NewMailFolder", "📁+ Folder",
+                () => ModalService.OpenCreateMailFolder(selectedAcc.Id),
+                title: $"Create new mail folder in {selectedAcc.EmailAddress}"));
             list.Add(new("Workspace.Compose", "✏️ Compose",
                 _ => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty),
                 Title: "Write a new message",
@@ -333,6 +336,14 @@ public partial class Mail
                 title: "Redownload this folder",
                 visualKind: ActionVisualKind.SidebarQuick));
         }
+        if (MailFolderManagementService.CanDelete(folder))
+        {
+            list.Add(new("Folder.Delete", "🗑️",
+                _ => DeleteMailFolderWithConfirmationAsync(account, folder),
+                Title: $"Delete folder '{folder.DisplayName}' (moves to Folder Trash)",
+                IsDanger: true,
+                VisualKind: ActionVisualKind.SidebarQuick));
+        }
         list.Add(UiActionModel.CreateMouseSync("Folder.Menu", "⋯", e => OpenFolderMenu(folder, e),
             title: "Folder actions",
             isFixed: true,
@@ -344,20 +355,34 @@ public partial class Mail
         AccountFolderData accFolder,
         Func<Task> onCreateQuickMail,
         bool isPending,
-        string? quickError) =>
-    [
-        UiActionModel.CreateSync("AccGroup.AddAccount", "➕", () => ModalService.OpenAddAccount(accFolder.Id),
-            title: $"Add account to {accFolder.Name}",
-            visualKind: ActionVisualKind.SidebarQuick),
-        new("AccGroup.QuickMailTm", isPending ? "⏳" : "⚡+", _ => onCreateQuickMail(),
-            Title: quickError ?? "Create a Mail.tm account here",
-            Disabled: isPending,
-            VisualKind: ActionVisualKind.SidebarQuick),
-        UiActionModel.CreateMouseSync("AccGroup.Menu", "⋯", e => OpenAccountFolderMenu(accFolder, e),
+        string? quickError)
+    {
+        List<UiActionModel> list =
+        [
+            UiActionModel.CreateSync("AccGroup.AddAccount", "➕", () => ModalService.OpenAddAccount(accFolder.Id),
+                title: $"Add account to {accFolder.Name}",
+                visualKind: ActionVisualKind.SidebarQuick),
+            new("AccGroup.QuickMailTm", isPending ? "⏳" : "⚡+", _ => onCreateQuickMail(),
+                Title: quickError ?? "Create a Mail.tm account here",
+                Disabled: isPending,
+                VisualKind: ActionVisualKind.SidebarQuick)
+        ];
+
+        if (!AccountFolderStore.IsDefaultFolder(accFolder.Id))
+        {
+            list.Add(new("AccGroup.Delete", "🗑️",
+                _ => MailMenuItems.ConfirmAndTrashAccountGroupAsync(accFolder),
+                Title: $"Delete folder '{accFolder.Name}' (moves to Folder Trash)",
+                IsDanger: true,
+                VisualKind: ActionVisualKind.SidebarQuick));
+        }
+
+        list.Add(UiActionModel.CreateMouseSync("AccGroup.Menu", "⋯", e => OpenAccountFolderMenu(accFolder, e),
             title: "Folder options",
             isFixed: true,
-            visualKind: ActionVisualKind.SidebarQuick)
-    ];
+            visualKind: ActionVisualKind.SidebarQuick));
+        return list;
+    }
 
     // ---- Universal Cross-Surface Resolvers (Menu <-> Toolbar & Submenu -> Root) ----
 
@@ -537,8 +562,13 @@ public partial class Mail
             "Account.EditNote" => Make("🏷️ Account note", "🏷️", _ => { if (activeAccount != null) ModalService.OpenAccountNote(activeAccount.Id); return Task.CompletedTask; }, disabled: activeAccount == null),
             "Account.Settings" => Make("⚙️ Account settings", "⚙️", _ => { if (activeAccount != null) Navigation.NavigateTo(AccountSettingsPage.RouteFor(activeAccount.Id)); return Task.CompletedTask; }, disabled: activeAccount == null),
             "Account.Rules" => Make("🪄 Account rules", "🪄", _ => { if (activeAccount != null) Navigation.NavigateTo(FilterRules.LinkFor(accountId: activeAccount.Id)); return Task.CompletedTask; }, disabled: activeAccount == null),
+            "Account.NewMailFolder" => Make("📁+ New folder", "📁+", _ => { if (activeAccount != null) ModalService.OpenCreateMailFolder(activeAccount.Id); return Task.CompletedTask; }, disabled: activeAccount == null),
             "Account.CopyEmail" => Make("📋 Copy email", "📋", _ => activeAccount == null ? Task.CompletedTask : MouseActionService.RunAsync(MouseActionService.CopyAction, activeAccount.EmailAddress), disabled: activeAccount == null, title: activeAccount != null ? $"Copy {activeAccount.EmailAddress}" : "Copy email address"),
             "Folder.Open" => Make("📂 Open folder", "📂", _ => { if (activeFolder is { Selectable: true }) MailUiState.SelectFolder(activeFolder); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
+            "Folder.NewSubfolder" => Make("📁+ New subfolder", "📁+", _ => { if (activeFolder != null) ModalService.OpenCreateMailFolder(activeFolder.AccountId, activeFolder.IsLocal ? null : activeFolder.FullName); return Task.CompletedTask; }, disabled: activeFolder == null),
+            "Folder.Rename" => Make("✏️ Rename folder", "✏️", _ => { if (activeFolder != null && MailFolderManagementService.CanRename(activeFolder)) ModalService.OpenRenameMailFolder(activeFolder.AccountId, activeFolder.FullName); return Task.CompletedTask; }, disabled: activeFolder == null || !MailFolderManagementService.CanRename(activeFolder)),
+            "Folder.Delete" => Make("🗑️ Delete folder", "🗑️", _ => activeAccount != null && activeFolder != null && MailFolderManagementService.CanDelete(activeFolder) ? DeleteMailFolderWithConfirmationAsync(activeAccount, activeFolder) : Task.CompletedTask, disabled: activeAccount == null || activeFolder == null || !MailFolderManagementService.CanDelete(activeFolder), isDanger: true),
+            "Folder.TrashRetention" => Make("⏱️ Trash auto-delete", "⏱️", _ => { if (activeFolder?.Role == FolderRole.Trash) ModalService.OpenMailTrashRetention(activeFolder.AccountId, activeFolder.FullName); else ModalService.OpenMailTrashRetention(activeAccount?.Id); return Task.CompletedTask; }),
             "Folder.ReadAll" => Make("✓✓ Mark folder read", "✓✓", _ => activeFolder is { Selectable: true } ? MouseActionService.ReadFolderAsync(activeFolder) : Task.CompletedTask, disabled: activeFolder is not { Selectable: true }),
             "Folder.Export" => Make("📦 Export .mbox", "📦", _ => { if (activeFolder is { Selectable: true }) ExportFolderMailbox(activeFolder); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
             "Folder.Resync" => Make("♻️ Redownload folder", "♻️", _ => { if (activeFolder is { IsLocal: false }) ResyncFolder(activeFolder); return Task.CompletedTask; }, disabled: activeFolder is not { IsLocal: false }),
@@ -552,6 +582,7 @@ public partial class Mail
             "AccGroup.NewFastMail" => Make("⚡ New Fast Mail", "⚡", _ => { ModalService.OpenFastMail(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId); return Task.CompletedTask; }),
             "AccGroup.AddSubfolder" => Make("📁+ Subfolder", "📁+", _ => { if (activeAccountFolder != null) ModalService.OpenCreateFolder(activeAccountFolder.Id); return Task.CompletedTask; }, disabled: activeAccountFolder == null),
             "AccGroup.Rename" => Make("✏️ Rename group", "✏️", _ => { if (activeAccountFolder != null) ModalService.OpenRenameFolder(activeAccountFolder.Id); return Task.CompletedTask; }, disabled: activeAccountFolder == null),
+            "AccGroup.Delete" => Make("🗑️ Delete group", "🗑️", _ => activeAccountFolder != null && !AccountFolderStore.IsDefaultFolder(activeAccountFolder.Id) ? MailMenuItems.ConfirmAndTrashAccountGroupAsync(activeAccountFolder) : Task.CompletedTask, disabled: activeAccountFolder == null || AccountFolderStore.IsDefaultFolder(activeAccountFolder.Id), isDanger: true),
             "AccGroup.Rules" => Make("🪄 Group rules", "🪄", _ => { if (activeAccountFolder != null) Navigation.NavigateTo(FilterRules.LinkFor(accountFolderId: activeAccountFolder.Id)); return Task.CompletedTask; }, disabled: activeAccountFolder == null),
             "Workspace.SyncAll" => Make("🔄 Check mail", "🔄", _ => MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty)),
             "Workspace.Settings" => Make("⚙️ Settings", "⚙️", _ => { Navigation.NavigateTo(NavigationConstants.Settings.Link); return Task.CompletedTask; }),
@@ -704,8 +735,13 @@ public partial class Mail
             "Account.EditNote" when activeAccount != null => new("🏷️ Edit title, note & folder", () => ModalService.OpenAccountNote(activeAccount.Id), actionId: actionId),
             "Account.Settings" when activeAccount != null => new("⚙️ Account settings", () => Navigation.NavigateTo(AccountSettingsPage.RouteFor(activeAccount.Id)), actionId: actionId),
             "Account.Rules" when activeAccount != null => new("🪄 Rules for this account", () => Navigation.NavigateTo(FilterRules.LinkFor(accountId: activeAccount.Id)), actionId: actionId),
+            "Account.NewMailFolder" when activeAccount != null => new("📁+ New mail folder…", () => ModalService.OpenCreateMailFolder(activeAccount.Id), actionId: actionId),
             "Account.CopyEmail" when activeAccount != null => new("📋 Copy email address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, activeAccount.EmailAddress), actionId: actionId),
             "Folder.Open" when activeFolder != null => new("📂 Open folder", () => RunFolderMenuAction(activeFolder, FolderMenuAction.Open), enabled: activeFolder.Selectable, actionId: actionId),
+            "Folder.NewSubfolder" when activeFolder != null => new("📁+ New mail folder…", () => ModalService.OpenCreateMailFolder(activeFolder.AccountId, activeFolder.IsLocal ? null : activeFolder.FullName), actionId: actionId),
+            "Folder.Rename" when activeFolder != null => new("✏️ Rename folder…", () => ModalService.OpenRenameMailFolder(activeFolder.AccountId, activeFolder.FullName), enabled: MailFolderManagementService.CanRename(activeFolder), actionId: actionId),
+            "Folder.Delete" when activeAccount != null && activeFolder != null => new("🗑️ Delete folder…", () => DeleteMailFolderWithConfirmationAsync(activeAccount, activeFolder), Enabled: MailFolderManagementService.CanDelete(activeFolder), ActionId: actionId),
+            "Folder.TrashRetention" => new("⏱️ Trash auto-delete settings…", () => ModalService.OpenMailTrashRetention(activeFolder?.AccountId ?? activeAccount?.Id, activeFolder?.Role == FolderRole.Trash ? activeFolder.FullName : null), actionId: actionId),
             "Folder.ReadAll" when activeFolder != null => new("✓✓ Mark folder read", () => MouseActionService.ReadFolderAsync(activeFolder), Enabled: activeFolder.Selectable, ActionId: actionId),
             "Folder.Export" when activeFolder != null => new("📦 Export folder as .mbox", () => ExportFolderMailbox(activeFolder), enabled: activeFolder.Selectable, actionId: actionId),
             "Folder.Resync" when activeFolder != null => new("🔄 Redownload folder", () => ResyncFolder(activeFolder), enabled: !activeFolder.IsLocal, actionId: actionId),
@@ -716,6 +752,7 @@ public partial class Mail
             "AccGroup.NewFastMail" => new("⚡ New Fast Mail here", () => ModalService.OpenFastMail(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId), actionId: actionId),
             "AccGroup.AddSubfolder" when activeAccountFolder != null => new("➕ Add subfolder", () => ModalService.OpenCreateFolder(activeAccountFolder.Id), actionId: actionId),
             "AccGroup.Rename" when activeAccountFolder != null => new("✏️ Rename folder", () => ModalService.OpenRenameFolder(activeAccountFolder.Id), actionId: actionId),
+            "AccGroup.Delete" when activeAccountFolder != null => new("🗑️ Delete folder…", () => MailMenuItems.ConfirmAndTrashAccountGroupAsync(activeAccountFolder), Enabled: !AccountFolderStore.IsDefaultFolder(activeAccountFolder.Id), ActionId: actionId),
             "AccGroup.Rules" when activeAccountFolder != null => new("🪄 Rules for this account group", () => Navigation.NavigateTo(FilterRules.LinkFor(accountFolderId: activeAccountFolder.Id)), actionId: actionId),
             "Compose.SaveDraft" => new("💾 Save draft", SaveActiveDraft, enabled: MailUiState.ActiveCompose != null, actionId: actionId),
             "Compose.Discard" => new("🗑️ Discard draft", DiscardCompose, enabled: MailUiState.ActiveCompose != null, actionId: actionId),
@@ -940,14 +977,20 @@ public partial class Mail
         // 7. Account & Folder Commands
         Add("Account.CopyEmail", "📋 Copy Account Email", "Account");
         Add("Account.Sync", "🔄 Sync Account Now", "Account");
+        Add("Account.NewMailFolder", "📁+ New Mail Folder…", "Account");
         Add("Account.EditNote", "🏷️ Edit Account Note & Folder", "Account");
         Add("Account.Settings", "⚙️ Account Settings", "Account");
         Add("Account.Rules", "🪄 Account Filter Rules", "Account");
+        Add("Folder.NewSubfolder", "📁+ New Subfolder…", "Folder");
+        Add("Folder.Rename", "✏️ Rename Folder…", "Folder");
+        Add("Folder.Delete", "🗑️ Delete Folder…", "Folder");
+        Add("Folder.TrashRetention", "⏱️ Trash Auto-Delete Settings…", "Folder");
         Add("Folder.ReadAll", "✓✓ Mark Folder Read", "Folder");
         Add("Folder.Export", "📦 Export Folder (.mbox)", "Folder");
         Add("Folder.Resync", "♻️ Redownload Folder", "Folder");
         Add("Folder.Filters", "🪄 Folder Filter Rules", "Folder");
         Add("Folder.Settings", "⚙️ Folder Settings", "Folder");
+        Add("AccGroup.Delete", "🗑️ Delete Account Group…", "Account");
 
         return list;
     }

@@ -55,6 +55,14 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     Log($"'{folder.FullName}' no longer holds the {cached.Role} role: {decision.Why}");
 
                 bool selectable = !folder.Attributes.HasFlag(FolderAttributes.NoSelect);
+                bool supportsMetadata = cached?.ServerSupportsRetentionMetadata ?? false;
+                int? serverRetentionDays = cached?.ServerRetentionDays;
+                if (decision.Role == FolderRole.Trash)
+                {
+                    (supportsMetadata, serverRetentionDays) =
+                        await TrashRetentionService.TryQueryServerRetentionAsync(client, folder, cancellationToken);
+                }
+
                 if (cached != null
                     && cached.DisplayName == folder.Name
                     && cached.Role == decision.Role
@@ -62,7 +70,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     && cached.Delimiter == folder.DirectorySeparator
                     && cached.UidValidity == folder.UidValidity
                     && cached.TotalCount == folder.Count
-                    && cached.UnreadCount == folder.Unread)
+                    && cached.UnreadCount == folder.Unread
+                    && cached.ServerSupportsRetentionMetadata == supportsMetadata
+                    && cached.ServerRetentionDays == serverRetentionDays)
                 {
                     continue;
                 }
@@ -82,7 +92,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     TotalCount = folder.Count,
                     UnreadCount = folder.Unread,
                     SortOrder = cached?.SortOrder ?? 0,
-                    IsExpanded = cached?.IsExpanded ?? true
+                    IsExpanded = cached?.IsExpanded ?? true,
+                    ServerSupportsRetentionMetadata = supportsMetadata,
+                    ServerRetentionDays = serverRetentionDays
                 });
             }
 

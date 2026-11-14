@@ -260,4 +260,29 @@ public static class MailCssClasses
 
     public const string WizardTest = "wizard-test";
     public const string WizardTestFail = "wizard-test--fail";
+
+    public const string FolderRetentionTag = "mail-folder-retention-tag";
+    public const string DeletedFoldersBin = "mail-deleted-folders-bin";
+    public const string DeletedFoldersBinActive = "mail-deleted-folders-bin--active";
+
+    public const string TrashPolicyBanner = "mail-trash-policy-banner";
+    public const string TrashPolicyText = "mail-trash-policy-text";
+    public const string TrashPolicyActions = "mail-trash-policy-actions";
+
+    public const string DeletedFolderCard = "mail-deleted-folder-card";
+    public const string DeletedFolderMain = "mail-deleted-folder-main";
+    public const string DeletedFolderTitle = "mail-deleted-folder-title";
+    public const string DeletedFolderMeta = "mail-deleted-folder-meta";
+    public const string DeletedFolderActions = "mail-deleted-folder-actions";
+
+    public const string ModalBodyStack = "mail-modal-body-stack";
+    public const string ModalFieldBlock = "mail-modal-field-block";
+    public const string ModalFieldLabel = "mail-modal-field-label";
+    public const string ModalFieldHint = "mail-modal-field-hint";
+    public const string ModalRowBetween = "mail-modal-row-between";
+    public const string ModalPresetBar = "mail-modal-preset-bar";
+    public const string ModalSelectInput = "mail-modal-select-input";
+    public const string ModalFooterActions = "mail-modal-footer-actions";
+    public const string ModalErrorBanner = "mail-modal-error-banner";
+    public const string ModalNumberBox = "mail-modal-number-box";
 }

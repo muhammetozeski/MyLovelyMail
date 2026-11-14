@@ -1,4 +1,5 @@
 @* Both settings pages edit the same scopes that the folder menu and notifications read. *@
+@using System.Globalization
 @inject NavigationManager Navigation
 <section id="folder-settings">
 <GlassCard CustomClass="settings-section">
@@ -18,7 +19,41 @@
             }
             @if (folder.Role == FolderRole.Trash)
             {
-                <p class="settings-empty-text">Trash never sends new-mail notifications or displays unread badges.</p>
+                var (resolvedTrashAuto, resolvedTrashDays) = TrashRetentionService.ResolveMailTrashPolicy(AccountId, AccountId != null ? folder.FullName : null);
+                <p class="@SettingsCssClasses.EmptyText">Trash never sends new-mail notifications or displays unread badges.</p>
+                <div class="@SettingsCssClasses.Row">
+                    <div class="@SettingsCssClasses.RowText">
+                        <label class="@SettingsCssClasses.RowLabel" for="@($"trash-auto-{folder.FullName}")">Auto-empty Trash</label>
+                        <span class="@SettingsCssClasses.RowHint">
+                            @(AccountId != null
+                                ? TrashRetentionService.BuildTrashHeaderDescription(folder)
+                                : "Default auto-empty policy for Trash folders across accounts.")
+                        </span>
+                    </div>
+                    <select id="@($"trash-auto-{folder.FullName}")" class="@SettingsCssClasses.EditorSelect"
+                            value="@(overrides.AutoEmptyTrash?.ToString() ?? "inherit")"
+                            @onchange="e => ChangeTrashAutoEmpty(folder, e.Value?.ToString())">
+                        <option value="inherit">@(AccountId == null ? "Use global setting" : "Inherit account / global") (@(resolvedTrashAuto ? "enabled" : "off"))</option>
+                        <option value="True">Enabled</option>
+                        <option value="False">Off</option>
+                    </select>
+                </div>
+                <div class="@SettingsCssClasses.Row">
+                    <div class="@SettingsCssClasses.RowText">
+                        <label class="@SettingsCssClasses.RowLabel">Delete messages older than (days)</label>
+                        <span class="@SettingsCssClasses.RowHint">Notifies the IMAP server via RFC 5464 METADATA when supported; otherwise whichever side deletes first wins.</span>
+                    </div>
+                    <div class="@SettingsCssClasses.Number">
+                        <CoreInput Type="number"
+                                   Disabled="@(!resolvedTrashAuto)"
+                                   Value="@resolvedTrashDays.ToString(CultureInfo.InvariantCulture)"
+                                   ValueChanged="v => ChangeTrashDays(folder, v)" />
+                    </div>
+                </div>
+                <SecondaryButton Disabled="@(overrides == new FolderPreferences())"
+                                 OnClick="@(() => SaveTrashRetention(folder, null))">
+                    ↩ @(AccountId == null ? "Reset to global Trash setting" : "Reset to inherited Trash policy")
+                </SecondaryButton>
             }
             else
             {
@@ -151,6 +186,28 @@
     void ChangeBadge(MailFolderData folder, string? selection) => Save(folder,
         FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName) with
         { ShowUnreadBadge = bool.TryParse(selection, out bool show) ? show : null });
+
+    void ChangeTrashAutoEmpty(MailFolderData folder, string? selection)
+    {
+        bool? auto = bool.TryParse(selection, out bool parsed) ? parsed : null;
+        SaveTrashRetention(folder,
+            FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName) with { AutoEmptyTrash = auto });
+    }
+
+    void ChangeTrashDays(MailFolderData folder, string? text)
+    {
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) || days <= 0)
+            return;
+        int clamped = TrashRetentionService.ClampDays(days, Stores.Settings.DefaultTrashRetentionDays);
+        SaveTrashRetention(folder,
+            FolderSettingsStore.GetOverrides(folder.Role, AccountId, folder.FullName) with { TrashRetentionDays = clamped });
+    }
+
+    void SaveTrashRetention(MailFolderData folder, FolderPreferences? preferences)
+    {
+        Save(folder, preferences);
+        TrashRetentionService.NotifySettingsUpdated(AccountId, AccountId != null ? folder.FullName : null);
+    }
 
     /// <summary>Reports persistence failures without claiming the controls were saved.</summary>
     /// <param name="folder">Edited scope.</param>

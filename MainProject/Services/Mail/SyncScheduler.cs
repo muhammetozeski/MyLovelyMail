@@ -53,6 +53,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public static void Start()
         {
             if (loopCancellation != null) return;
+            try { TrashRetentionService.RunMaintenance(); }
+            catch (Exception ex) { Log($"Initial Trash retention pass failed: {ex.Message}", LogLevel.Warning); }
             loopCancellation = new CancellationTokenSource();
             _ = LoopAsync(loopCancellation.Token);
         }
@@ -132,6 +134,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     catch (OperationCanceledException) { }
                     SnoozeService.WakeDue();
                     OfflineCacheTrimmer.TrimAll();
+                    TrashRetentionService.RunMaintenance();
                 }
             }
             finally

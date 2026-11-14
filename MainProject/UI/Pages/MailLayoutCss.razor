@@ -405,4 +405,26 @@
         box-shadow: inset 0 -@(AppMeasures.Border.Thick)px 0 0 @primary;
         background: @surfaceTint;
     }
+
+    .@(MailCssClasses.FolderRetentionTag) {
+        flex-shrink: 0;
+        font-size: @(AppMeasures.Font.XSmall)px;
+        font-weight: @(AppMeasures.Weight.Semibold);
+        color: @textMuted;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Pill)px;
+        padding: @(AppMeasures.Space.Px1)px @(AppMeasures.Space.Px6)px;
+        white-space: nowrap;
+        line-height: @(AppMeasures.LineHeight.Tight);
+    }
+
+    .@(MailCssClasses.DeletedFoldersBin) {
+        margin-top: @(AppMeasures.Space.Px4)px;
+        border-top: @(AppMeasures.Border.Thin)px dashed @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        padding-top: @(AppMeasures.Space.Px4)px;
+    }
+
+    .@(MailCssClasses.DeletedFoldersBinActive) {
+        background: @surfaceTint;
+    }
 </style>

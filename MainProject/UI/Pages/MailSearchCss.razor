@@ -72,7 +72,6 @@
         }
     }
 
-    .@(MailCssClasses.SearchToggle),
     .@(MailCssClasses.ActionBtn) {
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
         background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
@@ -88,41 +87,27 @@
         transition: all @(AppMeasures.Duration.Fast)s ease;
     }
 
-        .@(MailCssClasses.SearchToggle):hover:not(:disabled),
         .@(MailCssClasses.ActionBtn):hover:not(:disabled) {
             background: @surfaceTint;
             color: @textPrimary;
         }
 
-        .@(MailCssClasses.SearchToggle):disabled,
         .@(MailCssClasses.ActionBtn):disabled {
             opacity: @(AppMeasures.Opacity.Disabled);
             cursor: not-allowed;
         }
 
-    .@(MailCssClasses.SearchToggleIcon) {
-        padding: @(AppMeasures.Space.Px4)px @(AppMeasures.Space.Px8)px;
-    }
-
-    .@(MailCssClasses.SearchToggleCompact) {
-        padding: @(AppMeasures.Space.Px2)px @(AppMeasures.Space.Px8)px;
-        font-size: @(AppMeasures.Font.XSmall)px;
-    }
-
-    .@(MailCssClasses.SearchToggleOn),
     .@(MailCssClasses.ActionBtnActive) {
         background: linear-gradient(135deg, @primary, @AppColors.Accent.ToRgbaHex(true));
         color: @AppColors.TextOnAccent.ToRgbaHex(true);
         border-color: transparent;
     }
 
-    .@(MailCssClasses.SearchToggleDanger),
     .@(MailCssClasses.ActionBtnDanger) {
         color: @danger;
         border-color: @AppColors.TextDanger.WithAlpha(0.35f).ToRgbaHex(true);
     }
 
-        .@(MailCssClasses.SearchToggleDanger):hover:not(:disabled),
         .@(MailCssClasses.ActionBtnDanger):hover:not(:disabled) {
             background: @AppColors.TextDanger.WithAlpha(0.14f).ToRgbaHex(true);
             color: @danger;

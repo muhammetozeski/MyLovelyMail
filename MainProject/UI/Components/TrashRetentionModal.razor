@@ -1,0 +1,247 @@
+@inherits ModalBase
+@using System.Globalization
+@using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
+
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">@(IsDeletedFoldersBin ? "🗑️ Deleted Folders Auto-Delete" : "🗑️ Trash Auto-Delete")</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div class="@MailCssClasses.ModalBodyStack">
+    @if (!IsDeletedFoldersBin)
+    {
+        <div class="@MailCssClasses.ModalFieldBlock">
+            <span class="@MailCssClasses.ModalFieldLabel">Server auto-empty status</span>
+            <span class="@MailCssClasses.ModalFieldHint">@ServerStatusDescription</span>
+        </div>
+    }
+    else
+    {
+        <span class="@MailCssClasses.ModalFieldHint">
+            Deleted folders sit in their own Folder Trash bin until this timer expires. When no deleted folders remain, the Folder Trash bin deletes itself automatically.
+        </span>
+    }
+
+    <div class="@MailCssClasses.ModalRowBetween">
+        <div class="@MailCssClasses.ModalFieldBlock">
+            <span class="@MailCssClasses.ModalFieldLabel">@(IsDeletedFoldersBin ? "Auto-delete trashed folders" : "Auto-empty Trash in this app")</span>
+            <span class="@MailCssClasses.ModalFieldHint">@ScopeDescription</span>
+        </div>
+        <CoreToggle Checked="@AutoEnabled" CheckedChanged="@(v => AutoEnabled = v)" />
+    </div>
+
+    <div class="@MailCssClasses.ModalFieldBlock">
+        <span class="@MailCssClasses.ModalFieldLabel">Delete items older than (days)</span>
+        <div class="@MailCssClasses.ModalPresetBar">
+            @foreach (int preset in DayPresets)
+            {
+                <PillButton IsCompact="true"
+                            IsActive="@(AutoEnabled && Days == preset)"
+                            Disabled="@(!AutoEnabled)"
+                            OnClick="@(() => Days = preset)">
+                    @(preset)d
+                </PillButton>
+            }
+            <div class="@MailCssClasses.ModalNumberBox">
+                <CoreInput Type="number"
+                           Disabled="@(!AutoEnabled)"
+                           Value="@Days.ToString(CultureInfo.InvariantCulture)"
+                           ValueChanged="@OnDaysTextChanged" />
+            </div>
+        </div>
+    </div>
+
+    <div class="@MailCssClasses.ModalFooterActions">
+        @if (CanResetToInherited)
+        {
+            <SecondaryButton OnClick="@ResetToInherited">↺ Inherit default</SecondaryButton>
+        }
+        <SecondaryButton OnClick="@Close">Cancel</SecondaryButton>
+        <PrimaryButton OnClick="@Save">💾 Save</PrimaryButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsDeletedFoldersBin { get; set; }
+    [Parameter] public string? AccountId { get; set; }
+    [Parameter] public string? FolderFullName { get; set; }
+
+    static readonly int[] FolderBinPresets = [1, 2, 7, 14, 30];
+    static readonly int[] MailTrashPresets = [1, 2, 7, 14, 30, 90];
+
+    int[] DayPresets => IsDeletedFoldersBin ? FolderBinPresets : MailTrashPresets;
+
+    bool AutoEnabled { get; set; } = true;
+    int Days { get; set; } = 2;
+
+    MailAccountData? Account => string.IsNullOrWhiteSpace(AccountId) ? null : AccountStore.GetById(AccountId);
+
+    MailFolderData? TargetFolder => Account == null || string.IsNullOrWhiteSpace(FolderFullName)
+        ? null
+        : MessageStore.GetFolders(Account.Id).FirstOrDefault(f => string.Equals(f.FullName, FolderFullName, StringComparison.Ordinal));
+
+    bool CanResetToInherited
+    {
+        get
+        {
+            if (IsDeletedFoldersBin)
+            {
+                if (Account == null) return false;
+                var s = AccountStore.GetSettings(Account.Id);
+                return s.AutoPurgeDeletedFolders.IsOverridden || s.DeletedFolderRetentionDays.IsOverridden;
+            }
+            if (Account != null && !string.IsNullOrWhiteSpace(FolderFullName))
+            {
+                var ov = FolderSettingsStore.GetOverrides(FolderRole.Trash, Account.Id, FolderFullName);
+                var s = AccountStore.GetSettings(Account.Id);
+                return ov.AutoEmptyTrash != null || ov.TrashRetentionDays != null
+                    || s.AutoEmptyTrash.IsOverridden || s.TrashRetentionDays.IsOverridden;
+            }
+            if (Account != null)
+            {
+                var s = AccountStore.GetSettings(Account.Id);
+                return s.AutoEmptyTrash.IsOverridden || s.TrashRetentionDays.IsOverridden;
+            }
+            return false;
+        }
+    }
+
+    string ScopeDescription => Account != null
+        ? $"Applies to {Account.EmailAddress}" + (!IsDeletedFoldersBin && TargetFolder != null ? $" ({TargetFolder.DisplayName})" : "")
+        : "Global default across all accounts";
+
+    string ServerStatusDescription
+    {
+        get
+        {
+            if (TargetFolder is { IsLocal: true })
+                return "This Trash folder lives on this PC only (no server connection).";
+            if (TargetFolder?.ServerRetentionDays is > 0 and int srvDays)
+                return $"Server reported via IMAP METADATA: empties Trash after {srvDays} day(s). Saving notifies the server if writable.";
+            if (TargetFolder?.ServerSupportsRetentionMetadata == true)
+                return "Server supports RFC 5464 IMAP METADATA (no server limit currently set). Saving notifies the server.";
+            return "Server does not expose an auto-empty days protocol — whichever side deletes first wins.";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (IsDeletedFoldersBin)
+        {
+            var (autoPurge, days) = TrashRetentionService.ResolveDeletedFoldersPolicy(AccountId);
+            AutoEnabled = autoPurge;
+            Days = days;
+        }
+        else
+        {
+            var (autoEmpty, days) = TrashRetentionService.ResolveMailTrashPolicy(AccountId, FolderFullName);
+            AutoEnabled = autoEmpty;
+            Days = days;
+        }
+    }
+
+    void OnDaysTextChanged(string text)
+    {
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) && parsed > 0)
+            Days = TrashRetentionService.ClampDays(parsed, Days);
+    }
+
+    void ResetToInherited()
+    {
+        if (IsDeletedFoldersBin)
+        {
+            if (Account != null)
+            {
+                var s = AccountStore.GetSettings(Account.Id);
+                s.AutoPurgeDeletedFolders.ClearOverride();
+                s.DeletedFolderRetentionDays.ClearOverride();
+                s.Save();
+            }
+            TrashRetentionService.NotifySettingsUpdated(Account?.Id);
+            ModalService.CloseAll();
+            return;
+        }
+
+        if (Account != null)
+        {
+            if (!string.IsNullOrWhiteSpace(FolderFullName))
+            {
+                var ov = FolderSettingsStore.GetOverrides(FolderRole.Trash, Account.Id, FolderFullName) with
+                {
+                    AutoEmptyTrash = null,
+                    TrashRetentionDays = null
+                };
+                FolderSettingsStore.Save(FolderRole.Trash, ov, Account.Id, FolderFullName);
+            }
+            var s = AccountStore.GetSettings(Account.Id);
+            s.AutoEmptyTrash.ClearOverride();
+            s.TrashRetentionDays.ClearOverride();
+            s.Save();
+            TrashRetentionService.NotifySettingsUpdated(Account.Id, FolderFullName);
+        }
+        ModalService.CloseAll();
+    }
+
+    void Save()
+    {
+        int clamped = TrashRetentionService.ClampDays(
+            Days,
+            IsDeletedFoldersBin ? GlobalSettings.DefaultDeletedFolderRetentionDays : GlobalSettings.DefaultTrashRetentionDays);
+
+        if (IsDeletedFoldersBin)
+        {
+            if (Account != null)
+            {
+                var s = AccountStore.GetSettings(Account.Id);
+                s.AutoPurgeDeletedFolders.Value = AutoEnabled;
+                s.DeletedFolderRetentionDays.Value = clamped;
+                s.Save();
+            }
+            else
+            {
+                GlobalSettings.AutoPurgeDeletedFolders.Set(AutoEnabled);
+                GlobalSettings.DeletedFolderRetentionDays.Set(clamped);
+                SettingsManager.SaveSettings();
+            }
+            TrashRetentionService.NotifySettingsUpdated(Account?.Id);
+            MouseActionService.ReportStatus(AutoEnabled
+                ? $"Deleted folders will auto-purge after {clamped} day(s)."
+                : "Deleted folders auto-delete turned off.");
+            ModalService.CloseAll();
+            return;
+        }
+
+        if (Account != null && !string.IsNullOrWhiteSpace(FolderFullName))
+        {
+            var ov = FolderSettingsStore.GetOverrides(FolderRole.Trash, Account.Id, FolderFullName) with
+            {
+                AutoEmptyTrash = AutoEnabled,
+                TrashRetentionDays = clamped
+            };
+            FolderSettingsStore.Save(FolderRole.Trash, ov, Account.Id, FolderFullName);
+            TrashRetentionService.NotifySettingsUpdated(Account.Id, FolderFullName);
+        }
+        else if (Account != null)
+        {
+            var s = AccountStore.GetSettings(Account.Id);
+            s.AutoEmptyTrash.Value = AutoEnabled;
+            s.TrashRetentionDays.Value = clamped;
+            s.Save();
+            TrashRetentionService.NotifySettingsUpdated(Account.Id);
+        }
+        else
+        {
+            GlobalSettings.AutoEmptyTrash.Set(AutoEnabled);
+            GlobalSettings.TrashRetentionDays.Set(clamped);
+            SettingsManager.SaveSettings();
+            TrashRetentionService.NotifySettingsUpdated();
+        }
+
+        MouseActionService.ReportStatus(AutoEnabled
+            ? $"Trash auto-delete set to {clamped} day(s)."
+            : "Trash auto-delete turned off.");
+        ModalService.CloseAll();
+    }
+
+    static void Close() => ModalService.Close();
+}

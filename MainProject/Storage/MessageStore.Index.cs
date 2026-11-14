@@ -163,6 +163,9 @@ namespace MyLovelyMail.MainProject.Storage
         public static void UpsertSummaries(string accountId, string folderFullName, IEnumerable<MailMessageSummary> summaries)
         {
             var index = GetIndex(accountId, folderFullName);
+            var folderMeta = GetFolders(accountId).FirstOrDefault(f => string.Equals(f.FullName, folderFullName, StringComparison.Ordinal));
+            bool stampIncrementalTrashArrival = folderMeta is { Role: FolderRole.Trash, LastSyncedUtc: not null };
+            DateTime nowUtc = DateTime.UtcNow;
             foreach (var summary in summaries)
             {
                 if (index.Summaries.TryGetValue(summary.Uid, out var stored) && !ReferenceEquals(stored, summary))
@@ -170,6 +173,10 @@ namespace MyLovelyMail.MainProject.Storage
                     CarryOverLocalState(stored, summary);
                     if (pendingFlagPushes.ContainsKey(PendingKey(accountId, folderFullName, summary.Uid)))
                         summary.Flags = summary.Flags & ~ServerOwnedFlags | stored.Flags & ServerOwnedFlags;
+                }
+                else if (stampIncrementalTrashArrival && !index.Summaries.ContainsKey(summary.Uid))
+                {
+                    summary.TrashedAtUtc ??= nowUtc;
                 }
                 index.Summaries[summary.Uid] = summary;
             }
@@ -187,6 +194,7 @@ namespace MyLovelyMail.MainProject.Storage
         static void CarryOverLocalState(MailMessageSummary stored, MailMessageSummary incoming)
         {
             incoming.SnoozedUntilUtc ??= stored.SnoozedUntilUtc;
+            incoming.TrashedAtUtc ??= stored.TrashedAtUtc;
             if (incoming.Tags.Count == 0 && stored.Tags.Count > 0) incoming.Tags = stored.Tags;
             incoming.Flags |= stored.Flags & (MailFlags.Important | MailFlags.Muted);
         }

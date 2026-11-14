@@ -65,6 +65,18 @@ namespace MyLovelyMail.MainProject.Stores
         /// <inheritdoc cref="Settings.DeleteAction"/>
         public readonly InheritedSetting<DeleteBehavior> DeleteAction = new(Settings.DeleteAction);
 
+        /// <inheritdoc cref="Settings.AutoPurgeDeletedFolders"/>
+        public readonly InheritedSetting<bool> AutoPurgeDeletedFolders = new(Settings.AutoPurgeDeletedFolders);
+
+        /// <inheritdoc cref="Settings.DeletedFolderRetentionDays"/>
+        public readonly InheritedSetting<int> DeletedFolderRetentionDays = new(Settings.DeletedFolderRetentionDays);
+
+        /// <inheritdoc cref="Settings.AutoEmptyTrash"/>
+        public readonly InheritedSetting<bool> AutoEmptyTrash = new(Settings.AutoEmptyTrash);
+
+        /// <inheritdoc cref="Settings.TrashRetentionDays"/>
+        public readonly InheritedSetting<int> TrashRetentionDays = new(Settings.TrashRetentionDays);
+
         /// <inheritdoc cref="Settings.Signature"/>
         public readonly InheritedSetting<string> Signature = new(Settings.Signature);
 

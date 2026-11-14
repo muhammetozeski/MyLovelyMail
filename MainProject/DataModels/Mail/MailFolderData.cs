@@ -84,5 +84,14 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
 
         /// <summary>Whether child folders nested under this folder are expanded in the sidebar tree.</summary>
         public bool IsExpanded { get; set; } = true;
+
+        /// <summary>
+        /// Server-reported auto-expunge retention in days (learned via RFC 5464 IMAP METADATA when supported);
+        /// null when the server does not expose a retention protocol or has no expire value set.
+        /// </summary>
+        public int? ServerRetentionDays { get; set; }
+
+        /// <summary>True when the server advertised mailbox METADATA support during the last folder sync.</summary>
+        public bool ServerSupportsRetentionMetadata { get; set; }
     }
 }

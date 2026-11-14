@@ -220,6 +220,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             UiCustomizationStore.OnChanged += HandleSyncStateChanged;
             TagStore.OnTagsChanged += HandleSyncStateChanged;
             ListViewState.OnChanged += HandleListViewStateChanged;
+            DeletedFolderStore.OnChanged += HandleDeletedFoldersChanged;
+            FolderSettingsStore.OnChanged += HandleSyncStateChanged;
+            TrashRetentionService.OnRetentionChanged += HandleSyncStateChanged;
             ActionDragService.SurfaceInspector = InspectUiSurface;
             WorkspaceDragService.OnMailFoldersReordered = () => InvokeAsync(RefreshSidebarFolders);
 
@@ -244,6 +247,9 @@ namespace MyLovelyMail.MainProject.UI.Pages
             UiCustomizationStore.OnChanged -= HandleSyncStateChanged;
             TagStore.OnTagsChanged -= HandleSyncStateChanged;
             ListViewState.OnChanged -= HandleListViewStateChanged;
+            DeletedFolderStore.OnChanged -= HandleDeletedFoldersChanged;
+            FolderSettingsStore.OnChanged -= HandleSyncStateChanged;
+            TrashRetentionService.OnRetentionChanged -= HandleSyncStateChanged;
             if (ReferenceEquals(ActionDragService.SurfaceInspector?.Target, this))
                 ActionDragService.SurfaceInspector = null;
             if (ReferenceEquals(WorkspaceDragService.OnMailFoldersReordered?.Target, this))
@@ -253,6 +259,33 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleModalServiceChanged() => InvokeAsync(StateHasChanged);
         void HandleListViewStateChanged() => InvokeAsync(() => { RefreshLists(); StateHasChanged(); });
+
+        void HandleDeletedFoldersChanged() => InvokeAsync(() =>
+        {
+            if (MailUiState.IsViewingDeletedFolders)
+            {
+                bool stillHasItems = MailUiState.DeletedFoldersAccountFilter is { Length: > 0 } accId
+                    ? DeletedFolderStore.HasForAccount(accId)
+                    : DeletedFolderStore.HasAccountGroups;
+
+                if (!stillHasItems)
+                {
+                    if (MailUiState.SelectedAccount is { } acc)
+                    {
+                        var fallback = FolderMemoryStore.ResolveStartFolder(
+                            FolderMemoryStore.FolderOf(acc.Id),
+                            MessageStore.GetFolders(acc.Id));
+                        MailUiState.SelectFolder(fallback);
+                    }
+                    else
+                    {
+                        TrySelectFirstAccount();
+                    }
+                }
+            }
+            RefreshSidebarFolders();
+            StateHasChanged();
+        });
 
         bool TrySelectFirstAccount()
         {
@@ -591,17 +624,30 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         internal static string FolderFreshness(MailFolderData folder)
         {
-            if (folder.IsLocal) return "Local folder — nothing to sync";
-            if (folder.LastSyncedUtc is not { } synced) return "Messages not fetched yet";
-
-            var age = DateTime.UtcNow - synced;
-            return age switch
+            string syncText;
+            if (folder.IsLocal)
             {
-                { TotalMinutes: < 2 } => "Messages up to date",
-                { TotalHours: < 1 } => $"Messages from {(int)age.TotalMinutes} minutes ago",
-                { TotalDays: < 1 } => $"Messages from {(int)age.TotalHours} hours ago",
-                _ => $"Messages from {(int)age.TotalDays} days ago"
-            };
+                syncText = "Local folder — nothing to sync";
+            }
+            else if (folder.LastSyncedUtc is not { } synced)
+            {
+                syncText = "Messages not fetched yet";
+            }
+            else
+            {
+                var age = DateTime.UtcNow - synced;
+                syncText = age switch
+                {
+                    { TotalMinutes: < 2 } => "Messages up to date",
+                    { TotalHours: < 1 } => $"Messages from {(int)age.TotalMinutes} minutes ago",
+                    { TotalDays: < 1 } => $"Messages from {(int)age.TotalHours} hours ago",
+                    _ => $"Messages from {(int)age.TotalDays} days ago"
+                };
+            }
+
+            return folder.Role == FolderRole.Trash
+                ? $"{TrashRetentionService.BuildTrashHeaderDescription(folder)}\n{syncText}"
+                : syncText;
         }
 
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>

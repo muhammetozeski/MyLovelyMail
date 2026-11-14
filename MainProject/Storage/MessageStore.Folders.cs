@@ -120,9 +120,15 @@ namespace MyLovelyMail.MainProject.Storage
 
             var existingList = GetFolders(folder.AccountId);
             var existing = existingList.FirstOrDefault(f => string.Equals(f.FullName, folder.FullName, StringComparison.Ordinal));
-            if (existing != null && folder.SortOrder == 0 && existing.SortOrder > 0)
+            if (existing != null)
             {
-                folder.SortOrder = existing.SortOrder;
+                if (folder.SortOrder == 0 && existing.SortOrder > 0)
+                    folder.SortOrder = existing.SortOrder;
+                if (folder.ServerRetentionDays == null && existing.ServerRetentionDays != null && !folder.ServerSupportsRetentionMetadata)
+                {
+                    folder.ServerRetentionDays = existing.ServerRetentionDays;
+                    folder.ServerSupportsRetentionMetadata = existing.ServerSupportsRetentionMetadata;
+                }
             }
 
             string dir = FolderCachePath(folder.AccountId, folder.FullName);
@@ -138,6 +144,17 @@ namespace MyLovelyMail.MainProject.Storage
                     else list.Add(folder);
                 }
             }
+        }
+
+        /// <summary>Evicts cached folder and index state for an account/folder after disk-level restore or rename.</summary>
+        public static void InvalidateFolderCache(string accountId, string? folderFullName = null)
+        {
+            if (string.IsNullOrWhiteSpace(accountId)) return;
+            lock (FolderCacheLock)
+                FolderCache.TryRemove(accountId, out _);
+            if (!string.IsNullOrWhiteSpace(folderFullName))
+                Indexes.TryRemove(FolderKey(accountId, folderFullName), out _);
+            OnFolderChanged?.Invoke(accountId, folderFullName ?? InboxFullName);
         }
 
         /// <summary>Toggles and persists whether a mail folder's children are expanded in the sidebar tree.</summary>

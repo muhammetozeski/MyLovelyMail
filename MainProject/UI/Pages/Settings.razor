@@ -295,6 +295,74 @@
         </div>
     </GlassCard>
 
+    <GlassCard CustomClass="@SettingsCssClasses.Section">
+        <div class="@SettingsCssClasses.SectionTitle">🗑️ Trash &amp; Folder Retention</div>
+
+        <div class="@SettingsCssClasses.Row">
+            <div class="@SettingsCssClasses.RowText">
+                <span class="@SettingsCssClasses.RowLabel">Auto-delete trashed folders</span>
+                <span class="@SettingsCssClasses.RowHint">Deleted folders move to a dedicated Folder Trash bin first; when no deleted folders remain, the Folder Trash bin deletes itself automatically</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.AutoPurgeDeletedFolders.Value" CheckedChanged="@SetAutoPurgeDeletedFolders" />
+        </div>
+
+        <div class="@SettingsCssClasses.Row">
+            <div class="@SettingsCssClasses.RowText">
+                <span class="@SettingsCssClasses.RowLabel">Deleted Folders retention (days)</span>
+                <span class="@SettingsCssClasses.RowHint">Default: @(GlobalSettings.DefaultDeletedFolderRetentionDays) days · Folders stay recoverable in Folder Trash until this period expires</span>
+            </div>
+            <div class="@SettingsCssClasses.FinetuneControls">
+                @foreach (int preset in DeletedFolderRetentionPresets)
+                {
+                    <PillButton IsCompact="true"
+                                IsActive="@(GlobalSettings.AutoPurgeDeletedFolders.Value && GlobalSettings.DeletedFolderRetentionDays.Value == preset)"
+                                Disabled="@(!GlobalSettings.AutoPurgeDeletedFolders.Value)"
+                                OnClick="@(() => SetDeletedFolderRetentionDays(preset.ToString(CultureInfo.InvariantCulture)))">
+                        @(preset)d
+                    </PillButton>
+                }
+                <div class="@SettingsCssClasses.Number">
+                    <CoreInput Type="number"
+                               Disabled="@(!GlobalSettings.AutoPurgeDeletedFolders.Value)"
+                               Value="@GlobalSettings.DeletedFolderRetentionDays.Value.ToString(CultureInfo.InvariantCulture)"
+                               ValueChanged="@SetDeletedFolderRetentionDays" />
+                </div>
+            </div>
+        </div>
+
+        <div class="@SettingsCssClasses.Row">
+            <div class="@SettingsCssClasses.RowText">
+                <span class="@SettingsCssClasses.RowLabel">Auto-empty mail Trash</span>
+                <span class="@SettingsCssClasses.RowHint">Deletes messages in Trash older than the configured days. Notifies servers supporting RFC 5464 IMAP METADATA; otherwise whichever side deletes first wins</span>
+            </div>
+            <CoreToggle Checked="@GlobalSettings.AutoEmptyTrash.Value" CheckedChanged="@SetAutoEmptyTrash" />
+        </div>
+
+        <div class="@SettingsCssClasses.Row">
+            <div class="@SettingsCssClasses.RowText">
+                <span class="@SettingsCssClasses.RowLabel">Mail Trash retention (days)</span>
+                <span class="@SettingsCssClasses.RowHint">Default: @(GlobalSettings.DefaultTrashRetentionDays) days · Can also be overridden per account or per Trash folder</span>
+            </div>
+            <div class="@SettingsCssClasses.FinetuneControls">
+                @foreach (int preset in TrashRetentionPresets)
+                {
+                    <PillButton IsCompact="true"
+                                IsActive="@(GlobalSettings.AutoEmptyTrash.Value && GlobalSettings.TrashRetentionDays.Value == preset)"
+                                Disabled="@(!GlobalSettings.AutoEmptyTrash.Value)"
+                                OnClick="@(() => SetTrashRetentionDays(preset.ToString(CultureInfo.InvariantCulture)))">
+                        @(preset)d
+                    </PillButton>
+                }
+                <div class="@SettingsCssClasses.Number">
+                    <CoreInput Type="number"
+                               Disabled="@(!GlobalSettings.AutoEmptyTrash.Value)"
+                               Value="@GlobalSettings.TrashRetentionDays.Value.ToString(CultureInfo.InvariantCulture)"
+                               ValueChanged="@SetTrashRetentionDays" />
+                </div>
+            </div>
+        </div>
+    </GlassCard>
+
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">📦 Data &amp; migration</div>
         <div class="settings-row">

@@ -47,6 +47,8 @@
             || descriptor.ComponentType == typeof(UiCustomizerModal))
             return ModalSize.Wide;
         if (descriptor.ComponentType == typeof(AccountFolderModal)
+            || descriptor.ComponentType == typeof(MailboxFolderModal)
+            || descriptor.ComponentType == typeof(TrashRetentionModal)
             || descriptor.ComponentType == typeof(AccountNoteModal)
             || descriptor.ComponentType == typeof(ConfirmDialogModal)
             || descriptor.ComponentType == typeof(ShortcutHelpModal))

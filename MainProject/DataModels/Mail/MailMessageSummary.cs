@@ -55,6 +55,9 @@ namespace MyLovelyMail.MainProject.DataModels.Mail
         /// <summary>Hidden from the lists until this moment, then it comes back unread. Null = not snoozed.</summary>
         public DateTime? SnoozedUntilUtc { get; set; }
 
+        /// <summary>UTC moment when this message entered Trash in the app; null when not in Trash or trashed externally.</summary>
+        public DateTime? TrashedAtUtc { get; set; }
+
         public bool IsUnread => !Flags.HasFlag(MailFlags.Seen);
     }
 }

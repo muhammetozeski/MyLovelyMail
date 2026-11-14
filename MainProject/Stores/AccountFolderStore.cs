@@ -250,6 +250,102 @@ public static class AccountFolderStore
         OnFoldersChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Soft-deletes an account group folder into <see cref="DeletedFolderStore"/> while keeping its
+    /// accounts safely reassigned to the parent/default group (recording them so restore puts them back).
+    /// </summary>
+    public static DeletedFolderEntry? MoveFolderToTrash(string folderId)
+    {
+        if (IsDefaultFolder(folderId)) return null;
+
+        var target = folders.FirstOrDefault(f => string.Equals(f.Id, folderId, StringComparison.OrdinalIgnoreCase));
+        if (target == null) return null;
+
+        string fallbackFolderId = string.IsNullOrWhiteSpace(target.ParentFolderId)
+            ? DefaultFolderId
+            : NormalizeFolderId(target.ParentFolderId);
+
+        List<string> reparentedChildIds = [];
+        foreach (var child in folders.Where(f => string.Equals(f.ParentFolderId, target.Id, StringComparison.OrdinalIgnoreCase)))
+        {
+            child.ParentFolderId = target.ParentFolderId;
+            reparentedChildIds.Add(child.Id);
+        }
+
+        List<string> reassignedAccountIds = [.. AccountStore.Accounts
+            .Where(a => string.Equals(a.FolderId, target.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(static a => a.Id)];
+
+        var snapshot = new AccountFolderData
+        {
+            Id = target.Id,
+            Name = target.Name,
+            ParentFolderId = target.ParentFolderId,
+            IsExpanded = target.IsExpanded,
+            SortOrder = target.SortOrder
+        };
+
+        folders.Remove(target);
+        SaveToDisk();
+
+        AccountStore.ReassignFolder(target.Id, fallbackFolderId);
+        OnFoldersChanged?.Invoke();
+
+        var entry = new DeletedFolderEntry
+        {
+            Kind = DeletedFolderKind.AccountGroup,
+            DisplayName = snapshot.Name,
+            FullPathLabel = snapshot.Name,
+            DeletedAtUtc = DateTime.UtcNow,
+            AccountFolder = snapshot,
+            FallbackFolderId = fallbackFolderId,
+            ReassignedAccountIds = reassignedAccountIds,
+            ReparentedChildFolderIds = reparentedChildIds
+        };
+        DeletedFolderStore.Add(entry);
+        return entry;
+    }
+
+    /// <summary>Restores a soft-deleted account group folder from <see cref="DeletedFolderStore"/>.</summary>
+    public static bool RestoreDeletedFolder(DeletedFolderEntry entry)
+    {
+        if (entry?.Kind != DeletedFolderKind.AccountGroup || entry.AccountFolder == null)
+            return false;
+
+        var restored = new AccountFolderData
+        {
+            Id = string.IsNullOrWhiteSpace(entry.AccountFolder.Id) ? Guid.NewGuid().ToString("D") : entry.AccountFolder.Id,
+            Name = string.IsNullOrWhiteSpace(entry.AccountFolder.Name) ? "Restored Folder" : entry.AccountFolder.Name,
+            ParentFolderId = string.IsNullOrWhiteSpace(entry.AccountFolder.ParentFolderId)
+                ? null
+                : (folders.Any(f => string.Equals(f.Id, entry.AccountFolder.ParentFolderId, StringComparison.OrdinalIgnoreCase))
+                    ? entry.AccountFolder.ParentFolderId
+                    : null),
+            IsExpanded = true,
+            SortOrder = entry.AccountFolder.SortOrder
+        };
+
+        folders.RemoveAll(f => string.Equals(f.Id, restored.Id, StringComparison.OrdinalIgnoreCase));
+        folders.Add(restored);
+
+        foreach (string childId in entry.ReparentedChildFolderIds)
+        {
+            var child = folders.FirstOrDefault(f => string.Equals(f.Id, childId, StringComparison.OrdinalIgnoreCase));
+            if (child != null && !CreatesCycle(child.Id, restored.Id))
+                child.ParentFolderId = restored.Id;
+        }
+
+        folders.Sort(CompareFolders);
+        SaveToDisk();
+
+        if (entry.ReassignedAccountIds.Count > 0)
+            AccountStore.RestoreAccountsToFolder(entry.ReassignedAccountIds, entry.FallbackFolderId, restored.Id);
+
+        DeletedFolderStore.RemovePermanently(entry.Id);
+        OnFoldersChanged?.Invoke();
+        return true;
+    }
+
     public static bool DeleteFolder(string folderId)
     {
         if (IsDefaultFolder(folderId)) return false;

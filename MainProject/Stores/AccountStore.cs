@@ -28,6 +28,7 @@ namespace MyLovelyMail.MainProject.Stores
         public static void Load()
         {
             AccountFolderStore.Load();
+            DeletedFolderStore.Load();
             accounts.Clear();
             string accountsRoot = Path.Combine(AppPaths.UserData, AccountSettings.AccountsFolderName);
             if (!Directory.Exists(accountsRoot)) return;
@@ -209,6 +210,26 @@ namespace MyLovelyMail.MainProject.Stores
                 OnAccountsChanged?.Invoke();
         }
 
+        /// <summary>Restores accounts back into a restored folder if they have not been manually moved elsewhere.</summary>
+        internal static void RestoreAccountsToFolder(IReadOnlyCollection<string> accountIds, string fallbackFolderId, string restoredFolderId)
+        {
+            string normalizedRestored = AccountFolderStore.NormalizeFolderId(restoredFolderId);
+            var idSet = new HashSet<string>(accountIds, StringComparer.OrdinalIgnoreCase);
+            bool anyChanged = false;
+            foreach (var account in accounts)
+            {
+                if (idSet.Contains(account.Id)
+                    && (string.IsNullOrWhiteSpace(fallbackFolderId) || string.Equals(account.FolderId, fallbackFolderId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    account.FolderId = normalizedRestored;
+                    WriteAccountFile(account);
+                    anyChanged = true;
+                }
+            }
+            if (anyChanged)
+                OnAccountsChanged?.Invoke();
+        }
+
         /// <summary>Adds a new account or persists changes of an existing one, then notifies the UI.</summary>
         public static void Save(MailAccountData account)
         {
@@ -242,6 +263,7 @@ namespace MyLovelyMail.MainProject.Stores
             accounts.RemoveAll(a => a.Id == accountId);
             settingsById.TryRemove(accountId, out _);
             FolderMemoryStore.Forget(accountId);
+            DeletedFolderStore.RemoveAllForAccount(accountId);
             Services.Mail.OutboxAttemptStore.ForgetAccount(accountId);
             Services.Tor.TorService.ReleaseAccountCircuit(accountId);
             try

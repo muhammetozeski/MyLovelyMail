@@ -480,4 +480,140 @@
     .@(MailCssClasses.RowAttach) {
         margin-right: @(AppMeasures.Space.Px4)px;
     }
+
+    .@(MailCssClasses.TrashPolicyBanner) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+    }
+
+    .@(MailCssClasses.TrashPolicyText) {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textSecondary;
+        font-weight: @(AppMeasures.Weight.Medium);
+    }
+
+    .@(MailCssClasses.TrashPolicyActions) {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(MailCssClasses.DeletedFolderCard) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px10)px;
+        padding: @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+    }
+
+    .@(MailCssClasses.DeletedFolderMain) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px4)px;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .@(MailCssClasses.DeletedFolderTitle) {
+        font-size: @(AppMeasures.Font.Normal)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .@(MailCssClasses.DeletedFolderMeta) {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+    }
+
+    .@(MailCssClasses.DeletedFolderActions) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-shrink: 0;
+    }
+
+    .@(MailCssClasses.ModalBodyStack) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px14)px;
+    }
+
+    .@(MailCssClasses.ModalFieldBlock) {
+        display: flex;
+        flex-direction: column;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(MailCssClasses.ModalFieldLabel) {
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Bold);
+        color: @textPrimary;
+    }
+
+    .@(MailCssClasses.ModalFieldHint) {
+        font-size: @(AppMeasures.Font.Small)px;
+        color: @textMuted;
+        line-height: @(AppMeasures.LineHeight.Snug);
+    }
+
+    .@(MailCssClasses.ModalRowBetween) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: @(AppMeasures.Space.Px12)px;
+    }
+
+    .@(MailCssClasses.ModalPresetBar) {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+    }
+
+    .@(MailCssClasses.ModalSelectInput) {
+        width: @(AppMeasures.Percent.Full)%;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        border: @(AppMeasures.Border.Thin)px solid @glassBorder;
+        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
+        color: @textPrimary;
+        font-size: @(AppMeasures.Font.Normal)px;
+        outline: none;
+    }
+
+    .@(MailCssClasses.ModalFooterActions) {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px8)px;
+        margin-top: @(AppMeasures.Space.Px8)px;
+    }
+
+    .@(MailCssClasses.ModalErrorBanner) {
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Small)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.TextDanger.ToRgbaHex(true);
+        color: @AppColors.TextDanger.ToRgbaHex(true);
+        font-size: @(AppMeasures.Font.Small)px;
+    }
+
+    .@(MailCssClasses.ModalNumberBox) {
+        width: @(AppMeasures.Size.Px110)px;
+    }
 </style>

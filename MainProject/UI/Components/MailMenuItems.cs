@@ -16,6 +16,7 @@ internal static class MailMenuItems
             new("📬 Select account", () => MailUiState.SelectAccount(account, restoreFolder: true), actionId: "Account.Select"),
             new("✏️ New message from this account", () => MouseActionService.RunAsync(MouseActionService.ComposeAction, account.Id), actionId: "Account.Compose"),
             new("🔄 Sync this account now", () => MouseActionService.RunAsync(MouseActionService.AccountSyncAction, account.Id), actionId: "Account.Sync"),
+            new("📁+ New mail folder…", () => ModalService.OpenCreateMailFolder(account.Id), actionId: "Account.NewMailFolder"),
             new("🏷️ Edit title, note & folder", () => ModalService.OpenAccountNote(account.Id), actionId: "Account.EditNote"),
             new("⚙️ Account settings", () => NavigationBridge.TryNavigate(AccountSettingsPage.RouteFor(account.Id)), actionId: "Account.Settings"),
             new("🪄 Rules for this account", () => NavigationBridge.TryNavigate(FilterRules.LinkFor(accountId: account.Id)), actionId: "Account.Rules"),
@@ -37,7 +38,32 @@ internal static class MailMenuItems
             new("➕ Add account here", () => ModalService.OpenAddAccount(folder.Id), actionId: "AccGroup.AddAccount"),
             new("⚡ New Fast Mail here", () => ModalService.OpenFastMail(folder.Id), actionId: "AccGroup.NewFastMail"),
             new("🪄 Rules for this account group", () => NavigationBridge.TryNavigate(FilterRules.LinkFor(accountFolderId: folder.Id)), actionId: "AccGroup.Rules"),
-            new("🗑️ Delete folder (keep accounts)", () => { AccountFolderStore.DeleteFolder(folder.Id); return Task.CompletedTask; }, Enabled: !isDefault, ActionId: "AccGroup.Delete")
+            new("🗑️ Delete folder…", () => ConfirmAndTrashAccountGroupAsync(folder), Enabled: !isDefault, ActionId: "AccGroup.Delete")
         ];
+    }
+
+    public static async Task ConfirmAndTrashAccountGroupAsync(AccountFolderData folder)
+    {
+        if (AccountFolderStore.IsDefaultFolder(folder.Id)) return;
+
+        var (autoPurge, days) = TrashRetentionService.ResolveDeletedFoldersPolicy();
+        string parentName = folder.ParentFolderId is { Length: > 0 } pid && AccountFolderStore.GetById(pid) is { } parent
+            ? parent.Name
+            : "Accounts";
+        string retentionLine = autoPurge
+            ? $"It will move to Deleted Folders Trash and be permanently deleted after {days} day(s)."
+            : "It will move to Deleted Folders Trash (auto-delete is currently off).";
+
+        bool confirmed = await ModalService.ConfirmAsync(
+            $"Delete folder '{folder.Name}'?",
+            $"Are you sure you want to delete account group folder '{folder.Name}'? Any accounts inside will remain safe under '{parentName}'.\n\n{retentionLine}",
+            confirmLabel: "🗑️ Move to Folder Trash",
+            cancelLabel: "Cancel",
+            isDanger: true);
+
+        if (!confirmed) return;
+
+        if (AccountFolderStore.MoveFolderToTrash(folder.Id) != null)
+            MouseActionService.ReportStatus($"Moved folder '{folder.Name}' to Deleted Folders Trash.");
     }
 }

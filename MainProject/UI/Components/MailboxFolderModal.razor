@@ -1,0 +1,141 @@
+@inherits ModalBase
+
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">@(IsRename ? "✏️ Rename Mail Folder" : "📁+ New Mail Folder")</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div class="@MailCssClasses.ModalBodyStack">
+    @if (Account == null)
+    {
+        <div class="@MailCssClasses.ModalErrorBanner">The selected account no longer exists.</div>
+    }
+    else
+    {
+        <div class="@MailCssClasses.ModalFieldBlock">
+            <span class="@MailCssClasses.ModalFieldLabel">Folder name</span>
+            <CoreInput Placeholder="e.g. Receipts / Projects / Important" Icon="📁" @bind-Value="FolderName" />
+        </div>
+
+        @if (!IsRename && Account.Protocol == IncomingProtocol.Imap)
+        {
+            <div class="@MailCssClasses.ModalFieldBlock">
+                <span class="@MailCssClasses.ModalFieldLabel">Where should this folder live?</span>
+                <div class="@MailCssClasses.ModalPresetBar">
+                    <PillButton IsActive="@(!CreateLocalOnly)" OnClick="@(() => CreateLocalOnly = false)">🌐 Mail server (@Account.IncomingHost)</PillButton>
+                    <PillButton IsActive="@CreateLocalOnly" OnClick="@(() => CreateLocalOnly = true)">💻 This PC only</PillButton>
+                </div>
+            </div>
+
+            @if (!CreateLocalOnly)
+            {
+                <div class="@MailCssClasses.ModalFieldBlock">
+                    <span class="@MailCssClasses.ModalFieldLabel">Parent folder (optional)</span>
+                    <select class="@MailCssClasses.ModalSelectInput" @bind="SelectedParentFullName">
+                        <option value="">— Top level —</option>
+                        @foreach (var node in ServerFolderNodes)
+                        {
+                            <option value="@node.Folder.FullName">@(new string('—', node.Depth)) 📁 @node.Folder.DisplayName</option>
+                        }
+                    </select>
+                </div>
+            }
+        }
+        else if (!IsRename)
+        {
+            <span class="@MailCssClasses.ModalFieldHint">
+                @Account.EmailAddress uses @Account.Protocol, so custom folders are stored locally on this PC.
+            </span>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ErrorText))
+        {
+            <div class="@MailCssClasses.ModalErrorBanner">@ErrorText</div>
+        }
+    }
+
+    <div class="@MailCssClasses.ModalFooterActions">
+        <SecondaryButton OnClick="@Close" Disabled="@IsBusy">Cancel</SecondaryButton>
+        <PrimaryButton OnClick="@SaveAsync" Disabled="@(IsBusy || Account == null || string.IsNullOrWhiteSpace(FolderName))">
+            @(IsBusy ? "Saving…" : "💾 Save")
+        </PrimaryButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string AccountId { get; set; } = string.Empty;
+    [Parameter] public bool IsRename { get; set; }
+    [Parameter] public string? TargetFolderFullName { get; set; }
+    [Parameter] public string? InitialParentFullName { get; set; }
+
+    string FolderName { get; set; } = string.Empty;
+    string SelectedParentFullName { get; set; } = string.Empty;
+    bool CreateLocalOnly { get; set; }
+    bool IsBusy { get; set; }
+    string? ErrorText { get; set; }
+
+    MailAccountData? Account => AccountStore.GetById(AccountId);
+
+    MailFolderData? TargetFolder => string.IsNullOrWhiteSpace(TargetFolderFullName)
+        ? null
+        : MessageStore.GetFolders(AccountId).FirstOrDefault(f => string.Equals(f.FullName, TargetFolderFullName, StringComparison.Ordinal));
+
+    List<FolderNode> ServerFolderNodes =>
+        Account == null
+            ? []
+            : FolderTreeService.Build(
+                [.. MessageStore.GetFolders(Account.Id).Where(static f => !f.IsLocal)],
+                respectCollapsed: false);
+
+    protected override void OnParametersSet()
+    {
+        ErrorText = null;
+        if (IsRename && TargetFolder is { } target)
+        {
+            FolderName = target.DisplayName;
+        }
+        else
+        {
+            FolderName = string.Empty;
+            CreateLocalOnly = Account?.Protocol != IncomingProtocol.Imap;
+            SelectedParentFullName = InitialParentFullName ?? string.Empty;
+        }
+    }
+
+    async Task SaveAsync()
+    {
+        if (Account is not { } account || string.IsNullOrWhiteSpace(FolderName)) return;
+        IsBusy = true;
+        ErrorText = null;
+        try
+        {
+            if (IsRename)
+            {
+                if (TargetFolder is not { } target)
+                    throw new InvalidOperationException("The folder no longer exists.");
+                var renamed = await MailFolderManagementService.RenameFolderAsync(account, target, FolderName);
+                MouseActionService.ReportStatus($"Renamed folder to '{renamed.DisplayName}'.");
+            }
+            else
+            {
+                bool isLocal = CreateLocalOnly || account.Protocol != IncomingProtocol.Imap;
+                string? parent = isLocal || string.IsNullOrWhiteSpace(SelectedParentFullName) ? null : SelectedParentFullName;
+                var created = await MailFolderManagementService.CreateFolderAsync(account, FolderName, parent, isLocal);
+                if (MailUiState.SelectedAccount?.Id == account.Id && created.Selectable)
+                    MailUiState.SelectFolder(created);
+                MouseActionService.ReportStatus($"Created folder '{created.DisplayName}'.");
+            }
+            ModalService.CloseAll();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    static void Close() => ModalService.Close();
+}

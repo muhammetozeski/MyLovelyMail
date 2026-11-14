@@ -104,6 +104,11 @@ public partial class Settings
         nameof(GlobalSettings.TorSocksPort),
         nameof(GlobalSettings.TorAutoStart),
         nameof(GlobalSettings.TorExecutablePath),
+        // Trash & Folder Retention card
+        nameof(GlobalSettings.AutoPurgeDeletedFolders),
+        nameof(GlobalSettings.DeletedFolderRetentionDays),
+        nameof(GlobalSettings.AutoEmptyTrash),
+        nameof(GlobalSettings.TrashRetentionDays),
     ];
 
     static IEnumerable<ISetting> UncardedSettings =>
@@ -293,6 +298,41 @@ public partial class Settings
     {
         SetAndSave(GlobalSettings.MessageListDensity, density);
         Events.MainEvents.Trigger("OnStyleChanged");
+    }
+
+    static readonly int[] DeletedFolderRetentionPresets = [1, 2, 7, 14, 30];
+    static readonly int[] TrashRetentionPresets = [1, 2, 7, 14, 30, 90];
+
+    static void SetAutoPurgeDeletedFolders(bool enabled)
+    {
+        SetAndSave(GlobalSettings.AutoPurgeDeletedFolders, enabled);
+        TrashRetentionService.NotifySettingsUpdated();
+    }
+
+    static void SetDeletedFolderRetentionDays(string text)
+    {
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) && days > 0)
+        {
+            SetAndSave(GlobalSettings.DeletedFolderRetentionDays,
+                TrashRetentionService.ClampDays(days, GlobalSettings.DefaultDeletedFolderRetentionDays));
+            TrashRetentionService.NotifySettingsUpdated();
+        }
+    }
+
+    static void SetAutoEmptyTrash(bool enabled)
+    {
+        SetAndSave(GlobalSettings.AutoEmptyTrash, enabled);
+        TrashRetentionService.NotifySettingsUpdated();
+    }
+
+    static void SetTrashRetentionDays(string text)
+    {
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int days) && days > 0)
+        {
+            SetAndSave(GlobalSettings.TrashRetentionDays,
+                TrashRetentionService.ClampDays(days, GlobalSettings.DefaultTrashRetentionDays));
+            TrashRetentionService.NotifySettingsUpdated();
+        }
     }
 
     #region Cached mail check
