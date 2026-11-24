@@ -84,3 +84,24 @@ Short "problem → solution" notes so the same wall is never hit twice.
   view before a snapshot, reading a computed style, checking whether a script ran.
 - None of them move the cursor or take focus, so they are safe on a machine somebody is using.
   `RenderedPageProbe.ScriptRunner` is the hook; the head registers it in DEBUG only.
+
+- **Android .NET `CheckCertificateRevocation = true` breaks Gmail and other OCSP-less CAs.**
+  On Android, .NET validates revocation strictly through OCSP with no CRL fallback. Google Trust
+  Services' intermediate omits an OCSP responder URL, so MailKit's default revocation check fails
+  every direct connection with `SslHandshakeException` (`Chain_RevocationStatusUnknown`:
+  `Certificate does not specify OCSP responder`). Solution: `MailConnections.DirectRevocationCheck`
+  is `!OperatingSystem.IsAndroid()` and is applied on both direct connections and direct triage
+  probes (`ConnectTriageService.ProbeWithAsync`), while keeping full chain, hostname and expiry
+  validation intact.
+
+- **CSS Grid `1fr` tracks expand past phone viewports when a child scrolls horizontally.**
+  Under `MailResponsiveCss` (`OnePane` and `TwoPane`), `1fr` allows the grid track to grow to the
+  widest child's `min-content` (such as `.mail-sidebar-nav`), clipping the search bar and toolbars
+  off the right edge of the phone screen. Solution: use `minmax(0, 1fr)` so the track stays capped
+  at the viewport width while the inner strip scrolls horizontally.
+
+- **Android 11+ Scoped Storage blocks reading raw paths under `/sdcard/Download`.**
+  Typing a path into Migration bundle import cannot open files copied to Downloads by another app.
+  Solution: `UserFilePicker` (bridged to MAUI's `FilePicker.Default.PickAsync` in `MauiProgram`)
+  lets the user pick the `.lovelybundle` file through the system document picker, which copies it
+  into app-readable cache space.

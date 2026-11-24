@@ -7,7 +7,7 @@
      @onpointermove="HandleGlobalPointerMove"
      @onpointerup="HandleGlobalPointerUpAsync"
      @onkeydown="HandleGlobalKeyDown">
-    <div class="@MainLayoutCssClasses.Page @MainLayoutCssClasses.HasBottomNav">
+    <div class="@MainLayoutCssClasses.Page">
         <main>
             <article class="@MainLayoutCssClasses.Content">
                 <AppErrorBoundary @ref="mainErrorBoundary" Title="An unexpected error occurred in this view" RetryText="Try Again" ShowReload="true">
@@ -15,8 +15,6 @@
                 </AppErrorBoundary>
             </article>
         </main>
-
-        <AppBottomNav />
     </div>
 
     <VaultUnlockOverlay />

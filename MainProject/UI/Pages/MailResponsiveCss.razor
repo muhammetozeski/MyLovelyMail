@@ -4,9 +4,9 @@
 <style>
     @@media (max-width: @(AppMeasures.Breakpoint.TwoPane)px) {
         .@(MailCssClasses.Screen) {
-            grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
+            grid-template-columns: @(AppMeasures.Size.Px200)px minmax(0, 1fr);
             gap: @(AppMeasures.Space.Medium)px;
-            height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+            height: @(AppMeasures.Viewport.Full)vh;
             align-items: stretch;
         }
 
@@ -30,7 +30,6 @@
             inset: 0;
             z-index: @(AppMeasures.ZLayer.Overlay);
             padding: @(AppMeasures.Space.Medium)px;
-            padding-bottom: @(AppMeasures.Space.ScrollBottomInset + AppMeasures.Space.Medium)px;
             overflow-y: auto;
             min-height: 0;
             @((MarkupString)AppStyles.BuildAuroraBackground())
@@ -39,7 +38,9 @@
 
     @@media (max-width: @(AppMeasures.Breakpoint.OnePane)px) {
         .@(MailCssClasses.Screen) {
-            grid-template-columns: 1fr;
+            /* minmax(0, …): a plain 1fr track grows to its widest child's min-content, so the
+               horizontally scrolling account strip widened the whole phone screen past the viewport. */
+            grid-template-columns: minmax(0, 1fr);
             grid-template-rows: auto minmax(0, 1fr);
         }
 

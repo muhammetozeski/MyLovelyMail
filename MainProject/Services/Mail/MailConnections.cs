@@ -108,6 +108,17 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         const bool TorRevocationCheck = false;
 
+        /// <summary>
+        /// Whether a direct (non-Tor) connection asks for an online revocation check. On Windows it
+        /// stays MailKit's default (on). On Android it is off, because there .NET checks revocation
+        /// through the Android platform, which knows OCSP only and has no CRL fallback. Google
+        /// Trust Services' intermediate names no OCSP responder, so every Gmail connection on the
+        /// phone failed with Chain_RevocationStatusUnknown ("Certificate does not specify OCSP
+        /// responder" in the phone's log) and the account never connected. The chain, the host name
+        /// and the expiry are still verified, as on the Tor path above.
+        /// </summary>
+        internal static readonly bool DirectRevocationCheck = !OperatingSystem.IsAndroid();
+
         static SecureSocketOptions ToSocketOptions(ConnectionSecurity security) => security switch
         {
             ConnectionSecurity.SslOnConnect => SecureSocketOptions.SslOnConnect,
@@ -279,6 +290,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                         recoverable: false);
 
                 var direct = createClient();
+                direct.CheckCertificateRevocation = DirectRevocationCheck;
                 try
                 {
                     TrackDirectClient(account, direct);

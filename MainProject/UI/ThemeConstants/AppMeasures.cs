@@ -68,9 +68,6 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
 
             /// <summary> Top padding that pushes page headers below the device status bar / notch. </summary>
             public const int ScreenTopInset = 50;
-
-            /// <summary> Bottom padding on scroll containers so the last item clears the floating bottom nav: reads the nav's own height from the single source. </summary>
-            public const int ScrollBottomInset = Size.BottomNavHeight;
         }
 
         /// <summary> Element dimensions (width / height / min / max) in CSS px. Px* are exact so layouts do not shift. </summary>
@@ -127,9 +124,6 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
 
             /// <summary> How far the reader body may grow before it starts scrolling inside itself: the message opens whole, the page grows with it, and only a truly endless newsletter hits the ceiling. </summary>
             public const int ReaderBodyMax = 1500;
-
-            /// <summary> Height of the floating bottom navigation bar. Single source: the nav sets its height from this and the scroll bottom-inset reads it, so they can never drift apart. </summary>
-            public const int BottomNavHeight = 70;
         }
 
         /// <summary> Responsive breakpoints in CSS px (max-width media queries). Below TwoPane the mail screen drops the sidebar into a drawer; below OnePane the list and reader stack into a single switching pane. </summary>

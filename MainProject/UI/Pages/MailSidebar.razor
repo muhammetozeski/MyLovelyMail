@@ -13,6 +13,7 @@
     @* ---- Left: accounts + folders ---- *@
     <aside class="@MailCssClasses.Sidebar @(WorkspaceDragService.IsDragging ? MailCssClasses.SidebarWorkspaceDragging : "")" tabindex="-1" @onkeydown="HandleSidebarKeyDown">
         <div class="@MailCssClasses.Logo">
+            <AppNavToggle />
             💌<span class="@MailCssClasses.LogoText">My Lovely Mail</span>
             <SyncHeart />
         </div>

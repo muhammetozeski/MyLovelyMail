@@ -10,7 +10,7 @@
     string primary = AppColors.Primary.ToRgbaHex(true);
     string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
     string splitterColor = AppStyles.ResolvedScrollbarColorHex();
-    string paneHeight = $"calc({AppMeasures.Viewport.Full}vh - {AppMeasures.Space.Px90 + AppMeasures.Space.Medium * 2}px)";
+    string paneHeight = AppStyles.MailPaneHeight;
     string sidebarPct = GlobalSettings.SidebarColumnPercent.Value.ToString("0.######", CultureInfo.InvariantCulture);
     string listPct = GlobalSettings.ListColumnPercent.Value.ToString("0.######", CultureInfo.InvariantCulture);
     string readerPct = GlobalSettings.ReaderColumnPercent.Value.ToString("0.######", CultureInfo.InvariantCulture);
@@ -26,7 +26,7 @@
         gap: 0;
         padding: @(AppMeasures.Space.Medium)px;
         box-sizing: border-box;
-        min-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px90)px);
+        min-height: @(AppMeasures.Viewport.Full)vh;
         align-items: start;
     }
 
@@ -109,7 +109,7 @@
     .@(MailCssClasses.DragEscapeBanner) {
         position: fixed;
         left: @(AppMeasures.Space.Px16)px;
-        bottom: @(AppMeasures.Size.BottomNavHeight + AppMeasures.Space.Px10)px;
+        bottom: @(AppMeasures.Space.Medium)px;
         z-index: @(AppMeasures.ZLayer.Toast);
         display: flex;
         align-items: center;

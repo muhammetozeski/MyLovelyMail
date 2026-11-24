@@ -103,6 +103,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
                    $"inset 0 -1px 0 {AppColors.GlassBorderBottom.ToRgbaHex(true)},{ShadowSoft};";
         }
 
+        /// <summary> Height of a mail column: the whole viewport minus the mail screen's own top and bottom padding, so the sidebar, list and reader end at the window edge. </summary>
+        public static string MailPaneHeight => $"calc({AppMeasures.Viewport.Full}vh - {AppMeasures.Space.Medium * 2}px)";
+
         /// <summary> The frosted bar surface shared by the top header and the bottom navigation: the central acrylic fill, rounded inner corners, and a single hairline on the edge facing the content (the other three borders are dropped because they sit on the screen edges). </summary>
         public static string BuildBarSurface(bool pinnedToBottom)
         {

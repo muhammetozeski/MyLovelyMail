@@ -41,6 +41,10 @@ namespace MyLovelyMail
             // action finishing on a task — failed with an empty exception message.
             ClipboardService.Writer = static text =>
                 MainThread.InvokeOnMainThreadAsync(() => Clipboard.Default.SetTextAsync(text));
+            // Android lets an app read a document it did not create only through the system
+            // picker; MAUI copies the chosen document into the app's cache and returns that path.
+            UserFilePicker.Picker = static () =>
+                MainThread.InvokeOnMainThreadAsync(async () => (await FilePicker.Default.PickAsync())?.FullPath);
 #if DEBUG
             DebugApi.Start();
 #endif

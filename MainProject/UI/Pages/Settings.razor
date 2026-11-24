@@ -6,7 +6,10 @@
 <PageTitle>Settings — My Lovely Mail</PageTitle>
 
 <div class="settings-screen">
-    <h1 class="settings-title">⚙️ Settings</h1>
+    <div class="@SettingsCssClasses.Header">
+        <AppNavToggle />
+        <h1 class="@SettingsCssClasses.Title">⚙️ Settings</h1>
+    </div>
 
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🎨 Appearance</div>
@@ -376,6 +379,10 @@
             <CoreInput Type="password" Placeholder="Passphrase" @bind-Value="BundlePassphrase" />
         </div>
         <div class="settings-migration-actions">
+            @if (UserFilePicker.IsAvailable)
+            {
+                <SecondaryButton OnClick="@PickBundleFileAsync">📂 Choose file</SecondaryButton>
+            }
             <SecondaryButton OnClick="@ExportBundle" Disabled="@(BundlePath.Trim().Length == 0 || BundlePassphrase.Length == 0)">⬆️ Export</SecondaryButton>
             <SecondaryButton OnClick="@ImportBundle" Disabled="@(BundlePath.Trim().Length == 0 || BundlePassphrase.Length == 0)">⬇️ Import</SecondaryButton>
         </div>

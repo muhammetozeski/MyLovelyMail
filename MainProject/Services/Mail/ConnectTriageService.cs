@@ -222,6 +222,11 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 client.CheckCertificateRevocation = false;
             }
 
+            // The probe must judge the server the way the real connection will, or on a phone
+            // every candidate port fails the same OCSP revocation check and none is suggested.
+            if (torEndpoint == null)
+                client.CheckCertificateRevocation = MailConnections.DirectRevocationCheck;
+
             await client.ConnectAsync(host, port, options, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
         }

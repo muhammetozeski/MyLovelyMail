@@ -15,7 +15,7 @@
     string primary = AppColors.Primary.ToRgbaHex(true);
     string surfaceTint = AppColors.SurfaceTintPrimary.ToRgbaHex(true);
     string glassBorder = AppColors.GlassBorderDefault.ToRgbaHex(true);
-    string paneHeight = $"calc({AppMeasures.Viewport.Full}vh - {AppMeasures.Space.Px90 + AppMeasures.Space.Medium * 2}px)";
+    string paneHeight = AppStyles.MailPaneHeight;
 }
 
 <style>

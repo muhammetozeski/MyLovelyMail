@@ -5,6 +5,7 @@ using MyLovelyMail.MainProject.Constants.ThemeConstants;
 using MyLovelyMail.MainProject.Services;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Services.Tor;
+using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 using MyLovelyMail.MainProject.UI.Components;
 using MyLovelyMail.MainProject.UI.Elements.Modals;
@@ -478,6 +479,24 @@ public partial class Settings
         }
     }
 
+    /// <summary>
+    /// Fills the bundle path from the operating system's file picker. On Android this is the only
+    /// way to reach a bundle copied into the Download folder; a typed path there is not readable.
+    /// </summary>
+    async Task PickBundleFileAsync()
+    {
+        try
+        {
+            if (await UserFilePicker.PickAsync() is { } path)
+                BundlePath = path;
+        }
+        catch (Exception ex)
+        {
+            Log($"Bundle file picker failed: {ex}", LogLevel.Error);
+            MigrationStatus = $"❌ {ex.Message}";
+        }
+    }
+
     void ImportBundle()
     {
         try
@@ -486,6 +505,8 @@ public partial class Settings
             MigrationStatus = vaultMerged
                 ? "✅ Bundle imported — accounts, settings and passwords restored."
                 : "⚠️ Files imported, but the passphrase did not open the password vault (re-enter account passwords or retry).";
+            // The scheduler's last pass ran before these accounts existed; the next timed pass may be minutes away.
+            _ = SyncScheduler.SyncNowAsync();
         }
         catch (Exception ex)
         {

@@ -1,0 +1,36 @@
+@inject NavigationManager Navigation
+
+<CoreButton Background="@AppColors.SurfaceNormal"
+            TextColor="@AppColors.TextPrimary"
+            Border="@($"{AppMeasures.Border.Thin}px solid {AppColors.GlassBorderDefault.ToRgbaHex(true)}")"
+            BorderRadius="@(AppMeasures.Radius.Circular + "%")"
+            Padding="0"
+            FontSize="@AppMeasures.Font.Large"
+            OnClick="@Toggle"
+            CustomClass="@AppNavToggleCssClasses.Button">
+    @(IsOnMail ? NavigationConstants.Settings.Icon : HomeIcon)
+</CoreButton>
+
+<AppNavToggleCss />
+
+@code {
+    /// <summary>Icon of the button on every page except the mail screen; pressing it returns to the mail screen.</summary>
+    const string HomeIcon = "🏠";
+
+    /// <summary>
+    /// True on the mail screen (the root route or the Mail route), where the button opens Settings.
+    /// Read from the current address on every render, so the page that hosts the button does not
+    /// have to tell it where it is.
+    /// </summary>
+    bool IsOnMail
+    {
+        get
+        {
+            string path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+            return path == "/" || path.StartsWith(NavigationConstants.Mail.Link, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>Goes to Settings from the mail screen and back to the mail screen from anywhere else.</summary>
+    void Toggle() => Navigation.NavigateTo(IsOnMail ? NavigationConstants.Settings.Link : NavigationConstants.Mail.Link);
+}

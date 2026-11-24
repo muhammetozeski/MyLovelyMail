@@ -6,6 +6,7 @@ namespace MyLovelyMail.MainProject.UI.Pages;
 public static class SettingsCssClasses
 {
     public const string Screen = "settings-screen";
+    public const string Header = "settings-header";
     public const string Title = "settings-title";
     public const string Section = "settings-section";
     public const string SectionTitle = "settings-section-title";
