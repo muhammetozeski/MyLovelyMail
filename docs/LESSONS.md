@@ -105,3 +105,20 @@ Short "problem → solution" notes so the same wall is never hit twice.
   Solution: `UserFilePicker` (bridged to MAUI's `FilePicker.Default.PickAsync` in `MauiProgram`)
   lets the user pick the `.lovelybundle` file through the system document picker, which copies it
   into app-readable cache space.
+
+- **MAUI `10.0.110+` lets a `TaskbarIcon` added after `BlazorWebView` swallow all Windows mouse input.**
+  On `Microsoft.Maui` `10.0.20`–`10.0.70`, `RootLayout.Add(trayIcon)` (from `H.NotifyIcon.Maui`)
+  did not block `BlazorWebView` clicks. Starting with `10.0.110` (and `10.0.130`), placing
+  `TaskbarIcon` after `BlazorWebView` in the same `Grid` cell swallows every Win32 mouse event
+  before it reaches WebView2 (`click: 0`), even though CDP synthetic clicks still pass. Solution:
+  keep `TaskbarIcon` non-hit-testable (`InputTransparent = true`, `0×0` size) and insert it behind
+  `BlazorWebView` via `RootLayout.Insert(0, trayIcon)`.
+
+- **Windows auto-maximize and single-bar themed title bars on MAUI 10.**
+  Restoring saved full-screen bounds (`0, 0, 1536, 816`) as a non-maximized window leaves Win11
+  normal-window resize borders and edge gaps; calling `ClampToWorkArea` while maximized also drops
+  the window out of maximized state. Use `OverlappedPresenter.Maximize()` on startup/first show,
+  skip `SizeChanged` persistence and `ClampToWorkArea` while maximized, and style the title bar
+  through MAUI's `Window.TitleBar` plus `AppWindow.TitleBar` button colors (setting
+  `AppWindow.TitleBar.ExtendsContentIntoTitleBar = false` alone leaves MAUI's own bar underneath as
+  a duplicate bar).
