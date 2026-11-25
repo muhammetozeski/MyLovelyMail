@@ -1,10 +1,13 @@
 ﻿using MyLovelyMail.MainProject.Constants;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
+using MyLovelyMail.MainProject.Events;
 using MyLovelyMail.MainProject.Services.Mail;
 using MyLovelyMail.MainProject.Storage;
 using MyLovelyMail.MainProject.Stores;
 // Aliased because the implicit usings already import System.Threading.Timer under the same name.
 using Timer = System.Timers.Timer;
 #if WINDOWS
+using Microsoft.UI.Windowing;
 using Microsoft.Win32;
 // Aliased because MAUI's Window (the type of mainWindow) owns the plain name here.
 using WinUiWindow = Microsoft.UI.Xaml.Window;
@@ -23,6 +26,10 @@ namespace MyLovelyMail
         public const string AutostartMinimizedArgument = "--minimized";
 
         static Window? mainWindow;
+#if WINDOWS
+        static bool pendingMaximizeOnShow;
+        static bool themeSubscribed;
+#endif
 
         /// <summary>True when the process was started with the autostart "--minimized" argument.</summary>
         public static bool LaunchedMinimized =>
@@ -34,9 +41,28 @@ namespace MyLovelyMail
             mainWindow = window;
             RestoreWindowBounds(window);
 #if WINDOWS
+            ApplyMauiTitleBarTheme(window);
+            if (!themeSubscribed)
+            {
+                themeSubscribed = true;
+                MainEvents.OnDataChanged += static (eventName, _) =>
+                {
+                    if (eventName != "OnThemeChanged") return;
+                    mainWindow?.Dispatcher.Dispatch(() =>
+                    {
+                        if (mainWindow == null) return;
+                        ApplyMauiTitleBarTheme(mainWindow);
+                        if (mainWindow.Handler?.PlatformView is WinUiWindow win)
+                            ApplyWindowChromeTheme(win);
+                    });
+                };
+            }
+
             window.HandlerChanged += (_, _) =>
             {
                 if (window.Handler?.PlatformView is not WinUiWindow platformWindow) return;
+
+                ApplyWindowChromeTheme(platformWindow);
 
                 platformWindow.AppWindow.Closing += (_, e) =>
                 {
@@ -54,6 +80,7 @@ namespace MyLovelyMail
 
                 if (Settings.StartMinimized.Value || LaunchedMinimized)
                 {
+                    pendingMaximizeOnShow = true;
                     platformWindow.AppWindow.Hide();
 
                     // The handler exists before WinUI activates the window, so that first Hide()
@@ -68,6 +95,21 @@ namespace MyLovelyMail
                     }
 
                     platformWindow.Activated += HideOnFirstActivation;
+                }
+                else
+                {
+                    // Open maximized so the window sits flush with the screen edges and taskbar
+                    // instead of showing Win11 normal-window resize borders around a full-size rect.
+                    MaximizeWindow(platformWindow);
+
+                    void EnsureMaximizedOnFirstActivation(object _, Microsoft.UI.Xaml.WindowActivatedEventArgs e)
+                    {
+                        if (e.WindowActivationState == Microsoft.UI.Xaml.WindowActivationState.Deactivated) return;
+                        platformWindow.Activated -= EnsureMaximizedOnFirstActivation;
+                        MaximizeWindow(platformWindow);
+                    }
+
+                    platformWindow.Activated += EnsureMaximizedOnFirstActivation;
                 }
             };
 
@@ -84,13 +126,94 @@ namespace MyLovelyMail
             {
                 if (mainWindow?.Handler?.PlatformView is not WinUiWindow platformWindow) return;
                 // A window restored from poisoned bounds sits far off-screen — showing it there
-                // looks exactly like "nothing happens", so always pull it back first.
-                ClampToWorkArea(mainWindow);
+                // looks exactly like "nothing happens", so always pull it back first, unless
+                // it is maximized (touching X/Y while maximized drops the window out of maximized).
+                if (!IsWindowMaximized(platformWindow))
+                    ClampToWorkArea(mainWindow);
                 platformWindow.AppWindow.Show();
+                if (pendingMaximizeOnShow)
+                {
+                    pendingMaximizeOnShow = false;
+                    MaximizeWindow(platformWindow);
+                }
                 platformWindow.Activate();
             });
 #endif
         }
+
+#if WINDOWS
+        static bool IsWindowMaximized(WinUiWindow platformWindow) =>
+            platformWindow.AppWindow.Presenter is OverlappedPresenter presenter &&
+            presenter.State == OverlappedPresenterState.Maximized;
+
+        static bool IsWindowMaximized(Window window) =>
+            window.Handler?.PlatformView is WinUiWindow platformWindow && IsWindowMaximized(platformWindow);
+
+        static void MaximizeWindow(WinUiWindow platformWindow)
+        {
+            if (platformWindow.AppWindow.Presenter is OverlappedPresenter presenter &&
+                presenter.State != OverlappedPresenterState.Maximized)
+            {
+                presenter.Maximize();
+            }
+        }
+
+        static Windows.UI.Color ToWinUiColor(Color color) =>
+            Windows.UI.Color.FromArgb(
+                (byte)Math.Clamp((int)Math.Round(color.Alpha * 255), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(color.Red * 255), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(color.Green * 255), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(color.Blue * 255), 0, 255));
+
+        static void ApplyMauiTitleBarTheme(Window window)
+        {
+            string iconPath = Path.Combine(AppContext.BaseDirectory, "trayicon.ico");
+            if (window.TitleBar is not TitleBar bar)
+            {
+                bar = new TitleBar
+                {
+                    Title = AppConstants.AppNameHumanReadable
+                };
+                if (File.Exists(iconPath))
+                    bar.Icon = ImageSource.FromFile(iconPath);
+                window.TitleBar = bar;
+            }
+            bar.BackgroundColor = AppColors.BackgroundBase;
+            bar.ForegroundColor = AppColors.TextPrimary;
+        }
+
+        static void ApplyWindowChromeTheme(WinUiWindow platformWindow)
+        {
+            try
+            {
+                string iconPath = Path.Combine(AppContext.BaseDirectory, "trayicon.ico");
+                if (File.Exists(iconPath))
+                    platformWindow.AppWindow.SetIcon(iconPath);
+
+                if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+
+                var titleBar = platformWindow.AppWindow.TitleBar;
+                var bg = ToWinUiColor(AppColors.BackgroundBase);
+                var inactiveBg = ToWinUiColor(AppColors.BackgroundDeep);
+                var fg = ToWinUiColor(AppColors.TextPrimary);
+                var inactiveFg = ToWinUiColor(AppColors.TextSecondary);
+                var hoverBg = ToWinUiColor(AppColors.SurfaceTintPrimary);
+
+                titleBar.ButtonBackgroundColor = bg;
+                titleBar.ButtonInactiveBackgroundColor = inactiveBg;
+                titleBar.ButtonForegroundColor = fg;
+                titleBar.ButtonInactiveForegroundColor = inactiveFg;
+                titleBar.ButtonHoverBackgroundColor = hoverBg;
+                titleBar.ButtonHoverForegroundColor = fg;
+                titleBar.ButtonPressedBackgroundColor = hoverBg;
+                titleBar.ButtonPressedForegroundColor = fg;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Window chrome theme update failed: {ex.Message}", Logger.LogLevel.Warning);
+            }
+        }
+#endif
 
         public static void ExitApplication()
         {
@@ -166,10 +289,17 @@ namespace MyLovelyMail
             window.Y = Math.Clamp(window.Y, 0, maxY);
         }
 
-        /// <summary>Applies saved window bounds (first run keeps defaults) and persists them debounced on move/resize.</summary>
+        /// <summary>Applies saved normal-mode window bounds (first run keeps defaults) and persists them debounced on move/resize.</summary>
         static void RestoreWindowBounds(Window window)
         {
-            if (BoundsLookSane(Settings.WindowX.Value, Settings.WindowY.Value, Settings.WindowWidth.Value, Settings.WindowHeight.Value))
+            var screen = DeviceDisplay.MainDisplayInfo;
+            double screenW = screen.Width / Math.Max(1.0, screen.Density);
+            double screenH = screen.Height / Math.Max(1.0, screen.Density);
+            bool looksLikeOldMaximizedRect = Settings.WindowX.Value == 0 && Settings.WindowY.Value == 0 &&
+                Settings.WindowWidth.Value >= screenW - 20 && Settings.WindowHeight.Value >= screenH - 80;
+
+            if (!looksLikeOldMaximizedRect &&
+                BoundsLookSane(Settings.WindowX.Value, Settings.WindowY.Value, Settings.WindowWidth.Value, Settings.WindowHeight.Value))
             {
                 window.X = Settings.WindowX.Value;
                 window.Y = Settings.WindowY.Value;
@@ -185,12 +315,18 @@ namespace MyLovelyMail
                 saveDebounce = new Timer(800) { AutoReset = false };
                 saveDebounce.Elapsed += (_, _) =>
                 {
-                    if (!BoundsLookSane(window.X, window.Y, window.Width, window.Height)) return;
-                    Settings.WindowX.Set((int)window.X);
-                    Settings.WindowY.Set((int)window.Y);
-                    Settings.WindowWidth.Set((int)window.Width);
-                    Settings.WindowHeight.Set((int)window.Height);
-                    SettingsManager.SaveSettings();
+                    window.Dispatcher.Dispatch(() =>
+                    {
+#if WINDOWS
+                        if (IsWindowMaximized(window)) return;
+#endif
+                        if (!BoundsLookSane(window.X, window.Y, window.Width, window.Height)) return;
+                        Settings.WindowX.Set((int)window.X);
+                        Settings.WindowY.Set((int)window.Y);
+                        Settings.WindowWidth.Set((int)window.Width);
+                        Settings.WindowHeight.Set((int)window.Height);
+                        SettingsManager.SaveSettings();
+                    });
                 };
                 saveDebounce.Start();
             };

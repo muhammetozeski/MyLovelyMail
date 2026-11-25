@@ -1,4 +1,6 @@
 using MyLovelyMail.MainProject.Constants;
+using MyLovelyMail.MainProject.Constants.ThemeConstants;
+using MyLovelyMail.MainProject.Events;
 #if WINDOWS
 using H.NotifyIcon;
 #endif
@@ -10,6 +12,8 @@ namespace MyLovelyMail
         public MainPage()
         {
             InitializeComponent();
+            BackgroundColor = AppColors.BackgroundBase;
+            MainEvents.OnDataChanged += OnMainDataChanged;
 #if WINDOWS
             BuildTrayIcon();
 #endif
@@ -181,6 +185,15 @@ namespace MyLovelyMail
 
             Loaded += (_, _) => trayIcon.ForceCreate();
         }
+#endif
+
+        void OnMainDataChanged(string eventName, object? _)
+        {
+            if (eventName != "OnThemeChanged") return;
+            Dispatcher.Dispatch(() => BackgroundColor = AppColors.BackgroundBase);
+        }
+
+#if WINDOWS
 
         /// <summary>
         /// Returns a flyout item with <paramref name="clickAction"/> wired to both Clicked and Command.
