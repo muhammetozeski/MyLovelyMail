@@ -3,22 +3,25 @@
     .@(CoreInputCssClasses.Group) {
         display: flex;
         align-items: center;
-        padding: 0 @(AppMeasures.Space.Px16)px;
+        padding: 0 @(AppMeasures.Space.Px12)px;
+        min-height: @(AppMeasures.Size.Px36)px;
+        box-sizing: border-box;
         border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
     }
 
     .@(CoreInputCssClasses.Icon) {
-        font-size: @(AppMeasures.Font.Large)px;
+        font-size: @(AppMeasures.Font.Normal)px;
         opacity: @(AppMeasures.Opacity.Muted);
         margin-right: @(AppMeasures.Space.Px8)px;
     }
 
     .@(CoreInputCssClasses.Element) {
         flex: 1;
+        min-width: 0;
         border: none;
         background: transparent;
-        padding: @(AppMeasures.Space.Px20)px 0;
-        font-size: @(AppMeasures.Font.Normal)px;
+        padding: @(AppMeasures.Space.Px8)px 0;
+        font-size: @(AppMeasures.Font.Small)px;
         color: inherit;
         outline: none;
     }

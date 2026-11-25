@@ -74,12 +74,24 @@ public static class ContextMenuService
     public static bool IsEditMode { get; private set; }
     public static double X { get; private set; }
     public static double Y { get; private set; }
+    public static double LastPointerX { get; private set; }
+    public static double LastPointerY { get; private set; }
     public static IReadOnlyList<ContextMenuItem> RawItems { get; private set; } = [];
     public static Func<string, ContextMenuItem?>? AddedItemResolver { get; private set; }
 
     public static IReadOnlyList<ContextMenuItem> Items => ResolveVisibleItems(includeHidden: IsEditMode);
 
     public static event Action? OnChanged;
+
+    /// <summary>Records the latest non-zero pointer coordinate so keyboard/synthetic button clicks open near the button instead of (12, 12).</summary>
+    public static void TrackPointer(double x, double y)
+    {
+        if (x > 0 || y > 0)
+        {
+            LastPointerX = x;
+            LastPointerY = y;
+        }
+    }
 
     static ContextMenuService()
     {
@@ -100,6 +112,15 @@ public static class ContextMenuService
         Func<string, ContextMenuItem?>? addedItemResolver = null)
     {
         if (items.Count == 0 && string.IsNullOrWhiteSpace(surfaceId)) return;
+        if (x <= 0 && y <= 0)
+        {
+            x = LastPointerX > 0 ? LastPointerX : 360;
+            y = LastPointerY > 0 ? LastPointerY : 120;
+        }
+        else
+        {
+            TrackPointer(x, y);
+        }
         Owner = owner;
         Title = title;
         RawItems = items;

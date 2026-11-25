@@ -79,9 +79,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 return new FolderEmptyExplanation("POP3 only ever fills the Inbox",
                     "The protocol has no server folders, so nothing is fetched into this one.", EmptyFolderAction.None);
 
+            // A server folder configured as LocalOnly is intentionally never pulled from the server;
+            // offering a "Fetch it now" button that silently no-ops is misleading.
+            if (!FolderSyncPolicy.PullsFromServer(folder.AccountId, folder.FullName))
+                return new FolderEmptyExplanation("Server sync is turned off for this folder",
+                    $"Sync policy for this folder is set to {FolderSyncPolicy.For(folder.AccountId, folder.FullName)} in Account Settings, so server messages are not downloaded here.",
+                    EmptyFolderAction.None);
+
+            if (ImapSyncService.IsFolderSyncing(folder.AccountId, folder.FullName))
+                return new FolderEmptyExplanation("Fetching messages…",
+                    "Checking the server for messages in this folder right now.", EmptyFolderAction.None);
+
             if (folder.LastSyncedUtc == null)
-                return new FolderEmptyExplanation("Never fetched yet",
-                    "This folder has not been asked for since the account was added.", EmptyFolderAction.Fetch, "⬇️ Fetch it now");
+                return new FolderEmptyExplanation("Not loaded yet",
+                    "This folder has not been synced yet. Click below to fetch messages from the server.", EmptyFolderAction.Fetch, "⬇️ Fetch messages");
 
             int cached = MessageStore.CountSummaries(folder.AccountId, folder.FullName);
             if (folder.TotalCount > 0 && cached == 0)

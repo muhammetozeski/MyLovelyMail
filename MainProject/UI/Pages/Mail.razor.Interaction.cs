@@ -20,12 +20,27 @@ namespace MyLovelyMail.MainProject.UI.Pages
 
         void HandleFolderChanged(string accountId, string folderFullName)
         {
-            if (MailUiState.SelectedAccount?.Id != accountId) return;
+            if (MailUiState.SelectedAccount?.Id != accountId)
+            {
+                InvokeAsync(StateHasChanged);
+                return;
+            }
             senderHistoryKey = null;
             if (MailUiState.OpenMessageKey?.FolderFullName == folderFullName) openThreadKey = null;
-            RefreshLists();
-            TrackNewArrivalsForBloom(accountId, folderFullName);
-            InvokeAsync(StateHasChanged);
+
+            bool affectsOpenList = SearchAllFolders
+                || string.Equals(MailUiState.SelectedFolder?.FullName, folderFullName, StringComparison.Ordinal);
+
+            if (affectsOpenList)
+            {
+                RefreshLists();
+                TrackNewArrivalsForBloom(accountId, folderFullName);
+                InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                InvokeAsync(RefreshSidebarFolders);
+            }
         }
 
         void TrackNewArrivalsForBloom(string accountId, string folderFullName)

@@ -4,7 +4,7 @@
 <style>
     .@(UiCustomizerCssClasses.Layout) {
         display: grid;
-        grid-template-columns: @(AppMeasures.Size.Px220)px 1fr;
+        grid-template-columns: @(AppMeasures.Size.Px200)px 1fr;
         gap: @(AppMeasures.Space.Px14)px;
         min-height: @(AppMeasures.Size.Px420)px;
     }
@@ -78,7 +78,7 @@
 
     .@(UiCustomizerCssClasses.Columns) {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
         gap: @(AppMeasures.Space.Px12)px;
         min-width: 0;
     }

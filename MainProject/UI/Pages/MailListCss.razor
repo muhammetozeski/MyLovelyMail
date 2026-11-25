@@ -41,6 +41,12 @@
         display: flex;
     }
 
+    .@(MailCssClasses.RowShell):hover .@(MailCssClasses.RowDate),
+    .@(MailCssClasses.RowShell):hover .@(MailCssClasses.RowThreadCount) {
+        opacity: 0;
+        pointer-events: none;
+    }
+
     .@(MailCssClasses.RowShell) .@(MailCssClasses.RowSubject),
     .@(MailCssClasses.RowShell) .@(MailCssClasses.RowPreview) {
         padding-right: @(AppMeasures.Size.Px100)px;
@@ -120,7 +126,11 @@
         outline-offset: -@(AppMeasures.Border.Medium)px;
     }
 
-    .@(MailCssClasses.Rows):focus-visible,
+    .@(MailCssClasses.Rows):focus,
+    .@(MailCssClasses.Rows):focus-visible {
+        outline: none;
+    }
+
     .@(MailCssClasses.Account):focus-visible,
     .@(MailCssClasses.Folder):focus-visible,
     .@(MailCssClasses.FolderAction):focus-visible,
@@ -134,10 +144,6 @@
     .@(MailCssClasses.SavedRemove):focus-visible {
         outline: @(AppMeasures.Border.Medium)px solid @AppColors.Accent.ToRgbaHex(true);
         outline-offset: @(AppMeasures.Border.Thin)px;
-    }
-
-    .@(MailCssClasses.Rows):focus:not(:focus-visible) {
-        outline: none;
     }
 
     .@(MailCssClasses.Shortcuts) {

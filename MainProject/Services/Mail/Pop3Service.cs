@@ -31,7 +31,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// </summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
-            using var syncScope = SyncScheduler.EnterSyncScope();
+            using var syncScope = SyncScheduler.EnterSyncScope(account.Id, account.EmailAddress);
             Log($"POP3 sync started: {account.EmailAddress}");
             using var client = await ResiliencePolicy.RunNetwork(
                 ct => MailConnections.OpenPop3Async(account, ct), cancellationToken, account);

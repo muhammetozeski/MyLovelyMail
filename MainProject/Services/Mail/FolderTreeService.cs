@@ -35,6 +35,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             siblings
                 .OrderBy(static f => f.SortOrder > 0 ? 0 : 1)
                 .ThenBy(static f => f.SortOrder)
+                .ThenBy(static f => f.IsLocal ? 1 : 0)
                 .ThenBy(f => isRoot ? RoleRank(f.Role) : 0)
                 .ThenBy(static f => f.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static f => f.FullName, StringComparer.OrdinalIgnoreCase);

@@ -105,6 +105,7 @@ public partial class Settings
         nameof(GlobalSettings.TorSocksPort),
         nameof(GlobalSettings.TorAutoStart),
         nameof(GlobalSettings.TorExecutablePath),
+        nameof(GlobalSettings.TorBridgeLines),
         // Trash & Folder Retention card
         nameof(GlobalSettings.AutoPurgeDeletedFolders),
         nameof(GlobalSettings.DeletedFolderRetentionDays),

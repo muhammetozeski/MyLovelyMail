@@ -96,6 +96,10 @@
         {
             <div class="@MailCssClasses.SidebarStatus">@View.FolderActionStatus</div>
         }
+        else if (SyncScheduler.IsSyncing && !string.IsNullOrWhiteSpace(SyncScheduler.ActiveSyncSummary))
+        {
+            <div class="@MailCssClasses.SidebarStatus" title="@SyncScheduler.ActiveSyncSummary">🔄 @SyncScheduler.ActiveSyncSummary</div>
+        }
     </aside>
 
 @code {

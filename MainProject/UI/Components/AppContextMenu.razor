@@ -393,19 +393,28 @@
             ? $"{AppContextMenuCssClasses.Panel} {AppContextMenuCssClasses.PanelDropTarget}"
             : AppContextMenuCssClasses.Panel;
 
-    string RootPanelStyle => $"left:{RootX}px;top:{RootY}px;";
-    string Sub1PanelStyle => $"left:{GetSub1X()}px;top:{Sub1Y}px;";
-    string Sub2PanelStyle => $"left:{GetSub2X()}px;top:{Sub2Y}px;";
+    int EstimatedPanelHeight(int itemCount) => Math.Clamp(itemCount * 33 + 56, 120, 660);
 
-    int EffectiveWindowWidth => StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1280;
-    int EffectiveWindowHeight => StoreSettings.WindowHeight.Value > 300 ? StoreSettings.WindowHeight.Value : 800;
+    string BuildAnchoredStyle(double x, double y, int itemCount)
+    {
+        int estH = EstimatedPanelHeight(itemCount);
+        int left = Math.Max(Pad, (int)Math.Round(x));
+        int top = Math.Max(Pad, (int)Math.Round(y));
+        return $"left:clamp({Pad}px, {left}px, max({Pad}px, calc(100vw - {PanelWidth + Pad}px)));" +
+               $"top:clamp({Pad}px, {top}px, max({Pad}px, calc(100vh - {estH + Pad}px)));";
+    }
+
+    string RootPanelStyle => BuildAnchoredStyle(RootX, RootY, ContextMenuService.Items.Count);
+    string Sub1PanelStyle => BuildAnchoredStyle(GetSub1X(), Sub1Y, ResolvedActiveParent?.Children?.Count ?? 4);
+    string Sub2PanelStyle => BuildAnchoredStyle(GetSub2X(), Sub2Y, ResolvedActiveGrandParent?.Children?.Count ?? 4);
+
+    int EffectiveWindowWidth => Math.Max(1440, StoreSettings.WindowWidth.Value > 400 ? StoreSettings.WindowWidth.Value : 1440);
+    int EffectiveWindowHeight => Math.Max(900, StoreSettings.WindowHeight.Value > 300 ? StoreSettings.WindowHeight.Value : 900);
 
     int ClampSubY(double pointerY)
     {
-        int winH = EffectiveWindowHeight;
-        int maxSubH = winH * AppMeasures.Percent.ThreeQuarters / 100;
         int raw = (int)Math.Round(pointerY) - AppMeasures.Space.Px20;
-        return Math.Clamp(raw, Pad, Math.Max(Pad, winH - maxSubH - Pad));
+        return Math.Max(Pad, raw);
     }
 
     int GetSub1X()
@@ -443,25 +452,8 @@
 
     void CalculateRootPosition()
     {
-        int winW = EffectiveWindowWidth;
-        int winH = EffectiveWindowHeight;
-
-        int clickX = (int)Math.Round(ContextMenuService.X);
-        int clickY = (int)Math.Round(ContextMenuService.Y);
-
-        if (clickX + PanelWidth + Pad > winW)
-        {
-            RootX = clickX - PanelWidth >= Pad
-                ? clickX - PanelWidth
-                : Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
-        }
-        else
-        {
-            RootX = Math.Clamp(clickX, Pad, Math.Max(Pad, winW - PanelWidth - Pad));
-        }
-
-        int maxMenuH = winH * AppMeasures.Percent.ThreeQuarters / 100;
-        RootY = Math.Clamp(clickY, Pad, Math.Max(Pad, winH - maxMenuH - Pad));
+        RootX = Math.Max(Pad, (int)Math.Round(ContextMenuService.X));
+        RootY = Math.Max(Pad, (int)Math.Round(ContextMenuService.Y));
         Sub1Y = RootY;
         Sub2Y = RootY;
     }

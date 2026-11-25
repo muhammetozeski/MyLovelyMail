@@ -30,7 +30,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Refreshes the folder list, the Inbox, and a couple of the stalest other folders.</summary>
         public static async Task SyncAccountAsync(MailAccountData account, CancellationToken cancellationToken = default)
         {
-            using var syncScope = SyncScheduler.EnterSyncScope();
+            using var syncScope = SyncScheduler.EnterSyncScope(account.Id, account.EmailAddress);
             Log($"IMAP sync started: {account.EmailAddress}");
             await ResiliencePolicy.RunNetwork(async ct =>
             {
@@ -77,7 +77,13 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>Syncs one folder's messages; reached through <see cref="KickFolderSync"/> when the user opens a folder.</summary>
         static async Task SyncFolderAsync(MailAccountData account, string folderFullName, CancellationToken cancellationToken = default)
         {
-            using var syncScope = SyncScheduler.EnterSyncScope();
+            if (!FolderSyncPolicy.PullsFromServer(account.Id, folderFullName))
+            {
+                Log($"Skipped on-demand sync for '{folderFullName}' ({FolderSyncPolicy.For(account.Id, folderFullName)}).");
+                return;
+            }
+
+            using var syncScope = SyncScheduler.EnterSyncScope(account.Id, $"{account.EmailAddress} ({folderFullName})");
             await ResiliencePolicy.RunNetwork(async ct =>
             {
                 using var client = await MailConnections.OpenImapAsync(account, ct);
@@ -185,7 +191,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     oldestFetchedUid = oldestFetchedUid == 0 ? sliceLowest : Math.Min(oldestFetchedUid, sliceLowest);
                 }
             }
-            else
+            else if (folder.Count > 0 && !(folder.UidNext is { IsValid: true } uidNext && uidNext.Id <= lastSeenUid + 1))
             {
                 var range = new UniqueIdRange(new UniqueId(lastSeenUid + 1), UniqueId.MaxValue);
                 var fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);

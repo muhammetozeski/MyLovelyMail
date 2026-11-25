@@ -14,7 +14,7 @@
     DateTime? lastSyncEnd;
 
     string Tooltip => SyncScheduler.IsSyncing
-        ? "Syncing your mail..."
+        ? SyncScheduler.ActiveSyncSummary
         : lastSyncEnd == null ? "Click to sync now" : $"Last sync {lastSyncEnd:HH:mm:ss} — click to sync now";
 
     protected override void OnInitialized() => SyncScheduler.OnSyncStateChanged += HandleSyncChanged;

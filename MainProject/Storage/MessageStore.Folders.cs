@@ -59,6 +59,7 @@ namespace MyLovelyMail.MainProject.Storage
                     }
                 }
             }
+            FolderLayoutStore.ApplyTo(accountId, result);
             return result;
         }
 
@@ -130,6 +131,7 @@ namespace MyLovelyMail.MainProject.Storage
                     folder.ServerSupportsRetentionMetadata = existing.ServerSupportsRetentionMetadata;
                 }
             }
+            FolderLayoutStore.ApplyTo(folder);
 
             string dir = FolderCachePath(folder.AccountId, folder.FullName);
             Directory.CreateDirectory(dir);
@@ -164,6 +166,7 @@ namespace MyLovelyMail.MainProject.Storage
             var target = folders.FirstOrDefault(f => string.Equals(f.FullName, folderFullName, StringComparison.Ordinal));
             if (target == null) return;
             target.IsExpanded = !target.IsExpanded;
+            FolderLayoutStore.SetExpanded(accountId, folderFullName, target.IsExpanded);
             SaveFolder(target);
             OnFolderChanged?.Invoke(accountId, folderFullName);
         }
@@ -208,6 +211,8 @@ namespace MyLovelyMail.MainProject.Storage
             }
 
             nodes.InsertRange(Math.Clamp(targetIdx, 0, nodes.Count), movedSubtree);
+
+            FolderLayoutStore.SaveOrder(accountId, [.. nodes.Select(static n => n.Folder.FullName)]);
 
             for (int i = 0; i < nodes.Count; i++)
             {

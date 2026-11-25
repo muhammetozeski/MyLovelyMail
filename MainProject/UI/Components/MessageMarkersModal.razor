@@ -44,10 +44,10 @@
     }
 </div>
 
-<div class="@MailCssClasses.TagNew" style="display:flex;gap:@(AppMeasures.Space.Px6)px;">
-    <input class="@MailCssClasses.TagInput" style="flex:1;" placeholder="New tag name…"
-           @bind="NewTagText" @bind:event="oninput"
-           @onkeydown="HandleNewTagKey" />
+<div class="@MailCssClasses.TagNew" style="display:flex;gap:@(AppMeasures.Space.Px8)px;align-items:center;" @onkeydown="HandleNewTagKey">
+    <div style="flex:1;min-width:0;">
+        <CoreInput Placeholder="New tag name…" Icon="🏷️" @bind-Value="NewTagText" />
+    </div>
     <PrimaryButton OnClick="@AddNewTagAsync" Disabled="@string.IsNullOrWhiteSpace(NewTagText)">+ Add</PrimaryButton>
 </div>
 

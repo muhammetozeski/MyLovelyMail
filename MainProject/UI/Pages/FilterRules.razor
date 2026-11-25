@@ -211,7 +211,10 @@
 
     <div class="filters-grid">
         <input class="filters-input" aria-label="Find filters" placeholder="Find by name, scope or action" @bind="SearchText" @bind:event="oninput" />
-        <label><input type="checkbox" @bind="EnabledOnly" /> Enabled only</label>
+        <div class="filters-field filters-field--toggle">
+            <span class="filters-label">Enabled only</span>
+            <CoreToggle Checked="@EnabledOnly" CheckedChanged="@(v => EnabledOnly = v)" />
+        </div>
         @if (HasQueryScope) { <SecondaryButton OnClick="() => Navigation.NavigateTo(RoutePath)">Show all filters</SecondaryButton> }
     </div>
     <p class="filters-rule-summary">@ScopeCaption · @VisibleRules.Count() filter(s)</p>

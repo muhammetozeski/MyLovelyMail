@@ -214,7 +214,7 @@
                 Each setting follows the global value until you change it here. "Inherited" rows update
                 live when the global setting changes; overridden rows keep their own value.
             </p>
-            @foreach (var setting in AccountSettingsOf.GetAllSettings().Where(SettingHasItsOwnCard))
+            @foreach (var setting in AccountSettingsOf.GetAllSettings().Where(s => SettingHasItsOwnCard(s) && !(Account.Protocol != IncomingProtocol.Pop3 && s.Key == nameof(AccountSettings.Pop3FetchLimit))))
             {
                 <SettingEditorRow Setting="@setting"
                                   BadgeText="@(setting.IsDefault ? "inherited" : "overridden")"

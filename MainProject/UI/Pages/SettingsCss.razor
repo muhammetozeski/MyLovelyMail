@@ -80,6 +80,11 @@
         width: @(AppMeasures.Size.Px110)px;
     }
 
+    .settings-number--wide {
+        width: min(@(AppMeasures.Size.Px320)px, @(AppMeasures.Percent.Full)%);
+        flex: 1 1 @(AppMeasures.Size.Px240)px;
+    }
+
     .settings-finetune-controls {
         display: flex;
         flex-wrap: wrap;
@@ -170,14 +175,26 @@
     }
 
     .settings-bridge-input {
-        width: 100%;
+        width: @(AppMeasures.Percent.Full)%;
+        box-sizing: border-box;
+        background: @AppColors.Background.ToRgbaHex(true);
+        color: @AppColors.TextPrimary.ToRgbaHex(true);
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px12)px;
         resize: vertical;
-        white-space: pre;
-        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-y: auto;
         font-family: Consolas, 'Cascadia Mono', monospace;
         font-size: @(AppMeasures.Font.Small)px;
-        line-height: 1.5;
+        line-height: @(AppMeasures.LineHeight.Relaxed);
+        outline: none;
     }
+
+        .settings-bridge-input:focus-visible {
+            border-color: @AppColors.Primary.ToRgbaHex(true);
+        }
 
     .settings-vault-switch {
         display: flex;

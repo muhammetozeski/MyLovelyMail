@@ -36,7 +36,7 @@ public static partial class FastMailSyncService
         using var operation = await FastMailAccountOperations.EnterAsync(account, cancellationToken);
         cancellationToken = operation.Token;
         var sw = Stopwatch.StartNew();
-        using var syncScope = SyncScheduler.EnterSyncScope();
+        using var syncScope = SyncScheduler.EnterSyncScope(account.Id, account.EmailAddress);
         var provider = RequireProvider(account);
         Log($"FastMail sync started: {account.EmailAddress} ({provider.DisplayName})", Run: IsLogEnabled);
 

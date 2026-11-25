@@ -627,7 +627,15 @@ namespace MyLovelyMail.MainProject.UI.Pages
             string syncText;
             if (folder.IsLocal)
             {
-                syncText = "Local folder — nothing to sync";
+                syncText = "Local folder — stored on this PC only";
+            }
+            else if (!FolderSyncPolicy.PullsFromServer(folder.AccountId, folder.FullName))
+            {
+                syncText = $"Server sync off ({FolderSyncPolicy.For(folder.AccountId, folder.FullName)})";
+            }
+            else if (ImapSyncService.IsFolderSyncing(folder.AccountId, folder.FullName))
+            {
+                syncText = "Checking server for messages…";
             }
             else if (folder.LastSyncedUtc is not { } synced)
             {
@@ -645,9 +653,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
                 };
             }
 
+            string pathHint = !folder.IsLocal && !string.Equals(folder.FullName, folder.DisplayName, StringComparison.OrdinalIgnoreCase)
+                ? $"Server path: {folder.FullName}\n"
+                : string.Empty;
+
             return folder.Role == FolderRole.Trash
-                ? $"{TrashRetentionService.BuildTrashHeaderDescription(folder)}\n{syncText}"
-                : syncText;
+                ? $"{pathHint}{TrashRetentionService.BuildTrashHeaderDescription(folder)}\n{syncText}"
+                : $"{pathHint}{syncText}";
         }
 
         /// <summary>Total unread across the account's folders (Trash/Junk excluded so the badge means real mail).</summary>
@@ -762,8 +774,30 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal static string FolderIcon(MailFolderData folder) =>
             folder.IsLocal ? LocalFolderIcon : FolderIcon(folder.Role);
 
-        internal static string FolderLabel(MailFolderData folder) =>
-            folder.IsLocal ? $"{folder.DisplayName} {LocalFolderSuffix}" : folder.DisplayName;
+        internal static string FolderLabel(MailFolderData folder)
+        {
+            if (folder.IsLocal) return $"{folder.DisplayName} {LocalFolderSuffix}";
+
+            // Disambiguate colliding folder names in the same account (e.g. "[Gmail]/Önemli" vs user label "önemli")
+            // without hiding or deleting any folder.
+            if (folder.Delimiter != '\0' && folder.FullName.Contains(folder.Delimiter))
+            {
+                var siblings = MessageStore.GetFolders(folder.AccountId);
+                bool hasCollision = siblings.Any(other =>
+                    !other.IsLocal
+                    && !string.Equals(other.FullName, folder.FullName, StringComparison.Ordinal)
+                    && string.Equals(other.DisplayName, folder.DisplayName, StringComparison.OrdinalIgnoreCase));
+                if (hasCollision)
+                {
+                    int cut = folder.FullName.LastIndexOf(folder.Delimiter);
+                    string parent = folder.FullName[..cut].Trim('[', ']');
+                    if (!string.IsNullOrWhiteSpace(parent))
+                        return $"{folder.DisplayName} ({parent})";
+                }
+            }
+
+            return folder.DisplayName;
+        }
 
         internal static string FolderIcon(FolderRole role) => role switch
         {

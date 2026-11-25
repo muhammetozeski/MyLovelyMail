@@ -69,12 +69,14 @@
         tab-size: 2;
         resize: vertical;
         outline: none;
-        white-space: pre;
-        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-y: auto;
+        overflow-x: hidden;
     }
 
     .signature-editor-preview {
-        background: @AppColors.MailCanvas.Background;
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
     }
 
     .signature-editor-foot {

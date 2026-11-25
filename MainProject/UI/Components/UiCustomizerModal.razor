@@ -162,13 +162,13 @@
                 </div>
 
                 <input class="@UiCustomizerCssClasses.FilterInput"
-                       placeholder="Search commands, tags, folders, snooze presets, rules…"
+                       placeholder="Search commands, tags, folders…"
                        @bind="CatalogSearchText"
                        @bind:event="oninput" />
 
                 <div class="@UiCustomizerCssClasses.TagCreator">
                     <input class="@UiCustomizerCssClasses.FilterInput"
-                           placeholder="Create new tag (immediately available as 1-click button)…"
+                           placeholder="New tag name…"
                            @bind="NewTagInput"
                            @bind:event="oninput"
                            @onkeydown="HandleNewTagKeyDown" />
@@ -274,13 +274,8 @@
         if (ActionDragService.SurfaceInspector != null)
             return ActionDragService.SurfaceInspector(SelectedSurfaceId);
 
-        // Fallback if opened when Mail page hasn't mounted yet
-        var snap = UiCustomizationStore.GetSnapshot(SelectedSurfaceId);
-        var visible = snap.OrderedIds.Select(id => new CatalogEntryDescriptor(id, id, "Saved")).ToList();
-        var tags = TagStore.AllTags
-            .Select(t => new CatalogEntryDescriptor($"Msg.AddTag:{t}", $"🏷️ {t}", "Tag"))
-            .ToList();
-        return new SurfaceInspectionSnapshot(SelectedSurfaceId, visible, [], tags);
+        // Full static fallback when opened from Settings while Mail page is not mounted.
+        return UiActionCatalog.InspectFallback(SelectedSurfaceId);
     }
 
     List<CatalogEntryDescriptor> FilterCatalog(IReadOnlyList<CatalogEntryDescriptor> source, IReadOnlyList<string> visibleIds)

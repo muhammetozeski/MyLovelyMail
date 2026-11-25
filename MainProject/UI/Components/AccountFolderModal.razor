@@ -1,34 +1,35 @@
 @inherits ModalBase
 
-<div class="wizard-screen wizard-screen--modal">
-    <GlassCard CustomClass="wizard-card">
-        <div class="wizard-field">
-            <span class="wizard-label">Folder name</span>
-            <CoreInput Placeholder="e.g. Work / Shopping / Anonymous" Icon="📁" @bind-Value="FolderName" />
+<div class="@CoreModalCssClasses.Header">
+    <span class="@CoreModalCssClasses.Title">@(IsRename ? "✏️ Rename Account Group" : "📁+ New Account Group")</span>
+    <button class="@CoreModalCssClasses.Close" type="button" title="Close (Esc)" @onclick="Close">✕</button>
+</div>
+
+<div class="@MailCssClasses.ModalBodyStack">
+    <div class="@MailCssClasses.ModalFieldBlock">
+        <span class="@MailCssClasses.ModalFieldLabel">Group name</span>
+        <CoreInput Placeholder="e.g. Work / Personal / Anonymous" Icon="📁" @bind-Value="FolderName" />
+    </div>
+
+    @if (!IsRename)
+    {
+        <div class="@MailCssClasses.ModalFieldBlock">
+            <span class="@MailCssClasses.ModalFieldLabel">Parent group (optional)</span>
+            <select class="@MailCssClasses.ModalSelectInput" @bind="SelectedParentId">
+                <option value="">— Top level (Root) —</option>
+                @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
+                {
+                    <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
+                }
+            </select>
         </div>
+    }
 
-        @if (!IsRename)
-        {
-            <div class="wizard-field">
-                <span class="wizard-label">Parent folder (optional — for nested folders)</span>
-                <select class="wizard-select" @bind="SelectedParentId">
-                    <option value="">— Top level (Root) —</option>
-                    @foreach (var (folder, depth) in AccountFolderStore.GetFlattenedTree())
-                    {
-                        <option value="@folder.Id">@(new string('—', depth)) 📁 @folder.Name</option>
-                    }
-                </select>
-            </div>
-        }
-    </GlassCard>
-
-    <div class="wizard-actions">
-        <SecondaryButton OnClick="@(() => ModalService.CloseAll())">Cancel</SecondaryButton>
+    <div class="@MailCssClasses.ModalFooterActions">
+        <SecondaryButton OnClick="@Close">Cancel</SecondaryButton>
         <PrimaryButton OnClick="@Save" Disabled="@string.IsNullOrWhiteSpace(FolderName)">💾 Save</PrimaryButton>
     </div>
 </div>
-
-<AccountWizardCss />
 
 @code {
     [Parameter] public string? FolderId { get; set; }
@@ -66,4 +67,6 @@
         }
         ModalService.CloseAll();
     }
+
+    static void Close() => ModalService.Close();
 }

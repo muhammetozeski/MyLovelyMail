@@ -1,22 +1,54 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using MyLovelyMail.MainProject.DataModels.Mail;
 using MyLovelyMail.MainProject.Stores;
-using System.Security.Cryptography;
 
 namespace MyLovelyMail.MainProject.Services.Mail
 {
     /// <summary>
     /// Background sync loop: every <see cref="Settings.SyncIntervalMinutes"/> it syncs all enabled
-    /// accounts (IMAP or POP3 by account protocol). Failures of one account never block another —
-    /// each sync is isolated and logged. <see cref="SyncNowAsync"/> serves the manual refresh button.
+    /// accounts (IMAP, FastMail, or POP3). Direct accounts run in parallel without ever blocking on
+    /// slower Tor-only accounts, and per-account gates ensure manual syncs are never silently dropped.
     /// </summary>
     public static class SyncScheduler
     {
+        const int MaxDirectConcurrency = 4;
+        const int MaxTorConcurrency = 2;
+
         static CancellationTokenSource? loopCancellation;
         static int activeSyncCount;
-        static bool passRunning;
+        static int globalPassRunning;
+        static long nextScopeId;
+
+        static readonly ConcurrentDictionary<long, (string? AccountId, string Label)> activeScopes = new();
+        static readonly ConcurrentDictionary<string, SemaphoreSlim> accountGates = new(StringComparer.Ordinal);
 
         /// <summary>True while ANY sync runs — scheduled pass, IDLE push or folder-on-open alike.</summary>
         public static bool IsSyncing => Volatile.Read(ref activeSyncCount) > 0;
+
+        /// <summary>True when the given account currently has an active sync operation in flight.</summary>
+        public static bool IsAccountSyncing(string accountId) =>
+            !string.IsNullOrWhiteSpace(accountId)
+            && activeScopes.Values.Any(s => string.Equals(s.AccountId, accountId, StringComparison.Ordinal));
+
+        /// <summary>Human-readable summary of what is actively syncing right now, or empty when idle.</summary>
+        public static string ActiveSyncSummary
+        {
+            get
+            {
+                string[] labels = [.. activeScopes.Values
+                    .Select(static s => s.Label)
+                    .Where(static l => !string.IsNullOrWhiteSpace(l))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)];
+                return labels.Length switch
+                {
+                    0 => IsSyncing ? "Checking mail…" : string.Empty,
+                    1 => $"Checking {labels[0]}…",
+                    2 => $"Checking {labels[0]} & {labels[1]}…",
+                    _ => $"Checking {labels[0]} (+{labels.Length - 1} more)…"
+                };
+            }
+        }
 
         public static event Action? OnSyncStateChanged;
 
@@ -29,21 +61,26 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         /// <summary>
         /// Counted activity scope. Each real sync (account pass, single folder) wraps itself in
-        /// this, so the heart/sweep indicators fire no matter WHO triggered the sync. Without the
-        /// counter, IDLE-triggered and folder-open syncs ran invisible.
+        /// this, so the heart/sweep indicators fire no matter WHO triggered the sync.
         /// </summary>
-        internal static IDisposable EnterSyncScope() => new SyncScope();
+        internal static IDisposable EnterSyncScope(string? accountId = null, string? label = null) =>
+            new SyncScope(accountId, label ?? string.Empty);
 
         sealed class SyncScope : IDisposable
         {
-            public SyncScope()
+            readonly long scopeId;
+
+            public SyncScope(string? accountId, string label)
             {
+                scopeId = Interlocked.Increment(ref nextScopeId);
+                activeScopes[scopeId] = (accountId, label);
                 Interlocked.Increment(ref activeSyncCount);
                 OnSyncStateChanged?.Invoke();
             }
 
             public void Dispose()
             {
+                activeScopes.TryRemove(scopeId, out _);
                 Interlocked.Decrement(ref activeSyncCount);
                 OnSyncStateChanged?.Invoke();
             }
@@ -79,69 +116,108 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        /// <summary>Syncs every enabled account once. Safe to call while the loop runs.</summary>
+        /// <summary>
+        /// Syncs every enabled account (or one targeted account) concurrently. Direct accounts run immediately
+        /// without waiting behind Tor-only accounts, and targeted single-account syncs are never blocked by a
+        /// global pass running on other accounts.
+        /// </summary>
         public static async Task SyncNowAsync(CancellationToken cancellationToken = default, string? accountId = null)
         {
-            if (passRunning) return;
-            passRunning = true;
-            // The finally is load-bearing: any exception escaping this body would otherwise leave
-            // passRunning stuck at true and silently kill every future sync pass.
+            if (accountId != null)
+            {
+                var target = AccountStore.Accounts.FirstOrDefault(a => a.Id == accountId);
+                if (target != null)
+                    await SyncSingleAccountIsolatedAsync(target, staggeredTorDelay: false, cancellationToken);
+                Log($"Sync pass finished for account {accountId}.");
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref globalPassRunning, 1, 0) != 0)
+                return;
+
             try
             {
                 // Cheap safety net: picks up UseImapIdle toggles (global or per-account) within one
                 // polling cycle even though nothing explicitly notifies this scheduler about them.
-                if (accountId == null) ImapIdleService.Refresh();
+                ImapIdleService.Refresh();
 
-                var accounts = AccountStore.Accounts.Where(account => accountId == null ? account.Enabled : account.Id == accountId).ToArray();
-                if (accountId == null)
-                {
-                    var anonymous = accounts.Where(static a => a.TorOnly).ToArray();
-                    RandomNumberGenerator.Shuffle(anonymous.AsSpan());
-                    int index = 0;
-                    for (int i = 0; i < accounts.Length; i++)
-                        if (accounts[i].TorOnly) accounts[i] = anonymous[index++];
-                }
-                foreach (var account in accounts)
-                {
-                    try
-                    {
-                        if (accountId == null && account.TorOnly)
-                            await Task.Delay(RandomNumberGenerator.GetInt32(1000, 5001), cancellationToken);
-                        SyncHealthService.MarkAttempt(account.Id);
-                        if (account.Protocol == IncomingProtocol.Imap)
-                            await ImapSyncService.SyncAccountAsync(account, cancellationToken);
-                        else if (account.Protocol == IncomingProtocol.FastMail)
-                            await FastMail.FastMailSyncService.SyncAccountAsync(account, cancellationToken);
-                        else
-                            await Pop3Service.SyncAccountAsync(account, cancellationToken);
-                        SyncHealthService.MarkSuccess(account.Id);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        SyncHealthService.MarkFailure(account.Id, ex.Message);
-                        Log($"Sync failed for '{account.EmailAddress}': {ex}", LogLevel.Error);
-                    }
-                }
+                var accounts = AccountStore.Accounts.Where(static account => account.Enabled).ToArray();
+                var directAccounts = accounts.Where(static a => !a.TorOnly).ToArray();
+                var torAccounts = accounts.Where(static a => a.TorOnly).ToArray();
+                RandomNumberGenerator.Shuffle(torAccounts.AsSpan());
 
-                if (accountId == null)
-                {
-                    // A completed global pass also retries Outboxes and maintains the local cache.
-                    try { await OutboxService.FlushAsync(cancellationToken); }
-                    catch (OperationCanceledException) { }
-                    SnoozeService.WakeDue();
-                    OfflineCacheTrimmer.TrimAll();
-                    TrashRetentionService.RunMaintenance();
-                }
+                Task directTask = RunPoolAsync(directAccounts, MaxDirectConcurrency, staggeredTorDelay: false, cancellationToken);
+                Task torTask = RunPoolAsync(torAccounts, MaxTorConcurrency, staggeredTorDelay: true, cancellationToken);
+                await Task.WhenAll(directTask, torTask);
+
+                // A completed global pass also retries Outboxes and maintains the local cache.
+                try { await OutboxService.FlushAsync(cancellationToken); }
+                catch (OperationCanceledException) { }
+                SnoozeService.WakeDue();
+                OfflineCacheTrimmer.TrimAll();
+                TrashRetentionService.RunMaintenance();
             }
             finally
             {
-                passRunning = false;
+                Volatile.Write(ref globalPassRunning, 0);
             }
-            Log(accountId == null ? "Sync pass finished for all enabled accounts." : $"Sync pass finished for account {accountId}.");
+            Log("Sync pass finished for all enabled accounts.");
+        }
+
+        static async Task RunPoolAsync(MailAccountData[] accounts, int maxConcurrency, bool staggeredTorDelay, CancellationToken cancellationToken)
+        {
+            if (accounts.Length == 0) return;
+            using var pool = new SemaphoreSlim(Math.Max(1, maxConcurrency));
+            Task[] tasks = [.. accounts.Select(async account =>
+            {
+                try { await pool.WaitAsync(cancellationToken); }
+                catch (OperationCanceledException) { return; }
+
+                try
+                {
+                    await SyncSingleAccountIsolatedAsync(account, staggeredTorDelay, cancellationToken);
+                }
+                finally
+                {
+                    pool.Release();
+                }
+            })];
+            await Task.WhenAll(tasks);
+        }
+
+        static async Task SyncSingleAccountIsolatedAsync(MailAccountData account, bool staggeredTorDelay, CancellationToken cancellationToken)
+        {
+            var gate = accountGates.GetOrAdd(account.Id, static _ => new SemaphoreSlim(1, 1));
+            if (!await gate.WaitAsync(0, cancellationToken))
+                return;
+
+            try
+            {
+                if (staggeredTorDelay && account.TorOnly)
+                    await Task.Delay(RandomNumberGenerator.GetInt32(800, 3201), cancellationToken);
+
+                SyncHealthService.MarkAttempt(account.Id);
+                if (account.Protocol == IncomingProtocol.Imap)
+                    await ImapSyncService.SyncAccountAsync(account, cancellationToken);
+                else if (account.Protocol == IncomingProtocol.FastMail)
+                    await FastMail.FastMailSyncService.SyncAccountAsync(account, cancellationToken);
+                else
+                    await Pop3Service.SyncAccountAsync(account, cancellationToken);
+                SyncHealthService.MarkSuccess(account.Id);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown or explicit cancellation.
+            }
+            catch (Exception ex)
+            {
+                SyncHealthService.MarkFailure(account.Id, ex.Message);
+                Log($"Sync failed for '{account.EmailAddress}': {ex}", LogLevel.Error);
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
     }
 }

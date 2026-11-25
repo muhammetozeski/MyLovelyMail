@@ -88,7 +88,7 @@
     </GlassCard>
 
     <GlassCard CustomClass="settings-section">
-        <div class="settings-section-title">🎛️ Fine-tuning (İnce Ayarlar)</div>
+        <div class="settings-section-title">🎛️ Fine-tuning</div>
 
         <div class="settings-row">
             <div class="settings-row-text">
@@ -480,14 +480,16 @@
             <div class="settings-row-text">
                 <span class="settings-row-label">SOCKS proxy</span>
                 <span class="settings-row-hint">
-                    Where Tor listens. 9050 is the tor daemon's port and 9150 a running Tor Browser's; both are
-                    tried even when the value here is neither. Keep it on loopback — traffic to a proxy elsewhere
-                    would leave this machine before Tor ever saw it.
+                    Where Tor listens (9050 for tor daemon, 9150 for Tor Browser). Keep it on loopback so traffic never leaves this machine before Tor.
                 </span>
             </div>
-            <div class="settings-vault-switch">
-                <CoreInput Value="@GlobalSettings.TorSocksHost.Value" ValueChanged="@SetTorHost" />
-                <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
+            <div class="settings-finetune-controls">
+                <div class="settings-number settings-number--hex">
+                    <CoreInput Value="@GlobalSettings.TorSocksHost.Value" ValueChanged="@SetTorHost" />
+                </div>
+                <div class="settings-number">
+                    <CoreInput Type="number" Value="@GlobalSettings.TorSocksPort.Value.ToString()" ValueChanged="@SetTorPort" />
+                </div>
             </div>
         </div>
         <div class="settings-row">
@@ -518,7 +520,7 @@
             </div>
         </div>
         <div class="settings-vault-switch">
-            <textarea class="wizard-select settings-bridge-input" rows="3" spellcheck="false"
+            <textarea class="settings-bridge-input" rows="3" spellcheck="false"
                       placeholder="obfs4 10.0.0.1:443 FINGERPRINT cert=... iat-mode=0"
                       value="@BridgeText" @onchange="@(e => SetBridges(e.Value?.ToString() ?? string.Empty))"></textarea>
         </div>

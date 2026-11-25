@@ -17,7 +17,7 @@
         position: fixed;
         pointer-events: auto;
         width: @(AppMeasures.Size.Px260)px;
-        max-height: @(AppMeasures.Viewport.ThreeQuarters)vh;
+        max-height: calc(@(AppMeasures.Viewport.Full)vh - @(AppMeasures.Space.Px24)px);
         overflow-y: auto;
         padding: @(AppMeasures.Space.Px6)px;
         border-radius: @(AppMeasures.Radius.Large)px;
@@ -249,8 +249,9 @@
 
     .@(AppContextMenuCssClasses.InputStatus) {
         position: fixed;
-        right: @(AppMeasures.Space.Medium)px;
-        bottom: @(AppMeasures.Space.Medium)px;
+        top: @(AppMeasures.Space.Px12)px;
+        left: @(AppMeasures.Percent.Half)%;
+        transform: translateX(-@(AppMeasures.Percent.Half)%);
         z-index: @(AppMeasures.ZLayer.Toast);
         max-width: min(@(AppMeasures.Size.Px420)px, calc(@(AppMeasures.Viewport.Full)vw - @(AppMeasures.Space.Px32)px));
         padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
@@ -277,11 +278,11 @@
     @@keyframes app-toast-in {
         from {
             opacity: 0;
-            transform: translateY(@(AppMeasures.Space.Px6)px);
+            transform: translate(-@(AppMeasures.Percent.Half)%, -@(AppMeasures.Space.Px6)px);
         }
         to {
             opacity: 1;
-            transform: translateY(0);
+            transform: translate(-@(AppMeasures.Percent.Half)%, 0);
         }
     }
 </style>

@@ -159,6 +159,7 @@
         padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px8)px;
         font-size: @(AppMeasures.Font.Small)px;
         outline: none;
+        color-scheme: @(AppColors.Background.GetLuminosity() < 0.5f ? "dark" : "light");
     }
 
     .@(ListFilterCssClasses.Input) {

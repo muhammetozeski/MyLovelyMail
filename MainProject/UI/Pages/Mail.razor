@@ -42,7 +42,7 @@
 
             @if (SyncScheduler.IsSyncing)
             {
-                <div class="@MailCssClasses.SyncLine"><span class="@MailCssClasses.SyncLineRunner"></span></div>
+                <div class="@MailCssClasses.SyncLine" title="@SyncScheduler.ActiveSyncSummary"><span class="@MailCssClasses.SyncLineRunner"></span></div>
             }
 
             @if (ShowSearchTools && !MailUiState.IsViewingDeletedFolders)

@@ -25,7 +25,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         static async Task SyncFolderListAsync(MailAccountData account, ImapClient client, CancellationToken cancellationToken)
         {
-            var serverFolders = await ListEveryFolderAsync(client, cancellationToken);
+            bool usedListStatus = client.Capabilities.HasFlag(ImapCapabilities.ListStatus);
+            var serverFolders = await ListEveryFolderAsync(client, cancellationToken, includeStatus: usedListStatus);
             await CreateMissingRequiredFoldersAsync(account, client, serverFolders, cancellationToken);
 
             var cachedFolders = MessageStore.GetFolders(account.Id).ToDictionary(static folder => folder.FullName, StringComparer.Ordinal);
@@ -34,13 +35,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
             foreach (var folder in serverFolders)
             {
-                try
+                // When LIST-STATUS succeeded, Count/Unread/UidValidity are already populated in one round-trip.
+                // Only issue a separate STATUS command if LIST-STATUS was unavailable or omitted this folder.
+                if (!usedListStatus || (folder.UidValidity == 0 && !folder.Attributes.HasFlag(FolderAttributes.NoSelect)))
                 {
-                    await folder.StatusAsync(StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    Log($"STATUS failed for '{folder.FullName}' on {account.EmailAddress}: {ex.Message}", LogLevel.Warning);
+                    try
+                    {
+                        await folder.StatusAsync(StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"STATUS failed for '{folder.FullName}' on {account.EmailAddress}: {ex.Message}", LogLevel.Warning);
+                    }
                 }
 
                 byFullName[folder.FullName] = folder;
@@ -107,17 +113,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
         }
 
-        static async Task<List<IMailFolder>> ListEveryFolderAsync(ImapClient client, CancellationToken cancellationToken)
+        static async Task<List<IMailFolder>> ListEveryFolderAsync(ImapClient client, CancellationToken cancellationToken, bool includeStatus = false)
         {
             List<IMailFolder> found = [];
             HashSet<string> seen = new(StringComparer.Ordinal);
+            const StatusItems statusItems = StatusItems.Count | StatusItems.Unread | StatusItems.UidValidity;
 
             foreach (var space in client.PersonalNamespaces.Concat(client.SharedNamespaces).Concat(client.OtherNamespaces))
             {
                 IList<IMailFolder> folders;
                 try
                 {
-                    folders = await client.GetFoldersAsync(space, false, cancellationToken);
+                    folders = includeStatus
+                        ? await client.GetFoldersAsync(space, statusItems, false, cancellationToken)
+                        : await client.GetFoldersAsync(space, false, cancellationToken);
                 }
                 catch (Exception ex)
                 {

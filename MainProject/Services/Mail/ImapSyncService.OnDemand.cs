@@ -96,7 +96,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             // Nothing fetched yet means there is no floor to dig below; a normal sync goes first.
             if (cached is not { OldestFetchedUid: > 1 }) return 0;
 
-            using var syncScope = SyncScheduler.EnterSyncScope();
+            using var syncScope = SyncScheduler.EnterSyncScope(account.Id, $"{account.EmailAddress} (older mail)");
             int totalLanded = 0;
             const int ChunkSize = 300;
 

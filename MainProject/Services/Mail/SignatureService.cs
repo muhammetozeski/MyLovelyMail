@@ -122,14 +122,23 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// user's own code so its script and style run, but it runs in an opaque origin where it
         /// can reach neither the app nor any of their data.
         /// </summary>
-        public static string PreviewDocument(string signature, string? inputToken = null, bool blockRemoteContent = false) =>
-            blockRemoteContent ? MailBodyRenderer.RenderAnonymousHtml(ToHtml(signature)) :
-            "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
-            + $"html,body{{margin:0;padding:12px;background:{AppColors.MailCanvas.Background};color:{AppColors.MailCanvas.Text};"
-            + "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;}"
-            + $"a{{color:{AppColors.MailCanvas.Link};}}img{{max-width:100%;height:auto;}}"
-            + "</style>"
-            + (inputToken == null ? string.Empty : $"<script src=\"_content/MainProject/mouse-buttons.js\" data-input-token=\"{WebUtility.HtmlEncode(inputToken)}\"></script>")
-            + $"</head><body>{ToHtml(signature)}</body></html>";
+        public static string PreviewDocument(string signature, string? inputToken = null, bool blockRemoteContent = false)
+        {
+            if (blockRemoteContent) return MailBodyRenderer.RenderAnonymousHtml(ToHtml(signature));
+            string bg = AppColors.BackgroundBase.ToRgbaHex(true);
+            string fg = AppColors.TextPrimary.ToRgbaHex(true);
+            string muted = AppColors.TextMuted.ToRgbaHex(true);
+            string link = AppColors.Primary.ToRgbaHex(true);
+            string bodyHtml = string.IsNullOrWhiteSpace(signature)
+                ? $"<div style=\"color:{muted};font-style:italic;\">Signature preview appears here</div>"
+                : ToHtml(signature);
+            return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
+                + $"html,body{{margin:0;padding:12px;background:{bg};color:{fg};"
+                + "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;}"
+                + $"a{{color:{link};}}img{{max-width:100%;height:auto;}}"
+                + "</style>"
+                + (inputToken == null ? string.Empty : $"<script src=\"_content/MainProject/mouse-buttons.js\" data-input-token=\"{WebUtility.HtmlEncode(inputToken)}\"></script>")
+                + $"</head><body>{bodyHtml}</body></html>";
+        }
     }
 }

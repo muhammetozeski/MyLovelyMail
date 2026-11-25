@@ -142,8 +142,17 @@
         return Task.CompletedTask;
     }
 
+    double lastPointerX;
+    double lastPointerY;
+
     void HandlePointerDown(PointerEventArgs e)
     {
+        if (e.ClientX > 0 || e.ClientY > 0)
+        {
+            lastPointerX = e.ClientX;
+            lastPointerY = e.ClientY;
+            ContextMenuService.TrackPointer(e.ClientX, e.ClientY);
+        }
         if (e.Button != 0) return;
         ActionDragService.BeginCandidate(
             SurfaceId,
@@ -198,7 +207,25 @@
     {
         if (ActionDragService.ConsumeSuppressedClick()) return;
         if (Item.Disabled || Item.OnClick == null) return;
-        await Item.OnClick(e);
+        if (e.ClientX > 0 || e.ClientY > 0)
+        {
+            ContextMenuService.TrackPointer(e.ClientX, e.ClientY);
+            await Item.OnClick(e);
+            return;
+        }
+        var anchored = lastPointerX > 0 || lastPointerY > 0
+            ? new MouseEventArgs
+            {
+                ClientX = lastPointerX,
+                ClientY = lastPointerY,
+                Button = e.Button,
+                CtrlKey = e.CtrlKey,
+                ShiftKey = e.ShiftKey,
+                AltKey = e.AltKey,
+                MetaKey = e.MetaKey
+            }
+            : e;
+        await Item.OnClick(anchored);
     }
 
     void HandleContextMenu(MouseEventArgs e)

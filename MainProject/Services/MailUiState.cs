@@ -138,7 +138,8 @@ namespace MyLovelyMail.MainProject.Services
             // The scheduled pass only fills the Inbox, so any other server folder is fetched
             // the moment the user opens it (incremental — repeat visits only pull what's new).
             if (folder is { IsLocal: false }
-                && AccountStore.GetById(folder.AccountId) is { Enabled: true, Protocol: IncomingProtocol.Imap } account)
+                && AccountStore.GetById(folder.AccountId) is { Enabled: true, Protocol: IncomingProtocol.Imap } account
+                && FolderSyncPolicy.PullsFromServer(account.Id, folder.FullName))
                 ImapSyncService.KickFolderSync(account, folder.FullName);
         }
 
