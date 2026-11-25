@@ -5,12 +5,29 @@
 @using GlobalSettings = MyLovelyMail.MainProject.Stores.Settings
 <PageTitle>Settings — My Lovely Mail</PageTitle>
 
-<div class="settings-screen">
+<div class="@SettingsCssClasses.Screen">
     <div class="@SettingsCssClasses.Header">
         <AppNavToggle />
         <h1 class="@SettingsCssClasses.Title">⚙️ Settings</h1>
     </div>
 
+    <div class="@SettingsCssClasses.TabBar" role="tablist" aria-label="Settings categories">
+        @foreach (var (tab, label) in SettingsTabs)
+        {
+            bool active = ActiveTab == tab;
+            <button type="button"
+                    role="tab"
+                    aria-selected="@active"
+                    data-settings-tab="@tab"
+                    class="@SettingsCssClasses.TabBtn @(active ? SettingsCssClasses.TabBtnActive : "")"
+                    @onclick="() => ActiveTab = tab">
+                @label
+            </button>
+        }
+    </div>
+
+    @if (ActiveTab == SettingsTab.Appearance)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🎨 Appearance</div>
         <div class="settings-themes">
@@ -204,7 +221,10 @@
         </div>
     </GlassCard>
     }
+    }
 
+    @if (ActiveTab == SettingsTab.Mail)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🔔 Notifications</div>
         <div class="settings-row">
@@ -297,7 +317,10 @@
             <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.FilterRules.RoutePath))">🧹 Manage</SecondaryButton>
         </div>
     </GlassCard>
+    }
 
+    @if (ActiveTab == SettingsTab.Retention)
+    {
     <GlassCard CustomClass="@SettingsCssClasses.Section">
         <div class="@SettingsCssClasses.SectionTitle">🗑️ Trash &amp; Folder Retention</div>
 
@@ -365,7 +388,10 @@
             </div>
         </div>
     </GlassCard>
+    }
 
+    @if (ActiveTab == SettingsTab.Advanced)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">📦 Data &amp; migration</div>
         <div class="settings-row">
@@ -423,6 +449,20 @@
         </div>
     </GlassCard>
 
+    <GlassCard CustomClass="settings-section">
+        <div class="settings-section-title">🗄️ Everything else</div>
+        <p class="settings-empty-text">
+            Registered settings without a card of their own above.
+        </p>
+        @foreach (var setting in UncardedSettings)
+        {
+            <SettingEditorRow Setting="@setting" OnSaved="@SettingsManager.SaveSettings" />
+        }
+    </GlassCard>
+    }
+
+    @if (ActiveTab == SettingsTab.Privacy)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">🔐 Vault protection</div>
         <div class="settings-row">
@@ -548,20 +588,10 @@
             <p class="settings-empty-text">@TorMessage</p>
         }
     </GlassCard>
+    }
 
-    <GlassCard CustomClass="settings-section">
-        <div class="settings-section-title">🗄️ Everything else</div>
-        <p class="settings-empty-text">
-            Registered settings without a card of their own above. They are edited raw — the name is
-            the field name — but they are reachable, and a setting added later shows up here by
-            itself instead of shipping invisible.
-        </p>
-        @foreach (var setting in UncardedSettings)
-        {
-            <SettingEditorRow Setting="@setting" OnSaved="@SettingsManager.SaveSettings" />
-        }
-    </GlassCard>
-
+    @if (ActiveTab == SettingsTab.Accounts)
+    {
     <GlassCard CustomClass="settings-section">
         <div class="settings-section-title">👤 Accounts</div>
         @if (AccountStore.Accounts.Count == 0)
@@ -585,10 +615,12 @@
                         </span>
                         <span class="settings-row-hint">@account.Protocol · @account.IncomingHost · @SyncHealthLine(account.Id)</span>
                     </div>
-                    <button class="settings-account-move" title="Move up" @onclick="() => AccountStore.Move(account.Id, -1)">▲</button>
-                    <button class="settings-account-move" title="Move down" @onclick="() => AccountStore.Move(account.Id, 1)">▼</button>
-                    <SecondaryButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</SecondaryButton>
-                    <DangerButton OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</DangerButton>
+                    <div class="@SettingsCssClasses.AccountActions">
+                        <button class="settings-account-move" title="Move up" @onclick="() => AccountStore.Move(account.Id, -1)">▲</button>
+                        <button class="settings-account-move" title="Move down" @onclick="() => AccountStore.Move(account.Id, 1)">▼</button>
+                        <PillButton OnClick="@(() => NavManager.NavigateTo(UI.Pages.AccountSettingsPage.RouteFor(account.Id)))">⚙️ Settings</PillButton>
+                        <PillButton IsDanger="true" OnClick="@(() => RemoveAccount(account.Id))">🗑️ Remove</PillButton>
+                    </div>
                 </div>
             }
         }
@@ -598,6 +630,7 @@
     </GlassCard>
 
     <FolderSettingsPanel />
+    }
     <p class="settings-version">@AppConstants.AppNameHumanReadable @AppConstants.AppVersion</p>
 </div>
 

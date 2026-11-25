@@ -8,6 +8,10 @@ public static class SettingsCssClasses
     public const string Screen = "settings-screen";
     public const string Header = "settings-header";
     public const string Title = "settings-title";
+    public const string TabBar = "settings-tab-bar";
+    public const string TabBtn = "settings-tab-btn";
+    public const string TabBtnActive = "settings-tab-btn--active";
+    public const string AccountActions = "settings-account-actions";
     public const string Section = "settings-section";
     public const string SectionTitle = "settings-section-title";
     public const string Row = "settings-row";

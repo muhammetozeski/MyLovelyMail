@@ -34,6 +34,7 @@ public static class AppContextMenuCssClasses
     public const string PinPopover = "app-context-pin-popover";
     public const string PinButton = "app-context-pin-btn";
     public const string Arrow = "app-context-arrow";
+    public const string Divider = "app-context-divider";
     public const string FooterBar = "app-context-footer";
     public const string InputStatus = "app-input-status";
     public const string InputStatusClose = "app-input-status-close";

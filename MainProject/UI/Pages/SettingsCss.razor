@@ -2,8 +2,8 @@
 @inherits ThemedComponentBase
 
 <style>
-    .settings-screen {
-        max-width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px200)px;
+    .@(SettingsCssClasses.Screen) {
+        max-width: @(AppMeasures.Size.Px420 + AppMeasures.Size.Px420)px;
         margin: 0 auto;
         padding: @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Medium)px @(AppMeasures.Space.Large)px;
         display: flex;
@@ -23,6 +23,47 @@
         font-weight: @(AppMeasures.Weight.Bold);
         color: @AppColors.TextPrimary.ToRgbaHex(true);
         margin: 0;
+    }
+
+    .@(SettingsCssClasses.TabBar) {
+        display: flex;
+        flex-wrap: wrap;
+        gap: @(AppMeasures.Space.Px6)px;
+        padding: @(AppMeasures.Space.Px6)px;
+        border-radius: @(AppMeasures.Radius.Large)px;
+        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        background: @AppColors.SurfaceSubtle.ToRgbaHex(true);
+    }
+
+    .@(SettingsCssClasses.TabBtn) {
+        border: @(AppMeasures.Border.Thin)px solid transparent;
+        background: transparent;
+        color: @AppColors.TextSecondary.ToRgbaHex(true);
+        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px12)px;
+        border-radius: @(AppMeasures.Radius.Medium)px;
+        font-size: @(AppMeasures.Font.Small)px;
+        font-weight: @(AppMeasures.Weight.Medium);
+        cursor: pointer;
+        transition: all @(AppMeasures.Duration.Fast)s ease;
+        white-space: nowrap;
+    }
+
+        .@(SettingsCssClasses.TabBtn):hover {
+            background: @AppColors.SurfaceTintPrimary.ToRgbaHex(true);
+            color: @AppColors.TextPrimary.ToRgbaHex(true);
+        }
+
+    .@(SettingsCssClasses.TabBtnActive) {
+        background: linear-gradient(135deg, @AppColors.Primary.ToRgbaHex(true), @AppColors.Accent.ToRgbaHex(true));
+        color: @AppColors.TextOnAccent.ToRgbaHex(true);
+        font-weight: @(AppMeasures.Weight.Bold);
+    }
+
+    .@(SettingsCssClasses.AccountActions) {
+        display: inline-flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px6)px;
+        flex-shrink: 0;
     }
 
     .settings-section {

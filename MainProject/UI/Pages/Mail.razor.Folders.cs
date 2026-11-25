@@ -200,8 +200,8 @@ public partial class Mail
         bool remote = folder.Selectable && !folder.IsLocal && account?.Protocol == IncomingProtocol.Imap;
         int cachedCount = MessageStore.CountSummaries(folder.AccountId, folder.FullName);
 
-        ContextMenuItem Action(string label, FolderMenuAction action, string actionId, bool enabled = true) =>
-            new(label, () => RunFolderMenuAction(folder, action), enabled, actionId: actionId);
+        ContextMenuItem Action(string label, FolderMenuAction action, string actionId, bool enabled = true, bool separatorBefore = false) =>
+            new(label, () => RunFolderMenuAction(folder, action), enabled, actionId: actionId, separatorBefore: separatorBefore);
 
         List<ContextMenuItem> items = [Action("📂 Open folder", FolderMenuAction.Open, "Folder.Open", folder.Selectable)];
 
@@ -230,7 +230,8 @@ public partial class Mail
         {
             items.Add(new($"⏱️ Trash auto-delete ({TrashRetentionService.BuildSidebarTrashBadge(folder)})…",
                 () => ModalService.OpenMailTrashRetention(folder.AccountId, folder.FullName),
-                actionId: "Folder.TrashRetention"));
+                actionId: "Folder.TrashRetention",
+                separatorBefore: true));
         }
 
         if (folder.Role is FolderRole.Trash or FolderRole.Junk && account != null)
@@ -242,27 +243,26 @@ public partial class Mail
                 ActionId: "Folder.Empty"));
         }
 
-        if (folder.Role == FolderRole.Trash)
-            items.Add(new("🔕 Trash notifications are always off", Enabled: false, ActionId: "Folder.MuteTrashInfo"));
-        else
+        if (folder.Role != FolderRole.Trash)
         {
             bool muted = FolderSettingsStore.IsMuted(folder);
             List<ContextMenuItem> durations = [.. FolderSettingsPanel.MutePeriods.Select(period =>
                 new ContextMenuItem($"Mute for {period.Label}", () => SetFolderMute(folder, period.Minutes), actionId: $"Folder.MuteMinutes:{period.Minutes}"))];
             durations.Add(new("Mute forever", () => SetFolderMute(folder), actionId: "Folder.MuteForever"));
-            items.Add(new(muted ? "🔔 Unmute" : "🔕 Mute", () => { SetFolderMute(folder, unmute: muted); return Task.CompletedTask; }, Children: durations, ActionId: "Folder.MuteGroup"));
-            items.Add(new(FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName)), Enabled: false, ActionId: "Folder.MuteStatus"));
+            items.Add(new(muted ? "🔔 Unmute notifications" : "🔕 Mute notifications", () => { SetFolderMute(folder, unmute: muted); return Task.CompletedTask; }, Children: durations, ActionId: "Folder.MuteGroup", SeparatorBefore: true));
+            if (muted)
+                items.Add(new(FolderSettingsPanel.MuteStatus(FolderSettingsStore.Resolve(folder.Role, folder.AccountId, folder.FullName)), Enabled: false, ActionId: "Folder.MuteStatus"));
             items.Add(Action(FolderSettingsStore.ShowsUnreadCount(folder) ? "Hide unread badges" : "Show unread badges", FolderMenuAction.ToggleUnreadBadge, "Folder.ToggleBadge"));
         }
         items.AddRange([
-            Action("🔄 Check for new mail", FolderMenuAction.Sync, "Folder.Sync", remote),
+            Action("🔄 Check for new mail", FolderMenuAction.Sync, "Folder.Sync", remote, separatorBefore: true),
             Action("⬇️ Download older mail", FolderMenuAction.Backfill, "Folder.Backfill", remote),
             Action("♻️ Redownload folder", FolderMenuAction.Resync, "Folder.Resync", remote),
             new("✓✓ Mark all cached mail read", () => MouseActionService.ReadFolderAsync(folder), folder.Selectable, ActionId: "Folder.ReadAll"),
             Action("🔎 Find unread mail", FolderMenuAction.SearchUnread, "Folder.SearchUnread", folder.Selectable),
-            Action("📦 Export folder as .mbox", FolderMenuAction.Export, "Folder.Export", folder.Selectable),
+            Action("📦 Export folder as .mbox", FolderMenuAction.Export, "Folder.Export", folder.Selectable, separatorBefore: true),
             Action("🪄 Filters for this folder", FolderMenuAction.Filters, "Folder.Filters", folder.Selectable),
-            Action("⚙️ Folder settings", FolderMenuAction.Settings, "Folder.Settings"),
+            Action("⚙️ Folder settings", FolderMenuAction.Settings, "Folder.Settings", separatorBefore: true),
             Action("👤 Account settings", FolderMenuAction.AccountSettings, "Folder.AccountSettings"),
             Action("🌐 Global folder defaults", FolderMenuAction.GlobalSettings, "Folder.GlobalSettings"),
             Action("↺ Reset folder to global defaults", FolderMenuAction.ResetPreferences, "Folder.ResetPrefs", folder.Role != FolderRole.Trash)

@@ -147,7 +147,7 @@
         background: transparent;
         color: @AppColors.TextPrimary.ToRgbaHex(true);
         border-radius: @(AppMeasures.Radius.Medium)px;
-        padding: @(AppMeasures.Space.Px6)px @(AppMeasures.Space.Px10)px;
+        padding: @(AppMeasures.Space.Px5)px @(AppMeasures.Space.Px10)px;
         font-size: @(AppMeasures.Font.Small)px;
         text-align: left;
         cursor: pointer;
@@ -235,6 +235,13 @@
     .@(AppContextMenuCssClasses.Arrow) {
         color: @AppColors.TextMuted.ToRgbaHex(true);
         font-size: @(AppMeasures.Font.XSmall)px;
+    }
+
+    .@(AppContextMenuCssClasses.Divider) {
+        height: @(AppMeasures.Border.Thin)px;
+        margin: @(AppMeasures.Space.Px3)px @(AppMeasures.Space.Px6)px;
+        background: @AppColors.GlassBorderDefault.ToRgbaHex(true);
+        flex-shrink: 0;
     }
 
     .@(AppContextMenuCssClasses.FooterBar) {

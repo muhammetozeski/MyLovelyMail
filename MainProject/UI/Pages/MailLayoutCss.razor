@@ -148,13 +148,14 @@
     .@(MailCssClasses.Account) {
         display: flex;
         align-items: center;
-        gap: @(AppMeasures.Space.Px8)px;
+        gap: @(AppMeasures.Space.Px6)px;
         border: none;
         background: transparent;
         cursor: pointer;
-        padding: @(AppMeasures.Space.Px10)px @(AppMeasures.Space.Px8)px;
+        padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px8)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         font-weight: @(AppMeasures.Weight.Medium);
+        font-size: @(AppMeasures.Font.Small)px;
         color: @textPrimary;
         text-align: left;
         transition: background @(AppMeasures.Duration.Fast)s ease;
@@ -188,14 +189,10 @@
 
     .@(MailCssClasses.AccountOrdinal) {
         flex-shrink: 0;
-        min-width: @(AppMeasures.Size.Px16)px;
-        text-align: center;
         font-size: @(AppMeasures.Font.XSmall)px;
-        font-weight: @(AppMeasures.Weight.Bold);
+        font-weight: @(AppMeasures.Weight.Medium);
         color: @AppColors.TextMuted.ToRgbaHex(true);
-        border: @(AppMeasures.Border.Thin)px solid @AppColors.GlassBorderDefault.ToRgbaHex(true);
-        border-radius: @(AppMeasures.Radius.Px4)px;
-        padding: 0 @(AppMeasures.Space.Px2)px;
+        opacity: @(AppMeasures.Opacity.Dim);
     }
 
     .@(MailCssClasses.AccountName) {

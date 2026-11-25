@@ -18,10 +18,11 @@ public sealed record ContextMenuItem(
     IReadOnlyList<ContextMenuItem>? Children = null,
     string? PinActionId = null,
     string? ActionId = null,
-    bool IsFixed = false)
+    bool IsFixed = false,
+    bool SeparatorBefore = false)
 {
-    public ContextMenuItem(string label, Action action, bool enabled = true, string? pinActionId = null, string? actionId = null, bool isFixed = false)
-        : this(label, () => { action(); return Task.CompletedTask; }, enabled, null, pinActionId, actionId, isFixed) { }
+    public ContextMenuItem(string label, Action action, bool enabled = true, string? pinActionId = null, string? actionId = null, bool isFixed = false, bool separatorBefore = false)
+        : this(label, () => { action(); return Task.CompletedTask; }, enabled, null, pinActionId, actionId, isFixed, separatorBefore) { }
 
     public bool HasChildren => Children is { Count: > 0 };
 

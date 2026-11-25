@@ -57,6 +57,11 @@
                 bool isAdded = ContextMenuService.IsCustomizable && UiCustomizationStore.IsAdded(ContextMenuService.SurfaceId, actionId);
                 bool showQuickMenu = QuickOptionActionId == actionId;
 
+                @if (i > 0 && item.SeparatorBefore)
+                {
+                    <div class="@AppContextMenuCssClasses.Divider" role="separator"></div>
+                }
+
                 <div class="@GetItemWrapClass(null, actionId, isHidden)"
                      data-menu-item-id="@actionId"
                      @onpointerdown="e => BeginMenuDrag(null, item, rootVisibleIds, e)"

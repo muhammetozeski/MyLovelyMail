@@ -38,20 +38,23 @@ public partial class Mail
         int focus = FocusedRowIndex();
         List<ContextMenuItem> choices =
         [
-            new("All listed messages", () => ApplyListedSelection(all), all.Length > 0, actionId: "List.SelectAll"),
+            new(SelectionMode ? "✓ Exit selection mode" : "☑ Toggle selection mode", () => SelectionMode = !SelectionMode, actionId: "List.SelectMode"),
+            new("All listed messages", () => ApplyListedSelection(all), all.Length > 0, actionId: "List.SelectAll", separatorBefore: true),
             new("Clear selection", MailUiState.ClearSelection, current.Count > 0, actionId: "List.ClearSelection"),
             new("Invert listed selection", () => ApplyListedSelection(inverted), all.Length > 0, actionId: "Select.Invert")
         ];
+        bool firstChoice = true;
         foreach (var choice in SelectionChoices)
         {
             var matching = MessageIdentities(Rows.Where(row => row.Messages.Any(choice.Matches))
                 .SelectMany(static row => row.Messages));
-            choices.Add(new($"{choice.Label} · {matching.Length}", () => ApplyListedSelection(matching), matching.Length > 0, actionId: choice.Id));
+            choices.Add(new($"{choice.Label} · {matching.Length}", () => ApplyListedSelection(matching), matching.Length > 0, actionId: choice.Id, separatorBefore: firstChoice));
+            firstChoice = false;
         }
         var focused = focus < 0 ? [] : MessageTargets(Rows[focus].Message);
         var before = focus < 0 ? [] : MessageIdentities(Rows.Take(focus + 1).SelectMany(static row => row.Messages));
         var after = focus < 0 ? [] : MessageIdentities(Rows.Skip(focus).SelectMany(static row => row.Messages));
-        choices.Add(new("Focused conversation only", () => ApplyListedSelection(focused), focus >= 0, actionId: "Select.Focused"));
+        choices.Add(new("Focused conversation only", () => ApplyListedSelection(focused), focus >= 0, actionId: "Select.Focused", separatorBefore: true));
         choices.Add(new("Start through focused row", () => ApplyListedSelection(before), focus >= 0, actionId: "Select.ThroughFocused"));
         choices.Add(new("Focused row through end", () => ApplyListedSelection(after), focus >= 0, actionId: "Select.FromFocused"));
         return choices;

@@ -58,26 +58,22 @@ public partial class Mail
     {
         List<UiActionModel> list =
         [
-            UiActionModel.CreateSync("List.SelectMode", "☑ Select", () => SelectionMode = !SelectionMode,
-                title: "Toggle multi-selection mode", isActive: SelectionMode),
-            UiActionModel.CreateSync("List.SelectAll", "Select all", SelectAllMessages,
-                title: "Select all listed messages (Ctrl+A)", disabled: Rows.Count == 0),
-            UiActionModel.CreateMouseSync("List.SelectMenu", "Select ▾", OpenSelectionMenu,
-                title: "Select by read state, stars, attachments or tags", disabled: Rows.Count == 0),
+            UiActionModel.CreateMouseSync("List.SelectMenu", SelectionMode ? "☑ Select · On ▾" : "☑ Select ▾", OpenSelectionMenu,
+                title: "Selection mode, Select all, or select by read state, stars, attachments or tags", isActive: SelectionMode),
             UiActionModel.CreateMouseSync("List.SortMenu", $"⇅ {(IsSenderListView ? ListViewState.SenderSortLabel : ListViewState.MailSortLabel)} ▾", OpenSortMenu,
                 title: "Sort list"),
-            UiActionModel.CreateSync("List.SenderView", IsSenderListView ? "✉️ Mails" : "👥 Senders", ToggleSenderListView,
-                title: "Switch between Mail List and Sender List", isActive: IsSenderListView),
             UiActionModel.CreateSync("List.ToggleQuickFilters",
                 $"🎛️ Filters{(!ShowSearchTools && ActiveFilterCount > 0 ? $" · {ActiveFilterCount}" : "")} {(ShowSearchTools ? "▴" : "▾")}",
                 () => ShowSearchTools = !ShowSearchTools,
                 title: ShowSearchTools ? "Hide quick filter pills" : "Show quick filter pills",
-                isActive: !ShowSearchTools && ActiveFilterCount > 0),
+                isActive: ShowSearchTools || ActiveFilterCount > 0),
             UiActionModel.CreateSync("List.ToggleAdvancedFilters",
-                $"🎯 Advanced{(ListViewState.ActiveFilterCount > 0 ? $" · {ListViewState.ActiveFilterCount}" : "")} {(ListViewState.IsFilterWindowOpen ? "▴" : "▾")}",
+                $"🎯 Advanced{(ListViewState.ActiveFilterCount > 0 ? $" · {ListViewState.ActiveFilterCount}" : "")}",
                 ToggleAdvancedFilterWindow,
                 title: "Open advanced draggable filters window",
-                isActive: ListViewState.IsFilterWindowOpen),
+                isActive: ListViewState.IsFilterWindowOpen || ListViewState.ActiveFilterCount > 0),
+            UiActionModel.CreateSync("List.SenderView", IsSenderListView ? "✉️ Mails" : "👥 Senders", ToggleSenderListView,
+                title: "Switch between Mail List and Sender List", isActive: IsSenderListView),
             UiActionModel.CreateSync("List.Shortcuts", "⌨️", OpenShortcutHelpModal,
                 title: "Keyboard shortcuts (?)", isIcon: true)
         ];
@@ -92,12 +88,6 @@ public partial class Mail
                 _ => EmptyFolderWithConfirmationAsync(activeAcc, trashOrJunkFolder),
                 Title: $"Permanently delete all messages in {trashOrJunkFolder.DisplayName}",
                 IsDanger: true));
-        }
-
-        if (MailUiState.SelectedMessages.Count > 0)
-        {
-            list.Add(UiActionModel.CreateSync("List.ClearSelection", "Clear selection", MailUiState.ClearSelection,
-                title: "Clear active selection"));
         }
 
         return list;
@@ -230,31 +220,24 @@ public partial class Mail
 
         return
         [
-            new("Msg.ToggleRead", open.IsUnread ? "✅ Mark read" : "📩 Mark unread",
+            new("Msg.ToggleRead", open.IsUnread ? "✅ Mark read" : "📩 Unread",
                 _ => MouseActionService.RunMessagesAsync(open.IsUnread ? MailMessageCommand.Read : MailMessageCommand.Unread, readerTargets, includeSelection: false),
                 Title: open.IsUnread ? "Mark read" : "Mark unread"),
             UiActionModel.CreateMouseSync("Msg.ReplyMenu", "↩️ Reply ▾", e => OpenReplyMenu(open, e),
                 title: "Reply, Reply all, Forward, Forward as .eml"),
             UiActionModel.CreateSync("Msg.MarkersModal", $"{starIcon}{impIcon} Labels{tagCountBadge}", () => OpenMarkersModal(open),
                 title: "Star, Importance & Tags"),
-            UiActionModel.CreateSync("Msg.SaveModal", "💾 Save", () => OpenSaveModal(open),
-                title: "Save message as .eml or .html"),
-            UiActionModel.CreateMouseSync("Msg.MoreActions", "⚡ Message actions ▾", e => OpenReaderActionsMenu(open, e),
-                title: "All message actions"),
             new("Msg.Archive", "📦 Archive",
                 _ => MouseActionService.RunMessagesAsync(MailMessageCommand.Archive, readerTargets, includeSelection: false),
                 Title: "Archive message"),
             UiActionModel.CreateSync("Msg.MoveModal", "📂 Move", () => OpenMoveModal(open),
                 title: "Move message to folder"),
-            UiActionModel.CreateSync("Msg.SnoozeModal", "⏰ Snooze", () => OpenSnoozeModal(open),
-                title: "Snooze message until…"),
-            UiActionModel.CreateMouseSync("Msg.SenderMenu", "👤 Sender ▾",
-                e => OpenAddressMenu(open.FromAddress, e, MessageIdentityOf(open)?.AccountId),
-                title: "Actions & rules for this sender"),
-            new("Msg.Trash", isInTrash ? "🗑️ Delete forever" : "🗑️ Trash",
+            new("Msg.Trash", isInTrash ? "🗑️ Delete" : "🗑️ Trash",
                 _ => MouseActionService.RunMessagesAsync(MailMessageCommand.Trash, readerTargets, includeSelection: false),
                 Title: isInTrash ? "Permanently delete message" : "Move message to Trash",
                 IsDanger: true),
+            UiActionModel.CreateMouseSync("Msg.MoreActions", "⚡ More ▾", e => OpenReaderActionsMenu(open, e),
+                title: "Save, Snooze, Sender, Source & all message actions"),
             UiActionModel.CreateSync("Reader.ScaleDown", "A-", () => StepReaderTextScale(-1),
                 title: "Smaller text (Ctrl+-)", isCompact: true),
             UiActionModel.CreateSync("Reader.ScaleReset", $"{GlobalSettings.ReaderTextScalePercent.Value}%", () => StepReaderTextScale(0),
@@ -294,18 +277,38 @@ public partial class Mail
             title: "Send message", isActive: true, disabled: string.IsNullOrWhiteSpace(draft.To), isFixed: true)
     ];
 
+    internal void OpenSidebarNewMenu(MouseEventArgs pointer)
+    {
+        List<ContextMenuItem> items =
+        [
+            new("📁+ New account group…", () => ModalService.OpenCreateFolder(), actionId: "Sidebar.NewAccountFolder")
+        ];
+        if (MailUiState.SelectedAccount is { } selectedAcc)
+        {
+            items.Add(new($"📂+ New mail folder in {selectedAcc.EmailAddress}…",
+                () => ModalService.OpenCreateMailFolder(selectedAcc.Id),
+                actionId: "Account.NewMailFolder"));
+        }
+        items.Add(new("➕ Add mail account…",
+            () => ModalService.OpenAddAccount(MailUiState.SelectedAccount?.FolderId ?? AccountFolderStore.DefaultFolderId),
+            actionId: "AccGroup.AddAccount",
+            separatorBefore: true));
+        items.Add(new("⚡ New Fast Mail (Tor)…",
+            () => ModalService.OpenFastMail(MailUiState.SelectedAccount?.FolderId ?? AccountFolderStore.DefaultFolderId),
+            actionId: "AccGroup.NewFastMail"));
+
+        ContextMenuService.Open(this, "Create new", items, pointer.ClientX, pointer.ClientY);
+    }
+
     internal IReadOnlyList<UiActionModel> BuildSidebarTopActions()
     {
         List<UiActionModel> list =
         [
-            UiActionModel.CreateSync("Sidebar.NewAccountFolder", "📁+ Group", () => ModalService.OpenCreateFolder(),
-                title: "New account group folder"),
+            UiActionModel.CreateMouseSync("Sidebar.NewMenu", "➕ New ▾", OpenSidebarNewMenu,
+                title: "Create account group, mail folder, or add account"),
         ];
-        if (MailUiState.SelectedAccount is { } selectedAcc)
+        if (MailUiState.SelectedAccount != null)
         {
-            list.Add(UiActionModel.CreateSync("Account.NewMailFolder", "📁+ Folder",
-                () => ModalService.OpenCreateMailFolder(selectedAcc.Id),
-                title: $"Create new mail folder in {selectedAcc.EmailAddress}"));
             list.Add(new("Workspace.Compose", "✏️ Compose",
                 _ => MouseActionService.RunAsync(MouseActionService.ComposeAction, string.Empty),
                 Title: "Write a new message",
@@ -577,6 +580,7 @@ public partial class Mail
             "Folder.SearchUnread" => Make("🔎 Unread in folder", "🔎", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.SearchUnread); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
             "Folder.Filters" => Make("🪄 Folder filters", "🪄", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.Filters); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
             "Folder.Settings" => Make("⚙️ Folder settings", "⚙️", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.Settings); return Task.CompletedTask; }, disabled: activeFolder == null),
+            "Sidebar.NewMenu" => Make("➕ New ▾", "➕", e => { OpenSidebarNewMenu(e); return Task.CompletedTask; }),
             "Sidebar.NewAccountFolder" => Make("📁+ Group", "📁+", _ => { ModalService.OpenCreateFolder(); return Task.CompletedTask; }),
             "AccGroup.AddAccount" => Make("➕ Add account", "➕", _ => { ModalService.OpenAddAccount(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId); return Task.CompletedTask; }),
             "AccGroup.NewFastMail" => Make("⚡ New Fast Mail", "⚡", _ => { ModalService.OpenFastMail(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId); return Task.CompletedTask; }),

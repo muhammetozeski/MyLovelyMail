@@ -38,9 +38,17 @@
     }
 
     .@(MailCssClasses.ComposeFrom) {
+        display: flex;
+        align-items: center;
+        gap: @(AppMeasures.Space.Px8)px;
         font-size: @(AppMeasures.Font.Small)px;
         color: @textSecondary;
     }
+
+        .@(MailCssClasses.ComposeFrom) select {
+            flex: 1;
+            min-width: 0;
+        }
 
     .@(MailCssClasses.ComposeBody) {
         flex: 1;

@@ -131,17 +131,19 @@
             <GlassCard Level="AcrylicLevel.Strong" CustomClass="@MailCssClasses.ComposeCard">
                 <div class="@MailCssClasses.ComposeFields" @oninput="View.NoteComposeActivity">
                     <div class="@MailCssClasses.ComposeFrom">
-                        From:
-                        @foreach (var sender in AccountStore.Accounts)
-                        {
-                            <button class="@MailCssClasses.FromChip @(draft.Account?.Id == sender.Id ? MailCssClasses.FromChipOn : "")"
-                                    style="background:@sender.ColorHex;color:@AppColors.InkOn(sender.ColorHex).ToRgbaHex(true)"
-                                    data-context-menu="true"
-                                    @oncontextmenu="e => View.OpenAccountMenu(sender, e)"
-                                    @oncontextmenu:preventDefault="true"
-                                    @oncontextmenu:stopPropagation="true"
-                                    @onclick="() => View.SwitchDraftAccount(draft, sender)">@sender.EmailAddress</button>
-                        }
+                        <span class="@MailCssClasses.AccountDot" style="background:@(draft.Account?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))"></span>
+                        <span>From:</span>
+                        <select class="@MailCssClasses.ModalSelectInput"
+                                value="@(draft.Account?.Id ?? string.Empty)"
+                                @onchange="e => { if (AccountStore.GetById(e.Value?.ToString() ?? string.Empty) is { } chosen) View.SwitchDraftAccount(draft, chosen); }"
+                                @oncontextmenu="e => { if (draft.Account is { } acc) View.OpenAccountMenu(acc, e); }"
+                                @oncontextmenu:preventDefault="true"
+                                @oncontextmenu:stopPropagation="true">
+                            @foreach (var sender in AccountStore.Accounts)
+                            {
+                                <option value="@sender.Id">@(string.IsNullOrWhiteSpace(sender.DisplayName) ? sender.EmailAddress : $"{sender.DisplayName} <{sender.EmailAddress}>")</option>
+                            }
+                        </select>
                     </div>
                     <datalist id="@Mail.ContactListId">
                         @foreach (var contact in View.KnownContacts)

@@ -30,15 +30,27 @@ public partial class Mail
         MouseMenuRequest? native = null)
     {
         var leadFolder = MessageStore.GetFolders(lead.AccountId).FirstOrDefault(f => f.FullName == lead.FolderFullName);
+        var leadSummary = MessageStore.GetSummary(lead.AccountId, lead.FolderFullName, lead.Uid);
         bool isTrash = leadFolder?.Role == FolderRole.Trash;
 
-        ContextMenuItem Command(string label, MailMessageCommand command, string actionId, string? argument = null, DateTime? dueUtc = null) =>
-            new(label, () => MouseActionService.RunMessagesAsync(command, targets, argument, dueUtc, includeSelection: false), ActionId: actionId);
+        ContextMenuItem Command(string label, MailMessageCommand command, string actionId, string? argument = null, DateTime? dueUtc = null, bool separatorBefore = false) =>
+            new(label, () => MouseActionService.RunMessagesAsync(command, targets, argument, dueUtc, includeSelection: false), ActionId: actionId, SeparatorBefore: separatorBefore);
 
-        List<ContextMenuItem> items =
+        List<ContextMenuItem> items = [];
+        if (oneConversation && leadSummary != null)
+        {
+            items.Add(leadSummary.IsUnread
+                ? Command("✅ Mark read · Mouse 5", MailMessageCommand.Read, "Msg.Read")
+                : Command("📩 Mark unread", MailMessageCommand.Unread, "Msg.Unread"));
+        }
+        else
+        {
+            items.Add(Command("✅ Mark read · Mouse 5", MailMessageCommand.Read, "Msg.Read"));
+            items.Add(Command("📩 Mark unread", MailMessageCommand.Unread, "Msg.Unread"));
+        }
+
+        List<ContextMenuItem> markerChildren =
         [
-            Command("✅ Mark read · Mouse 5", MailMessageCommand.Read, "Msg.Read"),
-            Command("📩 Mark unread", MailMessageCommand.Unread, "Msg.Unread"),
             new("⭐ Star, Importance & Tags…", () =>
             {
                 ModalService.Open<MessageMarkersModal>(new Dictionary<string, object?>
@@ -46,15 +58,42 @@ public partial class Mail
                     [nameof(MessageMarkersModal.Targets)] = targets
                 }, ModalSize.Compact);
             }, actionId: "Msg.MarkersModal"),
-            Command(isTrash ? "🗑️ Delete forever · Mouse 4" : "🗑️ Move to Trash · Mouse 4", MailMessageCommand.Trash, "Msg.Trash"),
-            Command("📦 Archive", MailMessageCommand.Archive, "Msg.Archive"),
-            Command("🚫 Move to Spam", MailMessageCommand.Spam, "Msg.Spam"),
-            Command("📥 Restore to Inbox (local for local mail)", MailMessageCommand.Restore, "Msg.Restore"),
-            Command("⭐ Toggle stars", MailMessageCommand.ToggleStar, "Msg.ToggleStar"),
+            Command("⭐ Toggle star", MailMessageCommand.ToggleStar, "Msg.ToggleStar"),
             Command("❗ Toggle importance", MailMessageCommand.ToggleImportant, "Msg.ToggleImportant"),
             Command("🔇 Toggle mute", MailMessageCommand.ToggleMute, "Msg.ToggleMute")
         ];
+        if (TagStore.AllTags.Count > 0)
+        {
+            markerChildren.Add(new("🏷️ Add tag",
+                Children: [.. TagStore.AllTags.Select(tag => Command($"🏷️ {tag}", MailMessageCommand.AddTag, $"Msg.AddTag:{tag}", tag))],
+                ActionId: "Msg.AddTagGroup"));
+            markerChildren.Add(new("🏷️ Remove tag",
+                Children: [.. TagStore.AllTags.Select(tag => Command($"✕ {tag}", MailMessageCommand.RemoveTag, $"Msg.RemoveTag:{tag}", tag))],
+                ActionId: "Msg.RemoveTagGroup"));
+        }
 
+        items.Add(new("⭐ Labels, Star & Tags", () =>
+        {
+            ModalService.Open<MessageMarkersModal>(new Dictionary<string, object?>
+            {
+                [nameof(MessageMarkersModal.Targets)] = targets
+            }, ModalSize.Compact);
+            return Task.CompletedTask;
+        }, Children: markerChildren, ActionId: "Msg.MarkersModal"));
+
+        if (oneConversation)
+        {
+            items.Add(new("📖 Open message", () => OpenMessage(ResolveMenuMessage(lead)), actionId: "Msg.Open", separatorBefore: true));
+            items.Add(new("↩️ Reply & Forward", Children:
+            [
+                new("↩️ Reply", () => StartReply(ResolveMenuMessage(lead), false), actionId: "Msg.Reply"),
+                new("↩️ Reply all", () => StartReply(ResolveMenuMessage(lead), true), actionId: "Msg.ReplyAll"),
+                new("↪️ Forward", () => StartForward(ResolveMenuMessage(lead)), actionId: "Msg.Forward"),
+                new("📎 Forward as attachment (.eml)", () => StartForwardAsAttachment(ResolveMenuMessage(lead)), actionId: "Msg.ForwardAttachment")
+            ], ActionId: "Msg.ReplyMenu"));
+        }
+
+        items.Add(Command("📦 Archive", MailMessageCommand.Archive, "Msg.Archive", separatorBefore: true));
         var moves = MoveTargets(targets);
         if (moves.Count > 0)
         {
@@ -62,45 +101,33 @@ public partial class Mail
                 Children: [.. moves.Select(folder => Command(FolderLabel(folder), MailMessageCommand.Move, $"Msg.Move:{folder.FullName}", folder.FullName))],
                 ActionId: "Msg.MoveGroup"));
         }
-
-        if (TagStore.AllTags.Count > 0)
-        {
-            items.Add(new("🏷️ Add tag",
-                Children: [.. TagStore.AllTags.Select(tag => Command($"🏷️ {tag}", MailMessageCommand.AddTag, $"Msg.AddTag:{tag}", tag))],
-                ActionId: "Msg.AddTagGroup"));
-            items.Add(new("🏷️ Remove tag",
-                Children: [.. TagStore.AllTags.Select(tag => Command($"✕ {tag}", MailMessageCommand.RemoveTag, $"Msg.RemoveTag:{tag}", tag))],
-                ActionId: "Msg.RemoveTagGroup"));
-        }
-
         items.Add(new("💤 Snooze",
             Children: [.. SnoozeService.Presets.Select(preset =>
                 new ContextMenuItem(preset.Label, () => MouseActionService.RunMessagesAsync(MailMessageCommand.Snooze, targets, dueUtc: preset.DueUtc(), includeSelection: false), ActionId: $"Msg.Snooze:{preset.Label}"))],
             ActionId: "Msg.SnoozeGroup"));
-
         if (targets.Any(key => MessageStore.GetSummary(key.AccountId, key.FolderFullName, key.Uid)?.SnoozedUntilUtc != null))
             items.Add(Command("☀️ Wake now", MailMessageCommand.Wake, "Msg.Wake"));
+        items.Add(Command("🚫 Move to Spam", MailMessageCommand.Spam, "Msg.Spam"));
+        if (isTrash || leadFolder?.Role == FolderRole.Junk)
+            items.Add(Command("📥 Restore to Inbox", MailMessageCommand.Restore, "Msg.Restore"));
+        items.Add(Command(isTrash ? "🗑️ Delete forever · Mouse 4" : "🗑️ Move to Trash · Mouse 4", MailMessageCommand.Trash, "Msg.Trash"));
 
         if (oneConversation)
         {
-            string senderAddr = MessageStore.GetSummary(lead.AccountId, lead.FolderFullName, lead.Uid)?.FromAddress ?? string.Empty;
-            items.AddRange([
-                new("📖 Open message", () => OpenMessage(ResolveMenuMessage(lead)), actionId: "Msg.Open"),
-                new("↩️ Reply", () => StartReply(ResolveMenuMessage(lead), false), actionId: "Msg.Reply"),
-                new("↩️ Reply all", () => StartReply(ResolveMenuMessage(lead), true), actionId: "Msg.ReplyAll"),
-                new("↪️ Forward", () => StartForward(ResolveMenuMessage(lead)), actionId: "Msg.Forward"),
-                new("📎 Forward as attachment", () => StartForwardAsAttachment(ResolveMenuMessage(lead)), actionId: "Msg.ForwardAttachment"),
+            string senderAddr = leadSummary?.FromAddress ?? string.Empty;
+            items.Add(new("💾 Save & Export", Children:
+            [
                 new("💾 Save message (.eml / .html)…", () => OpenSaveModal(ResolveMenuMessage(lead)), actionId: "Msg.SaveModal"),
-                new("📄 Save message as .eml", () => ExportOpen(ResolveMenuMessage(lead), false), ActionId: "Msg.SaveEml"),
-                new("🌐 Save message as .html", () => ExportOpen(ResolveMenuMessage(lead), true), ActionId: "Msg.SaveHtml"),
+                new("📄 Save as .eml", () => ExportOpen(ResolveMenuMessage(lead), false), ActionId: "Msg.SaveEml"),
+                new("🌐 Save as .html", () => ExportOpen(ResolveMenuMessage(lead), true), ActionId: "Msg.SaveHtml"),
                 new("🧾 View message source", () => OpenMessageSource(ResolveMenuMessage(lead)), actionId: "Msg.ViewSource"),
                 new("📋 Copy subject", () => MouseActionService.RunAsync(MouseActionService.CopyAction, ResolveMenuMessage(lead).Subject), ActionId: "Msg.CopySubject"),
-                new("📋 Copy sender address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, ResolveMenuMessage(lead).FromAddress), ActionId: "Msg.CopySender"),
-                new("👤 Sender actions", Children: SenderMenuItems(lead.AccountId, senderAddr), ActionId: "Msg.SenderMenu")
-            ]);
+                new("📋 Copy sender address", () => MouseActionService.RunAsync(MouseActionService.CopyAction, ResolveMenuMessage(lead).FromAddress), ActionId: "Msg.CopySender")
+            ], ActionId: "Msg.SaveModal", SeparatorBefore: true));
+            items.Add(new("👤 Sender actions", Children: SenderMenuItems(lead.AccountId, senderAddr), ActionId: "Msg.SenderMenu"));
         }
         if (native?.Selection is { Length: > 0 } selected)
-            items.Add(new("📋 Copy selected text", () => MouseActionService.RunAsync(MouseActionService.CopyAction, selected), ActionId: "Msg.CopySelectedText"));
+            items.Add(new("📋 Copy selected text", () => MouseActionService.RunAsync(MouseActionService.CopyAction, selected), ActionId: "Msg.CopySelectedText", SeparatorBefore: true));
         if (native?.Link is { Length: > 0 } link)
         {
             items.Add(new("🔗 Copy link", () => MouseActionService.RunAsync(MouseActionService.CopyAction, link), ActionId: "Msg.CopyLink"));
@@ -108,10 +135,9 @@ public partial class Mail
                 items.Add(new("🌐 Open link", () => OpenUnsubscribePage(link), actionId: "Msg.OpenLink"));
         }
         AddGeneralMessageMenuItems(items, targets, lead);
-        items.AddRange([
-            new("☑️ Select all listed messages", SelectAllMessages, actionId: "List.SelectAll"),
-            new("✕ Clear selection", MailUiState.ClearSelection, actionId: "List.ClearSelection")
-        ]);
+        items.Add(new("☑️ Select all listed", SelectAllMessages, actionId: "List.SelectAll", separatorBefore: true));
+        if (MailUiState.SelectedMessages.Count > 0)
+            items.Add(new("✕ Clear selection", MailUiState.ClearSelection, actionId: "List.ClearSelection"));
         return items;
     }
 

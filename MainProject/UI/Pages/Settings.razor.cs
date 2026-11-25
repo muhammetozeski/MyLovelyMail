@@ -15,9 +15,33 @@ namespace MyLovelyMail.MainProject.UI.Pages;
 
 public partial class Settings
 {
+    internal enum SettingsTab
+    {
+        Appearance,
+        Accounts,
+        Mail,
+        Retention,
+        Privacy,
+        Advanced
+    }
+
+    static readonly (SettingsTab Tab, string Label)[] SettingsTabs =
+    [
+        (SettingsTab.Appearance, "🎨 Appearance & UI"),
+        (SettingsTab.Accounts, "👤 Accounts & Folders"),
+        (SettingsTab.Mail, "✉️ Mail & Sync"),
+        (SettingsTab.Retention, "🗑️ Retention"),
+        (SettingsTab.Privacy, "🛡️ Privacy & Tor"),
+        (SettingsTab.Advanced, "🧰 Data & Advanced")
+    ];
+
+    SettingsTab ActiveTab { get; set; } = SettingsTab.Appearance;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
+        if (NavManager.Uri.Contains("#folder-settings", StringComparison.OrdinalIgnoreCase))
+            ActiveTab = SettingsTab.Accounts;
         CredentialVault.OnVaultStateChanged += HandleVaultChanged;
         AccountStore.OnAccountsChanged += HandleVaultChanged;
         UiCustomizationStore.OnChanged += HandleVaultChanged;

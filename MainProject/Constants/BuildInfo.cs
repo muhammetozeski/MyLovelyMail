@@ -2,6 +2,6 @@ namespace MyLovelyMail.MainProject.Constants;
 
 public static class BuildInfo
 {
-    public const int BuildNumber = 170;
-    public const string CommitHash = "7ae2f07";
+    public const int BuildNumber = 173;
+    public const string CommitHash = "7fe0c74";
 }
