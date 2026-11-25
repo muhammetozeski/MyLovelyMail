@@ -161,7 +161,15 @@ namespace MyLovelyMail
             {
                 ToolTipText = AppConstants.AppNameHumanReadable,
                 LeftClickCommand = new Command(static () => TrayService.ShowMainWindow()),
-                NoLeftClickDelay = true
+                NoLeftClickDelay = true,
+                // MAUI 10.0.110+ lets a Grid child placed after BlazorWebView swallow all WinUI
+                // pointer input even when it renders nothing. Keep TaskbarIcon non-hit-testable
+                // and behind BlazorWebView; Win32 tray messages arrive on its own message window.
+                InputTransparent = true,
+                WidthRequest = 0,
+                HeightRequest = 0,
+                HorizontalOptions = LayoutOptions.Start,
+                VerticalOptions = LayoutOptions.Start
             };
 
             string iconPath = Path.Combine(AppContext.BaseDirectory, "trayicon.ico");
@@ -169,7 +177,7 @@ namespace MyLovelyMail
                 trayIcon.IconSource = ImageSource.FromFile(iconPath);
 
             FlyoutBase.SetContextFlyout(trayIcon, menu);
-            RootLayout.Add(trayIcon);
+            RootLayout.Insert(0, trayIcon);
 
             Loaded += (_, _) => trayIcon.ForceCreate();
         }
