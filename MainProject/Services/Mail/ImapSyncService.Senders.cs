@@ -43,7 +43,7 @@ public static partial class ImapSyncService
             var candidates = await ResiliencePolicy.GuardStep(folder.SearchAsync(SearchQuery.FromContains(senderAddress), ct), ct, account);
             foreach (var batch in candidates.Chunk(100))
             {
-                var fetched = await ResiliencePolicy.GuardStep(folder.FetchAsync(batch, SummaryItems, ct), ct, account);
+                var fetched = await ResiliencePolicy.GuardStep(folder.FetchAsync(batch, SummaryItemsFor(client), ct), ct, account);
                 var matches = fetched.Where(item => item.UniqueId.IsValid
                     && string.Equals(item.Envelope?.From?.Mailboxes.FirstOrDefault()?.Address, senderAddress,
                         StringComparison.OrdinalIgnoreCase)).Select(ToSummary).ToList();

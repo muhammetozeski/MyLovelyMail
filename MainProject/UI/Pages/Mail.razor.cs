@@ -312,22 +312,16 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal static string SyncHealthTooltip(MailAccountData account)
         {
             var health = SyncHealthService.For(account.Id);
-            if (!string.IsNullOrWhiteSpace(account.Title) || !string.IsNullOrWhiteSpace(account.Note))
-            {
-                string status = health.IsFailing
-                    ? $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}"
-                    : health.LastSuccessUtc is { } s ? $"Last synced {s.ToLocalTime():HH:mm}" : "Not synced yet";
-                var lines = new List<string>(4);
-                if (!string.IsNullOrWhiteSpace(account.Title)) lines.Add($"🏷️ {account.Title}");
-                if (!string.IsNullOrWhiteSpace(account.Note)) lines.Add(account.Note);
-                lines.Add(status);
-                return string.Join("\n", lines);
-            }
-            if (health.IsFailing)
-                return $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}";
-            return health.LastSuccessUtc is { } success
-                ? $"Last synced {success.ToLocalTime():HH:mm}"
-                : "Not synced yet";
+            string status = health.IsFailing
+                ? $"Failed {health.ConsecutiveFailures}× — {health.LastErrorMessage}"
+                : health.LastSuccessUtc is { } s ? $"Last synced {s.ToLocalTime():HH:mm}" : "Not synced yet";
+            var lines = new List<string>(5);
+            if (!string.IsNullOrWhiteSpace(account.Title)) lines.Add($"🏷️ {account.Title}");
+            if (!string.IsNullOrWhiteSpace(account.Note)) lines.Add(account.Note);
+            lines.Add(status);
+            if (!health.IsFailing && !string.IsNullOrWhiteSpace(health.LastNoticeMessage))
+                lines.Add($"Note: {health.LastNoticeMessage}");
+            return string.Join("\n", lines);
         }
 
         void RefreshLists()

@@ -372,6 +372,27 @@ public sealed class MailTmProvider : IFastMailProvider
         }
     }
 
+    static readonly SemaphoreSlim ApiPaceGate = new(1, 1);
+    static DateTime lastApiCallUtc = DateTime.MinValue;
+    static readonly TimeSpan MinApiSpacing = TimeSpan.FromMilliseconds(380);
+    const int MaxRateLimitRetries = 3;
+
+    static async Task PaceApiRequestAsync(CancellationToken cancellationToken)
+    {
+        await ApiPaceGate.WaitAsync(cancellationToken);
+        try
+        {
+            var elapsed = DateTime.UtcNow - lastApiCallUtc;
+            if (elapsed < MinApiSpacing)
+                await Task.Delay(MinApiSpacing - elapsed, cancellationToken);
+            lastApiCallUtc = DateTime.UtcNow;
+        }
+        finally
+        {
+            ApiPaceGate.Release();
+        }
+    }
+
     static async Task<HttpResponseMessage> SendAuthorizedAsync(
         HttpClient client,
         MailAccountData account,
@@ -394,15 +415,17 @@ public sealed class MailTmProvider : IFastMailProvider
             return r;
         }
 
+        await PaceApiRequestAsync(cancellationToken);
         using var req = BuildRequest(method, url, token, contentBytes, contentMediaType);
         var resp = await client.SendAsync(req, cancellationToken);
 
-        if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+        for (int attempt = 1; attempt <= MaxRateLimitRetries && resp.StatusCode == HttpStatusCode.TooManyRequests; attempt++)
         {
-            TimeSpan delay = GetRetryAfterDelay(resp);
+            TimeSpan delay = TimeSpan.FromSeconds(Math.Min(8.0, GetRetryAfterDelay(resp).TotalSeconds * attempt));
             resp.Dispose();
-            Log($"MailTm.SendAuthorizedAsync: 429 TooManyRequests on '{url}', waiting {delay.TotalMilliseconds:0}ms before retry.", LogLevel.Warning, Run: IsLogEnabled);
+            Log($"MailTm.SendAuthorizedAsync: 429 TooManyRequests on '{url}' (attempt {attempt}/{MaxRateLimitRetries}), waiting {delay.TotalMilliseconds:0}ms.", LogLevel.Warning, Run: IsLogEnabled);
             await Task.Delay(delay, cancellationToken);
+            await PaceApiRequestAsync(cancellationToken);
             using var rateRetryReq = BuildRequest(method, url, token, contentBytes, contentMediaType);
             resp = await client.SendAsync(rateRetryReq, cancellationToken);
         }
@@ -412,6 +435,7 @@ public sealed class MailTmProvider : IFastMailProvider
             resp.Dispose();
             Log($"MailTm.SendAuthorizedAsync: 401 on '{url}', refreshing bearer token for '{account.EmailAddress}'", LogLevel.Warning, Run: IsLogEnabled);
             string refreshed = await EnsureBearerTokenAsync(client, account, forceRefresh: true, cancellationToken);
+            await PaceApiRequestAsync(cancellationToken);
             using var retryReq = BuildRequest(method, url, refreshed, contentBytes, contentMediaType);
             resp = await client.SendAsync(retryReq, cancellationToken);
         }

@@ -21,10 +21,20 @@ namespace MyLovelyMail.MainProject.Services.Mail
         /// <summary>First-fill fetches land in slices this big, each painted into the UI on arrival.</summary>
         const int FirstFillSliceSize = 50;
 
-        const MessageSummaryItems SummaryItems =
+        const MessageSummaryItems BaseSummaryItems =
             MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.Flags |
-            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.PreviewText |
-            MessageSummaryItems.References;
+            MessageSummaryItems.Size | MessageSummaryItems.BodyStructure | MessageSummaryItems.References;
+
+        /// <summary>
+        /// Requests RFC 8970 PREVIEW only when the server advertises it. On servers without PREVIEW
+        /// (such as Gmail), requesting PreviewText forces MailKit to download partial BODY text for
+        /// every single message in a second round-trip, making header syncs 10-20x slower and causing
+        /// multi-folder passes to time out.
+        /// </summary>
+        static MessageSummaryItems SummaryItemsFor(ImapClient client) =>
+            client.Capabilities.HasFlag(ImapCapabilities.Preview)
+                ? BaseSummaryItems | MessageSummaryItems.PreviewText
+                : BaseSummaryItems;
 
 
         /// <summary>Refreshes the folder list, the Inbox, and a couple of the stalest other folders.</summary>
@@ -32,14 +42,18 @@ namespace MyLovelyMail.MainProject.Services.Mail
         {
             using var syncScope = SyncScheduler.EnterSyncScope(account.Id, account.EmailAddress);
             Log($"IMAP sync started: {account.EmailAddress}");
-            await ResiliencePolicy.RunNetwork(async ct =>
-            {
-                using var client = await MailConnections.OpenImapAsync(account, ct);
-                await SyncFolderListAsync(account, client, ct);
-                await SyncOpenedFolderAsync(account, client, client.Inbox, ct);
-                await RefreshStalestFoldersAsync(account, client, ct);
-                await client.DisconnectAsync(true, ct);
-            }, cancellationToken, account);
+
+            using var client = await ResiliencePolicy.RunNetwork(
+                ct => MailConnections.OpenImapAsync(account, ct),
+                cancellationToken,
+                account);
+
+            await SyncFolderListAsync(account, client, cancellationToken);
+            await SyncOpenedFolderAsync(account, client, client.Inbox, cancellationToken);
+            await RefreshStalestFoldersAsync(account, client, cancellationToken);
+            try { await ResiliencePolicy.GuardStep(client.DisconnectAsync(true, cancellationToken), cancellationToken, account); }
+            catch { /* Clean disconnect is best-effort after sync already persisted. */ }
+
             Log($"IMAP sync finished: {account.EmailAddress}");
         }
 
@@ -57,21 +71,39 @@ namespace MyLovelyMail.MainProject.Services.Mail
             if (count <= 0) return;
 
             var stalest = MessageStore.GetFolders(account.Id)
-                .Where(f => !f.IsLocal && f.Selectable && !f.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase))
-                // A server count that disagrees with the cache is free evidence something changed,
-                // so those folders go first; the rest fall back to plain age.
-                .OrderByDescending(f => f.TotalCount != MessageStore.CountSummaries(account.Id, f.FullName))
+                .Where(f => !f.IsLocal
+                    && f.Selectable
+                    && !f.FullName.Equals(MessageStore.InboxFullName, StringComparison.OrdinalIgnoreCase)
+                    && FolderSyncPolicy.PullsFromServer(account.Id, f.FullName))
+                // Never-synced folders first, then genuinely oldest synced folders so large
+                // folders (>300 messages) never starve the rotation.
+                .OrderBy(f => f.LastSyncedUtc.HasValue ? 1 : 0)
                 .ThenBy(f => f.LastSyncedUtc ?? DateTime.MinValue)
                 .Take(count)
                 .ToList();
 
+            List<string> touched = [];
             foreach (var folder in stalest)
             {
-                var serverFolder = await client.GetFolderAsync(folder.FullName, cancellationToken);
-                await SyncOpenedFolderAsync(account, client, serverFolder, cancellationToken, backgroundRefresh: true);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var serverFolder = await ResiliencePolicy.GuardStep(client.GetFolderAsync(folder.FullName, cancellationToken), cancellationToken, account);
+                    await SyncOpenedFolderAsync(account, client, serverFolder, cancellationToken, backgroundRefresh: true);
+                    touched.Add(folder.FullName);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Log($"Background folder refresh skipped '{folder.FullName}' on {account.EmailAddress}: {ex.Message}", LogLevel.Warning);
+                    if (!client.IsConnected) break;
+                }
             }
-            if (stalest.Count > 0)
-                Log($"Background refresh touched: {string.Join(", ", stalest.Select(static f => f.FullName))}");
+            if (touched.Count > 0)
+                Log($"Background refresh touched: {string.Join(", ", touched)}");
         }
 
         /// <summary>Syncs one folder's messages; reached through <see cref="KickFolderSync"/> when the user opens a folder.</summary>
@@ -154,8 +186,9 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 return;
             }
 
-            await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+            await ResiliencePolicy.GuardStep(folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken), cancellationToken, account);
 
+            var summaryItems = SummaryItemsFor(client);
             var cached = MessageStore.GetFolders(account.Id).FirstOrDefault(f => f.FullName == folder.FullName);
             uint lastSeenUid = cached?.LastSeenUid ?? 0;
 
@@ -181,7 +214,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 for (int sliceEnd = folder.Count - 1; sliceEnd >= startIndex; sliceEnd -= FirstFillSliceSize)
                 {
                     int sliceStart = Math.Max(startIndex, sliceEnd - FirstFillSliceSize + 1);
-                    var slice = await folder.FetchAsync(sliceStart, sliceEnd, SummaryItems, cancellationToken);
+                    var slice = await ResiliencePolicy.GuardStep(folder.FetchAsync(sliceStart, sliceEnd, summaryItems, cancellationToken), cancellationToken, account);
                     List<MailMessageSummary> sliceSummaries = [.. slice.Where(static i => i.UniqueId.IsValid).Select(ToSummary)];
                     if (sliceSummaries.Count == 0) continue;
                     MessageStore.UpsertSummaries(account.Id, folder.FullName, sliceSummaries);
@@ -194,7 +227,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
             else if (folder.Count > 0 && !(folder.UidNext is { IsValid: true } uidNext && uidNext.Id <= lastSeenUid + 1))
             {
                 var range = new UniqueIdRange(new UniqueId(lastSeenUid + 1), UniqueId.MaxValue);
-                var fetched = await folder.FetchAsync(range, SummaryItems, cancellationToken);
+                var fetched = await ResiliencePolicy.GuardStep(folder.FetchAsync(range, summaryItems, cancellationToken), cancellationToken, account);
                 foreach (var item in fetched)
                 {
                     if (!item.UniqueId.IsValid) continue;

@@ -12,6 +12,8 @@ namespace MyLovelyMail.MainProject.Services.Mail
         public DateTime? LastSuccessUtc { get; set; }
         public DateTime? LastErrorUtc { get; set; }
         public string? LastErrorMessage { get; set; }
+        public DateTime? LastNoticeUtc { get; set; }
+        public string? LastNoticeMessage { get; set; }
         public int ConsecutiveFailures { get; set; }
 
         /// <summary>
@@ -58,6 +60,19 @@ namespace MyLovelyMail.MainProject.Services.Mail
             health.LastSuccessUtc = DateTime.UtcNow;
             health.ConsecutiveFailures = 0;
             health.LastErrorMessage = null;
+            health.LastNoticeMessage = null;
+            Save();
+        }
+
+        /// <summary>
+        /// Records a non-actionable transient condition (e.g. offline internet or remote server slowness
+        /// timeout) so the user can inspect it in tooltips/logs without incrementing the account warning counter.
+        /// </summary>
+        public static void RecordNotice(string accountId, string notice)
+        {
+            var health = For(accountId);
+            health.LastNoticeUtc = DateTime.UtcNow;
+            health.LastNoticeMessage = notice;
             Save();
         }
 

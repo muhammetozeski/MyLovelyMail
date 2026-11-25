@@ -126,7 +126,7 @@ namespace MyLovelyMail.MainProject.Services.Mail
                     var chunk = wanted.Skip(i).Take(ChunkSize).ToList();
 
                     var fetched = await ResiliencePolicy.RunNetwork(
-                        ct => fetchFolder.FetchAsync(chunk, SummaryItems, ct),
+                        ct => fetchFolder.FetchAsync(chunk, SummaryItemsFor(fetchClient), ct),
                         cancellationToken,
                         account);
 

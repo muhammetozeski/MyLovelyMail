@@ -211,12 +211,96 @@ namespace MyLovelyMail.MainProject.Services.Mail
             }
             catch (Exception ex)
             {
-                SyncHealthService.MarkFailure(account.Id, ex.Message);
-                Log($"Sync failed for '{account.EmailAddress}': {ex}", LogLevel.Error);
+                await RecordSyncFailureAsync(account, ex, cancellationToken);
             }
             finally
             {
                 gate.Release();
+            }
+        }
+
+        static DateTime lastConnectivityCheckUtc = DateTime.MinValue;
+        static bool lastInternetReachable = true;
+        static readonly SemaphoreSlim ConnectivityGate = new(1, 1);
+        static readonly HttpClient ConnectivityProbeClient = new() { Timeout = TimeSpan.FromSeconds(2.5) };
+
+        /// <summary>
+        /// Classifies sync failures so genuine account/config/protocol errors increment the account warning
+        /// counter, while pure internet-offline outages or remote-server slowness timeouts are logged and
+        /// recorded as inspectable notices instead of showing false warning triangles on every account.
+        /// </summary>
+        static async Task RecordSyncFailureAsync(MailAccountData account, Exception ex, CancellationToken cancellationToken)
+        {
+            if (IsPureTimeoutException(ex))
+            {
+                SyncHealthService.RecordNotice(account.Id, $"Server responded slowly (timeout): {ex.Message}");
+                Log($"Sync timed out for '{account.EmailAddress}' (recorded as transient notice): {ex.Message}", LogLevel.Warning);
+                return;
+            }
+
+            if (IsConnectivityException(ex) && !await HasGeneralInternetConnectivityAsync(cancellationToken))
+            {
+                SyncHealthService.RecordNotice(account.Id, "No internet connection detected during sync.");
+                Log($"Sync paused for '{account.EmailAddress}' (no general internet connectivity): {ex.Message}", LogLevel.Warning);
+                return;
+            }
+
+            SyncHealthService.MarkFailure(account.Id, ex.Message);
+            Log($"Sync failed for '{account.EmailAddress}': {ex}", LogLevel.Error);
+        }
+
+        internal static bool IsPureTimeoutException(Exception ex)
+        {
+            for (Exception? cur = ex; cur != null; cur = cur.InnerException)
+            {
+                if (cur is Polly.Timeout.TimeoutRejectedException or TimeoutException)
+                    return true;
+                if (cur is TaskCanceledException && cur.InnerException is TimeoutException)
+                    return true;
+            }
+            return false;
+        }
+
+        internal static bool IsConnectivityException(Exception ex)
+        {
+            for (Exception? cur = ex; cur != null; cur = cur.InnerException)
+            {
+                if (cur is System.Net.Sockets.SocketException or HttpRequestException)
+                    return true;
+            }
+            return false;
+        }
+
+        static async Task<bool> HasGeneralInternetConnectivityAsync(CancellationToken cancellationToken)
+        {
+            if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+                return false;
+
+            if ((DateTime.UtcNow - lastConnectivityCheckUtc) < TimeSpan.FromSeconds(15))
+                return lastInternetReachable;
+
+            await ConnectivityGate.WaitAsync(cancellationToken);
+            try
+            {
+                if ((DateTime.UtcNow - lastConnectivityCheckUtc) < TimeSpan.FromSeconds(15))
+                    return lastInternetReachable;
+
+                try
+                {
+                    using var req = new HttpRequestMessage(HttpMethod.Head, "https://www.google.com/generate_204");
+                    using var resp = await ConnectivityProbeClient.SendAsync(req, cancellationToken);
+                    lastInternetReachable = true;
+                }
+                catch
+                {
+                    lastInternetReachable = false;
+                }
+                lastConnectivityCheckUtc = DateTime.UtcNow;
+                return lastInternetReachable;
+            }
+            finally
+            {
+                ConnectivityGate.Release();
             }
         }
     }

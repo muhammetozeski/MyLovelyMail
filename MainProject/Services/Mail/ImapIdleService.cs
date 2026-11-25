@@ -175,7 +175,10 @@ namespace MyLovelyMail.MainProject.Services.Mail
                 }
                 catch (Exception ex)
                 {
-                    SyncHealthService.MarkFailure(account.Id, ex.Message);
+                    // A dropped IDLE socket is normal on NAT routers, laptop sleep, or Tor circuit
+                    // rotation. Record it as a diagnostic notice rather than marking the account
+                    // broken while IDLE reconnects in the background.
+                    SyncHealthService.RecordNotice(account.Id, $"IDLE reconnecting: {ex.Message}");
 
                     // A long-held IDLE that dropped usually dropped because its circuit did. Coming
                     // back on the same one repeats the failure; the next connection picks a new path.
