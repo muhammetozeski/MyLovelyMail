@@ -34,6 +34,18 @@
             @Item.Label
         </PillButton>
     }
+    else if (Item.VisualKind == ActionVisualKind.GlowPlusOrb)
+    {
+        <GlowPlusButton Disabled="@Item.Disabled"
+                        Title="@EffectiveTitle"
+                        CustomClass="@Item.CustomClass"
+                        ShouldSuppressClick="ActionDragService.ConsumeSuppressedClick"
+                        OnClick="InvokeItemClickAsync"
+                        OnContextMenu="HandleContextMenu"
+                        PreventContextMenuDefault="true"
+                        StopContextMenuPropagation="true"
+                        @attributes="ExtraAttributes" />
+    }
     else
     {
         <button type="button"
@@ -206,6 +218,11 @@
     async Task HandleClickAsync(MouseEventArgs e)
     {
         if (ActionDragService.ConsumeSuppressedClick()) return;
+        await InvokeItemClickAsync(e);
+    }
+
+    async Task InvokeItemClickAsync(MouseEventArgs e)
+    {
         if (Item.Disabled || Item.OnClick == null) return;
         if (e.ClientX > 0 || e.ClientY > 0)
         {

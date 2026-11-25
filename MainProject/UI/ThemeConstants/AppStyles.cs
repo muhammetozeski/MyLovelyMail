@@ -25,6 +25,25 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static string ShadowGoldGlow => GetShadow(0, 10, 20, AppColors.Gold, 0.4f);
         public static string ShadowDiamondGlow => GetShadow(0, 0, 24, AppColors.Diamond, 0.6f);
         public static string ShadowErrorGlow => GetShadow(0, 10, 20, AppColors.Error, 0.4f);
+        public static string ShadowSuccessGlow =>
+            $"{GetShadow(0, 0, 14, AppColors.Success, 0.72f)}, {GetShadow(0, 0, 26, AppColors.Success, 0.38f)}, inset 0 1px 1px {AppColors.GlassBorderTop.ToRgbaHex(true)}";
+        public static string ShadowSuccessGlowStrong =>
+            $"{GetShadow(0, 0, 18, AppColors.Success, 0.90f)}, {GetShadow(0, 0, 34, AppColors.Success, 0.50f)}, inset 0 1px 2px {AppColors.GlassBorderTop.ToRgbaHex(true)}";
+        public static string GlowPlusGradient =>
+            $"radial-gradient(circle at 30% 25%, {AppColors.Success.ToRgbaHex(true)} 0%, {AppColors.SuccessDark.ToRgbaHex(true)} 100%)";
+        public const string EasingLerpOut = "cubic-bezier(0.16, 1, 0.3, 1)";
+
+        /// <summary>Builds a tinted background, border, and soft glow for an account-bound input box (e.g. Compose From selector).</summary>
+        public static string BuildAccountTintedBoxStyle(string? colorHex)
+        {
+            Color tint = AppColors.Primary;
+            if (!string.IsNullOrWhiteSpace(colorHex))
+            {
+                try { tint = Color.FromArgb(colorHex); }
+                catch { tint = AppColors.Primary; }
+            }
+            return $"background:{tint.WithAlpha(0.22f).ToRgbaHex(true)};border-color:{tint.WithAlpha(0.78f).ToRgbaHex(true)};box-shadow:{GetShadow(0, 0, 12, tint, 0.28f)};";
+        }
 
         /// <summary> A taller, warmer gold halo than <see cref="ShadowGoldGlow"/> — the premium "lift" under PRO badges and the Upgrade button so they read as the most valuable surface on screen. </summary>
         public static string ShadowPremiumGlow => GetShadow(0, 12, 32, AppColors.Gold, 0.45f);

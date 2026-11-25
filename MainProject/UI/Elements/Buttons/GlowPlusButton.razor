@@ -1,0 +1,100 @@
+@namespace MyLovelyMail.MainProject.UI.Elements.Buttons
+@inherits ThemedComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Web
+@using MyLovelyMail.MainProject.Services
+
+<button type="button"
+        class="@ComputedClass"
+        title="@Title"
+        aria-label="@(string.IsNullOrWhiteSpace(Title) ? "Create new" : Title)"
+        disabled="@Disabled"
+        data-orb-rotated="@(isRotated ? "true" : "false")"
+        @onclick="HandleButtonClickAsync"
+        @oncontextmenu="OnContextMenu"
+        @oncontextmenu:preventDefault="@PreventContextMenuDefault"
+        @oncontextmenu:stopPropagation="@StopContextMenuPropagation"
+        @attributes="AdditionalAttributes">
+    <svg class="@ActionBarCssClasses.GlowPlusGlyph" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4.5V19.5M4.5 12H19.5"
+              stroke="currentColor"
+              stroke-width="3.8"
+              stroke-linecap="round" />
+    </svg>
+</button>
+
+@code {
+    const int SpinBeforeMenuDelayMs = 180;
+
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+    [Parameter] public bool PreventContextMenuDefault { get; set; }
+    [Parameter] public bool StopContextMenuPropagation { get; set; }
+    [Parameter] public Func<bool>? ShouldSuppressClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnContextMenu { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    bool isRotated;
+    bool spinInFlight;
+
+    string ComputedClass
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder(ActionBarCssClasses.GlowPlusOrb);
+            if (isRotated) sb.Append(' ').Append(ActionBarCssClasses.GlowPlusOrbSpin);
+            if (!string.IsNullOrWhiteSpace(CustomClass)) sb.Append(' ').Append(CustomClass);
+            return sb.ToString();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ContextMenuService.OnChanged += HandleMenuChanged;
+    }
+
+    void HandleMenuChanged()
+    {
+        if (!spinInFlight && !ContextMenuService.IsOpen && isRotated)
+        {
+            isRotated = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task HandleButtonClickAsync(MouseEventArgs e)
+    {
+        if (Disabled || spinInFlight) return;
+        if (ShouldSuppressClick?.Invoke() == true) return;
+
+        spinInFlight = true;
+        isRotated = true;
+        StateHasChanged();
+
+        try
+        {
+            if (!MotionPreference.IsCalm)
+                await Task.Delay(SpinBeforeMenuDelayMs);
+
+            await OnClick.InvokeAsync(e);
+        }
+        finally
+        {
+            spinInFlight = false;
+            if (!ContextMenuService.IsOpen && isRotated)
+            {
+                isRotated = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    public new void Dispose()
+    {
+        ContextMenuService.OnChanged -= HandleMenuChanged;
+        base.Dispose();
+    }
+}

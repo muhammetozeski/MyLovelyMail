@@ -10,7 +10,8 @@ public enum ActionVisualKind
     RowQuick,
     SidebarQuick,
     SidebarNewFolder,
-    ComposeBtn
+    ComposeBtn,
+    GlowPlusOrb
 }
 
 /// <summary>

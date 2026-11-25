@@ -134,6 +134,7 @@
                         <span class="@MailCssClasses.AccountDot" style="background:@(draft.Account?.ColorHex ?? AppColors.Primary.ToRgbaHex(true))"></span>
                         <span>From:</span>
                         <select class="@MailCssClasses.ModalSelectInput"
+                                style="@AppStyles.BuildAccountTintedBoxStyle(draft.Account?.ColorHex)"
                                 value="@(draft.Account?.Id ?? string.Empty)"
                                 @onchange="e => { if (AccountStore.GetById(e.Value?.ToString() ?? string.Empty) is { } chosen) View.SwitchDraftAccount(draft, chosen); }"
                                 @oncontextmenu="e => { if (draft.Account is { } acc) View.OpenAccountMenu(acc, e); }"
@@ -141,7 +142,7 @@
                                 @oncontextmenu:stopPropagation="true">
                             @foreach (var sender in AccountStore.Accounts)
                             {
-                                <option value="@sender.Id">@(string.IsNullOrWhiteSpace(sender.DisplayName) ? sender.EmailAddress : $"{sender.DisplayName} <{sender.EmailAddress}>")</option>
+                                <option value="@sender.Id" style="background:@AppColors.Background.ToRgbaHex(true);color:@AppColors.TextPrimary.ToRgbaHex(true);">@(string.IsNullOrWhiteSpace(sender.DisplayName) ? sender.EmailAddress : $"{sender.DisplayName} <{sender.EmailAddress}>")</option>
                             }
                         </select>
                     </div>

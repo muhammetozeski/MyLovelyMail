@@ -131,4 +131,53 @@
         font-weight: @(AppMeasures.Weight.Normal);
         color: @AppColors.TextSecondary.ToRgbaHex(true);
     }
+
+    .@(ActionBarCssClasses.GlowPlusOrb) {
+        --orb-size: calc(var(--bar-row-h, @(AppMeasures.Size.Px40)px) * @(AppMeasures.Percent.GlowOrb) / @(AppMeasures.Percent.Full));
+        width: var(--orb-size);
+        height: var(--orb-size);
+        min-width: var(--orb-size);
+        min-height: var(--orb-size);
+        padding: 0;
+        border-radius: @(AppMeasures.Radius.Circular)%;
+        border: @(AppMeasures.Border.Medium)px solid @AppColors.Success.WithAlpha(0.82f).ToRgbaHex(true);
+        background: @AppStyles.GlowPlusGradient;
+        color: @AppColors.TextOnSuccess.ToRgbaHex(true);
+        box-shadow: @AppStyles.ShadowSuccessGlow;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: transform @(AppMeasures.Duration.Fast)s ease,
+                    box-shadow @(AppMeasures.Duration.Fast)s ease,
+                    filter @(AppMeasures.Duration.Fast)s ease;
+    }
+
+    .@(ActionBarCssClasses.GlowPlusOrb):hover:not(:disabled) {
+        box-shadow: @AppStyles.ShadowSuccessGlowStrong;
+        filter: brightness(1.08);
+        transform: scale(1.06);
+    }
+
+    .@(ActionBarCssClasses.GlowPlusOrb):active:not(:disabled) {
+        transform: scale(0.96);
+    }
+
+    .@(ActionBarCssClasses.GlowPlusOrbSpin) {
+        box-shadow: @AppStyles.ShadowSuccessGlowStrong;
+    }
+
+    .@(ActionBarCssClasses.GlowPlusGlyph) {
+        width: @(AppMeasures.Percent.GlowOrbIcon)%;
+        height: @(AppMeasures.Percent.GlowOrbIcon)%;
+        display: block;
+        pointer-events: none;
+        transform: rotate(0deg);
+        transition: transform @(AppMeasures.Duration.LerpOut)s @AppStyles.EasingLerpOut;
+    }
+
+    .@(ActionBarCssClasses.GlowPlusOrbSpin) .@(ActionBarCssClasses.GlowPlusGlyph) {
+        transform: rotate(135deg);
+    }
 </style>

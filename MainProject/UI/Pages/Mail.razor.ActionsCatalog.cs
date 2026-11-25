@@ -285,7 +285,7 @@ public partial class Mail
         ];
         if (MailUiState.SelectedAccount is { } selectedAcc)
         {
-            items.Add(new($"📂+ New mail folder in {selectedAcc.EmailAddress}…",
+            items.Add(new("📂+ New mail folder…",
                 () => ModalService.OpenCreateMailFolder(selectedAcc.Id),
                 actionId: "Account.NewMailFolder"));
         }
@@ -308,8 +308,9 @@ public partial class Mail
     {
         List<UiActionModel> list =
         [
-            UiActionModel.CreateMouseSync("Sidebar.NewMenu", "➕ New ▾", OpenSidebarNewMenu,
-                title: "Create account group, mail folder, add account, or sync"),
+            UiActionModel.CreateMouseSync("Sidebar.NewMenu", "+", OpenSidebarNewMenu,
+                title: "Create account group, mail folder, add account, or sync",
+                visualKind: ActionVisualKind.GlowPlusOrb),
         ];
         if (MailUiState.SelectedAccount != null)
         {
@@ -581,7 +582,9 @@ public partial class Mail
             "Folder.SearchUnread" => Make("🔎 Unread in folder", "🔎", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.SearchUnread); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
             "Folder.Filters" => Make("🪄 Folder filters", "🪄", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.Filters); return Task.CompletedTask; }, disabled: activeFolder is not { Selectable: true }),
             "Folder.Settings" => Make("⚙️ Folder settings", "⚙️", _ => { if (activeFolder != null) RunFolderMenuAction(activeFolder, FolderMenuAction.Settings); return Task.CompletedTask; }, disabled: activeFolder == null),
-            "Sidebar.NewMenu" => Make("➕ New ▾", "➕", e => { OpenSidebarNewMenu(e); return Task.CompletedTask; }),
+            "Sidebar.NewMenu" => new("Sidebar.NewMenu", "+", e => { OpenSidebarNewMenu(e); return Task.CompletedTask; },
+                Title: "Create account group, mail folder, add account, or sync",
+                VisualKind: ActionVisualKind.GlowPlusOrb),
             "Sidebar.NewAccountFolder" => Make("📁+ Group", "📁+", _ => { ModalService.OpenCreateFolder(); return Task.CompletedTask; }),
             "AccGroup.AddAccount" => Make("➕ Add account", "➕", _ => { ModalService.OpenAddAccount(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId); return Task.CompletedTask; }),
             "AccGroup.NewFastMail" => Make("⚡ New Fast Mail", "⚡", _ => { ModalService.OpenFastMail(activeAccountFolder?.Id ?? AccountFolderStore.DefaultFolderId); return Task.CompletedTask; }),

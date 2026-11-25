@@ -774,30 +774,8 @@ namespace MyLovelyMail.MainProject.UI.Pages
         internal static string FolderIcon(MailFolderData folder) =>
             folder.IsLocal ? LocalFolderIcon : FolderIcon(folder.Role);
 
-        internal static string FolderLabel(MailFolderData folder)
-        {
-            if (folder.IsLocal) return $"{folder.DisplayName} {LocalFolderSuffix}";
-
-            // Disambiguate colliding folder names in the same account (e.g. "[Gmail]/Önemli" vs user label "önemli")
-            // without hiding or deleting any folder.
-            if (folder.Delimiter != '\0' && folder.FullName.Contains(folder.Delimiter))
-            {
-                var siblings = MessageStore.GetFolders(folder.AccountId);
-                bool hasCollision = siblings.Any(other =>
-                    !other.IsLocal
-                    && !string.Equals(other.FullName, folder.FullName, StringComparison.Ordinal)
-                    && string.Equals(other.DisplayName, folder.DisplayName, StringComparison.OrdinalIgnoreCase));
-                if (hasCollision)
-                {
-                    int cut = folder.FullName.LastIndexOf(folder.Delimiter);
-                    string parent = folder.FullName[..cut].Trim('[', ']');
-                    if (!string.IsNullOrWhiteSpace(parent))
-                        return $"{folder.DisplayName} ({parent})";
-                }
-            }
-
-            return folder.DisplayName;
-        }
+        internal static string FolderLabel(MailFolderData folder) =>
+            folder.IsLocal ? $"{folder.DisplayName} {LocalFolderSuffix}" : folder.DisplayName;
 
         internal static string FolderIcon(FolderRole role) => role switch
         {

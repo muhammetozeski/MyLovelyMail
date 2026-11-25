@@ -25,4 +25,8 @@ public static class ActionBarCssClasses
 
     public const string Ghost = "ui-action-drag-ghost";
     public const string GhostHint = "ui-action-drag-ghost-hint";
+
+    public const string GlowPlusOrb = "ui-glow-plus-orb";
+    public const string GlowPlusOrbSpin = "ui-glow-plus-orb--spin";
+    public const string GlowPlusGlyph = "ui-glow-plus-glyph";
 }

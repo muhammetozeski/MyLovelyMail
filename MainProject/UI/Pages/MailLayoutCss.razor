@@ -85,6 +85,14 @@
         height: @paneHeight;
     }
 
+    .@(MailCssClasses.SidebarTopBar) {
+        --bar-row-h: @(AppMeasures.Size.Px40)px;
+        box-sizing: border-box;
+        min-height: var(--bar-row-h);
+        padding: 0 @(AppMeasures.Space.Px8)px;
+        gap: @(AppMeasures.Space.Px8)px;
+    }
+
     .@(MailCssClasses.SidebarNav) {
         display: contents;
     }

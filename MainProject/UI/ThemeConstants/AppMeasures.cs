@@ -137,7 +137,9 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         public static class Percent
         {
             public const int Half = 50;
+            public const int GlowOrbIcon = 62;
             public const int ThreeQuarters = 75;
+            public const int GlowOrb = 85;
             public const int Most = 88;
             public const int Full = 100;
             public const int Double = 200;
@@ -240,6 +242,7 @@ namespace MyLovelyMail.MainProject.Constants.ThemeConstants
         {
             public const string Instant = "0.15";
             public const string Fast = "0.2";
+            public const string LerpOut = "0.28";
             public const string Normal = "0.3";
             public const string Medium = "0.4";
             public const string Slow = "0.6";

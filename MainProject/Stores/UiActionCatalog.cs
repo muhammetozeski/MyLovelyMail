@@ -85,7 +85,7 @@ public static class UiActionCatalog
         ["Workspace.Compose"] = ("✏️ Compose New Message", "Workspace"),
         ["Workspace.SyncAll"] = ("🔄 Sync Mail Now", "Workspace"),
         ["Workspace.Settings"] = ("⚙️ Open Settings", "Workspace"),
-        ["Sidebar.NewMenu"] = ("➕ New (Group / Folder) ▾", "Workspace"),
+        ["Sidebar.NewMenu"] = ("➕ Create New (+)", "Workspace"),
         ["Sidebar.NewAccountFolder"] = ("📁+ New Account Group", "Workspace"),
 
         // Navigation, Reader & Compose

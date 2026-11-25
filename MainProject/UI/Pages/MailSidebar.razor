@@ -22,6 +22,7 @@
                                PairedMenuSurfaceId="@UiSurfaceIds.AccountContextMenu"
                                DefaultActions="@View.BuildSidebarTopActions()"
                                AddedActionResolver="@(id => View.ResolveToolbarAddedAction(UiSurfaceIds.SidebarTop, id))"
+                               CustomClass="@MailCssClasses.SidebarTopBar"
                                Wrap="true" />
 
         @if (quickMailError != null)
@@ -406,7 +407,7 @@
                             <button class="@MailCssClasses.Folder @(!MailUiState.IsViewingDeletedFolders && MailUiState.SelectedFolder?.FullName == folder.FullName ? MailCssClasses.FolderActive : "")"
                                     type="button"
                                     disabled="@(!folder.Selectable)"
-                                    title="@(folder.Selectable ? Mail.FolderFreshness(folder) : "This folder only holds other folders")"
+                                    title="@(folder.Selectable ? (folder.FullName == folder.DisplayName || folder.IsLocal ? Mail.FolderFreshness(folder) : $"{folder.FullName} — {Mail.FolderFreshness(folder)}") : $"{folder.FullName} — This folder only holds other folders")"
                                     @onclick="() => HandleMailFolderClick(folder)">
                                 <span class="@MailCssClasses.FolderIcon">@Mail.FolderIcon(folder)</span>
                                 <span class="@MailCssClasses.FolderName">@Mail.FolderLabel(folder)</span>
