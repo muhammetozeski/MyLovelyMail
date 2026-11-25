@@ -124,6 +124,7 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 startInfo.ArgumentList.Add("1");
                 startInfo.ArgumentList.Add("--Log");
                 startInfo.ArgumentList.Add("notice stdout");
+                AddPlaintextPortPolicy(startInfo);
 
                 AddGeoIpFiles(startInfo, executable.Path);
 
@@ -149,7 +150,16 @@ namespace MyLovelyMail.MainProject.Services.Tor
                 {
                     int exitCode = SafeExitCode(process);
                     string lastLines = LastMeaningfulLine();
-                    Log($"The tor process (PID {SafeProcessId(process)}) exited with code {exitCode}. Output: {lastLines}", LogLevel.Warning, Run: IsLogEnabled);
+                    bool plannedStop;
+                    lock (startGate) plannedStop = stopGeneration != myStopGeneration;
+                    if (plannedStop)
+                    {
+                        Log($"Managed tor process (PID {SafeProcessId(process)}) stopped as requested (exit code {exitCode}).", Run: IsLogEnabled);
+                    }
+                    else
+                    {
+                        Log($"The tor process (PID {SafeProcessId(process)}) exited unexpectedly with code {exitCode}. Output: {lastLines}", LogLevel.Warning, Run: IsLogEnabled);
+                    }
                     bootstrapped.TrySetException(new TorUnavailableException(
                         $"Tor exited before it finished starting (exit code {exitCode}). Last output: {lastLines}"));
                 };
@@ -444,6 +454,25 @@ namespace MyLovelyMail.MainProject.Services.Tor
         [GeneratedRegex(@"Problem bootstrapping.*?Stuck at (\d+)%(?:\s*\(([^)]*)\))?:\s*(.*)", RegexOptions.IgnoreCase)]
         private static partial Regex BootstrapStuck();
 
+        /// <summary>
+        /// Configures Tor's WarnPlaintextPorts so genuine unencrypted mail accounts still warn, while
+        /// STARTTLS-enforced accounts (e.g. port 143 with ConnectionSecurity.StartTls) do not trigger
+        /// false-positive plaintext warnings on every connection.
+        /// </summary>
+        static void AddPlaintextPortPolicy(ProcessStartInfo startInfo)
+        {
+            List<int> warnPorts = [23, 109];
+            bool anyPlainPop3 = AccountStore.Accounts.Any(static a =>
+                a.TorOnly && a.IncomingPort == 110 && a.IncomingSecurity == DataModels.Mail.ConnectionSecurity.None);
+            bool anyPlainImap = AccountStore.Accounts.Any(static a =>
+                a.TorOnly && a.IncomingPort == 143 && a.IncomingSecurity == DataModels.Mail.ConnectionSecurity.None);
+            if (anyPlainPop3) warnPorts.Add(110);
+            if (anyPlainImap) warnPorts.Add(143);
+
+            startInfo.ArgumentList.Add("--WarnPlaintextPorts");
+            startInfo.ArgumentList.Add(string.Join(",", warnPorts));
+        }
+
         /// <summary>Tor's notice log carries its own progress; "Bootstrapped 100%" is the line that means the SOCKS port will answer.</summary>
         static void ReadTorLine(string? line, TaskCompletionSource<bool> bootstrapped)
         {
@@ -460,9 +489,13 @@ namespace MyLovelyMail.MainProject.Services.Tor
             {
                 Log("Tor: " + line, LogLevel.Error, Run: IsLogEnabled);
             }
-            else if (line.Contains("Bootstrapped", StringComparison.OrdinalIgnoreCase) || line.Contains("[warn]", StringComparison.OrdinalIgnoreCase))
+            else if (line.Contains("[warn]", StringComparison.OrdinalIgnoreCase))
             {
                 Log("Tor: " + line, LogLevel.Warning, Run: IsLogEnabled);
+            }
+            else if (line.Contains("Bootstrapped", StringComparison.OrdinalIgnoreCase))
+            {
+                Log("Tor: " + line, Run: IsLogEnabled);
             }
         }
 

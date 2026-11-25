@@ -305,4 +305,13 @@ Check(customizerFallback.VisibleItems.Count > 0
       && customizerFallback.AvailablePromotableItems.Count > 20,
     "UiActionCatalog fallback provides human-readable labels and full command catalog outside Mail page");
 
+string redacted = MailLogPrivacy.Redact("[25.11.2026 17:08:19] tor\\0.4.8.16-16.0.1 connect 127.0.0.1:9050 exit 192.42.116.97 v6 2001:db8::1 user=test@example.com") ?? "";
+Check(redacted.Contains("17:08:19", StringComparison.Ordinal)
+      && redacted.Contains("0.4.8.16-16.0.1", StringComparison.Ordinal)
+      && !redacted.Contains("127.0.0.1", StringComparison.Ordinal)
+      && !redacted.Contains("192.42.116.97", StringComparison.Ordinal)
+      && !redacted.Contains("2001:db8::1", StringComparison.Ordinal)
+      && !redacted.Contains("test@example.com", StringComparison.Ordinal),
+    "MailLogPrivacy redacts IPv4/IPv6/email without corrupting timestamps or version paths");
+
 Console.WriteLine($"Completed {passed} filter checks. Data: {AppPaths.Root}");

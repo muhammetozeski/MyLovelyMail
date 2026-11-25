@@ -17,7 +17,9 @@ namespace MyLovelyMail.MainProject.Constants
         /// <summary>The one culture the interface formats in.</summary>
         public static readonly CultureInfo Display = CultureInfo.GetCultureInfo("en-US");
 
+#pragma warning disable CA2255 // Intentional: pins UI culture identically across MAUI, Web, and test entry points.
         [ModuleInitializer]
+#pragma warning restore CA2255
         internal static void Apply()
         {
             CultureInfo.DefaultThreadCurrentCulture = Display;

@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 
 /// <summary>Removes mail addresses, IPs and credential fields before logs reach any output sink.</summary>
-internal static partial class MailLogPrivacy
+public static partial class MailLogPrivacy
 {
     public static string? Redact(string? text)
     {
@@ -18,6 +18,6 @@ internal static partial class MailLogPrivacy
     [GeneratedRegex(@"[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}.\-]+")]
     private static partial Regex EmailAddresses();
 
-    [GeneratedRegex(@"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])|\b(?:[a-fA-F0-9]{1,4}:){2,}[a-fA-F0-9:]*\b")]
+    [GeneratedRegex(@"(?<![\w.\\/-])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w.-])|(?<![\w:])(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|:(?::[0-9a-fA-F]{1,4}){1,7}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4})(?![\w:])")]
     private static partial Regex IpAddresses();
 }

@@ -211,7 +211,15 @@ namespace MyLovelyMail.MainProject.Services.Tor
                     }
                 }
 
-                Log($"No existing Tor endpoint qualified ({string.Join("; ", refusals)}).", LogLevel.Warning);
+                bool willAutoStart = TorProcess.BundledExecutablePath == null && Settings.TorAutoStart.Value;
+                if (willAutoStart)
+                {
+                    Log($"No existing external Tor endpoint found ({string.Join("; ", refusals)}); starting app-managed Tor.");
+                }
+                else
+                {
+                    Log($"No existing Tor endpoint qualified ({string.Join("; ", refusals)}).", LogLevel.Warning);
+                }
 
                 // The app's own tor was already tried first and failed; a second start would fail the same way.
                 if (TorProcess.BundledExecutablePath != null)
