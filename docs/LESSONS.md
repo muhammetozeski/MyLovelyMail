@@ -122,3 +122,29 @@ Short "problem → solution" notes so the same wall is never hit twice.
   through MAUI's `Window.TitleBar` plus `AppWindow.TitleBar` button colors (setting
   `AppWindow.TitleBar.ExtendsContentIntoTitleBar = false` alone leaves MAUI's own bar underneath as
   a duplicate bar).
+
+- **Requesting `MessageSummaryItems.PreviewText` without RFC 8970 `PREVIEW` kills IMAP sync speed.**
+  On Gmail and other IMAP servers that do not advertise `ImapCapabilities.Preview`, passing
+  `MessageSummaryItems.PreviewText` forces MailKit to issue extra partial `BODY.PEEK` fetches for
+  every message; wrapping an entire multi-folder sync pass inside one 30-second Polly attempt timeout
+  then caused repeated `TimeoutRejectedException` retries and wiped `LastSeenUid` progress. Solution:
+  request `PreviewText` only when `client.Capabilities.HasFlag(ImapCapabilities.Preview)`, guard
+  individual IMAP commands with `ResiliencePolicy.GuardStep`, and order background folder refresh by
+  `LastSyncedUtc` (never by `TotalCount != CountSummaries`, which pins >300-message folders forever).
+
+- **Persist user folder order in `UserData`, never only in `UserCache`.**
+  Storing `SortOrder` solely inside `UserCache/.../folder.json` caused folder reorders to reset
+  whenever caches were cleared or stale partial sort orders pushed `INBOX` below `Local/Trash`.
+  Solution: `FolderLayoutStore` persists per-account folder order and collapse state in
+  `UserData/folder-layout.json` and reconciles it on every load/save.
+
+- **Popovers opened from toolbar buttons jump to `(12, 12)` if pointer coords are 0.**
+  Blazor button `@onclick` on synthetic/keyboard triggers can report `ClientX == 0, ClientY == 0`.
+  Track pointer coordinates on `onpointerdown` in `ActionSlot` -> `ContextMenuService.TrackPointer`,
+  and clamp menu position inside the viewport with CSS `clamp()` so menus never clip off the bottom.
+
+- **`UiCustomizerModal` opened from `/Settings` has no mounted `Mail` page instance.**
+  `ActionDragService.SurfaceInspector` is null when the user navigates to `/Settings`, which caused
+  `UiCustomizerModal` to fall back to raw truncated action IDs (`List.Sele...`). Solution: keep a
+  static `UiActionCatalog` with human-readable labels, categories, and default surfaces so the
+  customizer works identically from any route.
