@@ -285,4 +285,24 @@ AccountStore.Move(accountC.Id, -1);
 var afterAcctMove = AccountStore.GetAccountsInFolder(child.Id);
 Check(afterAcctMove[0].Id == accountC.Id && afterAcctMove[1].Id == account.Id, "AccountStore.Move(-1) reorders siblings within the same folder across intervening accounts");
 
+// Verify UserData FolderLayoutStore survives UserCache folder recreation with SortOrder=0
+MessageStore.SaveFolder(new MailFolderData { AccountId = account.Id, FullName = "INBOX", DisplayName = "INBOX", Role = FolderRole.Inbox, Selectable = true, SortOrder = 0 });
+MessageStore.InvalidateFolderCache(account.Id);
+var afterCacheReload = FolderTreeService.Build(MessageStore.GetFolders(account.Id));
+Check(afterCacheReload[0].Folder.FullName == "INBOX" && afterCacheReload.FindIndex(n => n.Folder.FullName == "Other") < afterCacheReload.FindIndex(n => n.Folder.FullName == "Archive"),
+    "FolderLayoutStore preserves INBOX first and custom folder order across cache invalidation");
+
+var serverDrafts = new MailFolderData { AccountId = account.Id, FullName = "[Gmail]/Drafts", DisplayName = "Drafts", Role = FolderRole.Drafts, Selectable = true, IsLocal = false, LastSyncedUtc = null };
+MessageStore.SaveFolder(serverDrafts);
+AccountStore.GetSettings(account.Id).DraftsSync.Value = FolderSyncDirection.LocalOnly;
+var localOnlyWhy = FolderEmptyReason.Explain(serverDrafts);
+Check(localOnlyWhy.Action == EmptyFolderAction.None && !localOnlyWhy.Headline.Contains("Never fetched", StringComparison.OrdinalIgnoreCase),
+    "FolderEmptyReason explains LocalOnly policy instead of misleading Never fetched yet");
+
+var customizerFallback = UiActionCatalog.InspectFallback(UiSurfaceIds.ListToolbar);
+Check(customizerFallback.VisibleItems.Count > 0
+      && customizerFallback.VisibleItems.All(static item => !item.Label.StartsWith("List.", StringComparison.OrdinalIgnoreCase))
+      && customizerFallback.AvailablePromotableItems.Count > 20,
+    "UiActionCatalog fallback provides human-readable labels and full command catalog outside Mail page");
+
 Console.WriteLine($"Completed {passed} filter checks. Data: {AppPaths.Root}");

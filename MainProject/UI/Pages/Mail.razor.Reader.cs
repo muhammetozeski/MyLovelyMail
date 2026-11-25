@@ -256,6 +256,13 @@ namespace MyLovelyMail.MainProject.UI.Pages
             await InvokeAsync(StateHasChanged);
         }
 
+        internal Task RetryOpenBodyAsync()
+        {
+            loadedBodyKey = null;
+            BodyError = null;
+            return LoadOpenBodyIfNeededAsync();
+        }
+
         static void MarkOpenAsRead(MailAccountData account, string folderName, MailMessageSummary open)
         {
             int delaySeconds = GlobalSettings.MarkAsReadDelaySeconds.Value;

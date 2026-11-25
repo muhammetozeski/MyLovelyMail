@@ -252,21 +252,21 @@ namespace MyLovelyMail.MainProject.Services.Mail
 
         public static string MailSortLabel => MailSort switch
         {
-            MailSortField.Date => MailSortDirection == SortDirection.Descending ? "Date (newest)" : "Date (oldest)",
-            MailSortField.Sender => MailSortDirection == SortDirection.Ascending ? "Sender (A-Z)" : "Sender (Z-A)",
-            MailSortField.Subject => MailSortDirection == SortDirection.Ascending ? "Subject (A-Z)" : "Subject (Z-A)",
-            MailSortField.Size => MailSortDirection == SortDirection.Descending ? "Size (largest)" : "Size (smallest)",
-            MailSortField.Unread => MailSortDirection == SortDirection.Descending ? "Unread first" : "Read first",
-            _ => "Date"
+            MailSortField.Date => MailSortDirection == SortDirection.Descending ? "Newest" : "Oldest",
+            MailSortField.Sender => MailSortDirection == SortDirection.Ascending ? "Sender A-Z" : "Sender Z-A",
+            MailSortField.Subject => MailSortDirection == SortDirection.Ascending ? "Subject A-Z" : "Subject Z-A",
+            MailSortField.Size => MailSortDirection == SortDirection.Descending ? "Largest" : "Smallest",
+            MailSortField.Unread => MailSortDirection == SortDirection.Descending ? "Unread" : "Read",
+            _ => "Newest"
         };
 
         public static string SenderSortLabel => SenderSort switch
         {
-            SenderSortField.LatestDate => SenderSortDirection == SortDirection.Descending ? "Date (newest)" : "Date (oldest)",
-            SenderSortField.MessageCount => SenderSortDirection == SortDirection.Descending ? "Count (most)" : "Count (least)",
-            SenderSortField.UnreadCount => SenderSortDirection == SortDirection.Descending ? "Unread (most)" : "Unread (least)",
-            SenderSortField.Name => SenderSortDirection == SortDirection.Ascending ? "Name (A-Z)" : "Name (Z-A)",
-            _ => "Date"
+            SenderSortField.LatestDate => SenderSortDirection == SortDirection.Descending ? "Newest" : "Oldest",
+            SenderSortField.MessageCount => SenderSortDirection == SortDirection.Descending ? "Most" : "Least",
+            SenderSortField.UnreadCount => SenderSortDirection == SortDirection.Descending ? "Unread" : "Read",
+            SenderSortField.Name => SenderSortDirection == SortDirection.Ascending ? "Name A-Z" : "Name Z-A",
+            _ => "Newest"
         };
     }
 }

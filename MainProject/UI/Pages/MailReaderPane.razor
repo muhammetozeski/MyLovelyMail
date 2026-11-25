@@ -480,6 +480,7 @@
                 {
                     <div class="@MailCssClasses.BodyLoading">
                         <CoreSpinner />
+                        <span class="@MailCssClasses.ReaderNoBody">Loading message…</span>
                     </div>
                 }
                 else if (View.OpenBodyHtml != null)
@@ -497,6 +498,7 @@
                     @if (View.BodyError != null)
                     {
                         <p class="@MailCssClasses.ComposeError">❌ @View.BodyError</p>
+                        <PillButton OnClick="View.RetryOpenBodyAsync">🔄 Try again</PillButton>
                     }
                     @if (string.IsNullOrWhiteSpace(open.PreviewText))
                     {

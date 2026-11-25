@@ -593,12 +593,14 @@
 
     .@(MailCssClasses.ModalSelectInput) {
         width: @(AppMeasures.Percent.Full)%;
+        min-height: @(AppMeasures.Size.Px36)px;
+        box-sizing: border-box;
         padding: @(AppMeasures.Space.Px8)px @(AppMeasures.Space.Px12)px;
         border-radius: @(AppMeasures.Radius.Medium)px;
         border: @(AppMeasures.Border.Thin)px solid @glassBorder;
-        background: @AppColors.SurfaceStrong.ToRgbaHex(true);
+        background: @AppColors.Background.ToRgbaHex(true);
         color: @textPrimary;
-        font-size: @(AppMeasures.Font.Normal)px;
+        font-size: @(AppMeasures.Font.Small)px;
         outline: none;
     }
 
