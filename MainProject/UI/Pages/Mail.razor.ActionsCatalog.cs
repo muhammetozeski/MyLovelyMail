@@ -296,6 +296,10 @@ public partial class Mail
         items.Add(new("⚡ New Fast Mail (Tor)…",
             () => ModalService.OpenFastMail(MailUiState.SelectedAccount?.FolderId ?? AccountFolderStore.DefaultFolderId),
             actionId: "AccGroup.NewFastMail"));
+        items.Add(new("🔄 Check all accounts now",
+            () => MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty),
+            ActionId: "Workspace.SyncAll",
+            SeparatorBefore: true));
 
         ContextMenuService.Open(this, "Create new", items, pointer.ClientX, pointer.ClientY);
     }
@@ -305,7 +309,7 @@ public partial class Mail
         List<UiActionModel> list =
         [
             UiActionModel.CreateMouseSync("Sidebar.NewMenu", "➕ New ▾", OpenSidebarNewMenu,
-                title: "Create account group, mail folder, or add account"),
+                title: "Create account group, mail folder, add account, or sync"),
         ];
         if (MailUiState.SelectedAccount != null)
         {
@@ -314,9 +318,6 @@ public partial class Mail
                 Title: "Write a new message",
                 IsActive: true));
         }
-        list.Add(new("Workspace.SyncAll", "🔄 Sync",
-            _ => MouseActionService.RunAsync(MouseActionService.SyncAction, string.Empty),
-            Title: "Check all enabled accounts now"));
         return list;
     }
 

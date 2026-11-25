@@ -142,7 +142,7 @@ public static class UiActionCatalog
 
     static readonly Dictionary<string, string[]> DefaultIdsBySurface = new(StringComparer.OrdinalIgnoreCase)
     {
-        [UiSurfaceIds.SidebarTop] = ["Sidebar.NewMenu", "Workspace.Compose", "Workspace.SyncAll"],
+        [UiSurfaceIds.SidebarTop] = ["Sidebar.NewMenu", "Workspace.Compose"],
         [UiSurfaceIds.SidebarFolderHover] = ["Folder.ReadAll", "Folder.Export", "Folder.Resync", "Folder.Delete", "Folder.Menu"],
         [UiSurfaceIds.SidebarAccountFolderHover] = ["AccGroup.AddAccount", "AccGroup.QuickMailTm", "AccGroup.Delete", "AccGroup.Menu"],
         [UiSurfaceIds.ListToolbar] = ["List.SelectMode", "List.SelectMenu", "List.SortMenu", "List.SenderView", "List.ToggleQuickFilters", "List.ToggleAdvancedFilters", "List.Shortcuts"],
